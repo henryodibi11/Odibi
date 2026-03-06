@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-03-06T10:15:51.938262",
+  "date": "2026-03-06",
+  "layers": [
+    {
+      "name": "generate_date_dim",
+      "story_path": "generate_date_dim\\2026-03-06\\run_10-15-51.html",
+      "status": "success",
+      "duration": 0.18503904342651367,
+      "pipeline_layer": "gold"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "date_dimension_node",
+      "type": "transform",
+      "layer": "gold"
+    }
+  ],
+  "edges": []
+}

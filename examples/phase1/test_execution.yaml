@@ -1,0 +1,28 @@
+# Minimal odibi project config for testing Phase 1 generated pipelines
+
+project: phase1_execution_test
+engine: pandas  # Use pandas for simplicity (no Spark setup needed)
+
+# Connections
+connections:
+  local:
+    type: local
+    base_path: examples/phase1/output
+
+  warehouse:
+    type: local
+    base_path: examples/phase1/output
+
+# Story tracking (optional but recommended)
+story:
+  connection: local
+  path: .story
+
+# System catalog (optional)
+system:
+  connection: local
+  path: .system
+
+# Import the date dimension pipeline
+imports:
+  - date_dimension.yaml

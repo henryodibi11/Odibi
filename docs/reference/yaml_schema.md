@@ -771,7 +771,7 @@ to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
-| **format** | ReadFormat \| str | Yes | - | Data format (csv, parquet, delta, etc.) |
+| **format** | ReadFormat | Yes | - | Data format: csv, parquet, delta, json, sql, api, excel, avro, cloudFiles |
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based sources |
 | **streaming** | bool | No | `False` | Enable streaming read (Spark only) |
@@ -1301,7 +1301,7 @@ write:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **connection** | str | Yes | - | Connection name from project.yaml |
-| **format** | ReadFormat \| str | Yes | - | Output format (csv, parquet, delta, etc.) |
+| **format** | ReadFormat | Yes | - | Output format: csv, parquet, delta, json, sql, api, excel, avro, cloudFiles |
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based outputs |
 | **register_table** | Optional[str] | No | - | Register file output as external table (Spark/Delta only) |

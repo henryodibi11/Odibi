@@ -5,11 +5,20 @@ Azure SQL Database Connection
 Provides connectivity to Azure SQL databases with authentication support.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from odibi.connections.base import BaseConnection
+from odibi.discovery.types import (
+    CatalogSummary,
+    Column,
+    DatasetRef,
+    FreshnessResult,
+    Schema,
+    TableProfile,
+)
 from odibi.exceptions import ConnectionError
 from odibi.utils.error_suggestions import get_suggestions_for_connection
 from odibi.utils.logging import logger
@@ -639,6 +648,505 @@ class AzureSQL(BaseConnection):
                 reason=f"Statement execution failed: {self._sanitize_error(str(e))}",
                 suggestions=self._get_error_suggestions(str(e)),
             )
+
+    # -------------------------------------------------------------------------
+    # Discovery Methods
+    # -------------------------------------------------------------------------
+
+    def list_schemas(self) -> List[str]:
+        """List all schemas in the database.
+
+        Returns:
+            List of schema names
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> schemas = conn.list_schemas()
+            >>> print(schemas)
+            ['dbo', 'staging', 'warehouse']
+        """
+        ctx = get_logging_context()
+        ctx.debug("Listing schemas", server=self.server, database=self.database)
+
+        query = """
+            SELECT SCHEMA_NAME
+            FROM INFORMATION_SCHEMA.SCHEMATA
+            WHERE SCHEMA_NAME NOT IN ('db_owner', 'db_accessadmin', 'db_securityadmin',
+                                      'db_ddladmin', 'db_backupoperator', 'db_datareader',
+                                      'db_datawriter', 'db_denydatareader', 'db_denydatawriter',
+                                      'sys', 'INFORMATION_SCHEMA', 'guest')
+            ORDER BY SCHEMA_NAME
+        """
+
+        try:
+            df = self.read_sql(query)
+            schemas = df["SCHEMA_NAME"].tolist()
+            ctx.info("Schemas listed successfully", count=len(schemas))
+            return schemas
+        except Exception as e:
+            ctx.error("Failed to list schemas", error=str(e))
+            return []
+
+    def list_tables(self, schema: str = "dbo") -> List[Dict]:
+        """List tables and views in a schema.
+
+        Args:
+            schema: Schema name (default: "dbo")
+
+        Returns:
+            List of dicts with keys: name, type (table/view), schema
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> tables = conn.list_tables("dbo")
+            >>> print(tables)
+            [{'name': 'customers', 'type': 'table', 'schema': 'dbo'},
+             {'name': 'orders', 'type': 'table', 'schema': 'dbo'}]
+        """
+        ctx = get_logging_context()
+        ctx.debug("Listing tables", schema=schema)
+
+        query = """
+            SELECT TABLE_NAME, TABLE_TYPE, TABLE_SCHEMA
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = :schema
+            ORDER BY TABLE_NAME
+        """
+
+        try:
+            df = self.read_sql(query, params={"schema": schema})
+            tables = []
+            for _, row in df.iterrows():
+                tables.append(
+                    {
+                        "name": row["TABLE_NAME"],
+                        "type": "table" if row["TABLE_TYPE"] == "BASE TABLE" else "view",
+                        "schema": row["TABLE_SCHEMA"],
+                    }
+                )
+            ctx.info("Tables listed successfully", schema=schema, count=len(tables))
+            return tables
+        except Exception as e:
+            ctx.error("Failed to list tables", schema=schema, error=str(e))
+            return []
+
+    def get_table_info(self, table: str) -> Dict:
+        """Get detailed schema information for a table.
+
+        Args:
+            table: Table name (can be "schema.table" or just "table")
+
+        Returns:
+            Schema-like dict with dataset and columns info
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> info = conn.get_table_info("dbo.customers")
+            >>> print(info['columns'])
+            [{'name': 'customer_id', 'dtype': 'int', ...}, ...]
+        """
+        ctx = get_logging_context()
+
+        # Parse schema and table name
+        if "." in table:
+            parts = table.split(".")
+            schema = parts[0]
+            table_name = parts[1]
+        else:
+            schema = "dbo"
+            table_name = table
+
+        ctx.debug("Getting table info", schema=schema, table=table_name)
+
+        query = """
+            SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, ORDINAL_POSITION
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table
+            ORDER BY ORDINAL_POSITION
+        """
+
+        try:
+            df = self.read_sql(query, params={"schema": schema, "table": table_name})
+
+            columns = []
+            for _, row in df.iterrows():
+                columns.append(
+                    {
+                        "name": row["COLUMN_NAME"],
+                        "dtype": row["DATA_TYPE"],
+                        "nullable": row["IS_NULLABLE"] == "YES",
+                    }
+                )
+
+            # Try to get row count
+            row_count = None
+            try:
+                count_query = """
+                    SELECT SUM(p.rows) AS row_count
+                    FROM sys.tables t
+                    INNER JOIN sys.partitions p ON t.object_id = p.object_id
+                    INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                    WHERE s.name = :schema AND t.name = :table
+                    AND p.index_id IN (0,1)
+                """
+                count_df = self.read_sql(
+                    count_query, params={"schema": schema, "table": table_name}
+                )
+                if not count_df.empty and count_df["row_count"].iloc[0] is not None:
+                    row_count = int(count_df["row_count"].iloc[0])
+            except Exception:
+                pass  # Row count is optional
+
+            dataset = DatasetRef(
+                name=table_name,
+                namespace=schema,
+                kind="table",
+                path=f"{schema}.{table_name}",
+                row_count=row_count,
+            )
+
+            schema_obj = Schema(dataset=dataset, columns=[Column(**c) for c in columns])
+
+            ctx.info("Table info retrieved", schema=schema, table=table_name, columns=len(columns))
+            return schema_obj.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to get table info", schema=schema, table=table_name, error=str(e))
+            return {}
+
+    def discover_catalog(
+        self,
+        include_schema: bool = False,
+        include_stats: bool = False,
+        limit: Optional[int] = None,
+    ) -> Dict:
+        """Discover all datasets in the database.
+
+        Args:
+            include_schema: If True, include column information for each table
+            include_stats: If True, include row counts and stats
+            limit: Maximum number of datasets per schema
+
+        Returns:
+            CatalogSummary dict with schemas and tables
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> catalog = conn.discover_catalog(include_schema=True, limit=10)
+            >>> print(catalog['total_datasets'])
+            25
+        """
+        ctx = get_logging_context()
+        ctx.info(
+            "Discovering catalog",
+            include_schema=include_schema,
+            include_stats=include_stats,
+            limit=limit,
+        )
+
+        schemas = self.list_schemas()
+        all_tables = []
+
+        for schema in schemas:
+            tables = self.list_tables(schema)
+
+            if limit:
+                tables = tables[:limit]
+
+            for table_info in tables:
+                dataset = DatasetRef(
+                    name=table_info["name"],
+                    namespace=table_info["schema"],
+                    kind="table" if table_info["type"] == "table" else "view",
+                    path=f"{table_info['schema']}.{table_info['name']}",
+                )
+
+                # Optionally get schema and stats
+                if include_schema or include_stats:
+                    try:
+                        full_info = self.get_table_info(
+                            f"{table_info['schema']}.{table_info['name']}"
+                        )
+                        if full_info and "dataset" in full_info:
+                            dataset = DatasetRef(**full_info["dataset"])
+                    except Exception as e:
+                        ctx.debug(
+                            "Could not get extended info for table",
+                            table=table_info["name"],
+                            error=str(e),
+                        )
+
+                all_tables.append(dataset)
+
+        catalog = CatalogSummary(
+            connection_name=f"{self.server}/{self.database}",
+            connection_type="azure_sql",
+            schemas=schemas,
+            tables=all_tables,
+            total_datasets=len(all_tables),
+            next_step="Use profile() to analyze specific tables or get_table_info() for schema details",
+            suggestions=[
+                f"Found {len(all_tables)} tables across {len(schemas)} schemas",
+                "Use include_schema=True to get column details",
+                "Use include_stats=True for row counts",
+            ],
+        )
+
+        ctx.info("Catalog discovery complete", total_datasets=len(all_tables), schemas=len(schemas))
+        return catalog.model_dump()
+
+    def profile(
+        self,
+        dataset: str,
+        sample_rows: int = 1000,
+        columns: Optional[List[str]] = None,
+    ) -> Dict:
+        """Profile a table with statistical analysis.
+
+        Args:
+            dataset: Table name (can be "schema.table" or just "table")
+            sample_rows: Number of rows to sample (default: 1000)
+            columns: Specific columns to profile (None = all columns)
+
+        Returns:
+            TableProfile dict with profiling statistics
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> profile = conn.profile("dbo.customers", sample_rows=5000)
+            >>> print(profile['candidate_keys'])
+            ['customer_id']
+        """
+        ctx = get_logging_context()
+
+        # Parse schema and table name
+        if "." in dataset:
+            parts = dataset.split(".")
+            schema = parts[0]
+            table_name = parts[1]
+        else:
+            schema = "dbo"
+            table_name = dataset
+
+        ctx.info("Profiling table", schema=schema, table=table_name, sample_rows=sample_rows)
+
+        # Read sample data
+        col_filter = ", ".join(f"[{c}]" for c in columns) if columns else "*"
+        query = f"SELECT TOP ({sample_rows}) {col_filter} FROM [{schema}].[{table_name}]"
+
+        try:
+            df = self.read_sql(query)
+
+            # Get total row count
+            total_rows = None
+            try:
+                count_query = """
+                    SELECT SUM(p.rows) AS row_count
+                    FROM sys.tables t
+                    INNER JOIN sys.partitions p ON t.object_id = p.object_id
+                    INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                    WHERE s.name = :schema AND t.name = :table
+                    AND p.index_id IN (0,1)
+                """
+                count_df = self.read_sql(
+                    count_query, params={"schema": schema, "table": table_name}
+                )
+                if not count_df.empty and count_df["row_count"].iloc[0] is not None:
+                    total_rows = int(count_df["row_count"].iloc[0])
+            except Exception:
+                total_rows = len(df)
+
+            # Profile columns
+            profiled_columns = []
+            candidate_keys = []
+            candidate_watermarks = []
+
+            for col in df.columns:
+                null_count = int(df[col].isnull().sum())
+                null_pct = null_count / len(df) if len(df) > 0 else 0
+                distinct_count = int(df[col].nunique())
+
+                # Determine cardinality
+                if distinct_count == len(df):
+                    cardinality = "unique"
+                    candidate_keys.append(col)
+                elif distinct_count > len(df) * 0.9:
+                    cardinality = "high"
+                elif distinct_count < 10:
+                    cardinality = "low"
+                else:
+                    cardinality = "medium"
+
+                # Check if datetime (candidate watermark)
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    candidate_watermarks.append(col)
+
+                # Get sample values (non-null)
+                sample_values = df[col].dropna().head(5).tolist()
+
+                profiled_columns.append(
+                    Column(
+                        name=col,
+                        dtype=str(df[col].dtype),
+                        nullable=null_count > 0,
+                        null_count=null_count,
+                        null_pct=round(null_pct, 4),
+                        cardinality=cardinality,
+                        distinct_count=distinct_count,
+                        sample_values=sample_values,
+                    )
+                )
+
+            # Calculate overall completeness
+            total_cells = len(df) * len(df.columns)
+            null_cells = df.isnull().sum().sum()
+            completeness = 1 - (null_cells / total_cells) if total_cells > 0 else 0
+
+            dataset_ref = DatasetRef(
+                name=table_name,
+                namespace=schema,
+                kind="table",
+                path=f"{schema}.{table_name}",
+                row_count=total_rows,
+            )
+
+            profile = TableProfile(
+                dataset=dataset_ref,
+                rows_sampled=len(df),
+                total_rows=total_rows,
+                columns=profiled_columns,
+                candidate_keys=candidate_keys,
+                candidate_watermarks=candidate_watermarks,
+                completeness=round(completeness, 4),
+                suggestions=[
+                    f"Sampled {len(df)} of {total_rows} rows"
+                    if total_rows
+                    else f"Sampled {len(df)} rows",
+                    f"Found {len(candidate_keys)} candidate key columns: {candidate_keys}"
+                    if candidate_keys
+                    else "No unique key columns found",
+                    f"Found {len(candidate_watermarks)} timestamp columns: {candidate_watermarks}"
+                    if candidate_watermarks
+                    else "No timestamp columns for incremental loading",
+                ],
+            )
+
+            ctx.info(
+                "Table profiling complete",
+                schema=schema,
+                table=table_name,
+                rows_sampled=len(df),
+                columns=len(profiled_columns),
+                candidate_keys=len(candidate_keys),
+            )
+
+            return profile.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to profile table", schema=schema, table=table_name, error=str(e))
+            return {}
+
+    def get_freshness(
+        self,
+        dataset: str,
+        timestamp_column: Optional[str] = None,
+    ) -> Dict:
+        """Get data freshness information.
+
+        Args:
+            dataset: Table name (can be "schema.table" or just "table")
+            timestamp_column: Column to check for max timestamp (optional)
+
+        Returns:
+            FreshnessResult dict with last_updated timestamp
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> freshness = conn.get_freshness("dbo.orders", timestamp_column="order_date")
+            >>> print(freshness['last_updated'])
+            2024-03-15 10:30:00
+        """
+        ctx = get_logging_context()
+
+        # Parse schema and table name
+        if "." in dataset:
+            parts = dataset.split(".")
+            schema = parts[0]
+            table_name = parts[1]
+        else:
+            schema = "dbo"
+            table_name = dataset
+
+        ctx.debug("Getting freshness", schema=schema, table=table_name, column=timestamp_column)
+
+        dataset_ref = DatasetRef(
+            name=table_name,
+            namespace=schema,
+            kind="table",
+            path=f"{schema}.{table_name}",
+        )
+
+        # If timestamp column specified, query data
+        if timestamp_column:
+            try:
+                query = f"SELECT MAX([{timestamp_column}]) AS max_ts FROM [{schema}].[{table_name}]"
+                df = self.read_sql(query)
+
+                if not df.empty and df["max_ts"].iloc[0] is not None:
+                    last_updated = pd.to_datetime(df["max_ts"].iloc[0])
+                    age_hours = (datetime.utcnow() - last_updated).total_seconds() / 3600
+
+                    result = FreshnessResult(
+                        dataset=dataset_ref,
+                        last_updated=last_updated,
+                        source="data",
+                        age_hours=round(age_hours, 2),
+                        details={"timestamp_column": timestamp_column},
+                    )
+
+                    ctx.info(
+                        "Freshness retrieved from data",
+                        schema=schema,
+                        table=table_name,
+                        age_hours=age_hours,
+                    )
+                    return result.model_dump()
+            except Exception as e:
+                ctx.debug("Could not get freshness from data column", error=str(e))
+
+        # Fallback to table metadata
+        try:
+            query = """
+                SELECT t.modify_date
+                FROM sys.tables t
+                INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                WHERE s.name = :schema AND t.name = :table
+            """
+            df = self.read_sql(query, params={"schema": schema, "table": table_name})
+
+            if not df.empty and df["modify_date"].iloc[0] is not None:
+                last_updated = pd.to_datetime(df["modify_date"].iloc[0])
+                age_hours = (datetime.utcnow() - last_updated).total_seconds() / 3600
+
+                result = FreshnessResult(
+                    dataset=dataset_ref,
+                    last_updated=last_updated,
+                    source="metadata",
+                    age_hours=round(age_hours, 2),
+                    details={"note": "Table modification time from sys.tables"},
+                )
+
+                ctx.info(
+                    "Freshness retrieved from metadata",
+                    schema=schema,
+                    table=table_name,
+                    age_hours=age_hours,
+                )
+                return result.model_dump()
+        except Exception as e:
+            ctx.error("Failed to get freshness", schema=schema, table=table_name, error=str(e))
+
+        return {}
 
     def close(self):
         """Close database connection and dispose of engine.

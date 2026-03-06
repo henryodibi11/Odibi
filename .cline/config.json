@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "odibi": {
+      "command": "python",
+      "args": ["-m", "odibi_mcp.server"],
+      "cwd": "d:/odibi",
+      "env": {
+        "ODIBI_CONFIG": "d:/odibi/exploration.yaml"
+      }
+    }
+  }
+}

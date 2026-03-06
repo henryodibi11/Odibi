@@ -2624,6 +2624,200 @@ class PipelineManager:
             return pd.DataFrame()
 
     # -------------------------------------------------------------------------
+    # Discovery API
+    # -------------------------------------------------------------------------
+
+    def discover(
+        self,
+        connection_name: str,
+        dataset: Optional[str] = None,
+        include_schema: bool = False,
+        include_stats: bool = False,
+        profile: bool = False,
+        sample_rows: int = 1000,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Discover data sources using connection's discovery API.
+
+        Convenience method that delegates to connection.discover_catalog(),
+        connection.get_schema(), or connection.profile().
+
+        Args:
+            connection_name: Name of connection from YAML config
+            dataset: Optional specific dataset to inspect (table name or file path)
+            include_schema: Include column schemas (catalog mode)
+            include_stats: Include row counts/stats (catalog mode)
+            profile: Run detailed profiling (requires dataset)
+            sample_rows: Rows to sample for profiling
+            **kwargs: Additional connection-specific options
+
+        Returns:
+            Discovery result dict (CatalogSummary, Schema, or TableProfile)
+
+        Examples:
+            # List all tables in a database
+            pm.discover("crm_db")
+
+            # Get schema for specific table
+            pm.discover("crm_db", dataset="dbo.Orders", include_schema=True)
+
+            # Profile a table
+            pm.discover("crm_db", dataset="dbo.Orders", profile=True, sample_rows=5000)
+
+            # Discover ADLS folder
+            pm.discover("raw_adls", dataset="sales/2024/")
+        """
+        # Get connection
+        conn = self.connections.get(connection_name)
+
+        if not conn:
+            available = list(self.connections.keys())
+            return {
+                "error": {
+                    "code": "CONNECTION_NOT_FOUND",
+                    "message": f"Connection '{connection_name}' not found",
+                    "available_connections": available,
+                    "fix": f"Use one of: {', '.join(available)}",
+                }
+            }
+
+        try:
+            # Profile specific dataset
+            if profile and dataset:
+                return conn.profile(
+                    dataset=dataset, sample_rows=sample_rows, columns=kwargs.get("columns")
+                )
+
+            # Get schema for specific dataset
+            elif dataset and (include_schema or not profile):
+                schema_result = conn.get_table_info(dataset)
+                return schema_result
+
+            # Discover catalog
+            else:
+                return conn.discover_catalog(
+                    include_schema=include_schema,
+                    include_stats=include_stats,
+                    limit=kwargs.get("limit", 200),
+                )
+
+        except NotImplementedError as e:
+            return {
+                "error": {
+                    "code": "NOT_SUPPORTED",
+                    "message": str(e),
+                    "connection_type": type(conn).__name__,
+                    "fix": "This connection type does not support discovery yet",
+                }
+            }
+        except Exception as e:
+            self._ctx.error(
+                f"Discovery failed for {connection_name}", error=str(e), dataset=dataset
+            )
+            return {
+                "error": {
+                    "code": "DISCOVERY_FAILED",
+                    "message": str(e),
+                    "connection": connection_name,
+                    "dataset": dataset,
+                }
+            }
+
+    def scaffold_project(
+        self, project_name: str, connections: Dict[str, Dict[str, Any]], **kwargs
+    ) -> str:
+        """Generate project YAML scaffold.
+
+        Args:
+            project_name: Name of the project
+            connections: Dict of connection name -> connection config
+            **kwargs: Additional options (imports, story_connection, system_connection)
+
+        Returns:
+            YAML string for project.yaml
+
+        Example:
+            >>> connections = {
+            ...     "local": {"type": "local", "base_path": "data/"},
+            ...     "azure": {"type": "azure_blob", "account_name": "myaccount"}
+            ... }
+            >>> yaml = pm.scaffold_project("my_project", connections)
+        """
+        from odibi.scaffold import generate_project_yaml
+
+        return generate_project_yaml(project_name, connections, **kwargs)
+
+    def scaffold_sql_pipeline(
+        self,
+        pipeline_name: str,
+        source_connection: str,
+        target_connection: str,
+        tables: List[Dict[str, Any]],
+        **kwargs,
+    ) -> str:
+        """Generate SQL ingestion pipeline YAML.
+
+        Args:
+            pipeline_name: Name for the pipeline
+            source_connection: SQL database connection name
+            target_connection: Target storage connection name
+            tables: List of table specs (see generate_sql_pipeline for details)
+            **kwargs: Additional options (target_format, target_schema, layer, node_prefix)
+
+        Returns:
+            YAML string for pipeline file
+
+        Example:
+            >>> tables = [
+            ...     {"schema": "dbo", "table": "customers", "primary_key": ["id"]},
+            ...     {"schema": "dbo", "table": "orders"}
+            ... ]
+            >>> yaml = pm.scaffold_sql_pipeline("ingest", "sqldb", "lake", tables)
+        """
+        from odibi.scaffold import generate_sql_pipeline
+
+        return generate_sql_pipeline(
+            pipeline_name, source_connection, target_connection, tables, **kwargs
+        )
+
+    def validate_yaml(self, yaml_content: str) -> Dict[str, Any]:
+        """Validate pipeline YAML.
+
+        Args:
+            yaml_content: YAML string to validate
+
+        Returns:
+            Validation result with errors/warnings
+
+        Example:
+            >>> result = pm.validate_yaml(yaml_string)
+            >>> if not result["valid"]:
+            ...     for error in result["errors"]:
+            ...         print(f"{error['field_path']}: {error['message']}")
+        """
+        from odibi.validate import validate_yaml
+
+        return validate_yaml(yaml_content)
+
+    def doctor(self) -> Dict[str, Any]:
+        """Run diagnostics check on environment and configuration.
+
+        Returns:
+            Diagnostic result with status, packages, connections, and issues
+
+        Example:
+            >>> result = pm.doctor()
+            >>> if result["status"] == "healthy":
+            ...     print("All good!")
+            >>> else:
+            ...     for issue in result["issues"]:
+            ...         print(f"{issue['severity']}: {issue['message']}")
+        """
+        from odibi.doctor import doctor
+
+        return doctor()
+
+    # -------------------------------------------------------------------------
     # Phase 5.2: State Methods
     # -------------------------------------------------------------------------
 

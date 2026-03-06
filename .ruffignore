@@ -1,0 +1,3 @@
+tests/mcp/*.py
+scripts/run_test_campaign.py
+# Test files can have imports after dotenv load

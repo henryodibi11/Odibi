@@ -47,6 +47,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import (
     TextContent,
     Tool,
+    Resource,
 )
 
 from .knowledge import get_knowledge
@@ -68,6 +69,27 @@ from odibi_mcp.tools.yaml_builder import (
     generate_project_yaml,
 )
 from odibi_mcp.tools.diagnose import diagnose, diagnose_path
+from odibi_mcp.tools.construction import (
+    list_transformers,
+    list_patterns,
+    apply_pattern_template,
+)
+from odibi_mcp.tools.validation import validate_pipeline as validate_pipeline_enhanced
+from odibi_mcp.tools.builder import (
+    create_pipeline,
+    add_node,
+    configure_read,
+    configure_write,
+    configure_transform,
+    get_pipeline_state,
+    render_pipeline_yaml,
+    list_sessions,
+    discard_pipeline,
+)
+from odibi_mcp.tools.phase3_smart import (
+    suggest_pipeline,
+    create_ingestion_pipeline,
+)
 
 # Removed execution tools - use shell instead (run_python, run_odibi, find_path, execute_pipeline)
 from dataclasses import asdict, is_dataclass
@@ -100,6 +122,33 @@ logger = logging.getLogger(__name__)
 audit_logger = AuditLogger(logger)
 # Create MCP server
 server = Server("odibi-knowledge")
+
+
+@server.list_resources()
+async def list_resources() -> list[Resource]:
+    """List available documentation resources for AI context."""
+    from odibi_mcp.resources import get_resources
+
+    resources_data = get_resources()
+
+    return [
+        Resource(
+            uri=r["uri"],
+            name=r["name"],
+            description=r["description"],
+            mimeType=r.get("mimeType", "text/markdown"),
+        )
+        for r in resources_data
+        if r["path"].exists()
+    ]
+
+
+@server.read_resource()
+async def read_resource(uri: str) -> str:
+    """Read a documentation resource."""
+    from odibi_mcp.resources import read_resource as read_res
+
+    return read_res(uri)
 
 
 @server.list_tools()
@@ -322,6 +371,162 @@ async def list_tools() -> list[Tool]:
         #         ],
         #     },
         # ),
+        # ============ PHASE 1: CONSTRUCTION TOOLS ============
+        Tool(
+            name="list_transformers",
+            description="""List all registered transformers with parameter schemas.
+
+Exposes the FunctionRegistry so agents discover available transformers instead of hallucinating function names.
+
+Returns transformer name, description, category, parameters with types/defaults, and example YAML.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Optional filter: scd, merge, column, filter, aggregate, all",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Optional search term to filter by name or description",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="list_patterns",
+            description="""List the 6 warehouse patterns with their required parameters.
+
+Returns pattern metadata so agents know exactly what each pattern needs:
+- dimension, fact, scd2, merge, aggregation, date_dimension
+- Required and optional parameters for each
+- Example calls with realistic parameters
+
+Use this BEFORE calling apply_pattern_template.""",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="apply_pattern_template",
+            description="""Build a complete, validated pipeline YAML from a pattern and typed parameters.
+
+This is the core Phase 1 tool: one call generates a validated pipeline YAML ready to run.
+
+WORKFLOW:
+1. list_patterns to see available patterns
+2. apply_pattern_template with required params
+3. Get back valid YAML that validates on first try
+
+PATTERNS:
+- dimension: requires natural_key, surrogate_key
+- scd2: requires keys, tracked_columns
+- fact: optional keys
+- date_dimension: requires start_date, end_date
+- aggregation: requires grain, measures
+- merge: requires keys
+
+Returns YAML string + validation results.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Pattern name",
+                        "enum": [
+                            "dimension",
+                            "fact",
+                            "scd2",
+                            "merge",
+                            "aggregation",
+                            "date_dimension",
+                        ],
+                    },
+                    "pipeline_name": {
+                        "type": "string",
+                        "description": "Pipeline name (alphanumeric + underscore)",
+                    },
+                    "source_connection": {
+                        "type": "string",
+                        "description": "Connection for reading data",
+                    },
+                    "target_connection": {
+                        "type": "string",
+                        "description": "Connection for writing data",
+                    },
+                    "target_path": {"type": "string", "description": "Output path or table name"},
+                    "source_table": {
+                        "type": "string",
+                        "description": "Table name (e.g., dbo.Customer)",
+                    },
+                    "source_query": {
+                        "type": "string",
+                        "description": "Optional SQL query (overrides source_table)",
+                    },
+                    "source_format": {
+                        "type": "string",
+                        "enum": ["sql", "csv", "parquet", "json", "delta"],
+                        "default": "sql",
+                    },
+                    "target_format": {
+                        "type": "string",
+                        "enum": ["delta", "parquet", "csv", "json"],
+                        "default": "delta",
+                    },
+                    "layer": {
+                        "type": "string",
+                        "enum": ["bronze", "silver", "gold"],
+                        "default": "gold",
+                    },
+                    "keys": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Business key columns",
+                    },
+                    "tracked_columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Columns to track for changes (SCD2)",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date for date dimension (YYYY-MM-DD)",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "End date for date dimension (YYYY-MM-DD)",
+                    },
+                    "grain": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Aggregation grain columns",
+                    },
+                    "measures": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Aggregation measure expressions",
+                    },
+                    "natural_key": {
+                        "type": "string",
+                        "description": "Natural key for dimension pattern",
+                    },
+                    "surrogate_key": {
+                        "type": "string",
+                        "description": "Surrogate key column name for dimension",
+                    },
+                },
+                "required": [
+                    "pattern",
+                    "pipeline_name",
+                    "source_connection",
+                    "target_connection",
+                    "target_path",
+                ],
+            },
+        ),
         Tool(
             name="validate_yaml",
             description="Validate odibi pipeline YAML and return errors.",
@@ -334,6 +539,285 @@ async def list_tools() -> list[Tool]:
                     },
                 },
                 "required": ["yaml_content"],
+            },
+        ),
+        Tool(
+            name="validate_pipeline",
+            description="""Enhanced pipeline validation using Pipeline.validate() + pattern checks.
+
+Provides comprehensive validation:
+- YAML syntax
+- Pydantic models (catches field name errors)
+- Transformer parameters (via FunctionRegistry)
+- Pattern parameters (via required_params metadata)
+- DAG validation (circular deps, missing nodes)
+- Connection checks (optional)
+
+Returns structured errors with field_path, code, message, and fix suggestions.
+
+Use this to validate YAML before running pipelines.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "yaml_content": {"type": "string", "description": "YAML to validate"},
+                    "check_connections": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Validate connection availability",
+                    },
+                },
+                "required": ["yaml_content"],
+            },
+        ),
+        # ============ PHASE 2: SESSION-BASED BUILDER TOOLS ============
+        Tool(
+            name="create_pipeline",
+            description="""Start a new pipeline builder session.
+
+For building complex multi-node pipelines incrementally.
+
+Returns a session_id for subsequent calls.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline_name": {
+                        "type": "string",
+                        "description": "Pipeline name (alphanumeric + underscore)",
+                    },
+                    "layer": {
+                        "type": "string",
+                        "enum": ["bronze", "silver", "gold"],
+                        "default": "gold",
+                    },
+                },
+                "required": ["pipeline_name"],
+            },
+        ),
+        Tool(
+            name="add_node",
+            description="""Add a node to the pipeline builder session.
+
+Nodes are added as skeletons - configure read/write/transform separately.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID from create_pipeline",
+                    },
+                    "node_name": {
+                        "type": "string",
+                        "description": "Node name (alphanumeric + underscore)",
+                    },
+                    "depends_on": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of node names this depends on",
+                    },
+                },
+                "required": ["session_id", "node_name"],
+            },
+        ),
+        Tool(
+            name="configure_read",
+            description="""Configure read operation for a node in the builder session.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                    "node_name": {"type": "string"},
+                    "connection": {"type": "string"},
+                    "format": {
+                        "type": "string",
+                        "enum": ["sql", "csv", "parquet", "json", "delta"],
+                    },
+                    "table": {"type": "string", "description": "Table name (for SQL)"},
+                    "path": {"type": "string", "description": "File path"},
+                    "query": {"type": "string", "description": "SQL query (overrides table)"},
+                    "options": {"type": "object", "description": "Additional read options"},
+                },
+                "required": ["session_id", "node_name", "connection", "format"],
+            },
+        ),
+        Tool(
+            name="configure_write",
+            description="""Configure write operation for a node in the builder session.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                    "node_name": {"type": "string"},
+                    "connection": {"type": "string"},
+                    "format": {"type": "string", "enum": ["delta", "parquet", "csv", "json"]},
+                    "path": {"type": "string"},
+                    "table": {"type": "string"},
+                    "mode": {
+                        "type": "string",
+                        "enum": ["overwrite", "append", "upsert", "append_once", "merge"],
+                        "default": "overwrite",
+                    },
+                    "keys": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Key columns (required for upsert/append_once/merge)",
+                    },
+                    "partition_by": {"type": "array", "items": {"type": "string"}},
+                    "options": {"type": "object"},
+                },
+                "required": ["session_id", "node_name", "connection", "format"],
+            },
+        ),
+        Tool(
+            name="configure_transform",
+            description="""Add transformation steps to a node in the builder session.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                    "node_name": {"type": "string"},
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "function": {"type": "string"},
+                                "params": {"type": "object"},
+                            },
+                        },
+                        "description": "List of transform steps",
+                    },
+                },
+                "required": ["session_id", "node_name", "steps"],
+            },
+        ),
+        Tool(
+            name="get_pipeline_state",
+            description="""Get current state of a pipeline builder session.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                },
+                "required": ["session_id"],
+            },
+        ),
+        Tool(
+            name="render_pipeline_yaml",
+            description="""Finalize and render the pipeline to validated YAML.
+
+Performs full validation before rendering.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                },
+                "required": ["session_id"],
+            },
+        ),
+        Tool(
+            name="list_sessions",
+            description="""List all active builder sessions.""",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="discard_pipeline",
+            description="""Discard a builder session without rendering.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                },
+                "required": ["session_id"],
+            },
+        ),
+        # ============ PHASE 3: SMART CHAINING & TEMPLATES ============
+        Tool(
+            name="suggest_pipeline",
+            description="""Auto-suggest pattern based on profiled data characteristics.
+
+Analyzes profile_source results and recommends the best pattern with pre-filled params.
+
+WORKFLOW:
+1. profile_source(connection, path) → get data characteristics
+2. suggest_pipeline(profile) → get pattern recommendation
+3. apply_pattern_template(ready_for params) → generate YAML
+
+Returns suggested pattern, confidence, reason, and ready_for params.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "profile": {
+                        "type": "object",
+                        "description": "Profile output from profile_source",
+                    },
+                },
+                "required": ["profile"],
+            },
+        ),
+        Tool(
+            name="create_ingestion_pipeline",
+            description="""Create a multi-table bulk ingestion pipeline.
+
+Generates one node per table for parallel ingestion from SQL database.
+
+Use for: Onboarding multiple tables at once (Bronze layer ingestion)
+
+Example:
+  tables: [
+    {"schema": "dbo", "table": "Orders", "keys": ["order_id"]},
+    {"schema": "dbo", "table": "Customers", "keys": ["customer_id"]}
+  ]
+
+Returns complete pipeline YAML with all nodes configured.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline_name": {"type": "string"},
+                    "source_connection": {
+                        "type": "string",
+                        "description": "SQL database connection",
+                    },
+                    "target_connection": {"type": "string", "description": "Data lake connection"},
+                    "tables": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "schema": {"type": "string", "default": "dbo"},
+                                "table": {"type": "string"},
+                                "keys": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Primary key columns",
+                                },
+                                "where": {"type": "string", "description": "Optional WHERE clause"},
+                            },
+                            "required": ["table"],
+                        },
+                        "description": "List of tables to ingest",
+                    },
+                    "layer": {
+                        "type": "string",
+                        "enum": ["bronze", "silver", "gold"],
+                        "default": "bronze",
+                    },
+                    "target_format": {
+                        "type": "string",
+                        "enum": ["delta", "parquet", "csv"],
+                        "default": "delta",
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["overwrite", "append", "upsert", "append_once"],
+                        "default": "append_once",
+                        "description": "Write mode (append_once recommended for idempotent ingestion)",
+                    },
+                },
+                "required": ["pipeline_name", "source_connection", "target_connection", "tables"],
             },
         ),
         # DISABLED: diagnose_error - just read the error message
@@ -671,7 +1155,10 @@ NEXT ACTIONS (pick one):
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "connection": {"type": "string", "description": "Connection name from exploration.yaml"},
+                    "connection": {
+                        "type": "string",
+                        "description": "Connection name from exploration.yaml",
+                    },
                     "path": {
                         "type": "string",
                         "default": "",
@@ -714,8 +1201,14 @@ NEXT ACTION: Pass ready_for dict to generate_bronze_node() to create runnable pi
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "connection": {"type": "string", "description": "Connection name from exploration.yaml"},
-                    "path": {"type": "string", "description": "File path (e.g., 'folder/file.csv') or SQL table (e.g., 'Sales.Orders')"},
+                    "connection": {
+                        "type": "string",
+                        "description": "Connection name from exploration.yaml",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "File path (e.g., 'folder/file.csv') or SQL table (e.g., 'Sales.Orders')",
+                    },
                     "max_attempts": {
                         "type": "integer",
                         "default": 5,
@@ -1034,10 +1527,51 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #         "projects": projects,
         #     }
         #     return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        # ============ PHASE 1: CONSTRUCTION TOOL HANDLERS ============
         if name == "list_transformers":
-            result = knowledge.list_transformers()
+            result = list_transformers(
+                category=arguments.get("category"), search=arguments.get("search")
+            )
         elif name == "list_patterns":
-            result = knowledge.list_patterns()
+            result = list_patterns()
+        elif name == "apply_pattern_template":
+            result = apply_pattern_template(**arguments)
+        elif name == "validate_pipeline":
+            result = validate_pipeline_enhanced(
+                yaml_content=arguments["yaml_content"],
+                check_connections=arguments.get("check_connections", False),
+            )
+        # ============ PHASE 2: BUILDER TOOL HANDLERS ============
+        elif name == "create_pipeline":
+            result = create_pipeline(
+                pipeline_name=arguments["pipeline_name"], layer=arguments.get("layer", "gold")
+            )
+        elif name == "add_node":
+            result = add_node(
+                session_id=arguments["session_id"],
+                node_name=arguments["node_name"],
+                depends_on=arguments.get("depends_on"),
+            )
+        elif name == "configure_read":
+            result = configure_read(**arguments)
+        elif name == "configure_write":
+            result = configure_write(**arguments)
+        elif name == "configure_transform":
+            result = configure_transform(**arguments)
+        elif name == "get_pipeline_state":
+            result = get_pipeline_state(session_id=arguments["session_id"])
+        elif name == "render_pipeline_yaml":
+            result = render_pipeline_yaml(session_id=arguments["session_id"])
+        elif name == "list_sessions":
+            result = list_sessions()
+        elif name == "discard_pipeline":
+            result = discard_pipeline(session_id=arguments["session_id"])
+        # ============ PHASE 3: SMART CHAINING HANDLERS ============
+        elif name == "suggest_pipeline":
+            result = suggest_pipeline(profile=arguments["profile"])
+        elif name == "create_ingestion_pipeline":
+            result = create_ingestion_pipeline(**arguments)
+        # ============ KNOWLEDGE BASE TOOLS ============
         elif name == "list_connections":
             result = knowledge.list_connections()
         elif name == "explain":

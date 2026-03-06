@@ -4,8 +4,19 @@ import os
 import posixpath
 import threading
 import warnings
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from odibi.discovery.types import (
+    CatalogSummary,
+    Column,
+    DatasetRef,
+    FreshnessResult,
+    PartitionInfo,
+    Schema,
+    TableProfile,
+)
+from odibi.discovery.utils import detect_file_format, detect_partitions, infer_format_from_path
 from odibi.utils.logging import logger
 from odibi.utils.logging_context import get_logging_context
 
@@ -523,3 +534,454 @@ class AzureADLS(BaseConnection):
         )
 
         return full_uri
+
+    def _get_fs(self):
+        """Get fsspec filesystem instance for this connection."""
+        try:
+            import adlfs
+        except ImportError as e:
+            raise ImportError(
+                "Azure ADLS discovery requires 'adlfs'. Install with: pip install odibi[azure]"
+            ) from e
+
+        storage_opts = self.pandas_storage_options()
+        fs = adlfs.AzureBlobFileSystem(**storage_opts)
+        return fs
+
+    def list_files(self, path: str = "", pattern: str = "*", limit: int = 1000) -> List[Dict]:
+        """List files in ADLS path.
+
+        Args:
+            path: Relative path within container (default: path_prefix)
+            pattern: Glob pattern for filtering (default: "*")
+            limit: Maximum number of files to return
+
+        Returns:
+            List of dicts with keys: name, path, size, modified, format
+        """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Listing ADLS files",
+            account=self.account,
+            container=self.container,
+            path=path,
+            pattern=pattern,
+            limit=limit,
+        )
+
+        try:
+            fs = self._get_fs()
+            full_path = f"{self.container}/{self.path_prefix}/{path}".strip("/")
+
+            # Use glob for pattern matching
+            import fnmatch
+
+            all_files = []
+            for entry in fs.ls(full_path, detail=True):
+                if entry["type"] == "file":
+                    file_name = entry["name"].split("/")[-1]
+                    if fnmatch.fnmatch(file_name, pattern):
+                        all_files.append(
+                            {
+                                "name": file_name,
+                                "path": entry["name"],
+                                "size": entry.get("size", 0),
+                                "modified": entry.get("last_modified"),
+                                "format": infer_format_from_path(file_name),
+                            }
+                        )
+                        if len(all_files) >= limit:
+                            break
+
+            ctx.info("Listed ADLS files", count=len(all_files))
+            return all_files
+
+        except Exception as e:
+            ctx.warning("Failed to list ADLS files", error=str(e), path=path)
+            return []
+
+    def list_folders(self, path: str = "", limit: int = 100) -> List[str]:
+        """List folders in ADLS path.
+
+        Args:
+            path: Relative path within container
+            limit: Maximum number of folders to return
+
+        Returns:
+            List of folder paths
+        """
+        ctx = get_logging_context()
+        ctx.debug(
+            "Listing ADLS folders",
+            account=self.account,
+            container=self.container,
+            path=path,
+            limit=limit,
+        )
+
+        try:
+            fs = self._get_fs()
+            full_path = f"{self.container}/{self.path_prefix}/{path}".strip("/")
+
+            folders = []
+            for entry in fs.ls(full_path, detail=True):
+                if entry["type"] == "directory":
+                    folders.append(entry["name"])
+                    if len(folders) >= limit:
+                        break
+
+            ctx.info("Listed ADLS folders", count=len(folders))
+            return folders
+
+        except Exception as e:
+            ctx.warning("Failed to list ADLS folders", error=str(e), path=path)
+            return []
+
+    def discover_catalog(
+        self, include_schema: bool = False, include_stats: bool = False, limit: int = 200
+    ) -> Dict[str, Any]:
+        """Discover datasets in ADLS container.
+
+        Args:
+            include_schema: Sample files and infer schema
+            include_stats: Include row counts and stats
+            limit: Maximum datasets to return
+
+        Returns:
+            CatalogSummary dict
+        """
+        ctx = get_logging_context()
+        ctx.info(
+            "Discovering ADLS catalog",
+            account=self.account,
+            container=self.container,
+            include_schema=include_schema,
+            include_stats=include_stats,
+        )
+
+        try:
+            fs = self._get_fs()
+            base_path = f"{self.container}/{self.path_prefix}".strip("/")
+
+            folders = []
+            files = []
+            formats = {}
+
+            for entry in fs.ls(base_path, detail=True):
+                if len(folders) + len(files) >= limit:
+                    break
+
+                if entry["type"] == "directory":
+                    folder_name = entry["name"].split("/")[-1]
+                    file_format = detect_file_format(entry["name"], fs)
+
+                    folders.append(
+                        DatasetRef(
+                            name=folder_name,
+                            kind="folder",
+                            path=entry["name"],
+                            format=file_format,
+                            size_bytes=entry.get("size", 0),
+                        )
+                    )
+
+                    if file_format:
+                        formats[file_format] = formats.get(file_format, 0) + 1
+
+                elif entry["type"] == "file":
+                    file_name = entry["name"].split("/")[-1]
+                    file_format = infer_format_from_path(file_name)
+
+                    files.append(
+                        DatasetRef(
+                            name=file_name,
+                            kind="file",
+                            path=entry["name"],
+                            format=file_format,
+                            size_bytes=entry.get("size", 0),
+                            modified_at=entry.get("last_modified"),
+                        )
+                    )
+
+                    if file_format:
+                        formats[file_format] = formats.get(file_format, 0) + 1
+
+            summary = CatalogSummary(
+                connection_name=f"{self.account}/{self.container}",
+                connection_type="azure_adls",
+                folders=[f.model_dump() for f in folders],
+                files=[f.model_dump() for f in files],
+                total_datasets=len(folders) + len(files),
+                formats=formats,
+                next_step="Use get_schema() to inspect individual datasets",
+            )
+
+            ctx.info(
+                "ADLS catalog discovery complete",
+                total_datasets=summary.total_datasets,
+                folders=len(folders),
+                files=len(files),
+            )
+
+            return summary.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to discover ADLS catalog", error=str(e))
+            return CatalogSummary(
+                connection_name=f"{self.account}/{self.container}",
+                connection_type="azure_adls",
+                total_datasets=0,
+                next_step=f"Error: {str(e)}",
+            ).model_dump()
+
+    def get_schema(self, dataset: str) -> Dict[str, Any]:
+        """Get schema for a dataset.
+
+        Args:
+            dataset: Relative path to file or folder
+
+        Returns:
+            Schema dict with columns
+        """
+        ctx = get_logging_context()
+        ctx.info("Getting ADLS schema", dataset=dataset)
+
+        try:
+            import pandas as pd
+
+            full_path = self.uri(dataset)
+            storage_opts = self.pandas_storage_options()
+
+            # Detect format
+            file_format = detect_file_format(dataset, self._get_fs())
+
+            if file_format == "parquet" or file_format == "delta":
+                df = pd.read_parquet(full_path, storage_options=storage_opts).head(0)
+            elif file_format == "csv":
+                df = pd.read_csv(full_path, storage_options=storage_opts, nrows=1000).head(0)
+            elif file_format == "json":
+                df = pd.read_json(
+                    full_path, storage_options=storage_opts, lines=True, nrows=1000
+                ).head(0)
+            else:
+                ctx.warning("Unsupported format for schema inference", format=file_format)
+                return Schema(
+                    dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                    columns=[],
+                ).model_dump()
+
+            columns = [Column(name=col, dtype=str(dtype)) for col, dtype in df.dtypes.items()]
+
+            schema = Schema(
+                dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                columns=columns,
+            )
+
+            ctx.info("Schema retrieved", column_count=len(columns))
+            return schema.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to get schema", dataset=dataset, error=str(e))
+            return Schema(
+                dataset=DatasetRef(name=dataset, kind="file"),
+                columns=[],
+            ).model_dump()
+
+    def profile(
+        self, dataset: str, sample_rows: int = 1000, columns: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Profile a dataset with statistics.
+
+        Args:
+            dataset: Relative path to file or folder
+            sample_rows: Number of rows to sample (max 10000)
+            columns: Specific columns to profile (None = all)
+
+        Returns:
+            TableProfile dict with stats
+        """
+        ctx = get_logging_context()
+        ctx.info("Profiling ADLS dataset", dataset=dataset, sample_rows=sample_rows)
+
+        sample_rows = min(sample_rows, 10000)  # Cap at 10k
+
+        try:
+            import pandas as pd
+
+            full_path = self.uri(dataset)
+            storage_opts = self.pandas_storage_options()
+            file_format = detect_file_format(dataset, self._get_fs())
+
+            # Read sample
+            if file_format == "parquet" or file_format == "delta":
+                df = pd.read_parquet(full_path, storage_options=storage_opts).head(sample_rows)
+            elif file_format == "csv":
+                df = pd.read_csv(full_path, storage_options=storage_opts, nrows=sample_rows)
+            elif file_format == "json":
+                df = pd.read_json(
+                    full_path, storage_options=storage_opts, lines=True, nrows=sample_rows
+                )
+            else:
+                ctx.warning("Unsupported format for profiling", format=file_format)
+                return TableProfile(
+                    dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                    rows_sampled=0,
+                    columns=[],
+                ).model_dump()
+
+            # Profile columns
+            profile_cols = columns or df.columns.tolist()
+            profiled = []
+
+            for col in profile_cols:
+                if col not in df.columns:
+                    continue
+
+                null_count = int(df[col].isnull().sum())
+                null_pct = null_count / len(df) if len(df) > 0 else 0
+                distinct_count = int(df[col].nunique())
+
+                # Cardinality heuristic
+                if distinct_count == len(df):
+                    cardinality = "unique"
+                elif distinct_count > len(df) * 0.9:
+                    cardinality = "high"
+                elif distinct_count > len(df) * 0.1:
+                    cardinality = "medium"
+                else:
+                    cardinality = "low"
+
+                sample_values = df[col].dropna().head(5).tolist()
+
+                profiled.append(
+                    Column(
+                        name=col,
+                        dtype=str(df[col].dtype),
+                        null_count=null_count,
+                        null_pct=round(null_pct, 3),
+                        cardinality=cardinality,
+                        distinct_count=distinct_count,
+                        sample_values=sample_values,
+                    )
+                )
+
+            # Detect candidate keys (unique non-null columns)
+            candidate_keys = [
+                c.name for c in profiled if c.cardinality == "unique" and c.null_count == 0
+            ]
+
+            # Detect candidate watermarks (datetime columns)
+            candidate_watermarks = [
+                c.name
+                for c in profiled
+                if "datetime" in c.dtype.lower() or "date" in c.dtype.lower()
+            ]
+
+            completeness = 1.0 - (df.isnull().sum().sum() / (len(df) * len(df.columns)))
+
+            profile = TableProfile(
+                dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                rows_sampled=len(df),
+                columns=profiled,
+                candidate_keys=candidate_keys,
+                candidate_watermarks=candidate_watermarks,
+                completeness=round(completeness, 3),
+            )
+
+            ctx.info("Profiling complete", rows_sampled=len(df), columns=len(profiled))
+            return profile.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to profile dataset", dataset=dataset, error=str(e))
+            return TableProfile(
+                dataset=DatasetRef(name=dataset, kind="file"),
+                rows_sampled=0,
+                columns=[],
+            ).model_dump()
+
+    def detect_partitions(self, path: str = "") -> Dict[str, Any]:
+        """Detect partition structure in ADLS path.
+
+        Args:
+            path: Relative path to scan (default: path_prefix)
+
+        Returns:
+            PartitionInfo dict
+        """
+        ctx = get_logging_context()
+        ctx.info("Detecting ADLS partitions", path=path)
+
+        try:
+            fs = self._get_fs()
+            full_path = f"{self.container}/{self.path_prefix}/{path}".strip("/")
+
+            # List all files recursively
+            all_paths = []
+            try:
+                all_paths = [
+                    entry["name"]
+                    for entry in fs.ls(full_path, detail=True, recursive=True)
+                    if entry["type"] == "file"
+                ][:100]  # Sample first 100
+            except Exception:
+                pass
+
+            partition_info = detect_partitions(all_paths)
+
+            result = PartitionInfo(
+                root=full_path,
+                keys=partition_info.get("keys", []),
+                example_values=partition_info.get("example_values", {}),
+                format=partition_info.get("format", "none"),
+                partition_count=len(all_paths),
+            )
+
+            ctx.info("Partition detection complete", keys=result.keys)
+            return result.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to detect partitions", path=path, error=str(e))
+            return PartitionInfo(root=path, keys=[], example_values={}).model_dump()
+
+    def get_freshness(self, dataset: str) -> Dict[str, Any]:
+        """Get data freshness for a dataset.
+
+        Args:
+            dataset: Relative path to file or folder
+
+        Returns:
+            FreshnessResult dict
+        """
+        ctx = get_logging_context()
+        ctx.info("Checking ADLS freshness", dataset=dataset)
+
+        try:
+            fs = self._get_fs()
+            full_path = f"{self.container}/{self.path_prefix}/{dataset}".strip("/")
+
+            # Get file/folder metadata
+            info = fs.info(full_path)
+            last_modified = info.get("last_modified")
+
+            if last_modified:
+                if isinstance(last_modified, str):
+                    last_modified = datetime.fromisoformat(last_modified.replace("Z", "+00:00"))
+
+                age_hours = (datetime.utcnow() - last_modified).total_seconds() / 3600
+
+                result = FreshnessResult(
+                    dataset=DatasetRef(name=dataset, kind="file"),
+                    last_updated=last_modified,
+                    source="metadata",
+                    age_hours=round(age_hours, 2),
+                )
+
+                ctx.info("Freshness check complete", age_hours=age_hours)
+                return result.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to check freshness", dataset=dataset, error=str(e))
+
+        return FreshnessResult(
+            dataset=DatasetRef(name=dataset, kind="file"), source="metadata"
+        ).model_dump()

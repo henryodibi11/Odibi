@@ -1,8 +1,21 @@
 """Local filesystem connection."""
 
+import os
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from odibi.connections.base import BaseConnection
+from odibi.discovery.types import (
+    CatalogSummary,
+    Column,
+    DatasetRef,
+    FreshnessResult,
+    PartitionInfo,
+    Schema,
+    TableProfile,
+)
+from odibi.discovery.utils import detect_file_format, detect_partitions, infer_format_from_path
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -122,3 +135,425 @@ class LocalConnection(BaseConnection):
                     error=str(e),
                 )
                 raise
+
+    def list_files(self, path: str = "", pattern: str = "*", limit: int = 1000) -> List[Dict]:
+        """List files in local path.
+
+        Args:
+            path: Relative path within base_path
+            pattern: Glob pattern for filtering (default: "*")
+            limit: Maximum number of files to return
+
+        Returns:
+            List of dicts with keys: name, path, size, modified, format
+        """
+        ctx = get_logging_context()
+        ctx.debug("Listing local files", path=path, pattern=pattern, limit=limit)
+
+        if self.is_uri:
+            ctx.warning("list_files not supported for URI paths")
+            return []
+
+        try:
+            full_path = self.base_path / path if path else self.base_path
+            all_files = []
+
+            for file_path in full_path.glob(pattern):
+                if file_path.is_file():
+                    stat = file_path.stat()
+                    all_files.append(
+                        {
+                            "name": file_path.name,
+                            "path": str(file_path.absolute()),
+                            "size": stat.st_size,
+                            "modified": datetime.fromtimestamp(stat.st_mtime),
+                            "format": infer_format_from_path(file_path.name),
+                        }
+                    )
+                    if len(all_files) >= limit:
+                        break
+
+            ctx.info("Listed local files", count=len(all_files))
+            return all_files
+
+        except Exception as e:
+            ctx.warning("Failed to list local files", error=str(e), path=path)
+            return []
+
+    def list_folders(self, path: str = "", limit: int = 100) -> List[str]:
+        """List folders in local path.
+
+        Args:
+            path: Relative path within base_path
+            limit: Maximum number of folders to return
+
+        Returns:
+            List of folder paths
+        """
+        ctx = get_logging_context()
+        ctx.debug("Listing local folders", path=path, limit=limit)
+
+        if self.is_uri:
+            ctx.warning("list_folders not supported for URI paths")
+            return []
+
+        try:
+            full_path = self.base_path / path if path else self.base_path
+            folders = []
+
+            for item in full_path.iterdir():
+                if item.is_dir():
+                    folders.append(str(item.absolute()))
+                    if len(folders) >= limit:
+                        break
+
+            ctx.info("Listed local folders", count=len(folders))
+            return folders
+
+        except Exception as e:
+            ctx.warning("Failed to list local folders", error=str(e), path=path)
+            return []
+
+    def discover_catalog(
+        self, include_schema: bool = False, include_stats: bool = False, limit: int = 200
+    ) -> Dict[str, Any]:
+        """Discover datasets in local filesystem.
+
+        Args:
+            include_schema: Sample files and infer schema
+            include_stats: Include row counts and stats
+            limit: Maximum datasets to return
+
+        Returns:
+            CatalogSummary dict
+        """
+        ctx = get_logging_context()
+        ctx.info(
+            "Discovering local catalog",
+            base_path=self.base_path_str,
+            include_schema=include_schema,
+            include_stats=include_stats,
+        )
+
+        if self.is_uri:
+            ctx.warning("discover_catalog not supported for URI paths")
+            return CatalogSummary(
+                connection_name=self.base_path_str,
+                connection_type="local",
+                total_datasets=0,
+                next_step="URI paths not supported for catalog discovery",
+            ).model_dump()
+
+        try:
+            folders = []
+            files = []
+            formats = {}
+
+            for item in self.base_path.iterdir():
+                if len(folders) + len(files) >= limit:
+                    break
+
+                if item.is_dir():
+                    file_format = detect_file_format(str(item))
+
+                    folders.append(
+                        DatasetRef(
+                            name=item.name,
+                            kind="folder",
+                            path=str(item.absolute()),
+                            format=file_format,
+                        )
+                    )
+
+                    if file_format:
+                        formats[file_format] = formats.get(file_format, 0) + 1
+
+                elif item.is_file():
+                    stat = item.stat()
+                    file_format = infer_format_from_path(item.name)
+
+                    files.append(
+                        DatasetRef(
+                            name=item.name,
+                            kind="file",
+                            path=str(item.absolute()),
+                            format=file_format,
+                            size_bytes=stat.st_size,
+                            modified_at=datetime.fromtimestamp(stat.st_mtime),
+                        )
+                    )
+
+                    if file_format:
+                        formats[file_format] = formats.get(file_format, 0) + 1
+
+            summary = CatalogSummary(
+                connection_name=self.base_path_str,
+                connection_type="local",
+                folders=[f.model_dump() for f in folders],
+                files=[f.model_dump() for f in files],
+                total_datasets=len(folders) + len(files),
+                formats=formats,
+                next_step="Use get_schema() to inspect individual datasets",
+            )
+
+            ctx.info(
+                "Local catalog discovery complete",
+                total_datasets=summary.total_datasets,
+                folders=len(folders),
+                files=len(files),
+            )
+
+            return summary.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to discover local catalog", error=str(e))
+            return CatalogSummary(
+                connection_name=self.base_path_str,
+                connection_type="local",
+                total_datasets=0,
+                next_step=f"Error: {str(e)}",
+            ).model_dump()
+
+    def get_schema(self, dataset: str) -> Dict[str, Any]:
+        """Get schema for a dataset.
+
+        Args:
+            dataset: Relative path to file or folder
+
+        Returns:
+            Schema dict with columns
+        """
+        ctx = get_logging_context()
+        ctx.info("Getting local schema", dataset=dataset)
+
+        try:
+            import pandas as pd
+
+            full_path = self.get_path(dataset)
+            file_format = detect_file_format(full_path)
+
+            if file_format == "parquet" or file_format == "delta":
+                df = pd.read_parquet(full_path).head(0)
+            elif file_format == "csv":
+                df = pd.read_csv(full_path, nrows=1000).head(0)
+            elif file_format == "json":
+                df = pd.read_json(full_path, lines=True, nrows=1000).head(0)
+            else:
+                ctx.warning("Unsupported format for schema inference", format=file_format)
+                return Schema(
+                    dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                    columns=[],
+                ).model_dump()
+
+            columns = [Column(name=col, dtype=str(dtype)) for col, dtype in df.dtypes.items()]
+
+            schema = Schema(
+                dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                columns=columns,
+            )
+
+            ctx.info("Schema retrieved", column_count=len(columns))
+            return schema.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to get schema", dataset=dataset, error=str(e))
+            return Schema(
+                dataset=DatasetRef(name=dataset, kind="file"),
+                columns=[],
+            ).model_dump()
+
+    def profile(
+        self, dataset: str, sample_rows: int = 1000, columns: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Profile a dataset with statistics.
+
+        Args:
+            dataset: Relative path to file or folder
+            sample_rows: Number of rows to sample (max 10000)
+            columns: Specific columns to profile (None = all)
+
+        Returns:
+            TableProfile dict with stats
+        """
+        ctx = get_logging_context()
+        ctx.info("Profiling local dataset", dataset=dataset, sample_rows=sample_rows)
+
+        sample_rows = min(sample_rows, 10000)  # Cap at 10k
+
+        try:
+            import pandas as pd
+
+            full_path = self.get_path(dataset)
+            file_format = detect_file_format(full_path)
+
+            # Read sample
+            if file_format == "parquet" or file_format == "delta":
+                df = pd.read_parquet(full_path).head(sample_rows)
+            elif file_format == "csv":
+                df = pd.read_csv(full_path, nrows=sample_rows)
+            elif file_format == "json":
+                df = pd.read_json(full_path, lines=True, nrows=sample_rows)
+            else:
+                ctx.warning("Unsupported format for profiling", format=file_format)
+                return TableProfile(
+                    dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                    rows_sampled=0,
+                    columns=[],
+                ).model_dump()
+
+            # Profile columns
+            profile_cols = columns or df.columns.tolist()
+            profiled = []
+
+            for col in profile_cols:
+                if col not in df.columns:
+                    continue
+
+                null_count = int(df[col].isnull().sum())
+                null_pct = null_count / len(df) if len(df) > 0 else 0
+                distinct_count = int(df[col].nunique())
+
+                # Cardinality heuristic
+                if distinct_count == len(df):
+                    cardinality = "unique"
+                elif distinct_count > len(df) * 0.9:
+                    cardinality = "high"
+                elif distinct_count > len(df) * 0.1:
+                    cardinality = "medium"
+                else:
+                    cardinality = "low"
+
+                sample_values = df[col].dropna().head(5).tolist()
+
+                profiled.append(
+                    Column(
+                        name=col,
+                        dtype=str(df[col].dtype),
+                        null_count=null_count,
+                        null_pct=round(null_pct, 3),
+                        cardinality=cardinality,
+                        distinct_count=distinct_count,
+                        sample_values=sample_values,
+                    )
+                )
+
+            # Detect candidate keys (unique non-null columns)
+            candidate_keys = [
+                c.name for c in profiled if c.cardinality == "unique" and c.null_count == 0
+            ]
+
+            # Detect candidate watermarks (datetime columns)
+            candidate_watermarks = [
+                c.name
+                for c in profiled
+                if "datetime" in c.dtype.lower() or "date" in c.dtype.lower()
+            ]
+
+            completeness = 1.0 - (df.isnull().sum().sum() / (len(df) * len(df.columns)))
+
+            profile = TableProfile(
+                dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                rows_sampled=len(df),
+                columns=profiled,
+                candidate_keys=candidate_keys,
+                candidate_watermarks=candidate_watermarks,
+                completeness=round(completeness, 3),
+            )
+
+            ctx.info("Profiling complete", rows_sampled=len(df), columns=len(profiled))
+            return profile.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to profile dataset", dataset=dataset, error=str(e))
+            return TableProfile(
+                dataset=DatasetRef(name=dataset, kind="file"),
+                rows_sampled=0,
+                columns=[],
+            ).model_dump()
+
+    def detect_partitions(self, path: str = "") -> Dict[str, Any]:
+        """Detect partition structure in local path.
+
+        Args:
+            path: Relative path to scan (default: base_path)
+
+        Returns:
+            PartitionInfo dict
+        """
+        ctx = get_logging_context()
+        ctx.info("Detecting local partitions", path=path)
+
+        if self.is_uri:
+            ctx.warning("detect_partitions not supported for URI paths")
+            return PartitionInfo(root=path, keys=[], example_values={}).model_dump()
+
+        try:
+            full_path = self.base_path / path if path else self.base_path
+
+            # Walk directory and collect paths
+            all_paths = []
+            for root, dirs, files in os.walk(full_path):
+                for file in files[:100]:  # Sample first 100
+                    all_paths.append(os.path.join(root, file))
+                if len(all_paths) >= 100:
+                    break
+
+            partition_info = detect_partitions(all_paths)
+
+            result = PartitionInfo(
+                root=str(full_path),
+                keys=partition_info.get("keys", []),
+                example_values=partition_info.get("example_values", {}),
+                format=partition_info.get("format", "none"),
+                partition_count=len(all_paths),
+            )
+
+            ctx.info("Partition detection complete", keys=result.keys)
+            return result.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to detect partitions", path=path, error=str(e))
+            return PartitionInfo(root=path, keys=[], example_values={}).model_dump()
+
+    def get_freshness(self, dataset: str) -> Dict[str, Any]:
+        """Get data freshness for a dataset.
+
+        Args:
+            dataset: Relative path to file or folder
+
+        Returns:
+            FreshnessResult dict
+        """
+        ctx = get_logging_context()
+        ctx.info("Checking local freshness", dataset=dataset)
+
+        if self.is_uri:
+            ctx.warning("get_freshness not supported for URI paths")
+            return FreshnessResult(
+                dataset=DatasetRef(name=dataset, kind="file"), source="metadata"
+            ).model_dump()
+
+        try:
+            full_path = Path(self.get_path(dataset))
+
+            if full_path.exists():
+                stat = full_path.stat()
+                last_modified = datetime.fromtimestamp(stat.st_mtime)
+                age_hours = (datetime.utcnow() - last_modified).total_seconds() / 3600
+
+                result = FreshnessResult(
+                    dataset=DatasetRef(name=dataset, kind="file"),
+                    last_updated=last_modified,
+                    source="metadata",
+                    age_hours=round(age_hours, 2),
+                )
+
+                ctx.info("Freshness check complete", age_hours=age_hours)
+                return result.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to check freshness", dataset=dataset, error=str(e))
+
+        return FreshnessResult(
+            dataset=DatasetRef(name=dataset, kind="file"), source="metadata"
+        ).model_dump()

@@ -14,11 +14,14 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import yaml
 
 from odibi_mcp.context import get_project_context
+
+if TYPE_CHECKING:
+    from odibi.discovery.types import CatalogSummary, TableProfile
 from odibi_mcp.contracts.smart import (
     ColumnInfo,
     DecisionHint,
@@ -59,7 +62,12 @@ def _is_storage_connection(conn) -> bool:
 def _is_sql_connection(conn) -> bool:
     """Check if connection is a SQL connection."""
     conn_type = type(conn).__name__
-    return conn_type in ("AzureSQLConnection", "SQLServerConnection", "SQLConnection", "AzureSQL")
+    return conn_type in (
+        "AzureSQLConnection",
+        "SQLServerConnection",
+        "SQLConnection",
+        "AzureSQL",
+    )
 
 
 def _detect_pattern(file_names: List[str]) -> Optional[str]:
@@ -442,7 +450,7 @@ def _validate_dataframe(df, sample_text: str = "") -> ValidationResult:
 
 def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentResponse:
     """
-    Scout a connection to understand what exists.
+    Scout a connection to understand what exists - delegates to core discover_catalog().
 
     For storage: scans folders, detects file patterns, groups by format.
     For SQL: lists schemas, tables, row counts.
@@ -461,12 +469,33 @@ def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentRes
         path: Optional path to scan (for storage connections)
     """
     from odibi_mcp.context import resolve_connection
+    from odibi.discovery.types import CatalogSummary
 
     conn_name = connection if isinstance(connection, str) else "inline"
 
     try:
         conn, conn_name = resolve_connection(connection)
+        logger.info(f"map_environment: delegating to {conn_name}.discover_catalog()")
+
+        # Call core's discover_catalog with stats
+        catalog_dict = conn.discover_catalog(include_schema=True, include_stats=True, limit=200)
+        catalog = CatalogSummary(**catalog_dict)
+
+        # Transform core response to MCP contract
+        return _transform_catalog_to_map_response(catalog, conn_name, path)
+
+    except NotImplementedError as e:
+        logger.warning(f"Connection {conn_name} doesn't support discovery: {e}")
+        return MapEnvironmentResponse(
+            connection=conn_name,
+            connection_type=type(conn).__name__ if "conn" in locals() else "unknown",
+            scanned_at=datetime.now(),
+            summary={},
+            structure=[],
+            errors=[f"Connection type doesn't support discovery: {e}"],
+        )
     except Exception as e:
+        logger.exception(f"Error mapping environment: {conn_name}")
         return MapEnvironmentResponse(
             connection=conn_name,
             connection_type="unknown",
@@ -476,306 +505,123 @@ def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentRes
             errors=[f"Connection error: {e}"],
         )
 
-    scanned_at = datetime.now()
 
-    if _is_storage_connection(conn):
-        return _map_storage(connection, conn, path, scanned_at)
-    elif _is_sql_connection(conn):
-        return _map_sql(connection, conn, scanned_at)
-    else:
-        return MapEnvironmentResponse(
-            connection=connection,
-            connection_type=type(conn).__name__,
-            scanned_at=scanned_at,
-            summary={},
-            structure=[],
-            errors=[f"Unsupported connection type: {type(conn).__name__}"],
-        )
+def _transform_catalog_to_map_response(
+    catalog: "CatalogSummary", conn_name: str, path: str = ""
+) -> MapEnvironmentResponse:
+    """Transform core CatalogSummary to MCP MapEnvironmentResponse."""
 
+    conn_type = "sql" if catalog.tables else "storage"
 
-def _map_storage(connection: str, conn, path: str, scanned_at: datetime) -> MapEnvironmentResponse:
-    """Map a storage connection."""
-    import fsspec
+    # Build structure based on connection type
+    structure = []
+    suggested_sources = []
 
-    try:
-        storage_options = {}
-        if hasattr(conn, "pandas_storage_options"):
-            storage_options = conn.pandas_storage_options()
+    if conn_type == "sql":
+        # SQL connection - group by schema
+        schema_map: Dict[str, List[str]] = {}
+        if catalog.tables:
+            for table in catalog.tables:
+                schema = table.namespace or "dbo"
+                if schema not in schema_map:
+                    schema_map[schema] = []
+                schema_map[schema].append(table.name)
 
-        full_path = conn.get_path(path) if path else conn.get_path("")
-
-        # Determine filesystem
-        if full_path.startswith(("abfss://", "abfs://", "az://")):
-            fs = fsspec.filesystem("abfs", **storage_options)
-            # Normalize path for fsspec
-            if "://" in full_path:
-                fs_path = full_path.split("://", 1)[1]
-                if "@" in fs_path.split("/")[0]:
-                    parts = fs_path.split("/", 1)
-                    container = parts[0].split("@")[0]
-                    rest = parts[1] if len(parts) > 1 else ""
-                    fs_path = f"{container}/{rest}"
-            else:
-                fs_path = full_path
-        else:
-            fs = fsspec.filesystem("file")
-            fs_path = full_path
-
-        # List items at this level
-        try:
-            items = fs.ls(fs_path, detail=True)
-        except Exception as e:
-            return MapEnvironmentResponse(
-                connection=connection,
-                connection_type="storage",
-                scanned_at=scanned_at,
-                summary={},
-                structure=[],
-                errors=[f"Failed to list path: {e}"],
+        for schema_name, tables in schema_map.items():
+            schema_info = SchemaInfo(
+                name=schema_name,
+                table_count=len(tables),
+                sample_tables=tables[:5],
             )
+            structure.append(schema_info)
 
-        # Track folders and subfolders separately
-        folders: Dict[str, List[str]] = {}  # folder -> list of files
-        subfolders: Dict[str, List[str]] = {}  # folder -> list of subfolder names
+            # Add first 2 tables to suggested sources
+            for t in tables[:2]:
+                suggested_sources.append(f"{schema_name}.{t}")
 
-        for item in items:
-            name = item.get("name", "").split("/")[-1]
-            item_type = item.get("type", "file")
-
-            if item_type == "directory":
-                # Scan subdirectory
-                try:
-                    sub_items = fs.ls(item["name"], detail=True)
-                    sub_files = []
-                    sub_dirs = []
-                    for si in sub_items:
-                        si_name = si.get("name", "").split("/")[-1]
-                        if si.get("type") == "directory":
-                            sub_dirs.append(si_name)
-                        else:
-                            sub_files.append(si_name)
-                    folders[name] = sub_files
-                    if sub_dirs:
-                        subfolders[name] = sub_dirs
-                except Exception:
-                    folders[name] = []
-            else:
-                if "" not in folders:
-                    folders[""] = []
-                folders[""].append(name)
-
-        # Build structure
-        structure = []
-        total_files = 0
+    else:
+        # Storage connection - group by folder
+        folder_map: Dict[str, List[str]] = {}
         format_counts: Dict[str, int] = {}
-        suggested_sources = []
 
-        for folder_path, files in folders.items():
-            file_count = len(files)
-            total_files += file_count
+        if catalog.files:
+            for file in catalog.files:
+                folder = file.namespace or "(root)"
+                if folder not in folder_map:
+                    folder_map[folder] = []
+                folder_map[folder].append(file.name)
 
-            # Count formats
+                # Track formats
+                if file.format:
+                    format_counts[file.format] = format_counts.get(file.format, 0) + 1
+
+        for folder_name, files in folder_map.items():
+            # Group files by format
             folder_formats: Dict[str, int] = {}
             for f in files:
-                ext = Path(f).suffix.lower().lstrip(".")
-                if ext:
-                    folder_formats[ext] = folder_formats.get(ext, 0) + 1
-                    format_counts[ext] = format_counts.get(ext, 0) + 1
+                ext = Path(f).suffix.lower().lstrip(".") or "unknown"
+                folder_formats[ext] = folder_formats.get(ext, 0) + 1
 
-            # Detect pattern
             pattern = _detect_pattern(files)
 
-            # Get subfolder info for this folder
-            folder_subfolders = subfolders.get(folder_path, [])
-
             folder_info = FolderInfo(
-                path=folder_path or "(root)",
-                file_count=file_count,
+                path=folder_name,
+                file_count=len(files),
                 pattern=pattern,
                 formats=folder_formats,
                 sample_files=files[:5],
             )
-            # Add subfolder info if present (FolderInfo may not have this field, add to sample_files note)
-            if folder_subfolders and file_count == 0:
-                # Override sample_files to show subfolders when no files
-                folder_info.sample_files = [f"[FOLDER] {sf}/" for sf in folder_subfolders[:5]]
-                folder_info.pattern = f"contains {len(folder_subfolders)} subfolder(s) - drill deeper with map_environment"
             structure.append(folder_info)
 
-            # Suggest first file of each format
+            # Add first 3 files to suggested sources
             for f in files[:3]:
-                full_file_path = f"{path}/{folder_path}/{f}" if folder_path else f"{path}/{f}"
+                full_file_path = (
+                    f"{path}/{folder_name}/{f}" if folder_name != "(root)" else f"{path}/{f}"
+                )
                 full_file_path = full_file_path.strip("/")
                 if full_file_path not in suggested_sources:
                     suggested_sources.append(full_file_path)
 
-            # If folder has subfolders but no files, suggest drilling into first subfolder
-            if folder_subfolders and file_count == 0:
-                for sf in folder_subfolders[:2]:
-                    drill_path = f"{path}/{folder_path}/{sf}" if folder_path else f"{path}/{sf}"
-                    drill_path = drill_path.strip("/")
-                    if drill_path not in suggested_sources:
-                        suggested_sources.append(drill_path)
-
-        # Generate recommendations
-        recommendations = []
-        if format_counts.get("csv", 0) > 5:
-            recommendations.append(
-                f"Found {format_counts['csv']} CSV files - consider batch profiling"
-            )
-        if format_counts.get("parquet", 0) > 0:
-            recommendations.append("Parquet files detected - schema is embedded, simpler to ingest")
-        if any(fi.pattern and "partition" in (fi.pattern or "").lower() for fi in structure):
-            recommendations.append("Date partitioning detected - configure incremental loading")
-
-        return MapEnvironmentResponse(
-            connection=connection,
-            connection_type="storage",
-            scanned_at=scanned_at,
-            summary={
-                "total_files": total_files,
-                "total_folders": len(folders),
-                "by_format": format_counts,
-            },
-            structure=structure,
-            recommendations=recommendations
-            + [
+    # Generate recommendations
+    recommendations = list(catalog.suggestions) if catalog.suggestions else []
+    if conn_type == "storage":
+        recommendations.extend(
+            [
                 "WORKFLOW: Call profile_source for each file you want to ingest, then generate_bronze_node, then test_node",
-                f"START WITH: profile_source(connection='{connection}', path='{suggested_sources[0] if suggested_sources else ''}')",
-            ],
-            next_step="profile_source",
-            suggested_sources=suggested_sources[:10],
-            errors=[],
+                f"START WITH: profile_source(connection='{conn_name}', path='{suggested_sources[0] if suggested_sources else ''}')",
+            ]
         )
 
-    except Exception as e:
-        logger.exception(f"Error mapping storage: {connection}")
-        return MapEnvironmentResponse(
-            connection=connection,
-            connection_type="storage",
-            scanned_at=scanned_at,
-            summary={},
-            structure=[],
-            errors=[str(e)],
-        )
+    # Build summary
+    summary = {
+        "total_datasets": catalog.total_datasets,
+        "formats": catalog.formats,
+    }
+    if conn_type == "sql":
+        summary["total_tables"] = len(catalog.tables) if catalog.tables else 0
+        summary["total_schemas"] = len(structure)
+    else:
+        summary["total_files"] = len(catalog.files) if catalog.files else 0
+        summary["total_folders"] = len(structure)
 
-
-def _map_sql(connection: str, conn, scanned_at: datetime) -> MapEnvironmentResponse:
-    """Map a SQL connection."""
-    try:
-        # Query schemas and table counts
-        query = """
-        SELECT
-            TABLE_SCHEMA,
-            COUNT(*) as table_count
-        FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_TYPE = 'BASE TABLE'
-        GROUP BY TABLE_SCHEMA
-        ORDER BY table_count DESC
-        """
-
-        # Try different execute methods based on connection type
-        if hasattr(conn, "execute_sql"):
-            result = conn.execute_sql(query)
-        elif hasattr(conn, "execute"):
-            result = conn.execute(query)
-        elif hasattr(conn, "read_sql_query"):
-            df = conn.read_sql_query(query)
-            result = df.values.tolist()
-        else:
-            raise AttributeError("No suitable execute method found")
-
-        structure = []
-        suggested_sources = []
-        total_tables = 0
-
-        for row in result:
-            if isinstance(row, (tuple, list)):
-                schema_name, table_count = row[0], row[1]
-            elif hasattr(row, "get"):
-                schema_name = row.get("TABLE_SCHEMA")
-                table_count = row.get("table_count")
-            else:
-                # pyodbc.Row or similar - access by index
-                schema_name, table_count = row[0], row[1]
-
-            total_tables += table_count
-
-            # Get sample tables
-            tables_query = f"""
-            SELECT TOP 5 TABLE_NAME
-            FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_SCHEMA = '{schema_name}'
-            AND TABLE_TYPE = 'BASE TABLE'
-            """
-            if hasattr(conn, "execute_sql"):
-                tables_result = conn.execute_sql(tables_query)
-            elif hasattr(conn, "execute"):
-                tables_result = conn.execute(tables_query)
-            elif hasattr(conn, "read_sql_query"):
-                tables_result = conn.read_sql_query(tables_query).values.tolist()
-            else:
-                tables_result = []
-            sample_tables = []
-            for r in tables_result:
-                if isinstance(r, (tuple, list)):
-                    sample_tables.append(r[0])
-                elif hasattr(r, "get"):
-                    sample_tables.append(r.get("TABLE_NAME"))
-                else:
-                    sample_tables.append(r[0])
-
-            schema_info = SchemaInfo(
-                name=schema_name,
-                table_count=table_count,
-                sample_tables=sample_tables,
-            )
-            structure.append(schema_info)
-
-            # Add to suggested sources
-            for t in sample_tables[:2]:
-                suggested_sources.append(f"{schema_name}.{t}")
-
-        recommendations = []
-        if total_tables > 50:
-            recommendations.append(
-                f"Large database with {total_tables} tables - prioritize key entities"
-            )
-
-        return MapEnvironmentResponse(
-            connection=connection,
-            connection_type="sql",
-            scanned_at=scanned_at,
-            summary={
-                "total_tables": total_tables,
-                "total_schemas": len(structure),
-            },
-            structure=structure,
-            recommendations=recommendations,
-            next_step="profile_source",
-            suggested_sources=suggested_sources[:10],
-            errors=[],
-        )
-
-    except Exception as e:
-        logger.exception(f"Error mapping SQL: {connection}")
-        return MapEnvironmentResponse(
-            connection=connection,
-            connection_type="sql",
-            scanned_at=scanned_at,
-            summary={},
-            structure=[],
-            errors=[str(e)],
-        )
+    return MapEnvironmentResponse(
+        connection=conn_name,
+        connection_type=conn_type,
+        scanned_at=catalog.generated_at,
+        summary=summary,
+        structure=structure,
+        recommendations=recommendations,
+        next_step=catalog.next_step or "profile_source",
+        suggested_sources=suggested_sources[:10],
+        errors=[],
+    )
 
 
 def profile_source(
     connection: str | dict, path: str, max_attempts: int = 5
 ) -> ProfileSourceResponse:
     """
-    Self-correcting profiler that figures out how to read a source.
-
-    Iterates through encoding/delimiter combinations until data looks right.
+    Profile a data source - delegates to core conn.profile().
 
     Args:
         connection: Either a connection name (str) or inline spec (dict).
@@ -789,26 +635,136 @@ def profile_source(
                 "password": "${SQL_PASSWORD}"
             }
         path: Path to the source (e.g., "schema.table" for SQL, "folder/file.csv" for storage)
-        max_attempts: Max attempts for CSV encoding/delimiter detection
+        max_attempts: Max attempts for CSV encoding/delimiter detection (kept for compatibility)
     """
     from odibi_mcp.context import resolve_connection
+    from odibi.discovery.types import TableProfile
 
     conn_name = connection if isinstance(connection, str) else "inline"
 
     try:
         conn, conn_name = resolve_connection(connection)
-    except Exception as e:
+        logger.info(f"profile_source: delegating to {conn_name}.profile(dataset='{path}')")
+
+        # Call core's profile method
+        profile_dict = conn.profile(dataset=path, sample_rows=1000)
+        profile = TableProfile(**profile_dict)
+
+        # Transform core response to MCP contract
+        return _transform_profile_to_mcp_response(profile, conn_name, path)
+
+    except NotImplementedError as e:
+        logger.warning(f"Connection {conn_name} doesn't support profiling: {e}")
         return ProfileSourceResponse(
             connection=conn_name,
             path=path,
             source_type="unknown",
-            errors=[f"Connection error: {e}"],
+            errors=[f"Connection type doesn't support profiling: {e}"],
+        )
+    except Exception as e:
+        logger.exception(f"Error profiling source: {conn_name}/{path}")
+        return ProfileSourceResponse(
+            connection=conn_name,
+            path=path,
+            source_type="unknown",
+            errors=[f"Profiling error: {e}"],
         )
 
-    if _is_sql_connection(conn):
-        return _profile_sql_table(conn_name, conn, path)
-    else:
-        return _profile_file(conn_name, conn, path, max_attempts)
+
+def _transform_profile_to_mcp_response(
+    profile: "TableProfile", conn_name: str, path: str
+) -> ProfileSourceResponse:
+    """Transform core TableProfile to MCP ProfileSourceResponse."""
+
+    # Determine source type from dataset format or path
+    dataset = profile.dataset
+    source_type = dataset.format or "unknown"
+    if source_type == "unknown":
+        suffix = Path(path).suffix.lower().lstrip(".")
+        source_type = suffix if suffix else "unknown"
+
+    # Transform columns from core Column to MCP ColumnInfo
+    schema = []
+    for col in profile.columns:
+        schema.append(
+            ColumnInfo(
+                name=col.name,
+                dtype=col.dtype,
+                nullable=col.nullable if col.nullable is not None else True,
+                null_count=col.null_count,
+                null_pct=col.null_pct,
+                cardinality=col.cardinality,
+                distinct_count=col.distinct_count,
+                sample_values=col.sample_values or [],
+                detected_pattern=col.detected_pattern,
+                suggested_transform=None,  # Core doesn't provide this yet
+            )
+        )
+
+    # Generate Odibi suggestions based on profile
+    suggestions = _generate_odibi_suggestions(
+        schema, source_type, path, profile.candidate_keys, profile.candidate_watermarks
+    )
+
+    # Build file options (for file sources)
+    file_options = None
+    if source_type in ("csv", "txt"):
+        # Extract options from profile warnings/suggestions if present
+        file_options = FileOptions(
+            encoding="utf-8",  # Default, core should enhance to include this
+            delimiter=",",  # Default, core should enhance to include this
+            skip_rows=0,
+            header_row=0,
+        )
+
+    # Create ready_for dict for chaining
+    ready_for = {
+        "connection": conn_name,
+        "path": path,
+        "source_type": source_type,
+        "schema": [{"name": c.name, "dtype": c.dtype} for c in schema],
+    }
+
+    if file_options:
+        ready_for["options"] = {
+            "encoding": file_options.encoding,
+            "delimiter": file_options.delimiter,
+            "skipRows": file_options.skip_rows,
+        }
+
+    # For SQL sources, add schema/table names
+    if dataset.kind in ("table", "view"):
+        if "." in path:
+            schema_name, table_name = path.split(".", 1)
+            ready_for["schema_name"] = schema_name
+            ready_for["table_name"] = table_name
+
+    # Build validation result
+    validation = ValidationResult(
+        column_count_consistent=True,  # Core assumes this
+        mojibake_detected=False,
+        empty_columns=[],
+        type_consistency={},
+    )
+
+    return ProfileSourceResponse(
+        connection=conn_name,
+        path=path,
+        source_type=source_type,
+        attempts=1,
+        confidence=0.95 if profile.completeness and profile.completeness > 0.9 else 0.85,
+        file_options=file_options,
+        schema=schema,
+        sample_rows=[],  # Core doesn't return sample rows yet
+        validation=validation,
+        candidate_keys=profile.candidate_keys,
+        candidate_watermarks=profile.candidate_watermarks,
+        suggestions=suggestions,
+        warnings=profile.warnings or [],
+        errors=[],
+        next_step="generate_bronze_node",
+        ready_for=ready_for,
+    )
 
 
 def _profile_file(connection: str, conn, path: str, max_attempts: int) -> ProfileSourceResponse:

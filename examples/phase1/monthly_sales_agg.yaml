@@ -1,0 +1,48 @@
+pipelines:
+- pipeline: aggregate_monthly_sales
+  layer: gold
+  freshness_anchor: run_completion
+  nodes:
+  - name: aggregation_node
+    enabled: true
+    tags: []
+    depends_on: []
+    columns: {}
+    read:
+      connection: warehouse
+      format: sql
+      table: gold.fact_orders
+      streaming: false
+      archive_options: {}
+      options: {}
+    write:
+      connection: warehouse
+      format: delta
+      path: gold/agg_monthly_sales
+      mode: overwrite
+      partition_by: []
+      zorder_by: []
+      table_properties: {}
+      merge_schema: false
+      overwrite_schema: false
+      options: {}
+      skip_if_unchanged: false
+    streaming: false
+    transformer: aggregation
+    params:
+      grain:
+      - customer_id
+      - year_month
+      measures:
+      - COUNT(*) as order_count
+      - SUM(total_amount) as total_revenue
+      - SUM(quantity) as total_quantity
+      - AVG(total_amount) as avg_order_value
+      - MIN(order_date) as first_order_date
+      - MAX(order_date) as last_order_date
+    pre_sql: []
+    post_sql: []
+    cache: false
+    on_error: fail_later
+    contracts: []
+    sensitive: false

@@ -6,12 +6,28 @@ Be action-oriented. Execute tasks directly.
 
 ## USEFUL TOOLS
 
-### Data Exploration → odibi-knowledge
+### Data Exploration → odibi MCP
 ```
-map_environment(conn, path)    ← See files/tables in ADLS, SQL, local
-profile_source(conn, path)     ← Get schema, sample data, stats
-profile_folder(conn, folder)   ← Batch profile files
+map_environment(conn, path)        ← Discover files/tables
+profile_source(conn, path)         ← Get schema, stats, suggestions
+list_patterns()                    ← See 6 available patterns
+list_transformers(search="...")    ← Find transformers
 ```
+
+### Pipeline Building → odibi MCP
+```
+apply_pattern_template(...)        ← Generate simple pipeline (1 call)
+create_pipeline(name)              ← Start multi-node builder
+add_node(session_id, name)         ← Add nodes incrementally
+configure_read/write/transform     ← Configure nodes
+render_pipeline_yaml(session_id)   ← Finalize to YAML
+validate_pipeline(yaml)            ← Check for errors
+```
+
+### CRITICAL: Never Write YAML Manually!
+- ❌ DON'T write: `nodes:`, `read:`, `write:` strings
+- ✅ DO call: MCP tools that generate YAML
+- Tools enforce correctness, prevent hallucination
 
 ### File Operations → odibi-fileops
 ```
@@ -38,15 +54,29 @@ browser_type(ref, text)        ← Type text
 
 ---
 
-## ODIBI DOCS
+## ODIBI MCP RESOURCES (Auto-Loaded!)
 
-Browse when needed: https://henryodibi11.github.io/Odibi/
+You have automatic access to 13 documentation resources:
+- ⚡ Quick Reference - Views, modes, gotchas (read first!)
+- ⚡ AI Instructions - Tool workflows
+- Complete Capabilities - ALL features
+- Pattern guides - How to use each pattern
+- Deep Context - 2,200 line complete reference
 
-Key pages:
-- `/reference/yaml_schema/` - YAML structure
-- `/patterns/` - All patterns
-- `/features/transformers/` - Transformers
-- `/troubleshooting/` - Common errors
+**No need to browse docs - they're loaded automatically via MCP!**
+
+When unsure: Reference the MCP resources or call discovery tools.
+
+## CRITICAL FIELD NAMES
+
+✅ Use: `read:`, `write:`, `query:`, `transform:`
+❌ NEVER: `source:`, `sink:`, `inputs:`, `outputs:`, `sql:`
+
+## CRITICAL REQUIREMENTS
+
+- Upsert/append_once: MUST have `options: {keys: [...]}`
+- Node names: alphanumeric_underscore only
+- Views: YES - all engines support via `table: schema.ViewName`
 
 ---
 

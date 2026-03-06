@@ -1,0 +1,33 @@
+pipelines:
+- pipeline: generate_date_dim
+  layer: gold
+  freshness_anchor: run_completion
+  nodes:
+  - name: date_dimension_node
+    enabled: true
+    tags: []
+    depends_on: []
+    columns: {}
+    write:
+      connection: warehouse
+      format: delta
+      path: gold/dim_date
+      mode: overwrite
+      partition_by: []
+      zorder_by: []
+      table_properties: {}
+      merge_schema: false
+      overwrite_schema: false
+      options: {}
+      skip_if_unchanged: false
+    streaming: false
+    transformer: date_dimension
+    params:
+      start_date: '2020-01-01'
+      end_date: '2030-12-31'
+    pre_sql: []
+    post_sql: []
+    cache: false
+    on_error: fail_later
+    contracts: []
+    sensitive: false
