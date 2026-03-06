@@ -124,7 +124,7 @@ def cmd_scaffold_sql_pipeline(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     """Validate YAML file."""
-    from odibi.pipeline import PipelineManager
+    from odibi.validate.pipeline import validate_yaml
 
     try:
         yaml_file = Path(args.file)
@@ -133,8 +133,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
             return 1
 
         yaml_content = yaml_file.read_text()
-        pm = PipelineManager()
-        result = pm.validate_yaml(yaml_content)
+        result = validate_yaml(yaml_content)
 
         if args.format == "json":
             print(json.dumps(result, indent=2))

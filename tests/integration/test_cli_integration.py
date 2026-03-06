@@ -14,17 +14,17 @@ class TestCLIHelp:
         result = subprocess.run(["python", "-m", "odibi", "--help"], capture_output=True, text=True)
         assert result.returncode == 0
         output = result.stdout + result.stderr
-        assert "run" in output.lower()
+        assert "discover" in output.lower()
         assert "validate" in output.lower()
 
-    def test_cli_run_help(self):
-        """CLI run --help should work."""
+    def test_cli_discover_help(self):
+        """CLI discover --help should work."""
         result = subprocess.run(
-            ["python", "-m", "odibi", "run", "--help"], capture_output=True, text=True
+            ["python", "-m", "odibi", "discover", "--help"], capture_output=True, text=True
         )
         assert result.returncode == 0
         output = result.stdout + result.stderr
-        assert "config" in output.lower()
+        assert "connection" in output.lower()
 
     def test_cli_validate_help(self):
         """CLI validate --help should work."""
@@ -33,7 +33,7 @@ class TestCLIHelp:
         )
         assert result.returncode == 0
         output = result.stdout + result.stderr
-        assert "config" in output.lower()
+        assert "file" in output.lower()
 
 
 class TestCLIValidateCommand:
@@ -65,8 +65,9 @@ class TestCLIValidateCommand:
         config_file = tmp_path / "valid.yaml"
         config_file.write_text(
             """
-project: Test Project
-engine: pandas
+project:
+  name: Test Project
+  engine: pandas
 connections:
   local:
     type: local
