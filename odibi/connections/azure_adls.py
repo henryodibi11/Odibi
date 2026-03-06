@@ -643,6 +643,8 @@ class AzureADLS(BaseConnection):
         include_stats: bool = False,
         limit: int = 200,
         recursive: bool = True,
+        path: str = "",
+        pattern: str = "",
     ) -> Dict[str, Any]:
         """Discover datasets in ADLS container.
 
@@ -651,6 +653,8 @@ class AzureADLS(BaseConnection):
             include_stats: Include row counts and stats
             limit: Maximum datasets to return
             recursive: Recursively scan all subfolders (default: True)
+            path: Scope search to specific subfolder in container
+            pattern: Filter by pattern (e.g. "*.csv", "sales_*")
 
         Returns:
             CatalogSummary dict
@@ -668,9 +672,18 @@ class AzureADLS(BaseConnection):
             fs = self._get_fs()
             base_path = f"{self.container}/{self.path_prefix}".strip("/")
 
+            # Use path parameter to scope search
+            if path:
+                base_path = f"{base_path}/{path}".strip("/")
+
             folders = []
             files = []
             formats = {}
+
+            # Compile pattern for filtering if provided
+            import fnmatch
+
+            has_pattern = bool(pattern)
 
             # Use walk for recursive or ls for shallow
             if recursive:
@@ -693,8 +706,14 @@ class AzureADLS(BaseConnection):
                 if len(folders) + len(files) >= limit:
                     break
 
+                entry_name = entry["name"].split("/")[-1]
+
+                # Apply pattern filter if specified
+                if has_pattern and not fnmatch.fnmatch(entry_name, pattern):
+                    continue
+
                 if entry["type"] == "directory":
-                    folder_name = entry["name"].split("/")[-1]
+                    folder_name = entry_name
                     file_format = detect_file_format(entry["name"], fs)
 
                     folders.append(
@@ -711,7 +730,7 @@ class AzureADLS(BaseConnection):
                         formats[file_format] = formats.get(file_format, 0) + 1
 
                 elif entry["type"] == "file":
-                    file_name = entry["name"].split("/")[-1]
+                    file_name = entry_name
                     file_format = infer_format_from_path(file_name)
 
                     files.append(

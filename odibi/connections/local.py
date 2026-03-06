@@ -220,6 +220,8 @@ class LocalConnection(BaseConnection):
         include_stats: bool = False,
         limit: int = 200,
         recursive: bool = True,
+        path: str = "",
+        pattern: str = "",
     ) -> Dict[str, Any]:
         """Discover datasets in local filesystem.
 
@@ -228,6 +230,8 @@ class LocalConnection(BaseConnection):
             include_stats: Include row counts and stats
             limit: Maximum datasets to return
             recursive: Recursively scan all subfolders (default: True)
+            path: Scope search to specific subfolder
+            pattern: Filter by glob pattern (e.g. "*.csv", "sales_*")
 
         Returns:
             CatalogSummary dict
@@ -254,11 +258,23 @@ class LocalConnection(BaseConnection):
             files = []
             formats = {}
 
+            # Determine search root - use path parameter to scope search
+            search_root = self.base_path / path if path else self.base_path
+            if not search_root.exists():
+                ctx.warning(f"Path not found: {search_root}")
+                return CatalogSummary(
+                    connection_name=self.base_path_str,
+                    connection_type="local",
+                    total_datasets=0,
+                    next_step=f"Path '{path}' not found in {self.base_path_str}",
+                ).model_dump()
+
             # Use rglob for recursive or iterdir for shallow
+            search_pattern = pattern if pattern else "*"
             if recursive:
-                items_to_scan = list(self.base_path.rglob("*"))
+                items_to_scan = list(search_root.rglob(search_pattern))
             else:
-                items_to_scan = list(self.base_path.iterdir())
+                items_to_scan = list(search_root.glob(search_pattern))
 
             for item in items_to_scan:
                 if len(folders) + len(files) >= limit:

@@ -36,6 +36,8 @@ class BaseConnection(ABC):
         include_stats: bool = False,
         limit: int = 200,
         recursive: bool = True,
+        path: str = "",
+        pattern: str = "",
     ) -> Dict[str, Any]:
         """Discover available datasets (tables/files) in this connection.
 
@@ -44,6 +46,8 @@ class BaseConnection(ABC):
             include_stats: Include row counts and stats
             limit: Max datasets to return per namespace
             recursive: Recursively scan all subfolders/schemas (default: True)
+            path: Scope search to specific subfolder/schema
+            pattern: Filter by pattern (e.g. "*.csv", "fact_*")
 
         Returns:
             CatalogSummary dict with datasets

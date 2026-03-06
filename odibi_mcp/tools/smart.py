@@ -448,7 +448,9 @@ def _validate_dataframe(df, sample_text: str = "") -> ValidationResult:
     )
 
 
-def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentResponse:
+def map_environment(
+    connection: str | dict, path: str = "", pattern: str = "", limit: int = 500
+) -> MapEnvironmentResponse:
     """
     Scout a connection to understand what exists - delegates to core discover_catalog().
 
@@ -466,7 +468,9 @@ def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentRes
                 "username": "${SQL_USER}",
                 "password": "${SQL_PASSWORD}"
             }
-        path: Optional path to scan (for storage connections)
+        path: Scope search to specific subfolder/schema (e.g. "raw/sales")
+        pattern: Filter by pattern (e.g. "*.csv", "fact_*")
+        limit: Maximum datasets to return (default: 500)
     """
     from odibi_mcp.context import resolve_connection
     from odibi.discovery.types import CatalogSummary
@@ -479,7 +483,12 @@ def map_environment(connection: str | dict, path: str = "") -> MapEnvironmentRes
 
         # Call core's discover_catalog with stats and recursive=True for deep scanning
         catalog_dict = conn.discover_catalog(
-            include_schema=True, include_stats=True, limit=500, recursive=True
+            include_schema=True,
+            include_stats=True,
+            limit=limit,
+            recursive=True,
+            path=path,
+            pattern=pattern,
         )
         catalog = CatalogSummary(**catalog_dict)
 
