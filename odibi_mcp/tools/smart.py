@@ -481,12 +481,13 @@ def map_environment(
         conn, conn_name = resolve_connection(connection)
         logger.info(f"map_environment: delegating to {conn_name}.discover_catalog()")
 
-        # Call core's discover_catalog with stats and recursive=True for deep scanning
+        # Call core's discover_catalog - SHALLOW by default for speed
+        # Shows immediate children only. User drills deeper with path parameter.
         catalog_dict = conn.discover_catalog(
             include_schema=True,
             include_stats=True,
             limit=limit,
-            recursive=True,
+            recursive=False,  # SHALLOW scan - fast! User drills with path="folder"
             path=path,
             pattern=pattern,
         )

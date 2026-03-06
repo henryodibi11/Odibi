@@ -1127,14 +1127,18 @@ Returns complete pipeline YAML with all nodes configured.""",
             name="map_environment",
             description="""🔍 SCOUT a connection to discover what data exists. START HERE for any new data source.
 
-BEHAVIOR - BE PERSISTENT:
-1. Call with path="" to see root level
-2. If you see "[FOLDER]" entries or "contains N subfolder(s)" → ALWAYS drill deeper by calling again with that folder path
-3. Keep drilling until you find actual files (CSV, Parquet, Excel, JSON)
-4. NEVER stop at the first level if you only see folders
+⚡ PERFORMANCE: Shallow scan by default (shows immediate children only). FAST even on huge containers.
 
-FILTERING OPTIONS (use when you hit 500 limit or need specific files):
-- path: Scope to specific folder/schema
+BEHAVIOR - BE PERSISTENT:
+1. Call with path="" to see root level (shows folders/files at top level ONLY)
+2. If you see "[FOLDER]" entries → ALWAYS drill deeper: map_environment(conn, path="folder_name")
+3. Keep drilling until you find actual data files
+4. NEVER stop at folders - you must find the actual CSV/Parquet/Excel files
+
+WHY IT'S FAST: Only scans the current directory level, not the entire tree.
+
+FILTERING OPTIONS:
+- path: Drill into specific folder (e.g., path="raw/sales")
 - pattern: Filter by glob (*.csv, fact_*, sales_2024_*)
 - limit: Increase from 500 if needed
 
