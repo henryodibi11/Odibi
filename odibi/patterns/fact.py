@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
@@ -83,6 +83,18 @@ class FactPattern(Pattern):
                 _rejected_at: true
                 _source_dimension: true
     """
+
+    required_params: ClassVar[List[str]] = []
+    optional_params: ClassVar[List[str]] = [
+        "grain",
+        "dimensions",
+        "orphan_handling",
+        "quarantine",
+        "measures",
+        "audit",
+        "deduplicate",
+        "keys",
+    ]
 
     def validate(self) -> None:
         """Validate fact pattern configuration parameters.

@@ -11,8 +11,8 @@ def make_node(name, depends_on=None, inputs=None, type_=None):
     """
     node = NodeConfig(
         name=name,
-        read={"connection": "dummy_conn", "format": "dummy_format", "path": "dummy_path"},
-        write={"connection": "dummy_conn", "format": "dummy_format", "path": "dummy_path"},
+        read={"connection": "dummy_conn", "format": "csv", "path": "dummy_path"},
+        write={"connection": "dummy_conn", "format": "csv", "path": "dummy_path"},
         depends_on=depends_on or [],
         inputs=inputs or {},
     )
@@ -150,7 +150,7 @@ class TestDependencyGraph:
 
         node_b = NodeConfig.model_construct(
             name="B",
-            write={"connection": "dummy_conn", "format": "dummy_format", "path": "dummy_path"},
+            write={"connection": "dummy_conn", "format": "csv", "path": "dummy_path"},
             depends_on=[],
             inputs={"input1": "$pipeline1.A"},
         )

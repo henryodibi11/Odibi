@@ -2643,7 +2643,7 @@ class NodeExecutor:
             source_table = read_config.table
 
             # Determine if file source based on format
-            read_format = str(read_config.format).lower()
+            read_format = read_config.format.value
             file_formats = {"csv", "parquet", "json", "avro", "excel"}
             is_file_source = read_format in file_formats
 
@@ -2677,7 +2677,7 @@ class NodeExecutor:
             Dict with 'should_skip' (bool) and 'hash' (str)
         """
         write_config = config.write
-        format_str = str(write_config.format).lower()
+        format_str = write_config.format.value
 
         if format_str != "delta":
             from odibi.utils.logging import logger

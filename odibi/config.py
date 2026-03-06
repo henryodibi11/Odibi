@@ -934,6 +934,11 @@ class ReadFormat(str, Enum):
     * `json` - JSON format (newline-delimited or array)
     * `sql` - SQL query against database connection
     * `api` - REST API endpoint
+    * `excel` - Excel workbook files (.xlsx, .xls)
+    * `avro` - Apache Avro serialization format
+    * `cloudFiles` - Databricks Auto Loader (Spark only)
+    * `sql_server` - Microsoft SQL Server via JDBC/pyodbc
+    * `azure_sql` - Azure SQL Database (alias for sql_server)
     """
 
     CSV = "csv"
@@ -942,6 +947,11 @@ class ReadFormat(str, Enum):
     JSON = "json"
     SQL = "sql"
     API = "api"
+    EXCEL = "excel"
+    AVRO = "avro"
+    CLOUD_FILES = "cloudFiles"
+    SQL_SERVER = "sql_server"
+    AZURE_SQL = "azure_sql"
 
 
 # =============================================================================
@@ -1449,7 +1459,9 @@ class ReadConfig(BaseModel):
     """
 
     connection: str = Field(description="Connection name from project.yaml")
-    format: Union[ReadFormat, str] = Field(description="Data format (csv, parquet, delta, etc.)")
+    format: ReadFormat = Field(
+        description="Data format: csv, parquet, delta, json, sql, api, excel, avro, cloudFiles"
+    )
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based sources")
     streaming: bool = Field(default=False, description="Enable streaming read (Spark only)")
@@ -2981,7 +2993,9 @@ class WriteConfig(BaseModel):
     """
 
     connection: str = Field(description="Connection name from project.yaml")
-    format: Union[ReadFormat, str] = Field(description="Output format (csv, parquet, delta, etc.)")
+    format: ReadFormat = Field(
+        description="Output format: csv, parquet, delta, json, sql, api, excel, avro, cloudFiles"
+    )
     table: Optional[str] = Field(default=None, description="Table name for SQL/Delta")
     path: Optional[str] = Field(default=None, description="Path for file-based outputs")
     register_table: Optional[str] = Field(
@@ -3100,6 +3114,16 @@ class WriteConfig(BaseModel):
             raise ValueError(
                 "WriteConfig: 'merge_keys' is required when mode='merge'. "
                 "Specify the key columns for the MERGE ON clause."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_upsert_append_once_keys(self):
+        """Ensure 'keys' is provided in options when mode is upsert or append_once."""
+        if self.mode in (WriteMode.UPSERT, WriteMode.APPEND_ONCE) and not self.options.get("keys"):
+            raise ValueError(
+                f"WriteConfig: 'keys' is required in options when mode='{self.mode.value}'. "
+                "Specify the key columns used to identify unique records."
             )
         return self
 
@@ -3685,6 +3709,33 @@ class NodeConfig(BaseModel):
             raise ValueError(
                 f"Node '{self.name}': 'transformer' is set but 'params' is empty. "
                 "Either remove transformer or provide matching params."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_pattern_required_params(self):
+        """Validate that required pattern params are present when a known pattern is used."""
+        if not self.transformer or not self.params:
+            return self
+        # Lazy import to avoid circular dependency (patterns import config)
+        from odibi.patterns import _PATTERNS
+
+        pattern_cls = _PATTERNS.get(self.transformer)
+        if pattern_cls is None:
+            return self
+        aliases = getattr(pattern_cls, "param_aliases", {})
+        missing = []
+        for p in pattern_cls.required_params:
+            if self.params.get(p):
+                continue
+            alt_names = aliases.get(p, [])
+            if not any(self.params.get(a) for a in alt_names):
+                missing.append(p)
+        if missing:
+            raise ValueError(
+                f"Node '{self.name}': Pattern '{self.transformer}' requires params {missing}. "
+                f"Provided: {list(self.params.keys())}. "
+                f"Optional params: {pattern_cls.optional_params}."
             )
         return self
 

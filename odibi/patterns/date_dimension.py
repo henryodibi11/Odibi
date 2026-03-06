@@ -1,6 +1,6 @@
 import time
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, ClassVar, List, Optional
 
 import pandas as pd
 
@@ -46,6 +46,14 @@ class DateDimensionPattern(Pattern):
         - is_year_start: First day of year
         - is_year_end: Last day of year
     """
+
+    required_params: ClassVar[List[str]] = ["start_date", "end_date"]
+    optional_params: ClassVar[List[str]] = [
+        "date_key_format",
+        "fiscal_year_start_month",
+        "include_time",
+        "unknown_member",
+    ]
 
     def validate(self) -> None:
         """Validate date dimension pattern configuration parameters.

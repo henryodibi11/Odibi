@@ -505,7 +505,7 @@ class TestExecuteTransformerNode:
         executor = _make_executor(
             mock_context, mock_engine, connections, performance_config=perf_config
         )
-        config = _make_config(transformer="merge", params={"key": ["id"]})
+        config = _make_config(transformer="merge", params={"keys": ["id"], "target": "/t"})
 
         executor._execute_transformer_node(config, None)
 
@@ -682,7 +682,9 @@ class TestExecuteTransformPhase:
         mock_get_pattern.return_value = pattern_cls
 
         executor = _make_executor(mock_context, mock_engine, connections)
-        config = _make_config(transformer="dimension", params={"key": ["id"]})
+        config = _make_config(
+            transformer="dimension", params={"natural_key": "id", "surrogate_key": "id_sk"}
+        )
         df = pd.DataFrame({"id": [1]})
 
         executor._execute_transform_phase(config, df, None)
@@ -738,7 +740,7 @@ class TestExecuteTransformPhase:
         executor = _make_executor(mock_context, mock_engine, connections, catalog_manager=catalog)
         config = _make_config(
             transformer="dimension",
-            params={"key": ["id"]},
+            params={"natural_key": "id", "surrogate_key": "id_sk"},
             write={"connection": "dst", "format": "csv", "path": "out.csv"},
         )
         df = pd.DataFrame({"id": [1]})

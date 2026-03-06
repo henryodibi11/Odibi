@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, ClassVar, List
 
 from odibi.context import EngineContext
 from odibi.patterns.base import Pattern
@@ -20,6 +20,14 @@ class SCD2Pattern(Pattern):
         - **valid_to_col** (str): Name of end date column (default: valid_to).
         - **is_current_col** (str): Name of current flag column (default: is_current).
     """
+
+    required_params: ClassVar[List[str]] = ["keys", "target"]
+    optional_params: ClassVar[List[str]] = [
+        "time_col",
+        "valid_from_col",
+        "valid_to_col",
+        "is_current_col",
+    ]
 
     def validate(self) -> None:
         """Validate SCD2 pattern configuration parameters.

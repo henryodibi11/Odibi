@@ -1,7 +1,7 @@
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 
 from odibi.config import NodeConfig
 from odibi.context import EngineContext
@@ -12,6 +12,10 @@ from odibi.utils.logging_context import get_logging_context
 
 class Pattern(ABC):
     """Base class for Execution Patterns."""
+
+    required_params: ClassVar[List[str]] = []
+    optional_params: ClassVar[List[str]] = []
+    param_aliases: ClassVar[Dict[str, List[str]]] = {}  # e.g. {"target": ["path"]}
 
     def __init__(self, engine: Engine, config: NodeConfig):
         """Initialize a pattern instance.

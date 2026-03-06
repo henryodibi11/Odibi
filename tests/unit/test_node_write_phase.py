@@ -265,6 +265,7 @@ class TestWritePhaseMergeKeys:
                 "path": "out_delta",
                 "mode": "upsert",
                 "merge_keys": ["id", "date"],
+                "options": {"keys": ["id", "date"]},
             }
         )
         df = pd.DataFrame({"id": [1], "date": ["2024-01-01"]})

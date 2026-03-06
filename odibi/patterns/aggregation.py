@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 
 from odibi.context import EngineContext
 from odibi.enums import EngineType
@@ -45,6 +45,9 @@ class AggregationPattern(Pattern):
             audit:
               load_timestamp: true
     """
+
+    required_params: ClassVar[List[str]] = ["grain", "measures"]
+    optional_params: ClassVar[List[str]] = ["incremental", "having", "audit"]
 
     def validate(self) -> None:
         """Validate aggregation pattern configuration parameters.

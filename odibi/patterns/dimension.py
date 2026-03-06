@@ -1,6 +1,6 @@
 import time
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, ClassVar, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -56,6 +56,15 @@ class DimensionPattern(Pattern):
             - Pickle: path/to/file.pickle, path/to/file.pkl
             - Connection-prefixed: warehouse.dim_customer
     """
+
+    required_params: ClassVar[List[str]] = ["natural_key", "surrogate_key"]
+    optional_params: ClassVar[List[str]] = [
+        "scd_type",
+        "track_cols",
+        "target",
+        "unknown_member",
+        "audit",
+    ]
 
     def validate(self) -> None:
         """Validate dimension pattern configuration parameters.

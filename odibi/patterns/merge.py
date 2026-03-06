@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, ClassVar, Dict, List
 
 from odibi.context import EngineContext
 from odibi.patterns.base import Pattern
@@ -16,6 +16,10 @@ class MergePattern(Pattern):
         - **keys** (list): Join keys.
         - **strategy** (str): 'upsert', 'append_only', 'delete_match'.
     """
+
+    required_params: ClassVar[List[str]] = ["keys", "target"]
+    optional_params: ClassVar[List[str]] = ["strategy"]
+    param_aliases: ClassVar[Dict[str, List[str]]] = {"target": ["path"]}
 
     def validate(self) -> None:
         """Validate merge pattern configuration parameters.
