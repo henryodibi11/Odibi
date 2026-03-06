@@ -1696,7 +1696,132 @@ The MCP tools must implement **three layers of validation**, because Pydantic al
 | **DAG integrity** | Circular deps, missing node references | `PipelineManager` at runtime | ✅ **YES — new** (Phase 2) |
 | **Format enum** | Invalid format strings like "xlsx" | `ReadFormat` enum (but config accepts `str` fallback) | ✅ **YES — constrain in MCP schema** |
 
-**Bottom line:** Pydantic validation is necessary but not sufficient. The MCP tools must replicate the runtime validation checks that currently only happen inside `PipelineManager.run()`. Without this, agents produce YAML that "validates" but crashes.
+### 19.8 Gap: `upsert` / `append_once` Require `keys` in `options` — No Pydantic Validator
+
+This is particularly nasty. `WriteConfig` has a validator for `merge` mode requiring `merge_keys`, but `upsert` and `append_once` modes require `keys` to be present **inside the `options: Dict[str, Any]`** free dict. There is **no Pydantic validator** for this — the error only surfaces deep in the engine:
+
+```python
+# pandas_engine.py line 1698
+raise ValueError("Upsert requires 'keys' in options")
+
+# pandas_engine.py line 1721
+raise ValueError("Append_once requires 'keys' in options")
+
+# spark_engine.py line 1166
+raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+
+# polars_engine.py line 496
+raise ValueError(f"Mode '{mode}' requires 'keys' list in options")
+```
+
+An agent could produce:
+```yaml
+write:
+  connection: local
+  format: delta
+  path: silver/orders
+  mode: upsert
+  # MISSING: options: {keys: [order_id]}
+```
+
+Pydantic says ✅ valid. Engine says 💥 crash.
+
+**Fix for MCP tools:** When `mode` is `upsert`, `append_once`, or `merge`:
+- `apply_pattern_template` must auto-populate `options.keys` from the `keys` param
+- `configure_write` must require `keys` param when mode is `upsert` or `append_once`
+- `validate_pipeline` must check `write.options.keys` presence for these modes
+
+```python
+def validate_write_mode_keys(write_config: dict) -> list[dict]:
+    mode = write_config.get("mode", "overwrite")
+    errors = []
+    if mode in ("upsert", "append_once"):
+        options = write_config.get("options", {})
+        if not options.get("keys"):
+            errors.append({
+                "field_path": "write.options.keys",
+                "code": "MODE_REQUIRES_KEYS",
+                "message": f"Write mode '{mode}' requires 'keys' in options",
+                "fix": f"Add 'options: {{keys: [your_key_column]}}' to write config"
+            })
+    if mode == "merge":
+        if not write_config.get("merge_keys"):
+            errors.append({
+                "field_path": "write.merge_keys",
+                "code": "MODE_REQUIRES_MERGE_KEYS",
+                "message": "Write mode 'merge' requires 'merge_keys'",
+                "fix": "Add 'merge_keys: [your_key_column]' to write config"
+            })
+    return errors
+```
+
+### 19.9 Gap: All Engine-Level Runtime Checks
+
+The engines (`pandas_engine.py`, `spark_engine.py`, `polars_engine.py`) have their own `raise ValueError` checks that happen at execution time, not at config validation. These are all things an agent could get wrong that Pydantic won't catch:
+
+| Engine Check | All 3 Engines? | Pydantic Catches It? |
+|-------------|---------------|---------------------|
+| `upsert` requires `keys` in options | ✅ Yes | ❌ No |
+| `append_once` requires `keys` in options | ✅ Yes | ❌ No |
+| `merge` requires `merge_keys` | Config-level | ✅ Yes (validator) |
+| SQL format write requires `table` | ✅ Yes | ❌ No (only file checks path/table) |
+| SQL format read requires `table` or `query` | ✅ Yes | ✅ Yes (validator) |
+| `path` or `table` must be provided for write | ✅ Yes | ✅ Yes (validator) |
+| Pivot requires `pivot_column` and `value_column` | Spark only | ❌ No |
+
+**Fix:** The MCP validation layer must replicate the top 4 checks. The rest are already covered by Pydantic validators.
+
+### 19.10 Gap: `DependencyGraph` Validation Exists But MCP Doesn't Use It
+
+Good news: `odibi/graph.py` already has complete DAG validation:
+- `_check_missing_dependencies()` — errors if `depends_on` references a non-existent node
+- `_check_cycles()` — DFS cycle detection
+- `check_cross_pipeline_cycles()` — cross-pipeline cycle detection
+
+This runs when `Pipeline` is instantiated with a list of `NodeConfig` objects.
+
+**Fix for Phase 2:** `render_pipeline_yaml` should instantiate a `DependencyGraph` from the builder state's nodes to validate the DAG before serializing. The code already exists — just needs to be called:
+
+```python
+from odibi.graph import DependencyGraph
+from odibi.exceptions import DependencyError
+
+def validate_dag(nodes: list[NodeConfig]) -> list[dict]:
+    try:
+        DependencyGraph(nodes)
+        return []
+    except DependencyError as e:
+        return [{"code": "DAG_ERROR", "message": str(e)}]
+```
+
+### 19.11 Gap: `Pipeline.validate()` Already Does Most of What We Need
+
+**Critical discovery:** `pipeline.py` lines 1688-1756 already have a `validate()` method on `Pipeline` that:
+1. Builds the dependency graph (catches missing deps + cycles)
+2. Checks transformer params against `FunctionRegistry.validate_params()`
+3. Checks transform step params against `FunctionRegistry.validate_params()`
+4. Checks connection existence (as warnings)
+5. Skips pattern validation ("detailed validation happens at runtime")
+
+This method does 80% of what `validate_pipeline` needs. **The MCP tool should use this method** instead of reimplementing everything from scratch. The only additions needed are:
+- Promote connection warnings to errors
+- Add pattern param validation (item 5 above — currently skipped)
+- Add `upsert`/`append_once` keys check
+- Convert the output format from `{"valid": bool, "errors": [str], "warnings": [str]}` to the structured error format with `field_path`, `code`, `fix`
+
+### 19.12 Updated Validation Layer Summary
+
+| Layer | What It Catches | Existing Code | MCP Tool Action |
+|-------|----------------|---------------|-----------------|
+| **Pydantic schema** | Wrong types, missing required fields, mutually exclusive fields | `config.py` model validators | ✅ Round-trip parse |
+| **DAG integrity** | Missing deps, circular deps | `graph.py` `DependencyGraph` | ✅ Instantiate DependencyGraph |
+| **Transformer params** | Wrong/missing function params | `Pipeline.validate()` already calls `FunctionRegistry.validate_params()` | ✅ Call `Pipeline.validate()` |
+| **Pattern params** | Missing `keys`, `target`, `natural_key` | `Pattern.validate()` — **NOT called by Pipeline.validate()** | ⚠️ **Must add** — use `required_params` metadata or call `Pattern.validate()` |
+| **Write mode + keys** | `upsert`/`append_once` without `options.keys` | Engine-level `raise ValueError` — **NOT in config or Pipeline.validate()** | ⚠️ **Must add** — explicit check |
+| **Connection existence** | Connection name not in project | `Pipeline.validate()` — but as warning only | ⚠️ **Promote to error** |
+| **Format enum** | Invalid format strings | `ReadFormat` enum — but config accepts `str` fallback | ⚠️ **Constrain in MCP schema** |
+
+**Bottom line:** Pydantic validation is necessary but not sufficient. The MCP tools must replicate the runtime validation checks that currently only happen inside `PipelineManager.run()`. Without this, agents produce YAML that "validates" but crashes. The good news is that `Pipeline.validate()` already does most of the work — the MCP tools should call it and add the 3 missing checks (pattern params, write mode keys, format constraints).
 
 ---
 
