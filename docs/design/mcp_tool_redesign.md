@@ -247,21 +247,27 @@ The FunctionRegistry is ready for MCP exposure. Key methods:
 | `aggregation` | `patterns/aggregation.py` | `group_by`, `aggregations` |
 | `date_dimension` | `patterns/date_dimension.py` | `start_date`, `end_date` |
 
-### 6.3 Eleven Validation Test Types
+### 6.3 Validation Test Types (Discriminated Union)
 
-| Type | Required Fields | Description |
-|------|----------------|-------------|
-| `not_null` | `column` | Column must not contain NULL |
-| `unique` | `column` | Column values must be unique |
-| `range` | `column`, `min`, `max` | Numeric within bounds |
-| `regex` | `column`, `pattern` | String matches regex |
-| `in_list` | `column`, `values` | Value in allowed set |
-| `not_in_list` | `column`, `values` | Value not in forbidden set |
-| `custom_sql` | `expression` | SQL expression evaluates TRUE |
-| `foreign_key` | `column`, `reference_node`, `reference_column` | Referential integrity |
-| `date_range` | `column`, `min`, `max` | Date within bounds |
-| `length` | `column`, `min`, `max` | String length within bounds |
-| `row_count` | `min` (opt), `max` (opt) | Table-level row count check |
+Defined in `config.py` as `TestConfig = Annotated[Union[...], Field(discriminator="type")]`. **Do not hardcode this list — introspect it at runtime** (see Section 18.2).
+
+Current members of the union (as of this writing):
+
+| Class | `type` discriminator | Description |
+|-------|---------------------|-------------|
+| `NotNullTest` | `not_null` | Column must not contain NULL |
+| `UniqueTest` | `unique` | Column values must be unique |
+| `AcceptedValuesTest` | `accepted_values` | Value in allowed set |
+| `RowCountTest` | `row_count` | Table-level row count check |
+| `CustomSQLTest` | `custom_sql` | SQL expression evaluates TRUE |
+| `RangeTest` | `range` | Numeric within bounds |
+| `RegexMatchTest` | `regex_match` | String matches regex |
+| `VolumeDropTest` | `volume_drop` | Detect unexpected volume drops |
+| `SchemaContract` | `schema_contract` | Enforce expected schema |
+| `DistributionContract` | `distribution_contract` | Statistical distribution checks |
+| `FreshnessContract` | `freshness_contract` | Data freshness/timeliness |
+
+**Note:** This list is derived from `get_args(TestConfig)`. MCP tools must introspect the union, not hardcode these names.
 
 ### 6.4 SmartResponse Pattern (`odibi_mcp/contracts/smart.py`)
 
@@ -917,61 +923,9 @@ The existing `profile_source` tool returns a `ready_for` dict. Today that dict p
 
 The agent literally copies the `ready_for` dict and passes it to `apply_pattern_template`. Two tool calls: profile → build.
 
-### 9.2 Pattern-Specific Template Tools
+### 9.2 Bulk Ingestion Tool: `create_ingestion_pipeline`
 
-Convenience tools that wrap `apply_pattern_template` with pattern-specific defaults and simplified params:
-
-#### `create_dimension_pipeline`
-
-```json
-{
-  "source_connection": "wwi",
-  "source_table": "Dimension.Customer",
-  "target_connection": "local",
-  "target_path": "gold/dim_customer",
-  "keys": ["CustomerKey"]
-}
-```
-
-Internally calls `apply_pattern_template(pattern="dimension", layer="gold", target_format="delta", ...)`.
-
-#### `create_scd2_pipeline`
-
-```json
-{
-  "source_connection": "wwi",
-  "source_table": "Dimension.Employee",
-  "target_connection": "local",
-  "target_path": "gold/dim_employee_history",
-  "key_columns": ["EmployeeKey"],
-  "tracked_columns": ["Title", "Department", "Salary"],
-  "effective_date_column": "valid_from",
-  "end_date_column": "valid_to",
-  "current_flag_column": "is_current"
-}
-```
-
-#### `create_fact_pipeline`
-
-```json
-{
-  "source_connection": "wwi",
-  "source_table": "Fact.Sale",
-  "target_connection": "local",
-  "target_path": "gold/fact_sale",
-  "keys": ["SaleKey"],
-  "incremental": {
-    "column": "LastModified",
-    "mode": "rolling_window",
-    "lookback": 3,
-    "unit": "day"
-  }
-}
-```
-
-#### `create_ingestion_pipeline`
-
-Bulk tool for Bronze layer—takes multiple tables at once (reusing the existing `generate_sql_pipeline` logic from `yaml_builder.py` but with Pydantic model construction):
+The one template tool worth building (because it handles a genuinely different shape — multiple tables in one call):
 
 ```json
 {
@@ -985,6 +939,10 @@ Bulk tool for Bronze layer—takes multiple tables at once (reusing the existing
   ]
 }
 ```
+
+Reuses existing `generate_sql_pipeline` logic from `yaml_builder.py` but with Pydantic model construction.
+
+**No per-pattern template tools** (`create_dimension_pipeline`, `create_scd2_pipeline`, etc.). `apply_pattern_template` already handles all patterns via the `pattern` enum. Adding per-pattern tools scales linearly and provides no value — see Section 18.4.
 
 ### 9.3 Auto-Suggestion: `suggest_pipeline`
 
@@ -1349,6 +1307,212 @@ tests/integration/test_mcp_end_to_end.py
 
 ---
 
+## 18. Zero-Hardcoding Strategy
+
+The #1 maintenance risk is hardcoded lists that drift from the source code. Every piece of data an MCP tool returns must be **dynamically introspected** from the actual Python objects at runtime.
+
+### 18.1 Problem: Pattern Lists
+
+**Bad (from initial design):** A hardcoded dict in `list_patterns` that says "dimension requires natural_key, surrogate_key."
+
+**Why it rots:** Someone adds a 7th pattern or changes what `DimensionPattern.validate()` checks → the MCP tool is wrong.
+
+**Fix:** Read from `odibi.patterns._PATTERNS` dict at runtime:
+
+```python
+from odibi.patterns import _PATTERNS
+
+def list_patterns():
+    result = []
+    for name, cls in _PATTERNS.items():
+        result.append({
+            "name": name,
+            "description": cls.__doc__,  # Already exists on every pattern class
+            "required_params": cls.get_required_params(),  # NEW: see below
+        })
+    return {"patterns": result}
+```
+
+**Prerequisite — add structured metadata to Pattern base class:**
+
+Each pattern class already checks its requirements in `validate()`, but via scattered `if not self.params.get(...)` checks. Add a class-level declaration:
+
+```python
+# odibi/patterns/base.py
+class Pattern(ABC):
+    # Subclasses override these
+    required_params: ClassVar[Dict[str, str]] = {}    # {param_name: description}
+    optional_params: ClassVar[Dict[str, str]] = {}    # {param_name: description}
+    default_write_mode: ClassVar[str] = "overwrite"
+    description: ClassVar[str] = ""
+    use_when: ClassVar[str] = ""
+
+    @classmethod
+    def get_required_params(cls) -> Dict[str, str]:
+        return cls.required_params
+
+    @classmethod
+    def get_optional_params(cls) -> Dict[str, str]:
+        return cls.optional_params
+```
+
+```python
+# odibi/patterns/dimension.py
+class DimensionPattern(Pattern):
+    required_params = {
+        "natural_key": "Business key column(s) that uniquely identify each record",
+        "surrogate_key": "Auto-generated primary key column name (e.g., 'customer_sk')",
+    }
+    optional_params = {
+        "scd_type": "SCD type: 0 (static), 1 (overwrite), 2 (history). Default: 1",
+        "track_cols": "Columns to track for SCD1/2 changes",
+        "target": "Target table path (required for SCD2)",
+        "unknown_member": "Insert SK=0 row for orphan FK handling",
+        "audit": "Audit config: {load_timestamp: bool, source_system: str}",
+    }
+    default_write_mode = "overwrite"
+    use_when = "Reference/lookup data that changes infrequently (customers, products, locations)"
+```
+
+This keeps the metadata **next to the code it describes** — if someone changes `validate()`, they see the `required_params` dict right above it and update both.
+
+### 18.2 Problem: Validation Test Types
+
+**Bad:** Hardcoding `["not_null", "unique", "range", ...]` in the MCP schema.
+
+**Actual truth:** `config.py` line 2045 defines `TestConfig` as a discriminated union:
+```python
+TestConfig = Annotated[Union[
+    NotNullTest, UniqueTest, AcceptedValuesTest, RowCountTest,
+    CustomSQLTest, RangeTest, RegexMatchTest, VolumeDropTest,
+    SchemaContract, DistributionContract, FreshnessContract,
+], Field(discriminator="type")]
+```
+
+**Fix:** Introspect the union at runtime:
+
+```python
+from typing import get_args, get_origin, Union
+from odibi.config import TestConfig
+
+def list_validation_tests():
+    # Unwrap Annotated[Union[...], Field(...)]
+    inner = get_args(TestConfig)[0]  # Union[NotNullTest, UniqueTest, ...]
+    test_classes = get_args(inner)    # (NotNullTest, UniqueTest, ...)
+
+    result = []
+    for cls in test_classes:
+        # Each test class has a `type` field with a Literal value
+        type_value = cls.model_fields["type"].default
+        result.append({
+            "type": type_value,
+            "description": cls.__doc__,
+            "fields": {
+                name: {
+                    "type": str(info.annotation),
+                    "required": info.is_required(),
+                    "description": info.description or "",
+                }
+                for name, info in cls.model_fields.items()
+                if name != "type"
+            }
+        })
+    return {"tests": result, "count": len(result)}
+```
+
+Now if someone adds a 12th validation test to the union, `list_validation_tests` picks it up automatically.
+
+### 18.3 Problem: Enum Values in MCP Input Schemas
+
+**Bad:** `"enum": ["overwrite", "append", "upsert", "append_once", "merge"]` typed by hand.
+
+**Fix:** Generate MCP schemas from the Python enums:
+
+```python
+from odibi.config import WriteMode, ConnectionType, EngineType
+
+def _enum_values(enum_cls) -> list[str]:
+    return [e.value for e in enum_cls]
+
+# In list_tools():
+Tool(
+    name="configure_write",
+    inputSchema={
+        "properties": {
+            "mode": {
+                "type": "string",
+                "enum": _enum_values(WriteMode),  # Always in sync
+            }
+        }
+    }
+)
+```
+
+Apply this pattern to every enum: `WriteMode`, `ConnectionType`, `EngineType`, `DeleteDetectionMode`, `AlertType`, `ErrorStrategy`.
+
+For format strings (csv, parquet, json, etc.) — extract from `ReadConfig.model_fields["format"]` annotation if it uses Literal, or define a `SupportedFormat` enum in `config.py`.
+
+### 18.4 Problem: Phase 3 Per-Pattern Template Tools
+
+**Bad:** `create_dimension_pipeline`, `create_scd2_pipeline`, `create_fact_pipeline` — one tool per pattern. Add a 7th pattern → write a 7th tool.
+
+**Fix:** Kill them. `apply_pattern_template` already handles all patterns. With `list_patterns` returning good `example_call` blocks (generated dynamically from pattern metadata), agents have everything they need. One tool handles all patterns.
+
+If convenience is still wanted, generate them dynamically at server startup:
+
+```python
+# In list_tools(), dynamically register one tool per pattern:
+for name, cls in _PATTERNS.items():
+    tools.append(Tool(
+        name=f"create_{name}_pipeline",
+        description=f"Create a {name} pipeline. Shortcut for apply_pattern_template(pattern='{name}').",
+        inputSchema=cls.generate_mcp_schema(),  # Derived from required_params/optional_params
+    ))
+```
+
+But honestly — this adds tools without adding value. `apply_pattern_template` with `pattern` as an enum is cleaner. **Recommend: don't build per-pattern tools.**
+
+### 18.5 Problem: Transformer Categories
+
+**Bad:** The design mentions `"category": "scd" | "merge" | "column" | "filter"` but `FunctionRegistry` doesn't store categories.
+
+**Fix (lightweight):** Infer category from the module path where the transformer is defined:
+
+```python
+# When building list_transformers response:
+func = FunctionRegistry.get(name)
+module = getattr(func, "__module__", "")
+# "odibi.transformers.scd" → "scd"
+# "odibi.transformers.column_ops" → "column_ops"
+category = module.split(".")[-1] if "transformers" in module else "custom"
+```
+
+No registration change needed. Categories are derived from the existing module structure.
+
+### 18.6 Summary: What Must Be Dynamic
+
+| Data | Source of Truth | How to Introspect |
+|------|----------------|-------------------|
+| Pattern names | `odibi.patterns._PATTERNS.keys()` | Import dict at runtime |
+| Pattern requirements | `PatternClass.required_params` | **NEW: class attribute to add** |
+| Pattern descriptions | `PatternClass.__doc__` | Already exists |
+| Transformer names | `FunctionRegistry.list_functions()` | Already exists |
+| Transformer params | `FunctionRegistry.get_param_model(name)` | Already exists |
+| Transformer categories | `func.__module__` | Derived from module path |
+| Validation test types | `get_args(TestConfig)` union members | Introspect Pydantic union |
+| Validation test fields | `TestClass.model_fields` | Pydantic introspection |
+| Enum values (WriteMode, etc.) | `[e.value for e in EnumClass]` | Standard enum iteration |
+| Connection types | `ConnectionType.__members__` | Standard enum |
+| Format strings | `ReadConfig` / `WriteConfig` annotations | Pydantic field introspection |
+
+### 18.7 The One Required Code Change
+
+The **only** change to `odibi/` core needed is adding `required_params` / `optional_params` / `default_write_mode` / `use_when` class attributes to each pattern class in `odibi/patterns/`. This is ~5 lines per pattern class, right next to the existing docstring and `validate()` method.
+
+Everything else (transformer info, validation types, enums) is already introspectable from existing code. Zero new registries needed.
+
+---
+
 ## Appendix A: Full MCP Tool Registry (Target State)
 
 ### Phase 1 Tools (New)
@@ -1379,10 +1543,7 @@ tests/integration/test_mcp_end_to_end.py
 
 | Tool | Category | Description |
 |------|----------|-------------|
-| `create_dimension_pipeline` | Template | One-call dimension pipeline |
-| `create_scd2_pipeline` | Template | One-call SCD2 pipeline |
-| `create_fact_pipeline` | Template | One-call fact pipeline |
-| `create_ingestion_pipeline` | Template | Bulk Bronze layer ingestion |
+| `create_ingestion_pipeline` | Template | Bulk Bronze layer ingestion (multi-table) |
 | `suggest_pipeline` | Smart | Auto-suggest pattern from profile results |
 
 ### Existing Tools (Keep)
@@ -1428,7 +1589,7 @@ These are the enum values that MCP input schemas must constrain:
 | Read/Write `format` | `csv`, `parquet`, `json`, `delta`, `sql`, `excel`, `avro` |
 | Pipeline `layer` | `bronze`, `silver`, `gold` |
 | Pipeline `pattern` | `dimension`, `fact`, `scd2`, `merge`, `aggregation`, `date_dimension` |
-| Validation `type` | `not_null`, `unique`, `range`, `regex`, `in_list`, `not_in_list`, `custom_sql`, `foreign_key`, `date_range`, `length`, `row_count` |
+| Validation `type` | **Introspect from `get_args(TestConfig)`** — currently: `not_null`, `unique`, `accepted_values`, `row_count`, `custom_sql`, `range`, `regex_match`, `volume_drop`, `schema_contract`, `distribution_contract`, `freshness_contract` |
 | Validation `on_fail` | `quarantine`, `fail`, `warn` |
 | Incremental `mode` | `rolling_window`, `append`, `high_watermark` |
 | Incremental `unit` | `day`, `hour`, `minute` |
