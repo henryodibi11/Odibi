@@ -380,13 +380,18 @@ async def list_tools() -> list[Tool]:
         # ============ WORKFLOW EXECUTION TOOLS ============
         Tool(
             name="list_workflows",
-            description="""List available decision-tree workflows.
+            description="""List available workflows for structured tasks.
 
-Workflows are deterministic recipes that AI executes mechanically (no thinking).
-Each workflow encodes complete logic: tool calls, loops, retries, error handling.
+⚠️ PREFER WORKFLOWS for these tasks instead of manual tool orchestration:
+- Building/validating pipelines → use "build_and_validate"
+- Debugging pipeline failures → use "debug_failed_run"
+- Inspecting pipeline results → use "inspect_pipeline_run"
+- Iterating until valid → use "iterate_until_valid"
 
-Phase 1 workflows:
-- validate_yaml_simple: Quick YAML validation
+Workflows are deterministic recipes (no AI thinking) with:
+- Built-in retry logic, loops, error handling
+- Guaranteed correct tool call sequences
+- Automatic pause/resume for user input
 
 Use get_workflow(name) to see full workflow definition.""",
             inputSchema={
@@ -411,14 +416,22 @@ Useful for understanding what a workflow does before running it.""",
             name="run_workflow",
             description="""Execute a workflow deterministically.
 
-Workflows are encoded recipes that remove AI decision-making:
-- No guessing which tools to call
-- No forgetting steps
-- Built-in retry logic
-- Automatic iteration
+⚠️ USE THIS for structured tasks instead of manual tool chains!
+
+When user asks to:
+- "Build a dimension/SCD2/fact pipeline" → run_workflow("build_and_validate")
+- "Why did my pipeline fail?" → run_workflow("debug_failed_run")
+- "Show me pipeline results" → run_workflow("inspect_pipeline_run")
+- "Keep trying until it validates" → run_workflow("iterate_until_valid")
+
+Workflows eliminate AI decision-making:
+- Guaranteed correct tool sequences (tested)
+- Built-in retry logic and error handling
+- Automatic loops for iteration
+- Pause/resume for user input
 
 Example:
-  run_workflow("validate_yaml_simple", {"params": {"yaml": "..."}})
+  run_workflow("build_and_validate", {})
 
 Returns status:
   - COMPLETED: Done, see outputs
