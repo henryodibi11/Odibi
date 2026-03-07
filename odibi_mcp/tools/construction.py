@@ -26,6 +26,7 @@ from odibi.config import (
     PipelineConfig,
     WriteMode,
 )
+from odibi_mcp.tools.render import render_runnable_yaml
 
 # Ensure transformers are registered
 register_standard_library()
@@ -484,36 +485,13 @@ def apply_pattern_template(
         # Validate through Pydantic
         pipeline_config = PipelineConfig(**pipeline_dict)
 
-        # Serialize to YAML
-        import yaml
-
-        yaml_content = yaml.safe_dump(
-            {"pipelines": [pipeline_config.model_dump(mode="json", exclude_none=True)]},
-            default_flow_style=False,
-            sort_keys=False,
-        )
-
-        # Round-trip validation: re-parse the YAML
-        try:
-            reparsed = yaml.safe_load(yaml_content)
-            PipelineConfig(**reparsed["pipelines"][0])
-        except Exception as e:
-            errors.append(
-                {
-                    "code": "ROUND_TRIP_FAILED",
-                    "message": f"Generated YAML failed round-trip validation: {str(e)}",
-                    "fix": "This is a bug in the tool - please report it",
-                }
+        # Render complete runnable YAML with project context
+        result = render_runnable_yaml(pipeline_config, warnings)
+        if result["valid"]:
+            result["next_step"] = (
+                "Save this YAML to a file and run with: python -m odibi run <filename>.yaml"
             )
-            return {"yaml": "", "valid": False, "errors": errors, "warnings": warnings}
-
-        return {
-            "yaml": yaml_content,
-            "valid": True,
-            "errors": [],
-            "warnings": warnings,
-            "next_step": "Add this to your project.yaml file under the 'pipelines:' section",
-        }
+        return result
 
     except Exception as e:
         errors.append(

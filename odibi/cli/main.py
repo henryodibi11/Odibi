@@ -249,6 +249,46 @@ def main() -> int:
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
+    # odibi run
+    run_parser = subparsers.add_parser("run", help="Execute pipeline")
+    run_parser.add_argument("config", help="Path to YAML config file")
+    run_parser.add_argument(
+        "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
+    )
+    run_parser.add_argument(
+        "--dry-run", action="store_true", help="Simulate execution without running operations"
+    )
+    run_parser.add_argument(
+        "--resume", action="store_true", help="Resume from last failure (skip successful nodes)"
+    )
+    run_parser.add_argument(
+        "--parallel", action="store_true", help="Run independent nodes in parallel"
+    )
+    run_parser.add_argument(
+        "--workers",
+        type=int,
+        help="Number of worker threads for parallel execution (default: 4)",
+    )
+    run_parser.add_argument(
+        "--on-error",
+        choices=["fail_fast", "fail_later", "ignore"],
+        help="Override error handling strategy",
+    )
+    run_parser.add_argument(
+        "--tag",
+        help="Filter nodes by tag (e.g., --tag daily)",
+    )
+    run_parser.add_argument(
+        "--pipeline",
+        dest="pipeline_name",
+        help="Run specific pipeline by name",
+    )
+    run_parser.add_argument(
+        "--node",
+        dest="node_name",
+        help="Run specific node by name",
+    )
+
     discover_parser = subparsers.add_parser("discover", help="Discover data sources")
     discover_parser.add_argument("connection", help="Connection name")
     discover_parser.add_argument("dataset", nargs="?", help="Dataset/database name")
@@ -289,7 +329,11 @@ def main() -> int:
         parser.print_help()
         return 1
 
-    if args.command == "discover":
+    if args.command == "run":
+        from odibi.cli.run import run_command
+
+        return run_command(args)
+    elif args.command == "discover":
         return cmd_discover(args)
     elif args.command == "scaffold":
         if args.scaffold_type == "project":

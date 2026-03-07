@@ -27,6 +27,7 @@ from odibi.config import (
     WriteConfig,
 )
 from odibi.registry import FunctionRegistry
+from odibi_mcp.tools.render import render_runnable_yaml
 from odibi.transformers import register_standard_library
 
 # Ensure transformers are registered
@@ -619,43 +620,16 @@ def render_pipeline_yaml(session_id: str) -> Dict[str, Any]:
                 "warnings": warnings,
             }
 
-        # Serialize to YAML
-        import yaml
-
-        yaml_content = yaml.safe_dump(
-            {"pipelines": [pipeline_config.model_dump(mode="json", exclude_none=True)]},
-            default_flow_style=False,
-            sort_keys=False,
-        )
-
-        # Round-trip validation
-        try:
-            reparsed = yaml.safe_load(yaml_content)
-            PipelineConfig(**reparsed["pipelines"][0])
-        except Exception as e:
-            return {
-                "yaml": "",
-                "valid": False,
-                "errors": [
-                    {
-                        "code": "ROUND_TRIP_FAILED",
-                        "message": f"Generated YAML failed validation: {str(e)}",
-                        "fix": "This is a bug - please report it",
-                    }
-                ],
-                "warnings": warnings,
-            }
-
-        return {
-            "yaml": yaml_content,
-            "valid": True,
-            "errors": [],
-            "warnings": warnings,
-            "session_id": session_id,
-            "pipeline_name": session.pipeline_name,
-            "node_count": len(session.nodes),
-            "next_step": "Save YAML to file and run with: python -m odibi run <file>.yaml",
-        }
+        # Render complete runnable YAML with project context
+        result = render_runnable_yaml(pipeline_config, warnings)
+        if result["valid"]:
+            result["session_id"] = session_id
+            result["pipeline_name"] = session.pipeline_name
+            result["node_count"] = len(session.nodes)
+            result["next_step"] = (
+                "Save this YAML to a file and run with: python -m odibi run <filename>.yaml"
+            )
+        return result
 
 
 def list_sessions() -> Dict[str, Any]:
