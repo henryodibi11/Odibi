@@ -461,6 +461,10 @@ def apply_pattern_template(
             "mode": write_mode,
         }
 
+        # Add merge_keys directly to write config (not nested in options)
+        if write_mode == WriteMode.MERGE and keys:
+            write_dict["merge_keys"] = keys
+
         if write_options:
             write_dict["options"] = write_options
 

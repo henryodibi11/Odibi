@@ -53,9 +53,7 @@ from mcp.types import (
 from .knowledge import get_knowledge
 
 # Import facade tools
-from odibi_mcp.tools.story import story_read
-from odibi_mcp.tools.sample import node_sample, node_failed_rows
-from odibi_mcp.tools.lineage import lineage_graph
+from odibi_mcp.tools.story import story_read, node_sample, node_failed_rows, lineage_graph
 from odibi_mcp.tools.smart import (
     map_environment,
     profile_source,
@@ -89,6 +87,14 @@ from odibi_mcp.tools.builder import (
 from odibi_mcp.tools.phase3_smart import (
     suggest_pipeline,
     create_ingestion_pipeline,
+)
+from odibi_mcp.tools.execution import test_pipeline
+from odibi_mcp.tools.guidance import get_task_guidance, list_task_types
+from odibi_mcp.tools.workflows import (
+    run_workflow as wf_run_workflow,
+    resume_workflow as wf_resume_workflow,
+    list_workflows as wf_list_workflows,
+    get_workflow as wf_get_workflow,
 )
 
 # Removed execution tools - use shell instead (run_python, run_odibi, find_path, execute_pipeline)
@@ -371,6 +377,152 @@ async def list_tools() -> list[Tool]:
         #         ],
         #     },
         # ),
+        # ============ WORKFLOW EXECUTION TOOLS ============
+        Tool(
+            name="list_workflows",
+            description="""List available decision-tree workflows.
+
+Workflows are deterministic recipes that AI executes mechanically (no thinking).
+Each workflow encodes complete logic: tool calls, loops, retries, error handling.
+
+Phase 1 workflows:
+- validate_yaml_simple: Quick YAML validation
+
+Use get_workflow(name) to see full workflow definition.""",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_workflow",
+            description="""Get full workflow definition by name.
+
+Shows the complete step-by-step recipe the engine will execute.
+Useful for understanding what a workflow does before running it.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"name": {"type": "string", "description": "Workflow name"}},
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="run_workflow",
+            description="""Execute a workflow deterministically.
+
+Workflows are encoded recipes that remove AI decision-making:
+- No guessing which tools to call
+- No forgetting steps
+- Built-in retry logic
+- Automatic iteration
+
+Example:
+  run_workflow("validate_yaml_simple", {"params": {"yaml": "..."}})
+
+Returns status:
+  - COMPLETED: Done, see outputs
+  - AWAITING_INPUT: Paused, use resume_workflow with inputs""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workflow_name": {
+                        "type": "string",
+                        "description": "Name of workflow to execute",
+                    },
+                    "params": {
+                        "type": "object",
+                        "description": "Workflow parameters (e.g., params.yaml, params.pipeline_name)",
+                    },
+                },
+                "required": ["workflow_name"],
+            },
+        ),
+        Tool(
+            name="resume_workflow",
+            description="""Resume a paused workflow by providing inputs.
+
+When run_workflow returns status='AWAITING_INPUT':
+1. It shows prompts (questions to ask user)
+2. Get user answers
+3. Call resume_workflow with resume_token + inputs
+
+Example:
+  resume_workflow(
+    resume_token="eyJ...",
+    inputs={"params.natural_key": "customer_id", "params.surrogate_key": "customer_sk"}
+  )""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "resume_token": {
+                        "type": "string",
+                        "description": "Resume token from paused workflow",
+                    },
+                    "inputs": {
+                        "type": "object",
+                        "description": "Map of dot-paths to values (e.g., params.natural_key: 'customer_id')",
+                    },
+                },
+                "required": ["resume_token"],
+            },
+        ),
+        # ============ TASK GUIDANCE TOOLS ============
+        Tool(
+            name="get_task_guidance",
+            description="""Get structured guidance for accomplishing a task.
+
+CRITICAL: Call this FIRST when user asks to do something!
+
+Instead of guessing what questions to ask, this tool tells you:
+- Exact questions to ask user
+- What parameters are required vs optional
+- Default values and options
+- Which discovery tools to call first
+- Suggested workflow
+
+Available tasks:
+- profile_data: Analyze schema, stats, sample data
+- build_pipeline: Generate pipeline YAML from pattern
+- test_pipeline: Validate and test a pipeline
+- inspect_output: Examine pipeline results
+- discover_environment: Explore connections and data
+
+Returns structured recipe - follow it mechanically!""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "enum": [
+                            "profile_data",
+                            "build_pipeline",
+                            "test_pipeline",
+                            "inspect_output",
+                            "discover_environment",
+                        ],
+                        "description": "Type of task user wants to accomplish",
+                    }
+                },
+                "required": ["task"],
+            },
+        ),
+        Tool(
+            name="list_task_types",
+            description="""List all available task types with descriptions.
+
+Use when user says something vague like:
+- "Help me with data"
+- "I want to build something"
+- "Analyze this"
+
+Shows user what's possible, then call get_task_guidance for details.""",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
         # ============ PHASE 1: CONSTRUCTION TOOLS ============
         Tool(
             name="list_transformers",
@@ -564,6 +716,55 @@ Use this to validate YAML before running pipelines.""",
                         "type": "boolean",
                         "default": False,
                         "description": "Validate connection availability",
+                    },
+                },
+                "required": ["yaml_content"],
+            },
+        ),
+        Tool(
+            name="test_pipeline",
+            description="""Test a pipeline YAML with three safety modes:
+
+1. **validate** (fastest) - YAML structure validation only
+   - Checks syntax and Pydantic models
+   - No execution or connection checks
+   - Use for: Quick iteration
+
+2. **dry-run** (recommended) - Validation + execution plan
+   - All validation checks
+   - Shows what would happen without running
+   - Safe for any connection type
+   - Use for: Pre-flight checks before actual run
+
+3. **sample** (full execution) - Run on limited data
+   - Actually executes pipeline
+   - Auto-downgrades to dry-run if non-local connections detected
+   - 30 second timeout
+   - Use for: Integration testing with test data
+
+WORKFLOW:
+1. Generate YAML with apply_pattern_template
+2. Test with mode='dry-run' to verify correctness
+3. Agent tells user to run: python -m odibi run <file>.yaml
+
+Returns execution results with validation errors, warnings, and output.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "yaml_content": {
+                        "type": "string",
+                        "description": "Complete odibi YAML configuration to test",
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["validate", "dry-run", "sample"],
+                        "default": "dry-run",
+                        "description": "Test mode: validate (structure only), dry-run (execution plan), sample (limited run)",
+                    },
+                    "max_rows": {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Max rows to process in sample mode (capped at 1000)",
                     },
                 },
                 "required": ["yaml_content"],
@@ -1561,8 +1762,26 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #         "projects": projects,
         #     }
         #     return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        # ============ WORKFLOW TOOL HANDLERS ============
+        if name == "list_workflows":
+            result = wf_list_workflows()
+        elif name == "get_workflow":
+            result = wf_get_workflow(name=arguments["name"])
+        elif name == "run_workflow":
+            result = wf_run_workflow(
+                workflow_name=arguments["workflow_name"], params=arguments.get("params")
+            )
+        elif name == "resume_workflow":
+            result = wf_resume_workflow(
+                resume_token=arguments["resume_token"], inputs=arguments.get("inputs")
+            )
+        # ============ TASK GUIDANCE TOOL HANDLERS ============
+        elif name == "get_task_guidance":
+            result = get_task_guidance(task=arguments["task"])
+        elif name == "list_task_types":
+            result = list_task_types()
         # ============ PHASE 1: CONSTRUCTION TOOL HANDLERS ============
-        if name == "list_transformers":
+        elif name == "list_transformers":
             result = list_transformers(
                 category=arguments.get("category"), search=arguments.get("search")
             )
@@ -1574,6 +1793,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = validate_pipeline_enhanced(
                 yaml_content=arguments["yaml_content"],
                 check_connections=arguments.get("check_connections", False),
+            )
+        elif name == "test_pipeline":
+            result = test_pipeline(
+                yaml_content=arguments["yaml_content"],
+                mode=arguments.get("mode", "dry-run"),
+                max_rows=arguments.get("max_rows", 100),
             )
         # ============ PHASE 2: BUILDER TOOL HANDLERS ============
         elif name == "create_pipeline":

@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any, Dict, List
 
 import fsspec
 
@@ -76,6 +76,38 @@ class NodeDescribeResult:
     duration: float
     row_count_in: Optional[int]
     row_count_out: Optional[int]
+    status: str
+    error: Optional[str]
+
+
+@dataclass
+class NodeSampleResult:
+    pipeline: str
+    node: str
+    columns: List[str]
+    rows: List[Any]
+    row_count: int
+    status: str
+    error: Optional[str]
+
+
+@dataclass
+class NodeFailedRowsResult:
+    pipeline: str
+    node: str
+    columns: List[str]
+    rows: List[Any]
+    row_count: int
+    validations: List[dict]
+    status: str
+    error: Optional[str]
+
+
+@dataclass
+class LineageGraphResult:
+    pipeline: str
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, str]]
     status: str
     error: Optional[str]
 
@@ -427,4 +459,316 @@ def story_diff(
             distinct_count_changes={},
             sample_diff_included=False,
             sample_diff=None,
+        )
+
+
+def node_sample(
+    pipeline: str,
+    node: str,
+    run_selector: RunSelector = DEFAULT_RUN_SELECTOR,
+    limit: Optional[int] = None,
+) -> NodeSampleResult:
+    """
+    Get sample output rows for a specific node.
+    """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return NodeSampleResult(
+            pipeline=pipeline,
+            node=node,
+            columns=[],
+            rows=[],
+            row_count=0,
+            status="unavailable",
+            error="Story tools require full project.yaml (exploration mode active)",
+        )
+
+    fs, story_path = _find_story_file(pipeline, run_selector)
+    if not fs or not story_path:
+        return NodeSampleResult(
+            pipeline=pipeline,
+            node=node,
+            columns=[],
+            rows=[],
+            row_count=0,
+            status="not_found",
+            error=f"No story found for pipeline: {pipeline}",
+        )
+
+    try:
+        story = _load_story(fs, story_path)
+
+        # Find node data
+        node_data = None
+        for n in story.get("nodes", []):
+            n_name = n.get("node_name", n.get("name"))
+            if n_name == node:
+                node_data = n
+                break
+
+        if not node_data:
+            return NodeSampleResult(
+                pipeline=pipeline,
+                node=node,
+                columns=[],
+                rows=[],
+                row_count=0,
+                status="not_found",
+                error=f"Node not found: {node}",
+            )
+
+        # Extract sample rows with fallbacks
+        sample_rows = (
+            node_data.get("sample_output")
+            or (node_data.get("sample") or {}).get("rows")
+            or node_data.get("sample_rows")
+            or []
+        )
+
+        # Infer columns
+        columns = []
+        if isinstance(sample_rows, list) and sample_rows:
+            first = sample_rows[0]
+            if isinstance(first, dict):
+                columns = list(first.keys())
+            elif isinstance(first, (list, tuple)):
+                columns = (
+                    (node_data.get("sample") or {}).get("columns") or node_data.get("columns") or []
+                )
+        else:
+            columns = (
+                (node_data.get("sample") or {}).get("columns") or node_data.get("columns") or []
+            )
+
+        if limit is not None and isinstance(sample_rows, list):
+            sample_rows = sample_rows[: max(0, int(limit))]
+
+        return NodeSampleResult(
+            pipeline=pipeline,
+            node=node,
+            columns=columns,
+            rows=sample_rows or [],
+            row_count=len(sample_rows or []),
+            status=node_data.get("status", "unknown"),
+            error=None,
+        )
+
+    except Exception as e:
+        logger.exception(f"Error reading sample rows from story: {story_path}")
+        return NodeSampleResult(
+            pipeline=pipeline,
+            node=node,
+            columns=[],
+            rows=[],
+            row_count=0,
+            status="error",
+            error=str(e),
+        )
+
+
+def node_failed_rows(
+    pipeline: str,
+    node: str,
+    run_selector: RunSelector = DEFAULT_RUN_SELECTOR,
+    limit: Optional[int] = None,
+) -> NodeFailedRowsResult:
+    """
+    Get rows that failed validation for a specific node.
+    """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return NodeFailedRowsResult(
+            pipeline=pipeline,
+            node=node,
+            columns=[],
+            rows=[],
+            row_count=0,
+            validations=[],
+            status="unavailable",
+            error="Story tools require full project.yaml (exploration mode active)",
+        )
+
+    fs, story_path = _find_story_file(pipeline, run_selector)
+    if not fs or not story_path:
+        return NodeFailedRowsResult(
+            pipeline=pipeline,
+            node=node,
+            columns=[],
+            rows=[],
+            row_count=0,
+            validations=[],
+            status="not_found",
+            error=f"No story found for pipeline: {pipeline}",
+        )
+
+    try:
+        story = _load_story(fs, story_path)
+
+        # Find node data
+        node_data = None
+        for n in story.get("nodes", []):
+            n_name = n.get("node_name", n.get("name"))
+            if n_name == node:
+                node_data = n
+                break
+
+        if not node_data:
+            return NodeFailedRowsResult(
+                pipeline=pipeline,
+                node=node,
+                columns=[],
+                rows=[],
+                row_count=0,
+                validations=[],
+                status="not_found",
+                error=f"Node not found: {node}",
+            )
+
+        # Extract failed rows with fallbacks
+        failed_rows = (
+            node_data.get("failed_rows")
+            or node_data.get("invalid_rows")
+            or node_data.get("rejected_rows")
+            or node_data.get("error_rows")
+            or []
+        )
+
+        # Validations context
+        validations = node_data.get("validation_failures") or node_data.get("validations") or []
+
+        # Infer columns
+        columns = []
+        if isinstance(failed_rows, list) and failed_rows:
+            first = failed_rows[0]
+            if isinstance(first, dict):
+                columns = list(first.keys())
+            elif isinstance(first, (list, tuple)):
+                columns = node_data.get("columns") or []
+        else:
+            columns = node_data.get("columns") or []
+
+        if limit is not None and isinstance(failed_rows, list):
+            failed_rows = failed_rows[: max(0, int(limit))]
+
+        return NodeFailedRowsResult(
+            pipeline=pipeline,
+            node=node,
+            columns=columns,
+            rows=failed_rows or [],
+            row_count=len(failed_rows or []),
+            validations=validations or [],
+            status=node_data.get("status", "unknown"),
+            error=None,
+        )
+
+    except Exception as e:
+        logger.exception(f"Error reading failed rows from story: {story_path}")
+        return NodeFailedRowsResult(
+            pipeline=pipeline,
+            node=node,
+            columns=[],
+            rows=[],
+            row_count=0,
+            validations=[],
+            status="error",
+            error=str(e),
+        )
+
+
+def lineage_graph(
+    pipeline: str,
+    run_selector: RunSelector = DEFAULT_RUN_SELECTOR,
+) -> LineageGraphResult:
+    """
+    Generate lineage visualization data for the pipeline run.
+    Returns nodes and edges suitable for a graph visualization.
+    """
+    ctx = get_project_context()
+    if ctx and ctx.is_exploration_mode():
+        return LineageGraphResult(
+            pipeline=pipeline,
+            nodes=[],
+            edges=[],
+            status="unavailable",
+            error="Story tools require full project.yaml (exploration mode active)",
+        )
+
+    fs, story_path = _find_story_file(pipeline, run_selector)
+    if not fs or not story_path:
+        return LineageGraphResult(
+            pipeline=pipeline,
+            nodes=[],
+            edges=[],
+            status="not_found",
+            error=f"No story found for pipeline: {pipeline}",
+        )
+
+    try:
+        story = _load_story(fs, story_path)
+
+        # If lineage explicitly present and structured, prefer it.
+        explicit_lineage = story.get("lineage")
+        if (
+            isinstance(explicit_lineage, dict)
+            and "nodes" in explicit_lineage
+            and "edges" in explicit_lineage
+        ):
+            return LineageGraphResult(
+                pipeline=pipeline,
+                nodes=explicit_lineage.get("nodes") or [],
+                edges=explicit_lineage.get("edges") or [],
+                status=story.get("status", "unknown"),
+                error=None,
+            )
+
+        # Derive lineage from node inputs/outputs
+        nodes_meta = story.get("nodes", [])
+        node_names = set()
+        for n in nodes_meta:
+            nn = n.get("node_name", n.get("name"))
+            if nn:
+                node_names.add(nn)
+
+        graph_nodes: Dict[str, Dict[str, Any]] = {}
+        edges: List[Dict[str, str]] = []
+
+        def ensure_node(nm: str, ntype: str):
+            if nm and nm not in graph_nodes:
+                graph_nodes[nm] = {"id": nm, "type": ntype}
+
+        for n in nodes_meta:
+            this_name = n.get("node_name", n.get("name"))
+            if not this_name:
+                continue
+            ensure_node(this_name, "node")
+
+            inputs = n.get("inputs", []) or []
+            outputs = n.get("outputs", []) or []
+
+            for inp in inputs:
+                inp_type = "node" if inp in node_names else "dataset"
+                ensure_node(inp, inp_type)
+                edges.append({"source": inp, "target": this_name, "kind": "input"})
+
+            for out in outputs:
+                out_type = "node" if out in node_names else "dataset"
+                ensure_node(out, out_type)
+                edges.append({"source": this_name, "target": out, "kind": "output"})
+
+        return LineageGraphResult(
+            pipeline=pipeline,
+            nodes=list(graph_nodes.values()),
+            edges=edges,
+            status=story.get("status", "unknown"),
+            error=None,
+        )
+
+    except Exception as e:
+        logger.exception(f"Error generating lineage graph from story: {story_path}")
+        return LineageGraphResult(
+            pipeline=pipeline,
+            nodes=[],
+            edges=[],
+            status="error",
+            error=str(e),
         )

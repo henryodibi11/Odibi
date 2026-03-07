@@ -276,7 +276,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 arguments.get("case_sensitive", True),
             )
         elif name == "run_command":
-            return _run_command(arguments["command"], arguments.get("cwd"), arguments.get("timeout", 300))
+            return _run_command(
+                arguments["command"], arguments.get("cwd"), arguments.get("timeout", 300)
+            )
         elif name == "find_path":
             return _find_path(arguments["name"])
         elif name == "list_dir":
@@ -480,14 +482,15 @@ def _grep(pattern: str, path: str, case_sensitive: bool) -> list[TextContent]:
 def _run_command(command: str, cwd: str | None, timeout: int = 300) -> list[TextContent]:
     """Execute shell command with real-time output capture."""
     work_dir = _resolve_path(cwd) if cwd else None
-    
+
     # Cap timeout at 1 hour max, minimum 10s
     timeout = max(10, min(timeout, 3600))
 
     try:
         import time
+
         start = time.time()
-        
+
         # Use Popen for better output handling
         process = subprocess.Popen(
             command,
@@ -497,16 +500,19 @@ def _run_command(command: str, cwd: str | None, timeout: int = 300) -> list[Text
             stderr=subprocess.PIPE,
             text=True,
         )
-        
+
         # Wait with timeout
         try:
             stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-            return [TextContent(type="text", text=f"""⏱️ COMMAND TIMEOUT after {timeout}s
+            return [
+                TextContent(
+                    type="text",
+                    text=f"""⏱️ COMMAND TIMEOUT after {timeout}s
 
-The command was killed after {timeout} seconds. This doesn't mean it failed - 
+The command was killed after {timeout} seconds. This doesn't mean it failed -
 long-running commands like odibi pipelines may have completed in the background.
 
 WHAT TO DO:
@@ -517,10 +523,12 @@ WHAT TO DO:
 
 Partial output:
 {stdout}
-{stderr}""")]
-        
+{stderr}""",
+                )
+            ]
+
         elapsed = time.time() - start
-        
+
         output = ""
         if stdout:
             output += stdout
@@ -532,17 +540,22 @@ Partial output:
             output += f"\n\n❌ [Exit code: {process.returncode}]"
         else:
             output += f"\n\n✅ [Completed successfully in {elapsed:.1f}s]"
-        
+
         return [TextContent(type="text", text=output or "(no output)")]
     except Exception as e:
-        return [TextContent(type="text", text=f"""❌ COMMAND FAILED
+        return [
+            TextContent(
+                type="text",
+                text=f"""❌ COMMAND FAILED
 
 Error: {e}
 
 WHAT TO DO:
 1. Check the command syntax
 2. Verify file paths exist
-3. Try running in terminal to see full error""")]
+3. Try running in terminal to see full error""",
+            )
+        ]
 
 
 def _find_path(name: str) -> list[TextContent]:
@@ -734,10 +747,15 @@ def _git_log(n: int, path: str | None) -> list[TextContent]:
 async def main():
     """Run the MCP server."""
     import sys
+
     # Immediate startup signal for debugging
     print("odibi-fileops: starting...", file=sys.stderr, flush=True)
     print(f"odibi-fileops: workspace={_get_workspace()}", file=sys.stderr, flush=True)
-    print(f"odibi-fileops: ODIBI_WORKSPACE={os.environ.get('ODIBI_WORKSPACE', 'NOT SET')}", file=sys.stderr, flush=True)
+    print(
+        f"odibi-fileops: ODIBI_WORKSPACE={os.environ.get('ODIBI_WORKSPACE', 'NOT SET')}",
+        file=sys.stderr,
+        flush=True,
+    )
     print(f"odibi-fileops: cwd={os.getcwd()}", file=sys.stderr, flush=True)
     async with stdio_server() as (read_stream, write_stream):
         print("odibi-fileops: stdio ready", file=sys.stderr, flush=True)
