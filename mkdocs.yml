@@ -77,6 +77,7 @@ nav:
           - Loading Patterns: features/patterns.md
           - Configuration: features/configuration.md
           - State Management: features/state.md
+          - Simulation: features/simulation.md
           - Stories: features/stories.md
           - Orchestration: features/orchestration.md
           - Bulk Copy (SQL Server): features/bulk_copy.md
@@ -142,6 +143,7 @@ nav:
           - Anti-Patterns: patterns/anti_patterns.md
       - Common Tasks:
           - Writing Transformations: guides/writing_transformations.md
+          - Synthetic Data (Simulation): guides/simulation.md
           - Custom Functions Reference: guides/custom_functions.md
           - Variable Substitution: guides/variable_substitution.md
           - Explanation Feature: guides/explanation_feature.md
@@ -197,6 +199,7 @@ nav:
       - Configuration: reference/configuration.md
       - Supported Formats: reference/supported_formats.md
       - Engine Parity: reference/PARITY_TABLE.md
+      - Simulation Generators: reference/simulation_generators.md
       - Glossary: reference/glossary.md
       - CLI Reference: features/cli.md
       - AI Deep Context: ODIBI_DEEP_CONTEXT.md

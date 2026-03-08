@@ -616,6 +616,31 @@ class NodeExecutor:
                 ctx.debug("Resolved sql_file to query", sql_file=read_config.sql_file)
                 self._execution_steps.append(f"Resolved sql_file: {read_config.sql_file}")
 
+            # Simulation Format: Pass metadata for validation and incremental mode
+            if read_config.format == "simulation":
+                # Pass write mode for validation
+                if config.write:
+                    read_options["_write_mode"] = config.write.mode
+                    if hasattr(config.write, "keys"):
+                        read_options["_write_keys"] = config.write.keys
+
+                # Pass HWM for incremental mode
+                if read_config.incremental:
+                    inc = read_config.incremental
+                    state_key = inc.state_key or f"{config.name}_hwm"
+                    last_hwm = self.state_manager.get_hwm(state_key) if self.state_manager else None
+
+                    if last_hwm:
+                        read_options["_hwm_timestamp"] = str(last_hwm)
+                        ctx.debug(
+                            "Simulation incremental mode",
+                            state_key=state_key,
+                            last_hwm=str(last_hwm),
+                        )
+                        self._execution_steps.append(
+                            f"Simulation incremental: starting from {last_hwm}"
+                        )
+
             # Execute Read
             df = self.engine.read(
                 connection=connection,
@@ -659,13 +684,33 @@ class NodeExecutor:
             # Apply Incremental Logic
             pending_hwm = None
             if config.read.incremental:
-                df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
-                if pending_hwm:
-                    ctx.debug(
-                        "Incremental filtering applied",
-                        hwm_key=pending_hwm[0],
-                        hwm_value=str(pending_hwm[1]),
-                    )
+                # For simulation, capture HWM from DataFrame attrs or property
+                if read_config.format == "simulation":
+                    max_ts = None
+                    # Try Pandas attrs first
+                    if hasattr(df, "attrs"):
+                        max_ts = df.attrs.get("_simulation_max_timestamp")
+                    # Try Spark property fallback
+                    elif hasattr(df, "_simulation_max_timestamp"):
+                        max_ts = df._simulation_max_timestamp
+
+                    if max_ts:
+                        state_key = config.read.incremental.state_key or f"{config.name}_hwm"
+                        pending_hwm = (state_key, max_ts)
+                        ctx.debug(
+                            "Simulation HWM captured",
+                            hwm_key=state_key,
+                            hwm_value=str(max_ts),
+                        )
+                        self._execution_steps.append(f"Simulation HWM captured: {max_ts}")
+                else:
+                    df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
+                    if pending_hwm:
+                        ctx.debug(
+                            "Incremental filtering applied",
+                            hwm_key=pending_hwm[0],
+                            hwm_value=str(pending_hwm[1]),
+                        )
 
             self._execution_steps.append(f"Read from {config.read.connection}")
             return df, pending_hwm

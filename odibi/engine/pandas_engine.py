@@ -751,6 +751,68 @@ class PandasEngine(Engine):
 
         return result
 
+    def _read_simulation(self, options: Dict[str, Any], ctx: Any) -> pd.DataFrame:
+        """Read simulated data.
+
+        Args:
+            options: Read options containing simulation configuration
+            ctx: Logging context
+
+        Returns:
+            DataFrame with simulated data
+        """
+        from odibi.config import SimulationConfig
+        from odibi.simulation import SimulationEngine
+
+        # Extract simulation config
+        sim_config_dict = options.get("simulation")
+        if not sim_config_dict:
+            raise ValueError(
+                "Simulation format requires 'simulation' key in read options. "
+                "Example: read.options.simulation = {scope: {...}, entities: {...}, columns: [...]}"
+            )
+
+        # Parse and validate simulation config
+        sim_config = SimulationConfig(**sim_config_dict)
+
+        # Validate write compatibility if write info passed
+        write_mode = options.get("_write_mode")
+        write_keys = options.get("_write_keys")
+        if write_mode:
+            sim_config.validate_write_compatibility(write_mode, write_keys)
+
+        # Check for HWM (passed through options for incremental mode)
+        hwm_timestamp = options.get("_hwm_timestamp")
+
+        # Create simulation engine
+        engine = SimulationEngine(sim_config, hwm_timestamp=hwm_timestamp)
+
+        # Generate data
+        ctx.info(
+            "Generating simulated data",
+            entities=len(engine.entity_names),
+            rows_per_entity=engine.total_rows,
+            total_rows=len(engine.entity_names) * engine.total_rows,
+        )
+
+        rows = engine.generate()
+
+        # Convert to DataFrame
+        df = pd.DataFrame(rows)
+
+        # Store max timestamp for HWM tracking
+        max_ts = engine.get_max_timestamp(rows)
+        if max_ts and hasattr(df, "attrs"):
+            df.attrs["_simulation_max_timestamp"] = max_ts
+
+        ctx.info(
+            "Simulation complete",
+            rows=len(df),
+            columns=len(df.columns) if not df.empty else 0,
+        )
+
+        return df
+
     def read(
         self,
         connection: Any,
@@ -985,7 +1047,10 @@ class PandasEngine(Engine):
             read_kwargs["dtype_backend"] = "pyarrow"
 
         # Read based on format
-        if format == "csv":
+        if format == "simulation":
+            ctx.debug("Generating simulated data")
+            return self._read_simulation(options, ctx)
+        elif format == "csv":
             try:
                 if is_glob and isinstance(full_path, list):
                     ctx.debug(

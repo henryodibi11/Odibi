@@ -939,6 +939,7 @@ class ReadFormat(str, Enum):
     * `cloudFiles` - Databricks Auto Loader (Spark only)
     * `sql_server` - Microsoft SQL Server via JDBC/pyodbc
     * `azure_sql` - Azure SQL Database (alias for sql_server)
+    * `simulation` - Simulated data generation for testing and development
     """
 
     CSV = "csv"
@@ -952,6 +953,7 @@ class ReadFormat(str, Enum):
     CLOUD_FILES = "cloudFiles"
     SQL_SERVER = "sql_server"
     AZURE_SQL = "azure_sql"
+    SIMULATION = "simulation"
 
 
 # =============================================================================
@@ -1222,6 +1224,551 @@ class TimeTravelConfig(BaseModel):
                 f"Use only one: as_of_version for a specific Delta version number, or as_of_timestamp for a point in time."
             )
         return self
+
+
+# =============================================================================
+# Simulation Configuration (format: simulation)
+# =============================================================================
+
+
+class SimulationDataType(str, Enum):
+    """Data types for simulated columns."""
+
+    INT = "int"
+    FLOAT = "float"
+    STRING = "string"
+    BOOLEAN = "boolean"
+    TIMESTAMP = "timestamp"
+    CATEGORICAL = "categorical"
+
+
+class GeneratorType(str, Enum):
+    """Types of data generators for simulation."""
+
+    RANGE = "range"
+    CATEGORICAL = "categorical"
+    BOOLEAN = "boolean"
+    TIMESTAMP = "timestamp"
+    SEQUENTIAL = "sequential"
+    CONSTANT = "constant"
+
+
+class DistributionType(str, Enum):
+    """Statistical distributions for range generators."""
+
+    UNIFORM = "uniform"
+    NORMAL = "normal"
+
+
+class RangeGeneratorConfig(BaseModel):
+    """Range generator for numeric values.
+
+    Example:
+    ```yaml
+    type: range
+    min: 50.0
+    max: 100.0
+    distribution: normal
+    ```
+    """
+
+    type: Literal["range"]
+    min: float = Field(description="Minimum value")
+    max: float = Field(description="Maximum value")
+    distribution: DistributionType = Field(
+        default=DistributionType.UNIFORM, description="Distribution type: uniform or normal"
+    )
+    mean: Optional[float] = Field(
+        default=None, description="Mean for normal distribution (defaults to midpoint)"
+    )
+    std_dev: Optional[float] = Field(
+        default=None, description="Standard deviation for normal (defaults to range/6)"
+    )
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.min >= self.max:
+            raise ValueError(f"Range min ({self.min}) must be less than max ({self.max})")
+        return self
+
+
+class CategoricalGeneratorConfig(BaseModel):
+    """Categorical generator for discrete values.
+
+    Example:
+    ```yaml
+    type: categorical
+    values: [Running, Idle, Error]
+    weights: [0.8, 0.15, 0.05]
+    ```
+    """
+
+    type: Literal["categorical"]
+    values: List[Any] = Field(description="List of possible values")
+    weights: Optional[List[float]] = Field(
+        default=None, description="Probability weights (must sum to 1.0)"
+    )
+
+    @model_validator(mode="after")
+    def validate_weights(self):
+        if not self.values:
+            raise ValueError("Categorical generator must have at least one value")
+        if self.weights:
+            if len(self.weights) != len(self.values):
+                raise ValueError(
+                    f"Weights length ({len(self.weights)}) must match values length ({len(self.values)})"
+                )
+            total = sum(self.weights)
+            if not (0.99 <= total <= 1.01):
+                raise ValueError(f"Weights must sum to 1.0, got {total}")
+        return self
+
+
+class BooleanGeneratorConfig(BaseModel):
+    """Boolean generator.
+
+    Example:
+    ```yaml
+    type: boolean
+    true_probability: 0.95
+    ```
+    """
+
+    type: Literal["boolean"]
+    true_probability: float = Field(default=0.5, ge=0.0, le=1.0, description="Probability of True")
+
+
+class TimestampGeneratorConfig(BaseModel):
+    """Timestamp generator (uses simulation scope).
+
+    Example:
+    ```yaml
+    type: timestamp
+    ```
+    """
+
+    type: Literal["timestamp"]
+
+
+class SequentialGeneratorConfig(BaseModel):
+    """Sequential number generator.
+
+    Example:
+    ```yaml
+    type: sequential
+    start: 1
+    step: 1
+    ```
+    """
+
+    type: Literal["sequential"]
+    start: int = Field(default=1, description="Starting value")
+    step: int = Field(default=1, description="Increment step")
+
+
+class ConstantGeneratorConfig(BaseModel):
+    """Constant value generator.
+
+    Example:
+    ```yaml
+    type: constant
+    value: "production"
+    ```
+    """
+
+    type: Literal["constant"]
+    value: Any = Field(description="Constant value for all rows")
+
+
+class UUIDGeneratorConfig(BaseModel):
+    """UUID/GUID generator.
+
+    Example:
+    ```yaml
+    type: uuid
+    version: 4  # UUID4 (random) or UUID5 (deterministic from namespace)
+    ```
+    """
+
+    type: Literal["uuid"]
+    version: Literal[4, 5] = Field(
+        default=4, description="UUID version: 4=random, 5=deterministic (from entity+row)"
+    )
+    namespace: Optional[str] = Field(
+        default=None, description="Namespace for UUID5 (uses UUID.NAMESPACE_DNS if not provided)"
+    )
+
+
+class EmailGeneratorConfig(BaseModel):
+    """Email address generator.
+
+    Example:
+    ```yaml
+    type: email
+    domain: example.com
+    ```
+    """
+
+    type: Literal["email"]
+    domain: str = Field(default="example.com", description="Email domain")
+    pattern: str = Field(
+        default="{entity}_{index}",
+        description="Username pattern (supports {entity}, {index}, {row})",
+    )
+
+
+class IPGeneratorConfig(BaseModel):
+    """IPv4 address generator.
+
+    Example:
+    ```yaml
+    type: ipv4
+    subnet: "192.168.0.0/16"
+    ```
+    """
+
+    type: Literal["ipv4"]
+    subnet: Optional[str] = Field(
+        default=None, description="CIDR subnet (e.g., '192.168.0.0/16'). If None, uses full range."
+    )
+
+
+class GeoGeneratorConfig(BaseModel):
+    """Geographic coordinate generator.
+
+    Example:
+    ```yaml
+    type: geo
+    bbox: [-90, -180, 90, 180]  # [min_lat, min_lon, max_lat, max_lon]
+    ```
+    """
+
+    type: Literal["geo"]
+    bbox: List[float] = Field(description="Bounding box [min_lat, min_lon, max_lat, max_lon]")
+    format: Literal["tuple", "lat_lon_separate"] = Field(
+        default="tuple",
+        description="Output format: 'tuple' for (lat,lon) or 'lat_lon_separate' for separate columns",
+    )
+
+    @model_validator(mode="after")
+    def validate_bbox(self):
+        if len(self.bbox) != 4:
+            raise ValueError(f"bbox must have exactly 4 values, got {len(self.bbox)}")
+        min_lat, min_lon, max_lat, max_lon = self.bbox
+        if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
+            raise ValueError(f"Latitude must be in [-90, 90], got [{min_lat}, {max_lat}]")
+        if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
+            raise ValueError(f"Longitude must be in [-180, 180], got [{min_lon}, {max_lon}]")
+        if min_lat >= max_lat:
+            raise ValueError(f"min_lat ({min_lat}) must be < max_lat ({max_lat})")
+        if min_lon >= max_lon:
+            raise ValueError(f"min_lon ({min_lon}) must be < max_lon ({max_lon})")
+        return self
+
+
+class DerivedGeneratorConfig(BaseModel):
+    """Derived column generator (calculated from other columns).
+
+    Example:
+    ```yaml
+    type: derived
+    expression: "temperature * 1.8 + 32"  # Celsius to Fahrenheit
+    ```
+
+    Supported operators:
+    - Arithmetic: +, -, *, /, //, %, **
+    - Comparison: ==, !=, <, <=, >, >=
+    - Logical: and, or, not
+    - Functions: abs(), round(), min(), max()
+
+    Example (conditional):
+    ```yaml
+    type: derived
+    expression: "100 if temperature > 80 else 0"
+    ```
+    """
+
+    type: Literal["derived"]
+    expression: str = Field(
+        description="Python expression using other column names. Evaluated safely."
+    )
+
+
+GeneratorConfig = Annotated[
+    Union[
+        RangeGeneratorConfig,
+        CategoricalGeneratorConfig,
+        BooleanGeneratorConfig,
+        TimestampGeneratorConfig,
+        SequentialGeneratorConfig,
+        ConstantGeneratorConfig,
+        UUIDGeneratorConfig,
+        EmailGeneratorConfig,
+        IPGeneratorConfig,
+        GeoGeneratorConfig,
+        DerivedGeneratorConfig,
+    ],
+    Field(discriminator="type"),
+]
+
+
+class DowntimeEvent(BaseModel):
+    """Downtime period where no data is generated.
+
+    Example:
+    ```yaml
+    entity: pump_05
+    start_time: "2026-01-01T12:00:00Z"
+    end_time: "2026-01-01T14:00:00Z"
+    ```
+    """
+
+    entity: Optional[str] = Field(default=None, description="Entity affected (None = all)")
+    start_time: str = Field(description="Downtime start timestamp (ISO8601)")
+    end_time: str = Field(description="Downtime end timestamp (ISO8601)")
+
+
+class ChaosConfig(BaseModel):
+    """Chaos engineering parameters for realistic data imperfections.
+
+    Example:
+    ```yaml
+    chaos:
+      outlier_rate: 0.01
+      outlier_factor: 3.0
+      duplicate_rate: 0.005
+      downtime_events:
+        - entity: pump_01
+          start_time: "2026-01-01T10:00:00Z"
+          end_time: "2026-01-01T12:00:00Z"
+    ```
+    """
+
+    outlier_rate: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Probability of outlier values"
+    )
+    outlier_factor: float = Field(default=3.0, gt=0.0, description="Multiplier for outlier values")
+    duplicate_rate: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Probability of duplicating rows"
+    )
+    downtime_events: List[DowntimeEvent] = Field(
+        default_factory=list, description="Time periods with no data generation"
+    )
+
+
+class ColumnGeneratorConfig(BaseModel):
+    """Configuration for a simulated column.
+
+    Example:
+    ```yaml
+    - name: temperature
+      data_type: float
+      generator:
+        type: range
+        min: 60.0
+        max: 100.0
+        distribution: normal
+      null_rate: 0.02
+      entity_overrides:
+        pump_01:
+          type: range
+          min: 80.0
+          max: 120.0
+    ```
+    """
+
+    name: str = Field(description="Column name")
+    data_type: SimulationDataType = Field(description="Data type")
+    generator: GeneratorConfig = Field(description="Generator configuration")
+    null_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="Probability of NULL values")
+    entity_overrides: Dict[str, GeneratorConfig] = Field(
+        default_factory=dict, description="Per-entity generator overrides"
+    )
+
+
+class EntityConfig(BaseModel):
+    """Entity declaration for simulation.
+
+    Example (auto-generated):
+    ```yaml
+    entities:
+      count: 10
+      id_prefix: pump_
+    ```
+
+    Example (explicit names):
+    ```yaml
+    entities:
+      names: [pump_01, pump_02, reactor_01]
+    ```
+    """
+
+    count: Optional[int] = Field(default=None, gt=0, description="Number of entities to generate")
+    names: Optional[List[str]] = Field(default=None, description="Explicit entity names")
+    id_prefix: str = Field(default="entity_", description="Prefix for auto-generated entity IDs")
+    id_format: Literal["sequential", "uuid"] = Field(
+        default="sequential", description="ID format: sequential or uuid"
+    )
+
+    @model_validator(mode="after")
+    def validate_entity_config(self):
+        if self.count is not None and self.names is not None:
+            raise ValueError("Specify either 'count' or 'names', not both")
+        if self.count is None and self.names is None:
+            raise ValueError("Must specify either 'count' or 'names'")
+        if self.names is not None and len(self.names) == 0:
+            raise ValueError("Entity names list cannot be empty")
+        return self
+
+
+class SimulationScope(BaseModel):
+    """Simulation scope and boundaries.
+
+    Example (row count):
+    ```yaml
+    scope:
+      start_time: "2026-01-01T00:00:00Z"
+      timestep: "5m"
+      row_count: 10000
+      seed: 42
+    ```
+
+    Example (time range):
+    ```yaml
+    scope:
+      start_time: "2026-01-01T00:00:00Z"
+      end_time: "2026-01-02T00:00:00Z"
+      timestep: "10m"
+      seed: 42
+    ```
+    """
+
+    start_time: str = Field(description="Simulation start timestamp (ISO8601)")
+    timestep: str = Field(description="Time between events (e.g., '5m', '1h', '30s')")
+    row_count: Optional[int] = Field(
+        default=None, gt=0, description="Total rows to generate (mutually exclusive with end_time)"
+    )
+    end_time: Optional[str] = Field(
+        default=None, description="Simulation end timestamp (mutually exclusive with row_count)"
+    )
+    seed: int = Field(default=42, description="Random seed for deterministic generation")
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if self.row_count is not None and self.end_time is not None:
+            raise ValueError("Specify either 'row_count' or 'end_time', not both")
+        if self.row_count is None and self.end_time is None:
+            raise ValueError("Must specify either 'row_count' or 'end_time'")
+        return self
+
+
+class SimulationConfig(BaseModel):
+    """Complete simulation configuration.
+
+    Example:
+    ```yaml
+    read:
+      connection: null
+      format: simulation
+      options:
+        simulation:
+          scope:
+            start_time: "2026-01-01T00:00:00Z"
+            timestep: "5m"
+            row_count: 10000
+            seed: 42
+          entities:
+            count: 10
+            id_prefix: pump_
+          columns:
+            - name: entity_id
+              data_type: string
+              generator:
+                type: constant
+                value: "{entity_id}"
+            - name: timestamp
+              data_type: timestamp
+              generator:
+                type: timestamp
+            - name: temperature
+              data_type: float
+              generator:
+                type: range
+                min: 60.0
+                max: 80.0
+                distribution: normal
+              null_rate: 0.02
+          chaos:
+            outlier_rate: 0.01
+            outlier_factor: 3.0
+    ```
+    """
+
+    scope: SimulationScope = Field(description="Simulation scope and boundaries")
+    entities: EntityConfig = Field(description="Entity configuration")
+    columns: List[ColumnGeneratorConfig] = Field(description="Column definitions")
+    chaos: Optional[ChaosConfig] = Field(default=None, description="Chaos parameters")
+
+    @model_validator(mode="after")
+    def validate_simulation(self):
+        # Validate unique column names
+        column_names = [c.name for c in self.columns]
+        if len(column_names) != len(set(column_names)):
+            duplicates = [name for name in column_names if column_names.count(name) > 1]
+            raise ValueError(f"Duplicate column names found: {set(duplicates)}")
+
+        # Validate entity overrides reference valid entities
+        if self.entities.names:
+            valid_entities = set(self.entities.names)
+            for col in self.columns:
+                for entity in col.entity_overrides.keys():
+                    if entity not in valid_entities:
+                        raise ValueError(
+                            f"Column '{col.name}' override references undefined entity '{entity}'"
+                        )
+
+        return self
+
+    def get_key_columns(self) -> List[str]:
+        """Get columns suitable for use as keys (sequential, uuid).
+
+        Returns:
+            List of column names that can be used as keys
+        """
+        key_cols = []
+        for col in self.columns:
+            if col.generator.type in ["sequential", "uuid"]:
+                key_cols.append(col.name)
+        return key_cols
+
+    def validate_write_compatibility(self, write_mode: str, write_keys: Optional[List[str]] = None):
+        """Validate simulation is compatible with write mode.
+
+        Args:
+            write_mode: Write mode (append, overwrite, upsert, append_once)
+            write_keys: Keys specified in write configuration
+
+        Raises:
+            ValueError: If simulation incompatible with write mode
+        """
+        if write_mode in ["upsert", "append_once"]:
+            key_cols = self.get_key_columns()
+
+            if not key_cols:
+                raise ValueError(
+                    f"Write mode '{write_mode}' requires key columns. "
+                    f"Add a column with type 'sequential' or 'uuid' generator. "
+                    f"Example: {{name: 'id', generator: {{type: uuid, version: 4}}}}"
+                )
+
+            if write_keys:
+                # Check that write_keys exist in simulation
+                missing = set(write_keys) - set(c.name for c in self.columns)
+                if missing:
+                    raise ValueError(
+                        f"Write keys {missing} not found in simulation columns. "
+                        f"Available columns: {[c.name for c in self.columns]}"
+                    )
 
 
 class IncrementalUnit(str, Enum):

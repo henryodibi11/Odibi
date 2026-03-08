@@ -1,0 +1,133 @@
+# Simulation Example - Generate synthetic IoT telemetry data
+# This demonstrates all simulation features without requiring external data sources
+
+name: simulation_demo
+engine: pandas
+
+connections: {}  # Simulation doesn't require connections
+
+pipelines:
+  - name: iot_telemetry_simulation
+    nodes:
+      - name: sensor_telemetry
+        read:
+          connection: null  # No connection needed for simulation
+          format: simulation
+          options:
+            simulation:
+              # Simulation scope: when and how much data to generate
+              scope:
+                start_time: "2026-01-01T00:00:00Z"
+                timestep: "5m"          # Generate data every 5 minutes
+                row_count: 288          # 288 rows = 24 hours of data per entity
+                seed: 42                # Deterministic random seed
+
+              # Entities: the "things" generating data (sensors, machines, etc.)
+              entities:
+                count: 10               # Generate 10 sensors
+                id_prefix: "sensor_"    # Names will be sensor_01, sensor_02, etc.
+
+              # Columns: define what data each entity generates
+              columns:
+                - name: sensor_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"  # Magic variable - replaced with actual sensor ID
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp      # Uses scope timestep automatically
+
+                - name: temperature
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 18.0
+                    max: 28.0
+                    distribution: normal  # Normal distribution centered in range
+                  null_rate: 0.02        # 2% of values will be NULL (sensor errors)
+                  entity_overrides:      # Sensor 05 runs hotter
+                    sensor_05:
+                      type: range
+                      min: 30.0
+                      max: 40.0
+
+                - name: humidity
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 30.0
+                    max: 70.0
+                    distribution: uniform
+
+                - name: status
+                  data_type: categorical
+                  generator:
+                    type: categorical
+                    values: [active, idle, maintenance, error]
+                    weights: [0.85, 0.10, 0.03, 0.02]
+
+                - name: is_online
+                  data_type: boolean
+                  generator:
+                    type: boolean
+                    true_probability: 0.98  # 98% uptime
+
+                - name: record_id
+                  data_type: int
+                  generator:
+                    type: sequential
+                    start: 1
+                    step: 1
+
+              # Chaos: add realistic imperfections
+              chaos:
+                outlier_rate: 0.01      # 1% of numeric values become outliers
+                outlier_factor: 3.0      # Outliers are 3x normal value
+                duplicate_rate: 0.005    # 0.5% duplicate records
+                downtime_events:         # Specific downtime periods
+                  - entity: sensor_03
+                    start_time: "2026-01-01T10:00:00Z"
+                    end_time: "2026-01-01T12:00:00Z"  # sensor_03 offline for 2 hours
+
+        # Transform the simulated data (same as any other source)
+        transform:
+          - operation: derive_columns
+            params:
+              columns:
+                temp_celsius: "temperature"
+                temp_fahrenheit: "(temperature * 9/5) + 32"
+                comfort_index: "CASE WHEN temperature BETWEEN 20 AND 25 AND humidity BETWEEN 40 AND 60 THEN 'comfortable' ELSE 'uncomfortable' END"
+
+        # Validate the simulated data
+        validate:
+          tests:
+            - type: not_null
+              columns: [sensor_id, timestamp]
+            - type: unique
+              columns: [sensor_id, timestamp]
+            - type: accepted_values
+              column: status
+              values: [active, idle, maintenance, error]
+            - type: range
+              column: temperature
+              min: -10  # Allow some outliers outside normal range
+              max: 50
+
+# To run this example:
+# odibi run examples/simulation_example.yaml
+#
+# The simulation will generate:
+# - 10 sensors × 288 rows = 2,880 total rows
+# - 24 hours of 5-minute interval data
+# - Realistic distributions, nulls, outliers
+# - sensor_03 will have a 2-hour outage
+# - sensor_05 will run at higher temperatures
+#
+# Use cases:
+# 1. Test pipelines without live data
+# 2. Generate demo datasets
+# 3. Stress test transformations
+# 4. Prototype analytics before prod data arrives

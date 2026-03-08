@@ -117,6 +117,32 @@ class PolarsEngine(Engine):
 
             return pl.from_pandas(pdf).lazy()
 
+        # Simulation format: delegate to Pandas, convert to Polars
+        if format == "simulation":
+            from odibi.engine.pandas_engine import PandasEngine
+            from odibi.utils.logging_context import get_logging_context
+
+            ctx = get_logging_context()
+            ctx.debug("Reading simulation via Pandas engine, converting to Polars")
+
+            # Use Pandas engine for simulation
+            pandas_engine = PandasEngine()
+            pdf = pandas_engine._read_simulation(options, ctx)
+
+            # Convert to Polars LazyFrame
+            lf = pl.from_pandas(pdf).lazy()
+
+            # Preserve HWM metadata
+            if hasattr(pdf, "attrs") and "_simulation_max_timestamp" in pdf.attrs:
+                # Polars LazyFrame doesn't have attrs, so we attach as property
+                lf._simulation_max_timestamp = pdf.attrs["_simulation_max_timestamp"]
+
+            ctx.info(
+                "Simulation read completed (via Pandas, converted to Polars LazyFrame)",
+                row_count=len(pdf),
+            )
+            return lf
+
         # Get full path
         if path:
             if connection:

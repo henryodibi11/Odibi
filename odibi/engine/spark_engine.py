@@ -576,6 +576,35 @@ class SparkEngine(Engine):
                 )
                 raise
 
+        # Simulation format: delegate to Pandas, convert to Spark
+        if format == "simulation":
+            if streaming:
+                ctx.error("Streaming not supported for simulation format")
+                raise ValueError("Streaming not supported for simulation format")
+
+            ctx.debug("Reading simulation via Pandas engine, converting to Spark")
+            from odibi.engine.pandas_engine import PandasEngine
+
+            # Use Pandas engine for simulation
+            pandas_engine = PandasEngine()
+            pdf = pandas_engine._read_simulation(options, ctx)
+
+            # Convert Pandas DataFrame to Spark DataFrame
+            df = self.spark.createDataFrame(pdf)
+            elapsed = (time.time() - start_time) * 1000
+
+            # Preserve HWM metadata in Spark DataFrame metadata
+            if hasattr(pdf, "attrs") and "_simulation_max_timestamp" in pdf.attrs:
+                # Note: Spark doesn't have attrs, so we'll attach as a property
+                df._simulation_max_timestamp = pdf.attrs["_simulation_max_timestamp"]
+
+            ctx.info(
+                "Simulation read completed (via Pandas)",
+                elapsed_ms=round(elapsed, 2),
+                row_count=len(pdf),
+            )
+            return df
+
         # Read based on format
         if table:
             # Managed/External Table (Catalog)

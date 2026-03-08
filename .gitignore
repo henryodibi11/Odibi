@@ -192,6 +192,20 @@ servers/
 
 # MkDocs build output
 site/
-github_logs/  
-tests/mcp/  
-# MCP tests require openai package 
+
+# Archived development documents
+docs/_archive/
+
+# Test artifacts
+.test_artifacts/
+
+# Development scripts
+scripts/dev/
+
+# Temporary examples
+examples/temp/
+
+# GitHub logs
+github_logs/
+tests/mcp/
+# MCP tests require openai package

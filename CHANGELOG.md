@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-03-08
+
+### Added
+
+- **🎲 Simulation Read Source (V3.2)**: Complete synthetic data generation system with 11 generator types
+  - **Core generators**: range (uniform/normal), categorical, boolean, timestamp, sequential, constant
+  - **Advanced generators**: derived (calculated fields with dependency resolution), uuid (V4/V5), email, ipv4 (with subnet), geo coordinates
+  - **Entity-based**: Domain-agnostic entity abstraction for pumps, sensors, users, devices, etc.
+  - **Incremental mode**: HWM-based continuous generation with StateManager integration
+  - **Chaos engineering**: Outliers, duplicates, downtime events for realistic data
+  - **Multi-engine**: Pandas (native), Spark (delegation), Polars (delegation)
+  - **Null-safe expressions**: `coalesce()`, `safe_div()`, `safe_mul()` for derived columns
+  - **Write mode validation**: Validates upsert/append_once have required key columns
+  - **Progress logging**: Shows progress for large simulations (every 10 entities)
+  - **46 tests**: Comprehensive coverage including edge cases, determinism, null safety
+  - **800+ line user guide**: Complete documentation with examples for all use cases
+
+### Changed
+
+- **Timestamp format**: Simulation now uses Zulu format (`Z` suffix) instead of `+00:00` for consistency
+- **Entity RNG**: Now uses stable `hashlib.md5()` instead of process-randomized `hash()` for deterministic generation
+- **Incremental RNG**: Advances seed based on rows already generated to produce unique values across runs
+
+### Fixed
+
+- **Simulation determinism**: Fixed non-deterministic entity-level random number generation (critical bug)
+- **Timestep validation**: Now rejects zero or negative timesteps with clear error
+- **End time edge case**: Empty datasets when `end_time < effective_start_time` (was producing 1 phantom row)
+
 ## [2.18.0] - 2026-03-04
 
 ### Added
