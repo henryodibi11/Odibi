@@ -2086,6 +2086,10 @@ class ReadConfig(BaseModel):
     @model_validator(mode="after")
     def check_table_or_path(self):
         """Ensure either table or path is provided."""
+        # Special case: simulation format generates data programmatically
+        if self.format == ReadFormat.SIMULATION:
+            return self
+
         # 1. Can't set both path and table
         if self.table and self.path:
             raise ValueError(

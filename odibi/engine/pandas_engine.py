@@ -869,6 +869,11 @@ class PandasEngine(Engine):
 
         options = options or {}
 
+        # Handle simulation format (no path/table needed)
+        if format == "simulation":
+            ctx.debug("Generating simulated data")
+            return self._read_simulation(options, ctx)
+
         # Resolve full path from connection
         try:
             full_path = self._resolve_path(path or table, connection)
@@ -1047,10 +1052,7 @@ class PandasEngine(Engine):
             read_kwargs["dtype_backend"] = "pyarrow"
 
         # Read based on format
-        if format == "simulation":
-            ctx.debug("Generating simulated data")
-            return self._read_simulation(options, ctx)
-        elif format == "csv":
+        if format == "csv":
             try:
                 if is_glob and isinstance(full_path, list):
                     ctx.debug(

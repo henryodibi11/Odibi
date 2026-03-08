@@ -1,5 +1,6 @@
 """Integration tests for incremental simulation with HWM persistence."""
 
+import pandas as pd
 import pytest
 import yaml
 
@@ -9,9 +10,6 @@ from odibi.pipeline import PipelineManager
 class TestIncrementalSimulation:
     """Test incremental simulation with StateManager."""
 
-    @pytest.mark.skip(
-        reason="Needs update for ReadConfig validation - simulation requires path/table field"
-    )
     def test_incremental_simulation_pandas(self, tmp_path):
         """Test incremental simulation with Pandas engine."""
         # Create project config with local state backend
@@ -111,8 +109,13 @@ class TestIncrementalSimulation:
         manager1 = PipelineManager.from_yaml(str(project_path))
         result1 = manager1.run("continuous_telemetry")
 
-        assert result1.success
-        df1 = result1.node_results["sensor_stream"].data
+        assert len(result1.failed) == 0, f"Pipeline failed: {result1.failed}"
+        node_result1 = result1.node_results["sensor_stream"]
+        assert node_result1.success
+
+        # Read data from parquet file
+        output_file = tmp_path / "sensor_data.parquet"
+        df1 = pd.read_parquet(output_file)
 
         # Should have 48 rows (2 sensors × 24 hours)
         assert len(df1) == 48
@@ -128,8 +131,15 @@ class TestIncrementalSimulation:
         manager2 = PipelineManager.from_yaml(str(project_path))
         result2 = manager2.run("continuous_telemetry")
 
-        assert result2.success
-        df2 = result2.node_results["sensor_stream"].data
+        assert len(result2.failed) == 0, f"Pipeline failed: {result2.failed}"
+        node_result2 = result2.node_results["sensor_stream"]
+        assert node_result2.success
+
+        # Read combined data from parquet file
+        combined = pd.read_parquet(output_file)
+
+        # Get only the new rows from run 2 (after last_ts from run 1)
+        df2 = combined[combined["timestamp"] > last_ts]
 
         # Should have another 48 rows
         assert len(df2) == 48
@@ -147,14 +157,6 @@ class TestIncrementalSimulation:
             f"Run 1 ended at {last_ts}, Run 2 started at {first_ts2}"
         )
 
-        # Check that data was appended
-        output_file = tmp_path / "sensor_data.parquet"
-        assert output_file.exists()
-
-        import pandas as pd
-
-        combined = pd.read_parquet(output_file)
-
         # Should have data from both runs
         # Each run: 2 sensors × 24 rows = 48 rows
         # Total: 96 rows
@@ -170,9 +172,6 @@ class TestIncrementalSimulation:
                 f"{total_rows} rows but only {unique_timestamps} unique timestamps"
             )
 
-    @pytest.mark.skip(
-        reason="Needs update for ReadConfig validation - simulation requires path/table field"
-    )
     def test_incremental_simulation_determinism(self, tmp_path):
         """Test that incremental simulation is deterministic with same seed."""
         project_config = {
@@ -227,6 +226,12 @@ class TestIncrementalSimulation:
                             }
                         },
                     },
+                    "write": {
+                        "connection": "local",
+                        "format": "parquet",
+                        "path": "test_data.parquet",
+                        "mode": "overwrite",
+                    },
                 }
             ],
         }
@@ -241,18 +246,19 @@ class TestIncrementalSimulation:
         # Run twice
         manager1 = PipelineManager.from_yaml(str(project_path))
         result1 = manager1.run("deterministic_sim")
-        values1 = result1.node_results["data_gen"].data["value"].tolist()
+        assert len(result1.failed) == 0
+        df1 = pd.read_parquet(tmp_path / "test_data.parquet")
+        values1 = df1["value"].tolist()
 
         manager2 = PipelineManager.from_yaml(str(project_path))
         result2 = manager2.run("deterministic_sim")
-        values2 = result2.node_results["data_gen"].data["value"].tolist()
+        assert len(result2.failed) == 0
+        df2 = pd.read_parquet(tmp_path / "test_data.parquet")
+        values2 = df2["value"].tolist()
 
         # Should be identical
         assert values1 == pytest.approx(values2), "Same seed should produce identical values"
 
-    @pytest.mark.skip(
-        reason="Needs update for ReadConfig validation - simulation requires path/table field"
-    )
     def test_incremental_reset_on_seed_change(self, tmp_path):
         """Test that changing seed restarts simulation."""
         project_config = {
@@ -310,6 +316,12 @@ class TestIncrementalSimulation:
                             "column": "timestamp",
                         },
                     },
+                    "write": {
+                        "connection": "local",
+                        "format": "parquet",
+                        "path": "test_data.parquet",
+                        "mode": "overwrite",
+                    },
                 }
             ],
         }
@@ -323,7 +335,9 @@ class TestIncrementalSimulation:
 
         manager1 = PipelineManager.from_yaml(str(project_path))
         result1 = manager1.run("seeded_sim")
-        values1 = result1.node_results["data"].data["value"].tolist()
+        assert len(result1.failed) == 0
+        df1 = pd.read_parquet(tmp_path / "test_data.parquet")
+        values1 = df1["value"].tolist()
 
         # Change seed to 100
         project_config["pipelines"][0]["nodes"][0]["read"]["options"]["simulation"]["scope"][
@@ -336,7 +350,9 @@ class TestIncrementalSimulation:
         # Run 2 with different seed
         manager2 = PipelineManager.from_yaml(str(project_path))
         result2 = manager2.run("seeded_sim")
-        values2 = result2.node_results["data"].data["value"].tolist()
+        assert len(result2.failed) == 0
+        df2 = pd.read_parquet(tmp_path / "test_data.parquet")
+        values2 = df2["value"].tolist()
 
         # Values should be different (different seed)
         assert values1 != pytest.approx(values2), "Different seeds should produce different values"
