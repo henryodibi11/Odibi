@@ -2572,7 +2572,13 @@ class NodeExecutor:
                 "project_name": project_name,
                 "table_name": table_name,
                 "path": table_path or "",
-                "format": write_config.format or "delta",
+                "format": (
+                    write_config.format.value
+                    if hasattr(write_config.format, "value")
+                    else str(write_config.format)
+                )
+                if write_config.format
+                else "delta",
                 "pattern_type": pattern_type,
                 "schema_hash": schema_hash,
             }
@@ -2614,7 +2620,9 @@ class NodeExecutor:
 
                 pattern_config = {
                     "materialized": config.materialized,
-                    "format": write_config.format,
+                    "format": write_config.format.value
+                    if hasattr(write_config.format, "value")
+                    else str(write_config.format),
                     "mode": str(write_config.mode) if write_config.mode else None,
                 }
                 table_name = write_config.table or config.name
@@ -3318,7 +3326,9 @@ class NodeExecutor:
             if config.read:
                 snapshot["read"] = {
                     "connection": config.read.connection,
-                    "format": config.read.format,
+                    "format": config.read.format.value
+                    if hasattr(config.read.format, "value")
+                    else str(config.read.format),
                     "table": getattr(config.read, "table", None),
                     "path": getattr(config.read, "path", None),
                 }
@@ -3339,7 +3349,9 @@ class NodeExecutor:
             if config.write:
                 snapshot["write"] = {
                     "connection": config.write.connection,
-                    "format": config.write.format,
+                    "format": config.write.format.value
+                    if hasattr(config.write.format, "value")
+                    else str(config.write.format),
                     "path": getattr(config.write, "path", None),
                     "mode": str(config.write.mode) if config.write.mode else None,
                 }
