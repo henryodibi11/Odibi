@@ -645,6 +645,21 @@ class NodeExecutor:
                             f"Simulation incremental: starting from {last_hwm}"
                         )
 
+                    # Restore random walk state for continuity across runs
+                    rw_state_key = f"{config.name}_rw_state"
+                    rw_state = (
+                        self.state_manager.get_hwm(rw_state_key) if self.state_manager else None
+                    )
+                    if rw_state:
+                        import json
+
+                        try:
+                            read_options["_random_walk_state"] = (
+                                json.loads(rw_state) if isinstance(rw_state, str) else rw_state
+                            )
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
             # Execute Read
             df = self.engine.read(
                 connection=connection,
@@ -707,6 +722,19 @@ class NodeExecutor:
                             hwm_value=str(max_ts),
                         )
                         self._execution_steps.append(f"Simulation HWM captured: {max_ts}")
+
+                    # Capture random walk final state for persistence
+                    rw_final = None
+                    if hasattr(df, "attrs"):
+                        rw_final = df.attrs.get("_simulation_random_walk_state")
+                    elif hasattr(df, "_simulation_random_walk_state"):
+                        rw_final = df._simulation_random_walk_state
+
+                    if rw_final and self.state_manager:
+                        import json
+
+                        rw_state_key = f"{config.name}_rw_state"
+                        self.state_manager.set_hwm(rw_state_key, json.dumps(rw_final))
                 else:
                     df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
                     if pending_hwm:

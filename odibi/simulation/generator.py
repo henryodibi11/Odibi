@@ -16,6 +16,7 @@ from odibi.config import (
     EmailGeneratorConfig,
     GeoGeneratorConfig,
     IPGeneratorConfig,
+    RandomWalkGeneratorConfig,
     RangeGeneratorConfig,
     SequentialGeneratorConfig,
     SimulationConfig,
@@ -27,15 +28,24 @@ from odibi.config import (
 class SimulationEngine:
     """Engine for generating simulated data according to YAML configuration."""
 
-    def __init__(self, config: SimulationConfig, hwm_timestamp: Optional[str] = None):
+    def __init__(
+        self,
+        config: SimulationConfig,
+        hwm_timestamp: Optional[str] = None,
+        random_walk_state: Optional[Dict[str, Dict[str, float]]] = None,
+    ):
         """Initialize simulation engine.
 
         Args:
             config: Simulation configuration
             hwm_timestamp: High-water mark timestamp for incremental generation
+            random_walk_state: Last random walk values per entity per column from previous run
         """
         self.config = config
         self.hwm_timestamp = hwm_timestamp
+        # Random walk state: last values per entity per column from previous run
+        # Format: {"entity_name": {"column_name": last_value, ...}, ...}
+        self.random_walk_state = random_walk_state or {}
         self.rng = np.random.default_rng(config.scope.seed)
 
         # Parse timestep
@@ -294,6 +304,23 @@ class SimulationEngine:
         """
         rows = []
 
+        # Initialize random walk current values from state or config defaults
+        random_walk_current = {}
+        col_map = {col.name: col for col in self.config.columns}
+        for col_config in self.config.columns:
+            gen = col_config.entity_overrides.get(entity_name, col_config.generator)
+            if isinstance(gen, RandomWalkGeneratorConfig):
+                # Restore from state if available, otherwise use start value
+                if (
+                    entity_name in self.random_walk_state
+                    and col_config.name in self.random_walk_state[entity_name]
+                ):
+                    random_walk_current[col_config.name] = self.random_walk_state[entity_name][
+                        col_config.name
+                    ]
+                else:
+                    random_walk_current[col_config.name] = gen.start
+
         for row_idx in range(self.total_rows):
             row_timestamp = self.effective_start_time + timedelta(
                 seconds=self.timestep_seconds * row_idx
@@ -306,8 +333,6 @@ class SimulationEngine:
             row = {}
 
             # Generate columns in dependency order
-            col_map = {col.name: col for col in self.config.columns}
-
             for col_name in self.column_order:
                 col_config = col_map[col_name]
 
@@ -323,6 +348,7 @@ class SimulationEngine:
                     row_idx,
                     entity_rng,
                     row,  # Pass current row for derived columns
+                    random_walk_current,
                 )
 
                 # Apply null_rate
@@ -372,6 +398,7 @@ class SimulationEngine:
         row_idx: int,
         rng: np.random.Generator,
         current_row: Dict[str, Any] = None,
+        random_walk_current: Dict[str, float] = None,
     ) -> Any:
         """Generate a single value based on generator configuration.
 
@@ -389,6 +416,8 @@ class SimulationEngine:
         """
         if isinstance(generator, RangeGeneratorConfig):
             return self._generate_range(generator, rng)
+        elif isinstance(generator, RandomWalkGeneratorConfig):
+            return self._generate_random_walk(generator, rng, random_walk_current)
         elif isinstance(generator, CategoricalGeneratorConfig):
             return self._generate_categorical(generator, rng)
         elif isinstance(generator, BooleanGeneratorConfig):
@@ -443,6 +472,60 @@ class SimulationEngine:
             # Generate normal value and clip to range
             value = rng.normal(mean, std_dev)
             return float(np.clip(value, config.min, config.max))
+
+    def _generate_random_walk(
+        self,
+        config: RandomWalkGeneratorConfig,
+        rng: np.random.Generator,
+        current_values: Dict[str, float],
+    ) -> float:
+        """Generate value using random walk with mean reversion.
+
+        Implements an Ornstein-Uhlenbeck process with optional trend.
+        Each value depends on the previous value, creating smooth, realistic
+        time-series data suitable for process simulation.
+
+        Args:
+            config: Random walk generator configuration
+            rng: Random number generator
+            current_values: Dict tracking current value per column name.
+                            Updated in-place with new value.
+
+        Returns:
+            Generated value
+        """
+        # Find the column name for this generator to track state
+        col_name = None
+        for col in self.config.columns:
+            if col.generator is config or any(ov is config for ov in col.entity_overrides.values()):
+                col_name = col.name
+                break
+
+        if col_name is None:
+            # Fallback: use start value if we can't identify the column
+            current = config.start
+        else:
+            current = current_values.get(col_name, config.start)
+
+        # Ornstein-Uhlenbeck step:
+        # dx = mean_reversion * (start - current) * dt + volatility * dW + trend
+        # Where dW is random noise
+        noise = rng.normal(0, config.volatility)
+        reversion_pull = config.mean_reversion * (config.start - current)
+        new_value = current + reversion_pull + noise + config.trend
+
+        # Clamp to physical bounds
+        new_value = float(np.clip(new_value, config.min, config.max))
+
+        # Apply precision rounding
+        if config.precision is not None:
+            new_value = round(new_value, config.precision)
+
+        # Update current value for next row
+        if col_name is not None and current_values is not None:
+            current_values[col_name] = new_value
+
+        return new_value
 
     def _generate_categorical(
         self, config: CategoricalGeneratorConfig, rng: np.random.Generator
@@ -751,3 +834,49 @@ class SimulationEngine:
             return None
 
         return max(timestamps)
+
+    def get_random_walk_final_state(
+        self, rows: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, float]]:
+        """Get the final random walk values per entity for state persistence.
+
+        Args:
+            rows: Generated rows
+
+        Returns:
+            Dict mapping entity_name -> {column_name: last_value}
+        """
+        # Identify random walk columns
+        rw_columns = [
+            col.name
+            for col in self.config.columns
+            if isinstance(col.generator, RandomWalkGeneratorConfig)
+        ]
+
+        if not rw_columns or not rows:
+            return {}
+
+        # Find the entity ID column (constant with {entity_id})
+        entity_col = None
+        for col in self.config.columns:
+            if isinstance(col.generator, ConstantGeneratorConfig) and "{entity_id}" in str(
+                col.generator.value
+            ):
+                entity_col = col.name
+                break
+
+        if not entity_col:
+            return {}
+
+        # Group by entity and get last values
+        state = {}
+        for row in rows:
+            entity = row.get(entity_col)
+            if entity:
+                if entity not in state:
+                    state[entity] = {}
+                for col in rw_columns:
+                    if row.get(col) is not None:
+                        state[entity][col] = row[col]
+
+        return state

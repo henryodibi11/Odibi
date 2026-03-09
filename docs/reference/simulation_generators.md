@@ -1,6 +1,6 @@
 # Simulation Generators Reference
 
-Quick reference for all 11 simulation generator types.
+Quick reference for all 12 simulation generator types.
 
 ## Generator Types
 
@@ -30,6 +30,50 @@ generator:
   max: 100.0
   distribution: normal
 ```
+
+---
+
+### random_walk
+
+**Purpose:** Realistic time-series data where each value depends on the previous value. Ideal for simulating controlled process variables (temperatures, pressures, flow rates).
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| start | float | Yes | - | Initial value / setpoint |
+| min | float | Yes | - | Hard lower bound (physical limit) |
+| max | float | Yes | - | Hard upper bound (physical limit) |
+| volatility | float | No | `1.0` | Std deviation of step-to-step noise |
+| mean_reversion | float | No | `0.0` | Pull toward start (0=none, 1=snap back) |
+| trend | float | No | `0.0` | Drift per timestep (+/- for gradual shift) |
+| precision | int | No | None | Round to N decimal places |
+
+**Data types:** float
+
+**How it works:** Uses an Ornstein-Uhlenbeck process. Each value = previous + noise + mean_reversion pull + trend. Values are clamped to [min, max].
+
+**Example:**
+```yaml
+name: reactor_temp
+data_type: float
+generator:
+  type: random_walk
+  start: 350.0
+  min: 300.0
+  max: 400.0
+  volatility: 0.5
+  mean_reversion: 0.1
+  trend: 0.001
+  precision: 1
+```
+
+**Tips:**
+
+- Use `mean_reversion: 0.1` to simulate a PID-controlled process at steady state
+- Use `trend: 0.001` to simulate slow fouling or catalyst deactivation
+- Use `precision: 1` to match real instrument resolution (e.g., temperature to 0.1°F)
+- Works with incremental mode — the last value per entity is saved and restored on the next run
 
 ---
 
@@ -340,6 +384,7 @@ generator:
 | Generator | Pandas | Spark | Polars | Incremental | Null Rate | Overrides |
 |-----------|--------|-------|--------|-------------|-----------|-----------|
 | range | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| random_walk | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | categorical | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | boolean | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | timestamp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |

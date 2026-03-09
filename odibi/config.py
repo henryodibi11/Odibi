@@ -1494,6 +1494,71 @@ class DerivedGeneratorConfig(BaseModel):
     )
 
 
+class RandomWalkGeneratorConfig(BaseModel):
+    """Random walk generator for realistic time-series data.
+
+    Produces values where each row depends on the previous row's value,
+    creating smooth, realistic process data instead of independent random values.
+
+    Uses an Ornstein-Uhlenbeck process with optional trend for realistic
+    simulation of controlled process variables (temperatures, pressures, flow rates).
+
+    Example:
+    ```yaml
+    type: random_walk
+    start: 350.0
+    min: 300.0
+    max: 400.0
+    volatility: 0.5
+    mean_reversion: 0.1
+    trend: 0.001
+    precision: 1
+    ```
+    """
+
+    type: Literal["random_walk"]
+    start: float = Field(description="Initial value / setpoint")
+    min: float = Field(description="Hard lower bound (physical limit)")
+    max: float = Field(description="Hard upper bound (physical limit)")
+    volatility: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Standard deviation of step-to-step changes. Controls noise magnitude.",
+    )
+    mean_reversion: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Strength of pull back toward start value (0 = pure random walk, "
+            "1 = snap back immediately). Simulates PID-like control."
+        ),
+    )
+    trend: float = Field(
+        default=0.0,
+        description=(
+            "Drift per timestep. Positive = gradual increase, negative = gradual decrease. "
+            "Simulates fouling, degradation, or slow process drift."
+        ),
+    )
+    precision: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=10,
+        description="Round values to N decimal places. None = no rounding.",
+    )
+
+    @model_validator(mode="after")
+    def validate_random_walk(self):
+        if self.min >= self.max:
+            raise ValueError(f"Random walk min ({self.min}) must be less than max ({self.max})")
+        if not (self.min <= self.start <= self.max):
+            raise ValueError(
+                f"Random walk start ({self.start}) must be between min ({self.min}) and max ({self.max})"
+            )
+        return self
+
+
 GeneratorConfig = Annotated[
     Union[
         RangeGeneratorConfig,
@@ -1506,6 +1571,7 @@ GeneratorConfig = Annotated[
         EmailGeneratorConfig,
         IPGeneratorConfig,
         GeoGeneratorConfig,
+        RandomWalkGeneratorConfig,
         DerivedGeneratorConfig,
     ],
     Field(discriminator="type"),

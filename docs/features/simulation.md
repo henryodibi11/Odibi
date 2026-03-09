@@ -44,8 +44,8 @@ nodes:
 
 ## Key Features
 
-### 🎲 11 Generator Types
-**Basic:** range, categorical, boolean, timestamp, sequential, constant  
+### 🎲 12 Generator Types
+**Basic:** range, random_walk, categorical, boolean, timestamp, sequential, constant  
 **Advanced:** derived, uuid, email, ipv4, geo
 
 ### ⚡ Incremental Mode
@@ -68,6 +68,7 @@ Same seed produces identical data every time.
 | Generator | Use Case | Example |
 |-----------|----------|---------|
 | range | Metrics, measurements | Temperature: 60-100°C |
+| random_walk | Process variables | Reactor temp: 350±5°F |
 | categorical | Status, enums | [Running, Idle, Error] |
 | boolean | Flags | is_active: 95% true |
 | timestamp | Event times | Auto 5-minute intervals |
@@ -115,7 +116,7 @@ read:
     column: timestamp
 ```
 
-Each run generates new data after previous run's max timestamp.
+Each run generates new data after previous run's max timestamp. This uses the same `incremental:` config as all other read sources — see [Stateful Incremental Loading](../patterns/incremental_stateful.md).
 
 ### Stress Testing
 

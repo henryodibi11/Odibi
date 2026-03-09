@@ -598,6 +598,10 @@ class SparkEngine(Engine):
                 # Note: Spark doesn't have attrs, so we'll attach as a property
                 df._simulation_max_timestamp = pdf.attrs["_simulation_max_timestamp"]
 
+            # Preserve random walk state
+            if hasattr(pdf, "attrs") and "_simulation_random_walk_state" in pdf.attrs:
+                df._simulation_random_walk_state = pdf.attrs["_simulation_random_walk_state"]
+
             ctx.info(
                 "Simulation read completed (via Pandas)",
                 elapsed_ms=round(elapsed, 2),

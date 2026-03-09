@@ -784,8 +784,13 @@ class PandasEngine(Engine):
         # Check for HWM (passed through options for incremental mode)
         hwm_timestamp = options.get("_hwm_timestamp")
 
+        # Check for random walk state (passed through options for incremental mode)
+        random_walk_state = options.get("_random_walk_state")
+
         # Create simulation engine
-        engine = SimulationEngine(sim_config, hwm_timestamp=hwm_timestamp)
+        engine = SimulationEngine(
+            sim_config, hwm_timestamp=hwm_timestamp, random_walk_state=random_walk_state
+        )
 
         # Generate data
         ctx.info(
@@ -804,6 +809,11 @@ class PandasEngine(Engine):
         max_ts = engine.get_max_timestamp(rows)
         if max_ts and hasattr(df, "attrs"):
             df.attrs["_simulation_max_timestamp"] = max_ts
+
+        # Store random walk final state for incremental persistence
+        rw_state = engine.get_random_walk_final_state(rows)
+        if rw_state and hasattr(df, "attrs"):
+            df.attrs["_simulation_random_walk_state"] = rw_state
 
         ctx.info(
             "Simulation complete",

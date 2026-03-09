@@ -1,100 +1,143 @@
 # Synthetic Data Generation (Simulation)
 
-## Overview
+Generate realistic data directly in your pipelines — no external tools, no real data needed.
 
-Generate realistic synthetic data directly in your Odibi pipelines using declarative YAML configuration.
+---
 
-**Use cases:**
+## Why Simulation?
 
-- Build pipelines before source data exists
-- Create reproducible test datasets
-- Generate realistic demos without exposing customer data
-- Stress test Delta Lake at scale
-- Provide safe training environments
+You need data but don't have it yet. Maybe the source system isn't ready, maybe you can't use production data, or maybe you just want to test your pipeline logic without waiting on IT.
 
-## Quick Start
+Simulation lets you:
 
-```yaml title="Generate 300 rows of device telemetry"
+- **Build pipelines before sources exist** — swap to real data later, no code changes
+- **Test with safe, reproducible data** — same seed = same output, every time
+- **Stress test at scale** — generate millions of rows to test Delta Lake performance
+- **Demo without risk** — realistic data that isn't anyone's real data
+
+---
+
+## Your First Simulation
+
+Here's the simplest possible simulation — 3 sensors generating 24 hours of readings:
+
+```yaml
 nodes:
-  - name: demo_data
+  - name: sensor_data
     read:
-      connection: null
+      connection: null          # No connection needed for simulation
       format: simulation
       options:
         simulation:
           scope:
             start_time: "2026-01-01T00:00:00Z"
             timestep: "5m"
-            row_count: 100
+            row_count: 288      # 288 × 5min = 24 hours
             seed: 42
           entities:
             count: 3
-            id_prefix: "device_"
+            id_prefix: "sensor_"
           columns:
-            - name: device_id
+            - name: sensor_id
               data_type: string
               generator: {type: constant, value: "{entity_id}"}
             - name: timestamp
               data_type: timestamp
               generator: {type: timestamp}
-            - name: value
+            - name: temperature
               data_type: float
-              generator: {type: range, min: 0, max: 100}
+              generator: {type: range, min: 20, max: 35}
+    write:
+      connection: my_lake
+      format: delta
+      table: bronze_sensors
+      mode: overwrite
 ```
 
-**Output:** 300 rows (3 devices × 100 rows each) with 5-minute intervals
+**What happens:** 3 entities × 288 rows = **864 rows** of sensor data, with temperatures between 20–35°C at 5-minute intervals.
 
 **Run it:**
 ```bash
 odibi run my_pipeline.yaml
 ```
 
-## Core Concepts
+!!! tip "connection: null"
+    Simulation doesn't read from any external source, so set `connection: null`. No connection definition needed in your project.yaml.
 
-### 1. Simulation Scope
+---
 
-Defines when and how much data to generate:
+## How Simulation Works
+
+Every simulation has three parts:
+
+```
+┌─────────┐     ┌──────────┐     ┌─────────┐
+│  Scope  │  →  │ Entities │  →  │ Columns │
+│ (when)  │     │  (who)   │     │ (what)  │
+└─────────┘     └──────────┘     └─────────┘
+```
+
+1. **Scope** — *When* and *how much* data: start time, interval, row count
+2. **Entities** — *Who* generates data: sensors, users, machines, etc.
+3. **Columns** — *What* data each entity produces: temperatures, IDs, statuses
+
+Each entity gets its own copy of `row_count` rows. So 5 entities × 100 rows = 500 total rows.
+
+---
+
+## Scope: When and How Much
 
 ```yaml
 scope:
-  start_time: "2026-01-01T00:00:00Z"  # ISO8601 timestamp
-  timestep: "5m"                       # 5s, 10m, 1h, 2d supported
-  row_count: 1000                      # Generate this many rows per entity
-  # OR
-  end_time: "2026-01-02T00:00:00Z"    # Generate until this time
-  seed: 42                             # Random seed for determinism
+  start_time: "2026-01-01T00:00:00Z"   # When data starts
+  timestep: "5m"                        # Interval between rows
+  row_count: 288                        # Rows per entity
+  seed: 42                              # Makes output reproducible
 ```
 
-!!! note "Scope Constraint"
-    Choose **exactly one** of `row_count` or `end_time`, not both.
+**Timestep formats:** `5s` (seconds), `10m` (minutes), `1h` (hours), `2d` (days)
 
-!!! tip "Determinism"
-    Set a fixed `seed` value to make simulations reproducible. Same seed + same config = identical data every time.
-
-**Timestep format**: `<number><unit>` where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days).
-
-### 2. Entities
-
-Entities represent the "things" generating data (sensors, users, machines, etc.):
+**How many rows?** Use either `row_count` OR `end_time` — not both:
 
 ```yaml
-# Auto-generate entity names
-entities:
-  count: 100
-  id_prefix: "sensor_"      # → sensor_01, sensor_02, ..., sensor_100
+# Option A: Fixed count
+scope:
+  row_count: 288        # Exactly 288 rows per entity
 
-# OR explicit names
+# Option B: Time range
+scope:
+  end_time: "2026-01-02T00:00:00Z"   # Generate until this time
+```
+
+!!! tip "Quick math"
+    `row_count × timestep = duration`. So 288 rows × 5 minutes = 1,440 minutes = **1 day**.
+
+---
+
+## Entities: Who Generates Data
+
+Entities are the "things" producing data — sensors, users, machines, production lines, etc.
+
+```yaml
+# Auto-generate names
+entities:
+  count: 10
+  id_prefix: "sensor_"       # → sensor_01, sensor_02, ... sensor_10
+
+# OR name them explicitly
 entities:
   names: [pump_01, pump_02, reactor_01]
 ```
 
-Each entity generates `row_count` (or time-based count) rows.
+Each entity generates its own set of `row_count` rows independently.
 
-### 3. Column Generators
+---
 
-Each column has a generator that defines how values are created:
+## Columns: What Gets Generated
 
-#### Range Generator (Numeric)
+Each column needs a `name`, `data_type`, and `generator`. Here are all the generator types:
+
+### range — Numbers
 
 ```yaml
 - name: temperature
@@ -103,43 +146,71 @@ Each column has a generator that defines how values are created:
     type: range
     min: 60.0
     max: 100.0
-    distribution: uniform    # or: normal
-    # For normal distribution:
-    mean: 80.0              # defaults to midpoint
-    std_dev: 10.0           # defaults to (max-min)/6
 ```
 
-#### Categorical Generator
+Optional: add `distribution: normal` with `mean` and `std_dev` for bell-curve values.
+
+### random_walk — Realistic process data
+
+Unlike `range` which picks each value independently, `random_walk` makes each value depend on the previous one — producing smooth, realistic time-series data.
+
+```yaml
+- name: reactor_temp
+  data_type: float
+  generator:
+    type: random_walk
+    start: 350.0          # Setpoint / initial value
+    min: 300.0             # Physical lower bound
+    max: 400.0             # Physical upper bound
+    volatility: 0.5        # How much it can change per step
+    mean_reversion: 0.1    # Pull back toward setpoint (like a PID controller)
+    trend: 0.001           # Slow drift per step (fouling, degradation)
+    precision: 1           # Round to 1 decimal (like a real sensor)
+```
+
+**When to use:** Temperatures, pressures, flow rates, pH, levels — any process variable that changes gradually, not randomly.
+
+**`mean_reversion`** controls how strongly values pull back to the `start` value. Think of it as the tightness of your control loop:
+- `0.0` = pure random walk (no control, drifts freely)
+- `0.1` = loose control (slow correction)
+- `0.5` = tight control (snaps back quickly)
+
+**`trend`** adds gradual drift — simulates fouling, catalyst deactivation, or filter clogging over time.
+
+!!! tip "Incremental mode"
+    With `incremental.mode: stateful`, the random walk remembers each entity's last value between runs. Run 2 picks up exactly where run 1 left off — no discontinuities.
+
+### categorical — Pick from a list
 
 ```yaml
 - name: status
-  data_type: categorical
+  data_type: string
   generator:
     type: categorical
     values: [Running, Idle, Error]
-    weights: [0.8, 0.15, 0.05]  # optional, defaults to uniform
+    weights: [0.8, 0.15, 0.05]     # Optional — default is equal probability
 ```
 
-#### Boolean Generator
+### boolean — True/False
 
 ```yaml
 - name: is_active
   data_type: boolean
   generator:
     type: boolean
-    true_probability: 0.95    # P(True) = 95%
+    true_probability: 0.95          # 95% chance of True
 ```
 
-#### Timestamp Generator
+### timestamp — Auto-incrementing time
 
 ```yaml
 - name: event_time
   data_type: timestamp
   generator:
-    type: timestamp           # Uses scope.timestep automatically
+    type: timestamp                 # Uses scope.timestep automatically
 ```
 
-#### Sequential Generator
+### sequential — Auto-incrementing numbers
 
 ```yaml
 - name: record_id
@@ -147,113 +218,115 @@ Each column has a generator that defines how values are created:
   generator:
     type: sequential
     start: 1
-    step: 1                   # → 1, 2, 3, 4, ...
+    step: 1                         # → 1, 2, 3, 4, ...
 ```
 
-#### Constant Generator
+### constant — Fixed value
 
 ```yaml
-- name: source
+- name: source_system
   data_type: string
   generator:
     type: constant
     value: "simulation"
 ```
 
-**Magic Variables** in constant values:
-- `{entity_id}`: Current entity name
-- `{entity_index}`: Entity index (0-based)
-- `{timestamp}`: Current row timestamp
-- `{row_number}`: Row index
+**Magic variables** you can use in constant values:
 
-#### Derived Generator (v3)
+| Variable | Description | Example output |
+|----------|-------------|----------------|
+| `{entity_id}` | Current entity name | `sensor_03` |
+| `{entity_index}` | Entity index (0-based) | `2` |
+| `{timestamp}` | Current row timestamp | `2026-01-01T00:15:00` |
+| `{row_number}` | Row index | `3` |
 
-Calculate columns from other columns using Python expressions:
+### uuid — Unique identifiers
 
 ```yaml
-- name: temperature_fahrenheit
+- name: transaction_id
+  data_type: string
+  generator:
+    type: uuid
+```
+
+### email — Email addresses
+
+```yaml
+- name: contact
+  data_type: string
+  generator:
+    type: email
+```
+
+### ipv4 — IP addresses
+
+```yaml
+- name: source_ip
+  data_type: string
+  generator:
+    type: ipv4
+```
+
+### geo — Coordinates
+
+```yaml
+- name: location
+  data_type: string
+  generator:
+    type: geo
+```
+
+### derived — Calculated from other columns
+
+```yaml
+- name: temp_fahrenheit
   data_type: float
   generator:
     type: derived
-    expression: "temperature_celsius * 1.8 + 32"
+    expression: "temp_celsius * 1.8 + 32"
 ```
 
-**Supported operations:**
-- Arithmetic: `+`, `-`, `*`, `/`, `//`, `%`, `**`
-- Comparison: `==`, `!=`, `<`, `<=`, `>`, `>=`
-- Logical: `and`, `or`, `not`
-- Conditionals: `value if condition else other_value`
-- Functions: `abs()`, `round()`, `min()`, `max()`, `int()`, `float()`, `str()`, `bool()`
+Derived columns can reference any column defined above them. Odibi automatically resolves the dependency order.
 
-**Examples:**
+**More examples:**
 
 ```yaml
 # Conditional logic
-- name: status
+- name: alert_level
   data_type: string
   generator:
     type: derived
-    expression: "'HOT' if temperature > 80 else 'NORMAL'"
+    expression: "'CRITICAL' if temperature > 90 else 'NORMAL'"
 
-# Multiple dependencies
+# Safe division
 - name: efficiency
   data_type: float
   generator:
     type: derived
     expression: "(output / input * 100) if input > 0 else 0"
-
-# Chained derivations (b depends on a, c depends on b)
-- name: a
-  data_type: int
-  generator: {type: sequential, start: 1}
-
-- name: b
-  data_type: int
-  generator: {type: derived, expression: "a * 10"}
-
-- name: c
-  data_type: int
-  generator: {type: derived, expression: "b + 5"}
 ```
-
-**Dependency Resolution:**
-- Automatic topological sort
-- Circular dependencies detected and rejected
-- Columns generated in correct order
 
 !!! warning "Expression Safety"
-    Derived expressions run in a **restricted namespace**:
+    Derived expressions run in a sandboxed namespace. Math, logic, and safe functions (`abs`, `round`, `min`, `max`) are allowed. Imports, file I/O, and system calls are blocked.
 
-    **Allowed:** Math/logic operators, safe functions (abs, round, safe_div, coalesce)  
-    **Blocked:** Imports, file I/O, network, system calls, exec, eval
+---
 
-    **Example safe:**
-    ```python
-    "temperature * 1.8 + 32"
-    "safe_div(output, input, 0)"
-    "'HOT' if temp > 80 else 'NORMAL'"
-    ```
+## Adding Realism
 
-    **Example unsafe (rejected):**
-    ```python
-    "import os; os.system('rm -rf /')"  # Blocked
-    "open('/etc/passwd').read()"        # Blocked
-    ```
+### Null Values
 
-### 4. Null Rate
-
-Add realistic missing data:
+Make some values randomly missing:
 
 ```yaml
-- name: optional_field
+- name: optional_reading
   data_type: float
   generator: {type: range, min: 0, max: 100}
-  null_rate: 0.1              # 10% of values will be NULL
+  null_rate: 0.1                    # 10% of values will be NULL
 ```
 
-### 5. Entity Overrides
+### Entity Overrides
 
-Override generator for specific entities:
+Give specific entities different behavior:
 
 ```yaml
 - name: pressure
@@ -263,59 +336,175 @@ Override generator for specific entities:
     min: 50
     max: 100
   entity_overrides:
-    pump_heavy_duty:          # This entity uses different range
+    heavy_duty_pump:                # This entity uses a higher range
       type: range
       min: 100
       max: 200
 ```
 
-### 6. Chaos Parameters
+### Chaos Engineering
 
-Add realistic imperfections:
+Add realistic imperfections to your data:
 
 ```yaml
 chaos:
-  outlier_rate: 0.01          # 1% of numeric values become outliers
-  outlier_factor: 3.0         # Outliers are 3x normal value
-  duplicate_rate: 0.005       # 0.5% of rows are duplicated
-  downtime_events:            # Specific periods with no data
-    - entity: sensor_05       # If null, affects all entities
+  outlier_rate: 0.01                # 1% of numeric values become outliers
+  outlier_factor: 3.0               # Outliers are 3× normal value
+  duplicate_rate: 0.005             # 0.5% of rows are duplicated
+  downtime_events:                  # Gaps where entities produce no data
+    - entity: sensor_05
       start_time: "2026-01-01T12:00:00Z"
       end_time: "2026-01-01T14:00:00Z"
 ```
 
-## Complete Example
+This is great for testing whether your pipeline handles bad data gracefully.
 
-See [simulation_example.yaml on GitHub](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_example.yaml) for a full working example with:
-- 10 sensors generating 24 hours of telemetry
-- Multiple generator types
-- Entity overrides
-- Chaos parameters
-- Downstream transformations and validation
+---
 
-## Determinism
+## Incremental Mode: Continuous Data Generation
 
-Simulations are **fully deterministic** when using the same seed:
+Want your simulation to generate **new data on each run**, like a real streaming source? Use incremental mode.
+
+!!! note "Same config as all other sources"
+    The `incremental:` block is the **exact same** config used for SQL, Delta, CSV, and every other read source. The simulator simply respects the High Water Mark (HWM) to know where to start. See [Stateful Incremental Loading](../patterns/incremental_stateful.md) for full details.
+
+### How it works
+
+```
+Run 1: Generates Jan 1 00:00 → 23:00  →  Saves HWM: Jan 1 23:00
+Run 2: Generates Jan 2 00:00 → 23:00  →  Saves HWM: Jan 2 23:00
+Run 3: Generates Jan 3 00:00 → 23:00  →  Saves HWM: Jan 3 23:00
+...
+```
+
+Each run picks up exactly where the last one left off.
+
+### Configuration
+
+Just add `incremental:` to your read block:
+
+```yaml
+- name: sensor_stream
+  read:
+    connection: null
+    format: simulation
+    options:
+      simulation:
+        scope:
+          start_time: "2026-01-01T00:00:00Z"
+          timestep: "5m"
+          row_count: 288            # 1 day of data per run
+          seed: 42
+        entities:
+          count: 10
+          id_prefix: "sensor_"
+        columns:
+          - name: sensor_id
+            data_type: string
+            generator: {type: constant, value: "{entity_id}"}
+          - name: timestamp
+            data_type: timestamp
+            generator: {type: timestamp}
+          - name: value
+            data_type: float
+            generator: {type: range, min: 0, max: 100}
+
+    incremental:
+      mode: stateful
+      column: timestamp             # Must match a timestamp column
+
+  write:
+    connection: my_lake
+    format: delta
+    table: sensor_stream
+    mode: append                    # Append each day's data
+```
+
+### Determinism
+
+Incremental simulation stays deterministic — same seed + same HWM = identical output. Each run advances the RNG state based on the HWM, so results are reproducible across environments.
+
+---
+
+## Common Patterns
+
+### Pattern 1: Build Before Sources Exist
+
+```yaml
+# Bronze: simulate what the upstream source will look like
+- name: bronze_orders
+  read:
+    connection: null
+    format: simulation
+    options:
+      simulation:
+        scope: {start_time: "2026-01-01T00:00:00Z", timestep: "1h", row_count: 100, seed: 42}
+        entities: {count: 1, id_prefix: ""}
+        columns:
+          - name: order_id
+            data_type: int
+            generator: {type: sequential, start: 1}
+          - name: amount
+            data_type: float
+            generator: {type: range, min: 10, max: 500}
+          - name: created_at
+            data_type: timestamp
+            generator: {type: timestamp}
+
+# Silver: process as if real — this code never changes
+- name: silver_orders
+  depends_on: [bronze_orders]
+  transform:
+    - operation: derive_columns
+      params:
+        columns:
+          order_tier: "CASE WHEN amount > 200 THEN 'high' ELSE 'standard' END"
+```
+
+When the real source is ready, just swap `bronze_orders` to read from it. Silver stays untouched.
+
+### Pattern 2: Stress Test Delta Lake
 
 ```yaml
 scope:
-  seed: 42
+  row_count: 10000
+entities:
+  count: 1000                      # 1,000 entities × 10K rows = 10M rows
 ```
 
-Same seed → identical data on every run. This enables:
-- Reproducible tests
-- Consistent demos
-- Debugging with fixed datasets
+Test write performance, partitioning strategies, and compaction.
 
-## Integration with Odibi Pipelines
-
-Simulated sources work exactly like real sources:
+### Pattern 3: Daily Data Feed for Dashboards
 
 ```yaml
-- name: simulated_bronze
+read:
+  connection: null
+  format: simulation
+  options:
+    simulation:
+      scope: {start_time: "2026-01-01T00:00:00Z", timestep: "1h", row_count: 24, seed: 42}
+      # ...columns...
+  incremental:
+    mode: stateful
+    column: timestamp
+write:
+  mode: append
+```
+
+Schedule with a cron job — each run adds one more day of demo data.
+
+---
+
+## Integration with Pipelines
+
+Simulated data is regular data. Everything that works with real sources works with simulation:
+
+```yaml
+- name: sim_bronze
   read:
+    connection: null
     format: simulation
-    options: {...}
+    options: {simulation: {...}}
   transform:
     - operation: derive_columns
       params: {...}
@@ -325,264 +514,82 @@ Simulated sources work exactly like real sources:
         columns: [id, timestamp]
   write:
     connection: lake
+    format: delta
     table: bronze.sim_data
     mode: overwrite
 ```
 
-Downstream nodes cannot distinguish simulation from real data.
+Transforms, validation, quality gates, quarantine, stories — all work exactly the same.
 
-## Performance Considerations
+---
 
-- **Memory**: All rows generated in-memory. For large datasets (>1M rows), use Spark engine
-- **Speed**: Generation is fast (~100K rows/second typical)
-- **Chaos**: Outliers and duplicates applied after generation, adds minimal overhead
+## Performance
 
-## Limitations
+| Scenario | Guidance |
+|----------|----------|
+| < 1M rows | Pandas engine is fine |
+| 1M–10M rows | Consider Spark engine |
+| > 10M rows | Use Spark with partitioning |
 
-**Not supported yet:**
-- Correlation between columns (planned for v4)
-- Time-series patterns (seasonality, trends, planned for v4)
-- Custom function libraries (planned for v4)
+Generation speed is roughly **100K rows/second** on Pandas. Chaos effects (outliers, duplicates) add minimal overhead.
 
-**Engine Support:**
-- ✅ Pandas: Fully supported (v1)
-- ✅ Spark: Fully supported (v2, delegates to Pandas)
-- ✅ Polars: Fully supported (v2, delegates to Pandas)
-- ✅ Incremental mode: Fully supported (v2)
-- ✅ Derived columns: Fully supported (v3)
+---
 
-## Use Cases
+## Engine Support
 
-### 1. Develop Without Source Data
+All three engines are fully supported. Same YAML, same output:
 
-```yaml
-# Bronze node simulates upstream source
-- name: bronze_orders
-  read: {format: simulation, options: {...}}
+| Engine | Status | Notes |
+|--------|--------|-------|
+| Pandas | ✅ Native | Primary implementation |
+| Spark | ✅ Supported | Generates via Pandas, converts to Spark DataFrame |
+| Polars | ✅ Supported | Generates via Pandas, converts to Polars LazyFrame |
 
-# Silver node processes as if real data
-- name: silver_orders
-  depends_on: [bronze_orders]
-  inputs: {source: bronze_orders}
-  transform: [...]
-```
-
-Later, swap bronze node to real source—silver logic unchanged.
-
-### 2. Generate Test Fixtures
-
-```python
-# Generate 1000 test records
-scope: {row_count: 1000, seed: 42}
-
-# Run tests
-pytest tests/test_transform.py
-```
-
-### 3. Demo Analytics
-
-Generate realistic data for dashboards without exposing real data.
-
-### 4. Stress Test Pipelines
-
-```yaml
-# Generate 10M rows
-scope:
-  row_count: 10000
-entities:
-  count: 1000  # 1000 entities × 10K rows = 10M
-```
-
-Test Delta write performance, partition strategies, etc.
-
-## Incremental Simulation (v2)
-
-Simulation sources support **stateful incremental mode** for continuous data generation.
-
-### How It Works
-
-With incremental mode enabled, the simulator:
-1. Tracks the maximum timestamp from each run in StateManager
-2. On subsequent runs, starts generating data after the last timestamp
-3. Persists the new maximum timestamp for the next run
-
-This creates a **continuously evolving data source** that behaves like real streaming data.
-
-### Configuration
-
-```yaml
-read:
-  connection: null
-  format: simulation
-  options:
-    simulation:
-      scope:
-        start_time: "2026-01-01T00:00:00Z"
-        timestep: "5m"
-        row_count: 288  # 24 hours of data
-        seed: 42
-      # ... entities and columns ...
-
-  incremental:
-    mode: stateful
-    column: timestamp        # Must match a timestamp column
-    state_key: my_sim_hwm    # Optional: defaults to <node_name>_hwm
-```
-
-### Example: Continuous Telemetry
-
-```yaml
-name: continuous_iot
-engine: pandas
-
-connections:
-  local:
-    type: local
-    base_path: ./data
-
-system:
-  connection: local
-  path: .odibi/catalog  # Stores HWM state
-
-pipelines:
-  - name: sensor_ingestion
-    nodes:
-      - name: sensor_data
-        read:
-          format: simulation
-          options:
-            simulation:
-              scope:
-                start_time: "2026-01-01T00:00:00Z"
-                timestep: "1h"
-                row_count: 24  # 24 hours per run
-                seed: 42
-              entities:
-                count: 10
-                id_prefix: sensor_
-              columns:
-                - name: timestamp
-                  data_type: timestamp
-                  generator: {type: timestamp}
-                - name: value
-                  data_type: float
-                  generator: {type: range, min: 0, max: 100}
-          incremental:
-            mode: stateful
-            column: timestamp
-
-        write:
-          connection: local
-          table: sensor_stream.parquet
-          mode: append
-```
-
-**Run 1:**
-- Generates data from 2026-01-01 00:00 → 23:00 (24 rows per sensor)
-- Stores HWM: 2026-01-01T23:00:00Z
-
-**Run 2:**
-- Starts from 2026-01-02 00:00 (after HWM)
-- Generates data from 00:00 → 23:00 (next 24 rows)
-- Updates HWM: 2026-01-02T23:00:00Z
-
-**Run 3:**
-- Continues from 2026-01-03 00:00...
-
-### State Storage
-
-HWM state is stored in the System Catalog configured in `project.yaml`:
-
-```yaml
-system:
-  connection: <connection_name>
-  path: <catalog_path>
-```
-
-Supported backends:
-- **LocalJSONStateBackend**: `.odibi/state.json` (development)
-- **DeltaStateBackend**: Delta table in lake (production)
-- **AzureSQLStateBackend**: Azure SQL table (enterprise)
-
-### Determinism
-
-Incremental simulation remains **deterministic**:
-- Same seed + same HWM → identical data
-- Each run advances the RNG state based on HWM
-- Reproducible across environments
-
-### Use Cases
-
-1. **Long-running test datasets**: Simulate weeks/months of data incrementally
-2. **Continuous integration tests**: Generate fresh data on each CI run
-3. **Demo environments**: Auto-refresh dashboards with new simulated data
-4. **Performance testing**: Gradually increase dataset size to test scalability
-
-## Configuration Reference
-
-See the [Config API reference](../reference/api/config.md) or [config.py on GitHub](https://github.com/henryodibi11/Odibi/blob/main/odibi/config.py) for complete Pydantic models:
-
-- `SimulationConfig`: Top-level config
-- `SimulationScope`: Time/count boundaries
-- `EntityConfig`: Entity generation
-- `ColumnGeneratorConfig`: Column definition
-- `ChaosConfig`: Chaos parameters
-
-All configs are validated at parse time with clear error messages.
+---
 
 ## Troubleshooting
 
-### Error: "Specify either row_count or end_time"
+### "Specify either row_count or end_time"
 
-Provide exactly one:
+You set both. Pick one:
 
 ```yaml
 scope:
-  row_count: 100  # ✅
-  # end_time: ...  # ❌ Don't specify both
+  row_count: 100          # ✅ Use this
+  # end_time: "..."       # ❌ Remove this
 ```
 
-### Error: "Weights must sum to 1.0"
+### "Weights must sum to 1.0"
 
-Categorical weights must be probabilities:
+Categorical weights are probabilities:
 
 ```yaml
-generator:
-  type: categorical
-  values: [A, B, C]
-  weights: [0.5, 0.3, 0.2]  # ✅ Sum = 1.0
+values: [A, B, C]
+weights: [0.5, 0.3, 0.2]   # ✅ Sums to 1.0
 ```
 
-### Error: "Column override references undefined entity"
+### "Column override references undefined entity"
 
-Entity overrides must reference entities that exist:
+Entity overrides must match defined entity names:
 
 ```yaml
 entities:
-  names: [pump_01, pump_02]  # ✅ Defined
+  names: [pump_01, pump_02]
 
 entity_overrides:
-  pump_03: {...}  # ❌ Not defined
+  pump_01: {...}              # ✅ Exists
+  pump_03: {...}              # ❌ Not defined
 ```
 
 ### No data generated
 
-Check downtime events—entities may be offline during entire simulation window.
+Check chaos `downtime_events` — your entities might be "offline" for the entire simulation window.
 
-## Future Enhancements (Roadmap)
+---
 
-- **v2.0**: Incremental mode with HWM persistence
-- **v2.1**: Derived columns with dependencies
-- **v2.2**: Correlation modeling between columns
-- **v2.3**: Time-series patterns (seasonality, trends)
-- **v3.0**: Spark and Polars engine support
-- **v3.1**: Simulation presets (IoT, retail, manufacturing)
-- **v3.2**: Event-driven simulation (Poisson processes)
+## What's Next
 
-## Contributing
-
-See [CONTRIBUTING.md on GitHub](https://github.com/henryodibi11/Odibi/blob/main/CONTRIBUTING.md) for how to extend the simulation feature.
-
-## License
-
-Part of the Odibi framework. See [LICENSE on GitHub](https://github.com/henryodibi11/Odibi/blob/main/LICENSE).
+- [Generators Reference](../reference/simulation_generators.md) — quick parameter lookup for all 12 generators
+- [Incremental Loading](../patterns/incremental_stateful.md) — deep dive into stateful vs rolling window modes
+- [Example YAML](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_example.yaml) — full working example
+- [Validation](../features/quality_gates.md) — add quality checks to your simulated data
