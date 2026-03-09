@@ -3134,7 +3134,9 @@ class NodeExecutor:
                 "output_type": output_type,
                 "connection_name": write_cfg.connection,
                 "path": write_cfg.path,
-                "format": write_cfg.format.value if hasattr(write_cfg.format, 'value') else str(write_cfg.format),
+                "format": write_cfg.format.value
+                if hasattr(write_cfg.format, "value")
+                else str(write_cfg.format),
                 "table_name": write_cfg.register_table or write_cfg.table,
                 "last_run": datetime.now(timezone.utc),
                 "row_count": row_count,
