@@ -33,7 +33,7 @@ When you call `https://api.fda.gov/food/enforcement.json?limit=2`, you get:
     },
     {
       "recall_number": "F-0865-2017",
-      "status": "Terminated", 
+      "status": "Terminated",
       "city": "Millbrae",
       "state": "CA",
       "classification": "Class II"
@@ -94,14 +94,14 @@ pipelines:
           options:
             params:                      # Query parameters to send
               limit: 1000
-            
+
             pagination:                  # How to get all pages
               type: offset_limit
               offset_param: skip
               limit_param: limit
               limit: 1000
               max_pages: 10
-            
+
             response:                    # Where to find the data in JSON
               items_path: results
 
@@ -307,6 +307,101 @@ options:
     items_path: value
 ```
 
+### Array Indexing
+
+Extract specific elements from arrays using bracket notation:
+
+```json
+[
+  {"meta": "ignored"},
+  [{"id": 1}, {"id": 2}]
+]
+```
+```yaml
+options:
+  response:
+    items_path: "[1]"   # Get second element (0-indexed)
+```
+
+Or with nested paths:
+```json
+{"series": [{"data": [{"id": 1}, {"id": 2}]}]}
+```
+```yaml
+options:
+  response:
+    items_path: "series[0].data"   # Navigate series[0] then .data
+```
+
+### Wrapping Single Objects
+
+Some APIs return a single object instead of an array:
+
+```json
+{"temperature": 72, "humidity": 45}
+```
+
+Use `wrap_single: true` to convert it to a 1-row table:
+
+```yaml
+options:
+  response:
+    items_path: ""
+    wrap_single: true   # Wraps single dict in array [{"temperature": 72, ...}]
+```
+
+### Array-of-Arrays to Dict
+
+APIs returning arrays of arrays (like OHLCV candles):
+
+```json
+[
+  [1640000000, 50000, 51000, 49000, 50500, 123.45],
+  [1640003600, 50500, 52000, 50000, 51500, 234.56]
+]
+```
+
+Map array elements to named fields:
+
+```yaml
+options:
+  response:
+    items_path: ""
+    array_row_fields: ["timestamp", "open", "high", "low", "close", "volume"]
+```
+
+Result:
+```json
+[
+  {"timestamp": 1640000000, "open": 50000, "high": 51000, ...},
+  {"timestamp": 1640003600, "open": 50500, "high": 52000, ...}
+]
+```
+
+### Converting Dict to Rows
+
+Extract dict values as rows with `dict_to_list`:
+
+```json
+{"rates": {"USD": 1.0, "EUR": 0.85, "GBP": 0.73}}
+```
+
+```yaml
+options:
+  response:
+    items_path: "rates"
+    dict_to_list: true   # Extracts values with keys preserved as _key
+```
+
+Result:
+```json
+[
+  {"_key": "USD", "_value": 1.0},
+  {"_key": "EUR", "_value": 0.85},
+  {"_key": "GBP", "_value": 0.73}
+]
+```
+
 ### Adding Metadata Fields
 
 You can add fields to every record using static values or **date variables**:
@@ -434,7 +529,7 @@ Configure timeouts, retries, and rate limiting:
 options:
   http:
     timeout_s: 60                 # Request timeout in seconds (default: 30)
-    
+
     retries:
       max_attempts: 5             # Total attempts including first (default: 3)
       backoff:
@@ -447,7 +542,7 @@ options:
         - 502                     # Bad Gateway
         - 503                     # Service Unavailable
         - 504                     # Gateway Timeout
-    
+
     rate_limit:
       type: auto                  # Respects Retry-After headers (default)
       # OR fixed rate:
@@ -838,18 +933,18 @@ read:
     request_body:              # JSON body for POST/PUT/PATCH requests
       filters:
         status: ["active"]
-    
+
     pagination:
       type: offset_limit       # offset_limit | page_number | cursor | link_header | none
       # ... pagination-specific options
       max_pages: 100           # Safety limit
       start_offset: 0          # Starting offset (use 1 for 1-indexed APIs)
-    
+
     response:
       items_path: results      # Dotted path to data array
       add_fields:              # Optional fields to add
         _fetched_at: "${date:now}"
-    
+
     http:
       timeout_s: 60            # Request timeout (default: 30)
       retries:

@@ -303,58 +303,120 @@ class ResponseExtractor:
         items_path: str = "",
         add_fields: Optional[Dict[str, Any]] = None,
         dict_to_list: bool = False,
+        wrap_single: bool = False,
+        array_row_fields: Optional[List[str]] = None,
     ):
         """Initialize extractor.
 
         Args:
-            items_path: Dotted path to items (e.g., "results", "data.items", "").
-                       Empty string means response is the list itself.
+            items_path: Path to items. Supports:
+                       - Dotted keys: "results", "data.items"
+                       - Array indices: "[1]", "series[0].data"
+                       - Empty string means response is the list itself
             add_fields: Fields to add to each record (e.g., {"_fetched_at": "$now"})
             dict_to_list: If True and items_path resolves to a dict, extract dict
                          values as rows with keys preserved in '_key' field.
-                         Dict values become '_value' for scalars, or are merged for dicts.
-                         Example: {"cpu": 80, "mem": 60} becomes
-                         [{"_key": "cpu", "_value": 80}, {"_key": "mem", "_value": 60}]
+            wrap_single: If True and items_path resolves to a single dict (not list),
+                        wrap it in a list to create a single-row result.
+            array_row_fields: If items are arrays (not dicts), map each array to dict
+                             using these field names. E.g., ["ts","o","h","l","c","v"]
 
         """
         self.items_path = items_path
         self.add_fields = add_fields or {}
         self.dict_to_list = dict_to_list
+        self.wrap_single = wrap_single
+        self.array_row_fields = array_row_fields
 
     def extract_items(self, response_json: Any) -> List[Dict[str, Any]]:
         """Extract items from response using the configured path."""
+        import re
+
+        # Helper function to navigate path with array index support
+        def resolve_path(data, path):
+            if not path or path in ("$", "$root"):
+                return data
+            obj = data
+            for segment in path.split("."):
+                if segment in ("", "$", "$root"):
+                    continue
+                # Parse "key[0][1]" or "[2]" or plain "key"
+                m = re.match(r"^(?P<key>[^\[]*)(?P<idx>(\[\-?\d+\])*)$", segment)
+                if not m:
+                    return None
+                key = m.group("key")
+                indexes = re.findall(r"\[\-?\d+\]", m.group("idx") or "")
+
+                # Navigate to key first
+                if key:
+                    if isinstance(obj, dict) and key in obj:
+                        obj = obj[key]
+                    else:
+                        return None
+
+                # Then apply array indices
+                for br in indexes:
+                    if isinstance(obj, list):
+                        idx = int(br[1:-1])
+                        if 0 <= idx < len(obj):
+                            obj = obj[idx]
+                        else:
+                            return None
+                    else:
+                        return None
+
+                if obj is None:
+                    return None
+            return obj
+
+        # Navigate to target
         if not self.items_path:
-            # Response itself should be a list or dict
             obj = response_json
         else:
-            # Navigate dotted path
-            obj = response_json
-            for key in self.items_path.split("."):
-                if isinstance(obj, dict) and key in obj:
-                    obj = obj[key]
-                else:
-                    return []
+            obj = resolve_path(response_json, self.items_path)
+            if obj is None:
+                return []
 
         # Convert result to list of items
         if isinstance(obj, list):
             items = obj
-        elif isinstance(obj, dict) and self.dict_to_list:
-            # Extract dict values as rows, preserving keys as '_key' field
-            items = []
-            for k, v in obj.items():
-                if isinstance(v, dict):
-                    item = {"_key": k, **v}
-                else:
-                    item = {"_key": k, "_value": v}
-                items.append(item)
+        elif isinstance(obj, dict):
+            if self.dict_to_list:
+                # Extract dict values as rows, preserving keys as '_key' field
+                items = []
+                for k, v in obj.items():
+                    if isinstance(v, dict):
+                        item = {"_key": k, **v}
+                    else:
+                        item = {"_key": k, "_value": v}
+                    items.append(item)
+            elif self.wrap_single:
+                # Wrap single dict in list for single-row result
+                items = [obj]
+            else:
+                items = []
         else:
             items = []
+
+        # Convert array-of-arrays to dicts if field mapping provided
+        if self.array_row_fields and items and isinstance(items[0], (list, tuple)):
+            normalized = []
+            for row in items:
+                row_list = list(row)
+                # Pad or trim to match field count
+                if len(row_list) < len(self.array_row_fields):
+                    row_list = row_list + [None] * (len(self.array_row_fields) - len(row_list))
+                elif len(row_list) > len(self.array_row_fields):
+                    row_list = row_list[: len(self.array_row_fields)]
+                normalized.append(dict(zip(self.array_row_fields, row_list)))
+            items = normalized
 
         # Add extra fields with date variable substitution
         if self.add_fields:
             for item in items:
-                for k, v in self.add_fields.items():
-                    item[k] = substitute_date_variables(v) if isinstance(v, str) else v
+                if isinstance(item, dict):
+                    for k, v in self.add_fields.items():
+                        item[k] = substitute_date_variables(v) if isinstance(v, str) else v
 
         return items
 
@@ -1119,6 +1181,20 @@ class ApiFetcher:
             return pd.DataFrame()
 
         result = pd.concat(frames, ignore_index=True)
+
+        # Move metadata columns (from add_fields) to the end for cleaner viewing
+        if (
+            hasattr(self.extractor, "add_fields")
+            and self.extractor.add_fields
+            and len(result.columns) > 0
+        ):
+            metadata_cols = [
+                col for col in self.extractor.add_fields.keys() if col in result.columns
+            ]
+            if metadata_cols:
+                other_cols = [col for col in result.columns if col not in metadata_cols]
+                result = result[other_cols + metadata_cols]
+
         self._ctx.info("Fetch complete", total_records=len(result))
         return result
 
@@ -1179,6 +1255,19 @@ class ApiFetcher:
         else:
             result_df = pd.concat(frames, ignore_index=True)
 
+            # Move metadata columns (from add_fields) to the end for cleaner viewing
+            if (
+                hasattr(self.extractor, "add_fields")
+                and self.extractor.add_fields
+                and len(result_df.columns) > 0
+            ):
+                metadata_cols = [
+                    col for col in self.extractor.add_fields.keys() if col in result_df.columns
+                ]
+                if metadata_cols:
+                    other_cols = [col for col in result_df.columns if col not in metadata_cols]
+                    result_df = result_df[other_cols + metadata_cols]
+
         complete = error is None
         if complete:
             self._ctx.info("Fetch complete", total_records=len(result_df))
@@ -1224,6 +1313,8 @@ def create_api_fetcher(
         items_path=response_config.get("items_path", ""),
         add_fields=response_config.get("add_fields"),
         dict_to_list=response_config.get("dict_to_list", False),
+        wrap_single=response_config.get("wrap_single", False),
+        array_row_fields=response_config.get("array_row_fields"),
     )
 
     # Retry policy (matches ApiRetryConfig schema)

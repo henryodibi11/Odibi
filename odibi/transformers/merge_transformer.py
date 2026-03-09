@@ -731,9 +731,11 @@ def _merge_pandas(
                     created = audit_cols.created_col
                     # For updates: use target's created_col; for inserts: use source's
                     src_cols = ", ".join(
-                        f'COALESCE(t."{created}", s."{created}") AS "{created}"'
-                        if c == created
-                        else f's."{c}"'
+                        (
+                            f'COALESCE(t."{created}", s."{created}") AS "{created}"'
+                            if c == created
+                            else f's."{c}"'
+                        )
                         for c in source_df.columns
                     )
                     query = f"""

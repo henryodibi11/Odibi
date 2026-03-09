@@ -1047,15 +1047,21 @@ class AzureSQL(BaseConnection):
                 candidate_watermarks=candidate_watermarks,
                 completeness=round(completeness, 4),
                 suggestions=[
-                    f"Sampled {len(df)} of {total_rows} rows"
-                    if total_rows
-                    else f"Sampled {len(df)} rows",
-                    f"Found {len(candidate_keys)} candidate key columns: {candidate_keys}"
-                    if candidate_keys
-                    else "No unique key columns found",
-                    f"Found {len(candidate_watermarks)} timestamp columns: {candidate_watermarks}"
-                    if candidate_watermarks
-                    else "No timestamp columns for incremental loading",
+                    (
+                        f"Sampled {len(df)} of {total_rows} rows"
+                        if total_rows
+                        else f"Sampled {len(df)} rows"
+                    ),
+                    (
+                        f"Found {len(candidate_keys)} candidate key columns: {candidate_keys}"
+                        if candidate_keys
+                        else "No unique key columns found"
+                    ),
+                    (
+                        f"Found {len(candidate_watermarks)} timestamp columns: {candidate_watermarks}"
+                        if candidate_watermarks
+                        else "No timestamp columns for incremental loading"
+                    ),
                 ],
             )
 
