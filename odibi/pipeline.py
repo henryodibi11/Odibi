@@ -949,7 +949,7 @@ class Pipeline:
                 t0 = time.time()
                 self.catalog_manager.log_runs_batch(run_records)
                 self._ctx.debug(
-                    f"Batch logged {len(run_records)} run records in {time.time()-t0:.1f}s",
+                    f"Batch logged {len(run_records)} run records in {time.time() - t0:.1f}s",
                     record_count=len(run_records),
                 )
 
@@ -963,7 +963,7 @@ class Pipeline:
                     t0 = time.time()
                     self.catalog_manager.register_outputs_batch(output_records)
                     self._ctx.debug(
-                        f"Batch registered {len(output_records)} output(s) in {time.time()-t0:.1f}s",
+                        f"Batch registered {len(output_records)} output(s) in {time.time() - t0:.1f}s",
                         output_count=len(output_records),
                     )
                 except Exception as e:
@@ -1112,7 +1112,7 @@ class Pipeline:
             try:
                 t0 = time.time()
                 self.catalog_manager.log_pipeline_run(pipeline_run)
-                self._ctx.debug(f"Logged pipeline run {run_id} in {time.time()-t0:.1f}s")
+                self._ctx.debug(f"Logged pipeline run {run_id} in {time.time() - t0:.1f}s")
             except Exception as e:
                 self._ctx.debug(f"Failed to log pipeline run (non-fatal): {e}")
 
@@ -1162,7 +1162,7 @@ class Pipeline:
                     t0 = time.time()
                     self.catalog_manager.log_node_runs_batch(node_run_records)
                     self._ctx.debug(
-                        f"Logged {len(node_run_records)} node runs in {time.time()-t0:.1f}s"
+                        f"Logged {len(node_run_records)} node runs in {time.time() - t0:.1f}s"
                     )
             except Exception as e:
                 self._ctx.debug(f"Failed to log node runs (non-fatal): {e}")
@@ -1197,7 +1197,7 @@ class Pipeline:
                     )
                 for dt, fn in derived_updates:
                     updater.apply_derived_update(dt, run_id, fn)
-                self._ctx.debug(f"Derived updates completed in {time.time()-t0:.1f}s")
+                self._ctx.debug(f"Derived updates completed in {time.time() - t0:.1f}s")
             except Exception as e:
                 self._ctx.debug(f"Derived updates failed (non-fatal): {e}")
 
