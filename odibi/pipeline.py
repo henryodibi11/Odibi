@@ -1196,11 +1196,24 @@ class Pipeline:
 
         if self.generate_story:
             from concurrent.futures import ThreadPoolExecutor
+            from enum import Enum
+
+            def _sanitize_enums(obj):
+                """Recursively convert enum values to their string representation."""
+                if isinstance(obj, Enum):
+                    return obj.value
+                elif isinstance(obj, dict):
+                    return {k: _sanitize_enums(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [_sanitize_enums(v) for v in obj]
+                return obj
 
             if hasattr(self.config, "model_dump"):
                 config_dump = self.config.model_dump(mode="json")
             else:
                 config_dump = self.config.model_dump()
+
+            config_dump = _sanitize_enums(config_dump)
 
             if self.project_config:
                 project_dump = (
@@ -1230,7 +1243,9 @@ class Pipeline:
                         graph_data=graph_data_dict,
                     )
                 except Exception as e:
-                    self._ctx.warning(f"Story generation failed: {e}")
+                    import traceback
+
+                    self._ctx.warning(f"Story generation failed: {e}\n{traceback.format_exc()}")
                     return None
 
             story_executor = ThreadPoolExecutor(max_workers=1)
