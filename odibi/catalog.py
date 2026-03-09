@@ -3735,8 +3735,8 @@ class CatalogManager:
         "meta_tables": "updated_at",
         "meta_failures": "timestamp",
         "meta_sla_status": "updated_at",
-        "meta_patterns": "timestamp",
-        "meta_metrics": "timestamp",
+        "meta_patterns": "table_name",
+        "meta_metrics": "metric_name",
         "meta_pipelines": "pipeline_name",
         "meta_nodes": "node_name",
         "meta_schemas": "table_name",
@@ -3797,12 +3797,21 @@ class CatalogManager:
     def _optimize_spark(self, table: str, path: str, retention_hours: int) -> Dict[str, Any]:
         """OPTIMIZE + ZORDER + VACUUM a single table via Spark SQL."""
         zorder_col = self._ZORDER_COLUMNS.get(table)
+        applied_zorder = None
         if zorder_col:
-            self.spark.sql(f"OPTIMIZE delta.`{path}` ZORDER BY ({zorder_col})")
+            try:
+                self.spark.sql(f"OPTIMIZE delta.`{path}` ZORDER BY ({zorder_col})")
+                applied_zorder = zorder_col
+            except Exception as e:
+                logger.debug(
+                    f"ZORDER BY ({zorder_col}) failed for {table}, "
+                    f"falling back to plain OPTIMIZE: {e}"
+                )
+                self.spark.sql(f"OPTIMIZE delta.`{path}`")
         else:
             self.spark.sql(f"OPTIMIZE delta.`{path}`")
         self.spark.sql(f"VACUUM delta.`{path}` RETAIN {retention_hours} HOURS")
-        return {"success": True, "engine": "spark", "zorder": zorder_col}
+        return {"success": True, "engine": "spark", "zorder": applied_zorder}
 
     def _optimize_deltars(self, table: str, path: str, retention_hours: int) -> Dict[str, Any]:
         """Compact + vacuum a single table via delta-rs."""
