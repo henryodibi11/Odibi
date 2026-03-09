@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-03-09
+
+### Added
+
+- **`optimize_catalog` config flag**: New `system.optimize_catalog` setting (default `true`) runs OPTIMIZE + VACUUM on all system catalog Delta tables after each pipeline run, preventing small file accumulation from frequent MERGE operations
+- **Post-pipeline timing instrumentation**: All post-pipeline operations now log duration (batch writes, observability logging, derived updates, catalog optimization) with total overhead summary when >5s
+
+### Fixed
+
+- **Spark pickle serialization bug**: Fixed `ReadFormat`/`WriteFormat` enums leaking as raw enum objects into dicts passed to `spark.createDataFrame()` during catalog batch operations (`register_outputs_batch`, `register_assets_batch`, `log_runs_batch`). All enum values are now converted to strings
+- **Story generation enum crash**: Added `_sanitize_enums()` helper to recursively convert enum values in config dumps before story generation
+- **ZORDER column mismatch**: Fixed `meta_patterns` and `meta_metrics` ZORDER columns pointing to non-existent `timestamp` column (now `table_name` and `metric_name` respectively)
+- **ZORDER fallback**: `_optimize_spark` now falls back to plain OPTIMIZE if ZORDER fails instead of skipping the entire table optimization
+- **Story generation error logging**: Now includes full traceback on failure for easier debugging
+
 ## [2.19.0] - 2026-03-08
 
 ### Added
