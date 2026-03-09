@@ -7,7 +7,6 @@ from odibi.config import (
     ConstantGeneratorConfig,
     EntityConfig,
     RandomWalkGeneratorConfig,
-    RangeGeneratorConfig,
     SimulationConfig,
     SimulationDataType,
     SimulationScope,
@@ -113,7 +112,7 @@ class TestRandomWalkGeneration:
         rows = engine.generate()
         temps = [r["temperature"] for r in rows]
         # Check that average step size is small relative to range
-        steps = [abs(temps[i+1] - temps[i]) for i in range(len(temps)-1)]
+        steps = [abs(temps[i + 1] - temps[i]) for i in range(len(temps) - 1)]
         avg_step = sum(steps) / len(steps)
         assert avg_step < 5.0, f"Average step {avg_step} too large for volatility=0.5"
 
