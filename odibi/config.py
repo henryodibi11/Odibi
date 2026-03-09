@@ -4883,6 +4883,15 @@ class SystemConfig(BaseModel):
         default=None,
         description="Retention periods for system tables",
     )
+    optimize_catalog: bool = Field(
+        default=False,
+        description=(
+            "Run OPTIMIZE + VACUUM on all system catalog Delta tables after each pipeline run. "
+            "Compacts small files created by frequent MERGE operations. "
+            "Adds ~15-20s but prevents accumulation of small files "
+            "that degrade read performance over time. Recommended for production pipelines."
+        ),
+    )
 
 
 class LineageConfig(BaseModel):

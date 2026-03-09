@@ -936,6 +936,7 @@ class Pipeline:
 
         # Batch write run records to catalog (much faster than per-node writes)
         # Skip if performance.skip_run_logging is enabled
+        post_pipeline_start = time.time()
         skip_run_logging = self.performance_config and getattr(
             self.performance_config, "skip_run_logging", False
         )
@@ -945,9 +946,10 @@ class Pipeline:
                 if node_result.metadata and "_run_record" in node_result.metadata:
                     run_records.append(node_result.metadata.pop("_run_record"))
             if run_records:
+                t0 = time.time()
                 self.catalog_manager.log_runs_batch(run_records)
                 self._ctx.debug(
-                    f"Batch logged {len(run_records)} run records",
+                    f"Batch logged {len(run_records)} run records in {time.time()-t0:.1f}s",
                     record_count=len(run_records),
                 )
 
@@ -958,9 +960,10 @@ class Pipeline:
                     output_records.append(node_result.metadata.pop("_output_record"))
             if output_records:
                 try:
+                    t0 = time.time()
                     self.catalog_manager.register_outputs_batch(output_records)
                     self._ctx.debug(
-                        f"Batch registered {len(output_records)} output(s)",
+                        f"Batch registered {len(output_records)} output(s) in {time.time()-t0:.1f}s",
                         output_count=len(output_records),
                     )
                 except Exception as e:
@@ -970,7 +973,11 @@ class Pipeline:
                     )
 
             # Flush buffered catalog writes (lineage, assets, HWM)
+            t0 = time.time()
             self._flush_batch_writes()
+            flush_dur = time.time() - t0
+            if flush_dur > 1.0:
+                self._ctx.debug(f"Flushed batch writes in {flush_dur:.1f}s")
 
         elif skip_run_logging:
             self._ctx.debug("Skipping run logging (skip_run_logging=true)")
@@ -1103,8 +1110,9 @@ class Pipeline:
 
             # Log pipeline run (wrapped to never fail pipeline)
             try:
+                t0 = time.time()
                 self.catalog_manager.log_pipeline_run(pipeline_run)
-                self._ctx.debug(f"Logged pipeline run {run_id}")
+                self._ctx.debug(f"Logged pipeline run {run_id} in {time.time()-t0:.1f}s")
             except Exception as e:
                 self._ctx.debug(f"Failed to log pipeline run (non-fatal): {e}")
 
@@ -1151,13 +1159,17 @@ class Pipeline:
             # Log node runs batch (wrapped to never fail pipeline)
             try:
                 if node_run_records:
+                    t0 = time.time()
                     self.catalog_manager.log_node_runs_batch(node_run_records)
-                    self._ctx.debug(f"Logged {len(node_run_records)} node runs")
+                    self._ctx.debug(
+                        f"Logged {len(node_run_records)} node runs in {time.time()-t0:.1f}s"
+                    )
             except Exception as e:
                 self._ctx.debug(f"Failed to log node runs (non-fatal): {e}")
 
             # Run derived updates (each wrapped independently)
             try:
+                t0 = time.time()
                 updater = DerivedUpdater(self.catalog_manager)
                 derived_updates = [
                     ("meta_daily_stats", lambda: updater.update_daily_stats(run_id, pipeline_run)),
@@ -1185,6 +1197,7 @@ class Pipeline:
                     )
                 for dt, fn in derived_updates:
                     updater.apply_derived_update(dt, run_id, fn)
+                self._ctx.debug(f"Derived updates completed in {time.time()-t0:.1f}s")
             except Exception as e:
                 self._ctx.debug(f"Derived updates failed (non-fatal): {e}")
 
@@ -1298,11 +1311,23 @@ class Pipeline:
         else:
             self._send_alerts("on_success", results)
 
-        # Catalog optimization (optional - can be slow, ~15-20s)
-        # Only run if explicitly enabled via optimize_catalog flag
-        if self.catalog_manager and getattr(self, "optimize_catalog", False):
-            self.catalog_manager.optimize()
-            self._ctx.debug("Catalog optimized")
+        # Catalog optimization (optional - compacts small files from MERGE operations)
+        # Enabled via system.optimize_catalog in project config
+        _optimize_catalog = False
+        if self.project_config and self.project_config.system:
+            _optimize_catalog = getattr(self.project_config.system, "optimize_catalog", False)
+        if self.catalog_manager and _optimize_catalog:
+            try:
+                opt_start = time.time()
+                opt_results = self.catalog_manager.optimize()
+                opt_dur = time.time() - opt_start
+                ok = sum(1 for r in opt_results.values() if r.get("success"))
+                self._ctx.info(
+                    f"Catalog optimized ({ok}/{len(opt_results)} tables) in {opt_dur:.1f}s",
+                    duration_s=round(opt_dur, 2),
+                )
+            except Exception as e:
+                self._ctx.warning(f"Catalog optimization failed (non-fatal): {e}")
 
         # Catalog sync to secondary destination (if configured)
         self._sync_catalog_if_configured()
@@ -1310,6 +1335,14 @@ class Pipeline:
         # Lineage: Complete
         if self.lineage:
             self.lineage.emit_pipeline_complete(self.config, results)
+
+        # Log total post-pipeline overhead
+        post_pipeline_dur = time.time() - post_pipeline_start
+        if post_pipeline_dur > 5.0:
+            self._ctx.info(
+                f"Post-pipeline overhead: {post_pipeline_dur:.1f}s",
+                duration_s=round(post_pipeline_dur, 2),
+            )
 
         return results
 
