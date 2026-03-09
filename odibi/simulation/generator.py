@@ -514,6 +514,20 @@ class SimulationEngine:
         reversion_pull = config.mean_reversion * (config.start - current)
         new_value = current + reversion_pull + noise + config.trend
 
+        # Apply shock event (sudden process upset)
+        if config.shock_rate > 0 and rng.random() < config.shock_rate:
+            shock_size = rng.uniform(0, config.shock_magnitude)
+            # Determine direction based on bias
+            if config.shock_bias >= 1.0:
+                direction = 1.0
+            elif config.shock_bias <= -1.0:
+                direction = -1.0
+            else:
+                # Bias shifts probability: 0.0 = 50/50, 0.7 = 85% up, -0.7 = 85% down
+                up_probability = (1.0 + config.shock_bias) / 2.0
+                direction = 1.0 if rng.random() < up_probability else -1.0
+            new_value += shock_size * direction
+
         # Clamp to physical bounds
         new_value = float(np.clip(new_value, config.min, config.max))
 

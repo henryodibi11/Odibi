@@ -166,6 +166,9 @@ Unlike `range` which picks each value independently, `random_walk` makes each va
     mean_reversion: 0.1    # Pull back toward setpoint (like a PID controller)
     trend: 0.001           # Slow drift per step (fouling, degradation)
     precision: 1           # Round to 1 decimal (like a real sensor)
+    shock_rate: 0.02       # 2% chance of sudden process upset per step
+    shock_magnitude: 30.0  # Shocks up to ±30 degrees
+    shock_bias: 1.0        # Shocks always go up (exothermic runaway)
 ```
 
 **When to use:** Temperatures, pressures, flow rates, pH, levels — any process variable that changes gradually, not randomly.
@@ -176,6 +179,11 @@ Unlike `range` which picks each value independently, `random_walk` makes each va
 - `0.5` = tight control (snaps back quickly)
 
 **`trend`** adds gradual drift — simulates fouling, catalyst deactivation, or filter clogging over time.
+
+**`shock_rate`**, **`shock_magnitude`**, and **`shock_bias`** simulate sudden process upsets. Unlike chaos outliers (which modify output after generation), shocks perturb the walk's internal state — so `mean_reversion` naturally pulls the value back over subsequent rows, just like a real PID-controlled process recovering from an upset:
+- `shock_rate: 0.02` = 2% chance per step (~1 shock every 50 readings)
+- `shock_magnitude: 30.0` = shock jumps up to ±30 from current value
+- `shock_bias: 1.0` = shocks always push upward (+1=up, -1=down, 0=random direction)
 
 !!! tip "Incremental mode"
     With `incremental.mode: stateful`, the random walk remembers each entity's last value between runs. Run 2 picks up exactly where run 1 left off — no discontinuities.

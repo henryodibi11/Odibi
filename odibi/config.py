@@ -1,5 +1,6 @@
 """Configuration models for ODIBI framework."""
 
+import warnings
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 
@@ -1513,6 +1514,9 @@ class RandomWalkGeneratorConfig(BaseModel):
     mean_reversion: 0.1
     trend: 0.001
     precision: 1
+    shock_rate: 0.02
+    shock_magnitude: 30.0
+    shock_bias: 1.0
     ```
     """
 
@@ -1547,6 +1551,38 @@ class RandomWalkGeneratorConfig(BaseModel):
         le=10,
         description="Round values to N decimal places. None = no rounding.",
     )
+    shock_rate: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Probability of a sudden shock at each timestep (0.0 = never, 1.0 = every step). "
+            "Simulates process upsets like valve sticks, feed disruptions, or sensor glitches. "
+            "The shock perturbs the walk's internal state, so mean_reversion naturally recovers "
+            "over subsequent steps — just like a real PID-controlled process."
+        ),
+    )
+    shock_magnitude: float = Field(
+        default=10.0,
+        gt=0.0,
+        description=(
+            "Maximum absolute size of a shock event. The actual shock is drawn uniformly "
+            "from [0, shock_magnitude]. Use values relative to your min/max range — e.g., "
+            "if range is 300-400, a magnitude of 30 means shocks up to 30% of range."
+        ),
+    )
+    shock_bias: float = Field(
+        default=0.0,
+        ge=-1.0,
+        le=1.0,
+        description=(
+            "Directional tendency for shocks. "
+            "+1.0 = shocks always go UP (e.g., exothermic runaway, pressure buildup). "
+            "-1.0 = shocks always go DOWN (e.g., pump cavitation, flow drop). "
+            "0.0 = shocks go either direction with equal probability. "
+            "Values between give partial bias (e.g., 0.7 = mostly upward)."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_random_walk(self):
@@ -1555,6 +1591,12 @@ class RandomWalkGeneratorConfig(BaseModel):
         if not (self.min <= self.start <= self.max):
             raise ValueError(
                 f"Random walk start ({self.start}) must be between min ({self.min}) and max ({self.max})"
+            )
+        if self.shock_rate > 0 and self.mean_reversion == 0:
+            warnings.warn(
+                "shock_rate > 0 without mean_reversion means shocks will never recover. "
+                "Consider setting mean_reversion > 0.",
+                stacklevel=2,
             )
         return self
 

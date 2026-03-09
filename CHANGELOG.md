@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-03-09
+
+### Added
+
+- **Random walk shock events**: New `shock_rate`, `shock_magnitude`, and `shock_bias` parameters for the `random_walk` simulation generator
+  - Simulates sudden process upsets (valve sticks, feed disruptions, exothermic runaways)
+  - Shocks perturb the walk's internal state, so `mean_reversion` naturally recovers over subsequent steps — producing realistic spike-and-recover patterns
+  - `shock_bias` controls directional tendency: +1.0 = always up, -1.0 = always down, 0.0 = either direction
+  - Warning issued when `shock_rate > 0` without `mean_reversion` (shocks without recovery aren't realistic)
+  - 11 new tests (5 config validation + 6 generation behavior)
+
+## [2.21.0] - 2026-03-09
+
+### Added
+
+- **Random walk generator**: New `random_walk` simulation generator type using Ornstein-Uhlenbeck process for realistic time-series data (temperatures, pressures, flow rates)
+
 ## [2.20.0] - 2026-03-09
 
 ### Added

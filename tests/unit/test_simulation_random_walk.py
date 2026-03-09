@@ -1,5 +1,7 @@
 """Tests for random walk simulation generator."""
 
+import warnings
+
 import pytest
 
 from odibi.config import (
@@ -53,6 +55,47 @@ class TestRandomWalkConfig:
         assert config.mean_reversion == 0.0
         assert config.trend == 0.0
         assert config.precision is None
+
+    def test_shock_rate_defaults(self):
+        """Shock parameters should have sensible defaults."""
+        config = RandomWalkGeneratorConfig(type="random_walk", start=50, min=0, max=100)
+        assert config.shock_rate == 0.0
+        assert config.shock_magnitude == 10.0
+        assert config.shock_bias == 0.0
+
+    def test_shock_rate_validation(self):
+        """shock_rate must be between 0.0 and 1.0."""
+        with pytest.raises(ValueError):
+            RandomWalkGeneratorConfig(type="random_walk", start=50, min=0, max=100, shock_rate=-0.1)
+        with pytest.raises(ValueError):
+            RandomWalkGeneratorConfig(type="random_walk", start=50, min=0, max=100, shock_rate=1.1)
+
+    def test_shock_bias_validation(self):
+        """shock_bias must be between -1.0 and 1.0."""
+        with pytest.raises(ValueError):
+            RandomWalkGeneratorConfig(type="random_walk", start=50, min=0, max=100, shock_bias=-1.5)
+        with pytest.raises(ValueError):
+            RandomWalkGeneratorConfig(type="random_walk", start=50, min=0, max=100, shock_bias=1.5)
+
+    def test_shock_magnitude_must_be_positive(self):
+        """shock_magnitude must be greater than 0."""
+        with pytest.raises(ValueError):
+            RandomWalkGeneratorConfig(
+                type="random_walk", start=50, min=0, max=100, shock_magnitude=0.0
+            )
+        with pytest.raises(ValueError):
+            RandomWalkGeneratorConfig(
+                type="random_walk", start=50, min=0, max=100, shock_magnitude=-5.0
+            )
+
+    def test_shock_without_mean_reversion_warns(self):
+        """Warning should be issued when shock_rate > 0 and mean_reversion == 0."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            RandomWalkGeneratorConfig(type="random_walk", start=50, min=0, max=100, shock_rate=0.5)
+            assert len(w) == 1
+            assert "shock_rate" in str(w[0].message)
+            assert "mean_reversion" in str(w[0].message)
 
 
 class TestRandomWalkGeneration:
@@ -267,3 +310,162 @@ class TestRandomWalkGeneration:
             f"Continuity broken: run1 ended at {last_temp_run1}, "
             f"run2 started at {first_temp_run2} (diff={diff})"
         )
+
+    def test_shock_creates_large_jumps(self):
+        """With shock_rate=1.0 and high magnitude, steps should be much larger."""
+        config_shock = self._make_config(
+            RandomWalkGeneratorConfig(
+                type="random_walk",
+                start=50.0,
+                min=0.0,
+                max=100.0,
+                volatility=0.1,
+                shock_rate=1.0,
+                shock_magnitude=20.0,
+                mean_reversion=0.1,
+            ),
+            row_count=500,
+            seed=42,
+        )
+        config_no_shock = self._make_config(
+            RandomWalkGeneratorConfig(
+                type="random_walk",
+                start=50.0,
+                min=0.0,
+                max=100.0,
+                volatility=0.1,
+                shock_rate=0.0,
+            ),
+            row_count=500,
+            seed=42,
+        )
+        rows_shock = SimulationEngine(config_shock).generate()
+        rows_no_shock = SimulationEngine(config_no_shock).generate()
+
+        temps_shock = [r["temperature"] for r in rows_shock]
+        temps_no_shock = [r["temperature"] for r in rows_no_shock]
+
+        avg_step_shock = sum(
+            abs(temps_shock[i + 1] - temps_shock[i]) for i in range(len(temps_shock) - 1)
+        ) / (len(temps_shock) - 1)
+        avg_step_no_shock = sum(
+            abs(temps_no_shock[i + 1] - temps_no_shock[i]) for i in range(len(temps_no_shock) - 1)
+        ) / (len(temps_no_shock) - 1)
+
+        assert avg_step_shock > avg_step_no_shock * 2, (
+            f"Shocks should create larger steps: shock={avg_step_shock}, "
+            f"no_shock={avg_step_no_shock}"
+        )
+
+    def test_shock_with_mean_reversion_recovers(self):
+        """With mean_reversion, values should cluster around start despite shocks."""
+        config = self._make_config(
+            RandomWalkGeneratorConfig(
+                type="random_walk",
+                start=50.0,
+                min=0.0,
+                max=100.0,
+                volatility=0.5,
+                shock_rate=0.5,
+                shock_magnitude=30.0,
+                mean_reversion=0.3,
+            ),
+            row_count=1000,
+            seed=42,
+        )
+        rows = SimulationEngine(config).generate()
+        temps = [r["temperature"] for r in rows]
+        avg = sum(temps) / len(temps)
+        assert 25.0 < avg < 75.0, (
+            f"Mean {avg} not within reasonable range of start=50 with mean_reversion=0.3"
+        )
+
+    def test_shock_bias_positive(self):
+        """With shock_bias=1.0, shocks always go up so average should be above start."""
+        config = self._make_config(
+            RandomWalkGeneratorConfig(
+                type="random_walk",
+                start=50.0,
+                min=0.0,
+                max=100.0,
+                volatility=0.1,
+                shock_rate=1.0,
+                shock_magnitude=5.0,
+                shock_bias=1.0,
+                mean_reversion=0.05,
+            ),
+            row_count=200,
+            seed=42,
+        )
+        rows = SimulationEngine(config).generate()
+        temps = [r["temperature"] for r in rows]
+        avg = sum(temps) / len(temps)
+        assert avg > 50.0, f"Positive bias should push average above start=50, got {avg}"
+
+    def test_shock_bias_negative(self):
+        """With shock_bias=-1.0, shocks always go down so average should be below start."""
+        config = self._make_config(
+            RandomWalkGeneratorConfig(
+                type="random_walk",
+                start=50.0,
+                min=0.0,
+                max=100.0,
+                volatility=0.1,
+                shock_rate=1.0,
+                shock_magnitude=5.0,
+                shock_bias=-1.0,
+                mean_reversion=0.05,
+            ),
+            row_count=200,
+            seed=42,
+        )
+        rows = SimulationEngine(config).generate()
+        temps = [r["temperature"] for r in rows]
+        avg = sum(temps) / len(temps)
+        assert avg < 50.0, f"Negative bias should push average below start=50, got {avg}"
+
+    def test_shock_respects_bounds(self):
+        """Even with extreme shocks, values must stay within min/max bounds."""
+        config = self._make_config(
+            RandomWalkGeneratorConfig(
+                type="random_walk",
+                start=50.0,
+                min=0.0,
+                max=100.0,
+                volatility=1.0,
+                shock_rate=1.0,
+                shock_magnitude=50.0,
+                mean_reversion=0.1,
+            ),
+            row_count=500,
+            seed=42,
+        )
+        rows = SimulationEngine(config).generate()
+        temps = [r["temperature"] for r in rows]
+        assert all(0.0 <= t <= 100.0 for t in temps), (
+            f"Out of bounds: min={min(temps)}, max={max(temps)}"
+        )
+
+    def test_shock_zero_rate_no_effect(self):
+        """With shock_rate=0.0, shock_magnitude should have no effect on output."""
+        rw_no_shock = RandomWalkGeneratorConfig(
+            type="random_walk", start=50.0, min=0.0, max=100.0, volatility=1.0
+        )
+        rw_shock_zero_rate = RandomWalkGeneratorConfig(
+            type="random_walk",
+            start=50.0,
+            min=0.0,
+            max=100.0,
+            volatility=1.0,
+            shock_rate=0.0,
+            shock_magnitude=100.0,
+        )
+        config1 = self._make_config(rw_no_shock, seed=42)
+        config2 = self._make_config(rw_shock_zero_rate, seed=42)
+
+        rows1 = SimulationEngine(config1).generate()
+        rows2 = SimulationEngine(config2).generate()
+
+        temps1 = [r["temperature"] for r in rows1]
+        temps2 = [r["temperature"] for r in rows2]
+        assert temps1 == temps2

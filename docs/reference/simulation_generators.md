@@ -48,10 +48,13 @@ generator:
 | mean_reversion | float | No | `0.0` | Pull toward start (0=none, 1=snap back) |
 | trend | float | No | `0.0` | Drift per timestep (+/- for gradual shift) |
 | precision | int | No | None | Round to N decimal places |
+| shock_rate | float | No | `0.0` | Probability of sudden shock per timestep (0=never, 1=every step) |
+| shock_magnitude | float | No | `10.0` | Maximum absolute size of a shock event |
+| shock_bias | float | No | `0.0` | Directional tendency: +1=up only, -1=down only, 0=either direction |
 
 **Data types:** float
 
-**How it works:** Uses an Ornstein-Uhlenbeck process. Each value = previous + noise + mean_reversion pull + trend. Values are clamped to [min, max].
+**How it works:** Uses an Ornstein-Uhlenbeck process with optional shock events. Each value = previous + noise + mean_reversion pull + trend. Random shocks inject sudden jumps that the mean_reversion naturally recovers from. Values are clamped to [min, max].
 
 **Example:**
 ```yaml
@@ -66,6 +69,9 @@ generator:
   mean_reversion: 0.1
   trend: 0.001
   precision: 1
+  shock_rate: 0.02
+  shock_magnitude: 30.0
+  shock_bias: 1.0
 ```
 
 **Tips:**
@@ -73,6 +79,9 @@ generator:
 - Use `mean_reversion: 0.1` to simulate a PID-controlled process at steady state
 - Use `trend: 0.001` to simulate slow fouling or catalyst deactivation
 - Use `precision: 1` to match real instrument resolution (e.g., temperature to 0.1°F)
+- Use `shock_rate: 0.02` with `shock_bias: 1.0` to simulate occasional exothermic runaways in a reactor
+- Shocks perturb the walk's internal state, so `mean_reversion` naturally pulls values back — producing realistic spike-and-recover patterns
+- A warning is issued if `shock_rate > 0` without `mean_reversion` — shocks without recovery aren't realistic
 - Works with incremental mode — the last value per entity is saved and restored on the next run
 
 ---
