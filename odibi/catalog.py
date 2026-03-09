@@ -1549,7 +1549,7 @@ class CatalogManager:
             return {
                 "connection": write_cfg.connection,
                 "path": write_cfg.path,
-                "format": write_cfg.format or "delta",
+                "format": (write_cfg.format.value if hasattr(write_cfg.format, 'value') else str(write_cfg.format)) if write_cfg.format else "delta",
                 "register_table": write_cfg.register_table or write_cfg.table,
                 "output_type": output_type,
             }
