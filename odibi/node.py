@@ -491,15 +491,19 @@ class NodeExecutor:
             return None, None
 
         read_config = config.read
-        connection = self.connections.get(read_config.connection)
 
-        if connection is None:
-            available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
-            raise ValueError(
-                f"Read phase failed: Connection '{read_config.connection}' not found in configured connections. "
-                f"Available connections: [{available}]. "
-                f"Check your read.connection value in the node configuration or add the missing connection to project.yaml."
-            )
+        # Simulation format doesn't require a connection
+        if read_config.connection is None and read_config.format == "simulation":
+            connection = None
+        else:
+            connection = self.connections.get(read_config.connection)
+            if connection is None:
+                available = ", ".join(sorted(self.connections.keys())) or "(none defined)"
+                raise ValueError(
+                    f"Read phase failed: Connection '{read_config.connection}' not found in configured connections. "
+                    f"Available connections: [{available}]. "
+                    f"Check your read.connection value in the node configuration or add the missing connection to project.yaml."
+                )
 
         with ctx.operation(
             OperationType.READ,

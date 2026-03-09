@@ -4,7 +4,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
@@ -356,7 +356,7 @@ class Pipeline:
             PipelineResults with execution details
         """
         start_time = time.time()
-        start_timestamp = datetime.now().isoformat()
+        start_timestamp = datetime.now(timezone.utc).isoformat()
 
         # Generate run_id at start for observability (used by log_failure in nodes)
         self._current_run_id = str(uuid.uuid4())
@@ -691,6 +691,7 @@ class Pipeline:
                     config_file=node_config.source_yaml,
                     run_id=self._current_run_id,
                     project_config=self.project_config,
+                    max_sample_rows=self.story_config.get("max_sample_rows", 10),
                 )
                 result = node.execute()
 
@@ -932,7 +933,7 @@ class Pipeline:
 
         # Calculate duration
         results.duration = time.time() - start_time
-        results.end_time = datetime.now().isoformat()
+        results.end_time = datetime.now(timezone.utc).isoformat()
 
         # Batch write run records to catalog (much faster than per-node writes)
         # Skip if performance.skip_run_logging is enabled
@@ -1010,7 +1011,6 @@ class Pipeline:
         # =========================================================================
         if self.catalog_manager and not dry_run:
             import json
-            from datetime import timezone
 
             from odibi.derived_updater import DerivedUpdater
 

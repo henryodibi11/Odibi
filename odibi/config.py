@@ -2005,7 +2005,10 @@ class ReadConfig(BaseModel):
     to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
     """
 
-    connection: str = Field(description="Connection name from project.yaml")
+    connection: Optional[str] = Field(
+        default=None,
+        description="Connection name from project.yaml (null for synthetic/simulation sources)",
+    )
     format: ReadFormat = Field(
         description="Data format: csv, parquet, delta, json, sql, api, excel, avro, cloudFiles"
     )

@@ -1731,16 +1731,24 @@ class PandasEngine(Engine):
         for col in df.columns:
             if df[col].isna().all():
                 if col in existing_schema:
-                    arrow_type = str(existing_schema[col])
+                    raw_type = str(existing_schema[col])
+                    # Normalize PrimitiveType("X") → "X"
+                    import re
+
+                    m = re.match(r'PrimitiveType\("(.+)"\)', raw_type)
+                    arrow_type = m.group(1) if m else raw_type
                     type_map = {
                         "int32": "Int32",
                         "int64": "Int64",
+                        "long": "Int64",
                         "float": "float64",
                         "double": "float64",
                         "string": "string",
+                        "boolean": "boolean",
+                        "bool": "boolean",
                         "timestamp[us]": "datetime64[us]",
                         "timestamp[us, tz=UTC]": "datetime64[us, UTC]",
-                        "bool": "boolean",
+                        "date": "datetime64[ns]",
                     }
                     pd_type = type_map.get(arrow_type, "string")
                     if pd_type == "string" and arrow_type != "string":
