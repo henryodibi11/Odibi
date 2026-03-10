@@ -124,4 +124,6 @@ def test_cli_version(capsys):
 
     assert exc_info.value.code == 0
     captured = capsys.readouterr()
-    assert "2.18.0" in captured.out
+    from odibi import __version__
+
+    assert __version__ in captured.out
