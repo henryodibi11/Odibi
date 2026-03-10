@@ -1195,8 +1195,7 @@ class Pipeline:
                             ),
                         )
                     )
-                for dt, fn in derived_updates:
-                    updater.apply_derived_update(dt, run_id, fn)
+                updater.apply_derived_updates_batch(run_id, derived_updates)
                 self._ctx.debug(f"Derived updates completed in {time.time() - t0:.1f}s")
             except Exception as e:
                 self._ctx.debug(f"Derived updates failed (non-fatal): {e}")

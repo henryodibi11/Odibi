@@ -16,7 +16,7 @@ import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     from odibi.catalog import CatalogManager
@@ -170,6 +170,8 @@ class DerivedUpdater:
         self.catalog = catalog
         self._guard_path = catalog.tables["meta_derived_applied_runs"]
         self._errors_path = catalog.tables["meta_observability_errors"]
+        # Cached meta_pipeline_runs DataFrame for batch mode (avoids redundant ADLS reads)
+        self._runs_df_cache: Optional[Any] = None
 
     def try_claim(self, derived_table: str, run_id: str) -> Optional[str]:
         """
@@ -1096,6 +1098,236 @@ class DerivedUpdater:
                 run_id=run_id,
             )
 
+    def apply_derived_updates_batch(
+        self,
+        run_id: str,
+        updates: List[Tuple[str, Callable[[], None]]],
+    ) -> None:
+        """Batch process multiple derived table updates with minimal ADLS round-trips.
+
+        Instead of 8 ADLS guard-table ops per update (24 for 3 updates), this does:
+        - 1 guard read + 1 batch claim write + 1 verify read
+        - N update_fn executions (unchanged)
+        - 1 guard read + 1 batch mark write
+        = 5 guard ops total regardless of N.
+
+        Falls back to sequential apply_derived_update for Spark/SQL Server
+        (where guard ops are fast single SQL statements).
+
+        Args:
+            run_id: Pipeline run ID
+            updates: List of (derived_table_name, update_fn) tuples
+        """
+        if not updates:
+            return
+
+        # Validate table names
+        valid_updates = []
+        for derived_table, update_fn in updates:
+            if derived_table not in VALID_DERIVED_TABLES:
+                self.log_observability_error(
+                    "derived_update",
+                    f"Invalid derived_table: {derived_table}",
+                    run_id=run_id,
+                )
+            else:
+                valid_updates.append((derived_table, update_fn))
+
+        if not valid_updates:
+            return
+
+        # Pandas/delta-rs: use batched guard table operations
+        if self.catalog.is_pandas_mode:
+            self._apply_derived_updates_batch_pandas(run_id, valid_updates)
+            return
+
+        # Spark/SQL Server: fall back to sequential (guard ops are fast SQL)
+        for derived_table, update_fn in valid_updates:
+            self.apply_derived_update(derived_table, run_id, update_fn)
+
+    def _apply_derived_updates_batch_pandas(
+        self,
+        run_id: str,
+        updates: List[Tuple[str, Callable[[], None]]],
+    ) -> None:
+        """Pandas/delta-rs batched guard lifecycle.
+
+        Reduces guard table ADLS round-trips from 8×N to 5 total.
+        """
+        if not DeltaTable or not pd or not pa or not write_deltalake:
+            # Fall back to sequential
+            for derived_table, update_fn in updates:
+                self.apply_derived_update(derived_table, run_id, update_fn)
+            return
+
+        storage_opts = self.catalog._get_storage_options()
+        guard_columns = [
+            "derived_table",
+            "run_id",
+            "claim_token",
+            "status",
+            "claimed_at",
+            "applied_at",
+            "error_message",
+        ]
+
+        # --- STEP 1: Read guard table once ---
+        try:
+            dt = DeltaTable(self._guard_path, storage_options=storage_opts or None)
+            guard_df = dt.to_pandas()
+        except Exception:
+            guard_df = pd.DataFrame(columns=guard_columns)
+
+        # --- STEP 2: Determine which updates need claiming ---
+        to_claim: List[Tuple[str, Callable[[], None], str]] = []
+        for derived_table, update_fn in updates:
+            mask = (guard_df["derived_table"] == derived_table) & (guard_df["run_id"] == run_id)
+            if mask.any():
+                logger.debug(f"Skipping {derived_table}/{run_id} - already processed")
+            else:
+                token = str(uuid.uuid4())
+                to_claim.append((derived_table, update_fn, token))
+
+        if not to_claim:
+            return
+
+        # --- STEP 3: Batch append all claims in a single write ---
+        now = datetime.now(timezone.utc)
+        claim_table = pa.table(
+            {
+                "derived_table": [t[0] for t in to_claim],
+                "run_id": [run_id] * len(to_claim),
+                "claim_token": [t[2] for t in to_claim],
+                "status": ["CLAIMED"] * len(to_claim),
+                "claimed_at": pa.array([now] * len(to_claim), type=pa.timestamp("us", tz="UTC")),
+                "applied_at": pa.array([None] * len(to_claim), type=pa.timestamp("us", tz="UTC")),
+                "error_message": pa.array([None] * len(to_claim), type=pa.string()),
+            }
+        )
+
+        try:
+
+            def _do_append():
+                write_deltalake(
+                    self._guard_path,
+                    claim_table,
+                    mode="append",
+                    storage_options=storage_opts or None,
+                )
+
+            _retry_delta_operation(_do_append)
+        except Exception as e:
+            self.log_observability_error(
+                "derived_update",
+                f"Batch claim write failed: {e}",
+                run_id=run_id,
+            )
+            return
+
+        # --- STEP 4: Re-read once to verify all claims won ---
+        try:
+            dt = DeltaTable(self._guard_path, storage_options=storage_opts or None)
+            verify_df = dt.to_pandas()
+        except Exception as e:
+            self.log_observability_error(
+                "derived_update",
+                f"Batch claim verify failed: {e}",
+                run_id=run_id,
+            )
+            return
+
+        claimed: List[Tuple[str, Callable[[], None], str]] = []
+        for derived_table, update_fn, token in to_claim:
+            mask = (
+                (verify_df["derived_table"] == derived_table)
+                & (verify_df["run_id"] == run_id)
+                & (verify_df["claim_token"] == token)
+            )
+            if mask.any():
+                claimed.append((derived_table, update_fn, token))
+            else:
+                logger.debug(f"Lost race for {derived_table}/{run_id}")
+
+        if not claimed:
+            return
+
+        # --- STEP 4.5: Pre-load meta_pipeline_runs once for all update_fns ---
+        try:
+            runs_path = self.catalog.tables["meta_pipeline_runs"]
+            runs_dt = DeltaTable(runs_path, storage_options=storage_opts or None)
+            self._runs_df_cache = runs_dt.to_pandas()
+        except Exception:
+            self._runs_df_cache = pd.DataFrame()
+
+        # --- STEP 5: Execute each update_fn, track results ---
+        succeeded: List[Tuple[str, str]] = []  # (derived_table, token)
+        failed: List[Tuple[str, str, str]] = []  # (derived_table, token, error_msg)
+        for derived_table, update_fn, token in claimed:
+            try:
+                update_fn()
+                succeeded.append((derived_table, token))
+            except Exception as e:
+                failed.append((derived_table, token, str(e)))
+                self.log_observability_error(
+                    "derived_update",
+                    f"{derived_table}: {e}",
+                    run_id=run_id,
+                )
+
+        # --- STEP 6: Batch mark_applied/failed - single read + write ---
+        if not succeeded and not failed:
+            return
+
+        try:
+            dt = DeltaTable(self._guard_path, storage_options=storage_opts or None)
+            df = dt.to_pandas()
+
+            now = datetime.now(timezone.utc)
+            for derived_table, token in succeeded:
+                mask = (
+                    (df["derived_table"] == derived_table)
+                    & (df["run_id"] == run_id)
+                    & (df["claim_token"] == token)
+                    & (df["status"] == "CLAIMED")
+                )
+                df.loc[mask, "status"] = "APPLIED"
+                df.loc[mask, "applied_at"] = now
+
+            for derived_table, token, error_msg in failed:
+                mask = (
+                    (df["derived_table"] == derived_table)
+                    & (df["run_id"] == run_id)
+                    & (df["claim_token"] == token)
+                    & (df["status"] == "CLAIMED")
+                )
+                df.loc[mask, "status"] = "FAILED"
+                df.loc[mask, "applied_at"] = now
+                df.loc[mask, "error_message"] = error_msg[:500] if error_msg else None
+
+            def _do_overwrite():
+                arrow_schema = _get_guard_table_arrow_schema()
+                arrow_table = pa.Table.from_pandas(df, schema=arrow_schema, preserve_index=False)
+                write_deltalake(
+                    self._guard_path,
+                    arrow_table,
+                    mode="overwrite",
+                    schema_mode="overwrite",
+                    storage_options=storage_opts or None,
+                )
+
+            _retry_delta_operation(_do_overwrite)
+            logger.debug(
+                f"Batch marked {len(succeeded)} APPLIED, {len(failed)} FAILED for run {run_id}"
+            )
+        except Exception as e:
+            self.log_observability_error(
+                "derived_update",
+                f"Batch mark_applied/failed write failed: {e}",
+                run_id=run_id,
+            )
+        finally:
+            self._runs_df_cache = None
+
     def update_daily_stats(self, run_id: str, pipeline_run: Dict[str, Any]) -> None:
         """
         MERGE incremental deltas to meta_daily_stats.
@@ -1452,7 +1684,6 @@ class DerivedUpdater:
 
         storage_opts = self.catalog._get_storage_options()
         daily_stats_path = self.catalog.tables["meta_daily_stats"]
-        runs_path = self.catalog.tables["meta_pipeline_runs"]
 
         pipeline_name = pipeline_run["pipeline_name"]
         run_end_at = pipeline_run["run_end_at"]
@@ -1468,11 +1699,15 @@ class DerivedUpdater:
         except Exception:
             existing = pd.DataFrame()
 
-        try:
-            runs_dt = DeltaTable(runs_path, storage_options=storage_opts or None)
-            runs_df = runs_dt.to_pandas()
-        except Exception:
-            runs_df = pd.DataFrame()
+        if self._runs_df_cache is not None:
+            runs_df = self._runs_df_cache
+        else:
+            try:
+                runs_path = self.catalog.tables["meta_pipeline_runs"]
+                runs_dt = DeltaTable(runs_path, storage_options=storage_opts or None)
+                runs_df = runs_dt.to_pandas()
+            except Exception:
+                runs_df = pd.DataFrame()
 
         if runs_df.empty:
             return
@@ -1550,7 +1785,6 @@ class DerivedUpdater:
 
         storage_opts = self.catalog._get_storage_options()
         health_path = self.catalog.tables["meta_pipeline_health"]
-        runs_path = self.catalog.tables["meta_pipeline_runs"]
 
         pipeline_name = pipeline_run["pipeline_name"]
         owner = pipeline_run.get("owner")
@@ -1564,11 +1798,15 @@ class DerivedUpdater:
         except Exception:
             existing = pd.DataFrame()
 
-        try:
-            runs_dt = DeltaTable(runs_path, storage_options=storage_opts or None)
-            runs_df = runs_dt.to_pandas()
-        except Exception:
-            runs_df = pd.DataFrame()
+        if self._runs_df_cache is not None:
+            runs_df = self._runs_df_cache
+        else:
+            try:
+                runs_path = self.catalog.tables["meta_pipeline_runs"]
+                runs_dt = DeltaTable(runs_path, storage_options=storage_opts or None)
+                runs_df = runs_dt.to_pandas()
+            except Exception:
+                runs_df = pd.DataFrame()
 
         current_row = (
             existing[existing["pipeline_name"] == pipeline_name]
@@ -1673,7 +1911,6 @@ class DerivedUpdater:
 
         storage_opts = self.catalog._get_storage_options()
         sla_path = self.catalog.tables["meta_sla_status"]
-        runs_path = self.catalog.tables["meta_pipeline_runs"]
         now = datetime.now(timezone.utc)
 
         try:
@@ -1682,11 +1919,15 @@ class DerivedUpdater:
         except Exception:
             existing = pd.DataFrame()
 
-        try:
-            runs_dt = DeltaTable(runs_path, storage_options=storage_opts or None)
-            runs_df = runs_dt.to_pandas()
-        except Exception:
-            runs_df = pd.DataFrame()
+        if self._runs_df_cache is not None:
+            runs_df = self._runs_df_cache
+        else:
+            try:
+                runs_path = self.catalog.tables["meta_pipeline_runs"]
+                runs_dt = DeltaTable(runs_path, storage_options=storage_opts or None)
+                runs_df = runs_dt.to_pandas()
+            except Exception:
+                runs_df = pd.DataFrame()
 
         last_success_at = None
         minutes_since_success = None
