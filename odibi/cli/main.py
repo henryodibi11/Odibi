@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+from odibi import __version__
+
 try:
     from rich.console import Console
     from rich.table import Table
@@ -245,7 +247,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         prog="odibi", description="Odibi - Declarative Data Engineering Framework"
     )
-    parser.add_argument("--version", action="version", version="odibi 2.18.0")
+    parser.add_argument("--version", action="version", version=f"odibi {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

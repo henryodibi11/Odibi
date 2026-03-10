@@ -470,6 +470,7 @@ system:
 | **cost_per_compute_hour** | Optional[float] | No | - | Estimated cost per compute hour (USD) for cost tracking |
 | **databricks_billing_enabled** | bool | No | `False` | Attempt to query Databricks billing tables for actual costs |
 | **retention_days** | Optional[[RetentionConfig](#retentionconfig)] | No | - | Retention periods for system tables |
+| **optimize_catalog** | bool | No | `True` | Run OPTIMIZE + VACUUM on all system catalog Delta tables after each pipeline run. Compacts small files created by frequent MERGE operations. Adds ~15-20s but prevents accumulation of small files that degrade read performance over time. Set to false to skip. |
 
 ---
 ### `SyncFromConfig`
@@ -770,7 +771,7 @@ to enable parallel reads (requires partitionColumn, lowerBound, upperBound).
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **connection** | str | Yes | - | Connection name from project.yaml |
+| **connection** | Optional[str] | No | - | Connection name from project.yaml (null for synthetic/simulation sources) |
 | **format** | ReadFormat | Yes | - | Data format: csv, parquet, delta, json, sql, api, excel, avro, cloudFiles |
 | **table** | Optional[str] | No | - | Table name for SQL/Delta |
 | **path** | Optional[str] | No | - | Path for file-based sources |
