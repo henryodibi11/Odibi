@@ -5003,6 +5003,14 @@ class SystemConfig(BaseModel):
             "that degrade read performance over time. Set to false to skip."
         ),
     )
+    sync_timeout_seconds: float = Field(
+        default=30.0,
+        description=(
+            "Maximum time (seconds) to wait for async catalog sync to complete. "
+            "Reduced from 300s default to 30s for better performance. "
+            "Sync is incremental, so incomplete syncs will catch up on next run."
+        ),
+    )
 
 
 class LineageConfig(BaseModel):

@@ -2346,12 +2346,18 @@ class PipelineManager:
         t_lineage_end = time.time()
         overhead_timings["lineage_generation"] = t_lineage_end - t_lineage_start
 
-        # Wait for any pending async catalog syncs to complete
+        # Wait for any pending async catalog syncs to complete (with reduced timeout)
         t_sync_start = time.time()
+        sync_timeout = 30.0  # Default reduced timeout for performance
+        if self.project_config and self.project_config.system:
+            sync_timeout = getattr(self.project_config.system, "sync_timeout_seconds", 30.0)
+
         for name in pipeline_names:
             pipeline = self._pipelines[name]
             if hasattr(pipeline, "flush_sync"):
-                pipeline.flush_sync()
+                # Configurable timeout (default 30s, was 300s)
+                # Sync is incremental, so incomplete syncs will catch up next run
+                pipeline.flush_sync(timeout=sync_timeout)
         t_sync_end = time.time()
         overhead_timings["catalog_sync"] = t_sync_end - t_sync_start
 
@@ -2548,8 +2554,9 @@ class PipelineManager:
             existing_pipelines = self.catalog_manager.get_all_registered_pipelines()
             existing_nodes = self.catalog_manager.get_all_registered_nodes(pipeline_names)
             t_fetch_end = time.time()
-            self._ctx.debug(
-                f"Auto-register: Fetched existing metadata in {t_fetch_end - t_fetch_start:.2f}s"
+            print(
+                f"[OVERHEAD] Auto-register: Fetched existing metadata in {t_fetch_end - t_fetch_start:.2f}s",
+                flush=True,
             )
 
             pipeline_records = []
@@ -2615,9 +2622,9 @@ class PipelineManager:
                 t_write_p_start = time.time()
                 self.catalog_manager.register_pipelines_batch(pipeline_records)
                 t_write_p_end = time.time()
-                self._ctx.debug(
-                    f"Batch registered {len(pipeline_records)} changed pipeline(s) in {t_write_p_end - t_write_p_start:.2f}s",
-                    pipelines=[r["pipeline_name"] for r in pipeline_records],
+                print(
+                    f"[OVERHEAD] Batch registered {len(pipeline_records)} changed pipeline(s) in {t_write_p_end - t_write_p_start:.2f}s",
+                    flush=True,
                 )
             else:
                 self._ctx.debug("All pipelines unchanged - skipping registration")
@@ -2626,9 +2633,9 @@ class PipelineManager:
                 t_write_n_start = time.time()
                 self.catalog_manager.register_nodes_batch(node_records)
                 t_write_n_end = time.time()
-                self._ctx.debug(
-                    f"Batch registered {len(node_records)} changed node(s) in {t_write_n_end - t_write_n_start:.2f}s",
-                    nodes=[r["node_name"] for r in node_records],
+                print(
+                    f"[OVERHEAD] Batch registered {len(node_records)} changed node(s) in {t_write_n_end - t_write_n_start:.2f}s",
+                    flush=True,
                 )
             else:
                 self._ctx.debug("All nodes unchanged - skipping registration")
