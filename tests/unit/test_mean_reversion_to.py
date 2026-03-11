@@ -181,9 +181,9 @@ def test_mean_reversion_to_vs_static_start():
     diff_static = abs(final_tank_static - final_ambient)
     diff_dynamic = abs(final_tank_dynamic - final_ambient)
 
-    assert (
-        diff_dynamic < diff_static
-    ), f"Dynamic tank should track ambient better (static diff: {diff_static:.2f}, dynamic diff: {diff_dynamic:.2f})"
+    assert diff_dynamic < diff_static, (
+        f"Dynamic tank should track ambient better (static diff: {diff_static:.2f}, dynamic diff: {diff_dynamic:.2f})"
+    )
 
 
 def test_mean_reversion_to_dependency_order():

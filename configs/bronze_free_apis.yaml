@@ -1,0 +1,363 @@
+project: bronze_free_apis
+engine: pandas
+
+connections:
+  # ========================================
+  # FREE & PUBLIC APIs (No Auth Required)
+  # ========================================
+  
+  # US Government - FDA Data
+  openfda:
+    type: http
+    base_url: "https://api.fda.gov"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # Currency Exchange Rates (Free, No Auth)
+  frankfurter:
+    type: http
+    base_url: "https://api.frankfurter.app"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # REST Countries (Free, No Auth)
+  restcountries:
+    type: http
+    base_url: "https://restcountries.com/v3.1"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # JSON Placeholder (Test API)
+  jsonplaceholder:
+    type: http
+    base_url: "https://jsonplaceholder.typicode.com"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # Cat Facts (Fun API)
+  catfacts:
+    type: http
+    base_url: "https://catfact.ninja"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # Official Joke API
+  jokes:
+    type: http
+    base_url: "https://official-joke-api.appspot.com"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # ========================================
+  # FREE with API Key (Requires Signup)
+  # ========================================
+  
+  # CoinGecko (Free tier: 10-30 calls/min)
+  # Sign up: https://www.coingecko.com/en/api
+  # Note: Works without key but with lower limits
+  coingecko:
+    type: http
+    base_url: "https://api.coingecko.com/api/v3"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # AlphaVantage (Free: 25 requests/day)
+  # Sign up: https://www.alphavantage.co/support/#api-key
+  alphavantage:
+    type: http
+    base_url: "https://www.alphavantage.co"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+    # Note: Pass apikey in params, not headers
+  
+  # ========================================
+  # Storage
+  # ========================================
+  
+  bronze:
+    type: local
+    base_path: D:/data/bronze  # Adjust to your path
+
+story:
+  connection: bronze
+  path: _monitoring/stories
+
+system:
+  connection: bronze
+  path: _odibi_system
+
+pipelines:
+  # ========================================
+  # DAILY PULLS - 100% Free, No Auth
+  # ========================================
+  
+  - pipeline: bronze_fda_food_recalls
+    layer: bronze
+    description: "FDA food recall enforcement data"
+    nodes:
+      - name: fda_food_recalls
+        read:
+          connection: openfda
+          format: api
+          path: /food/enforcement.json
+          options:
+            params:
+              limit: 1000
+            
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 1000
+              max_pages: 50
+              stop_on_empty: true
+            
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: openfda_food
+            
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            
+            rate_limit:
+              requests_per_second: 1
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: fda/food_recalls.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+
+  - pipeline: bronze_fda_drug_recalls
+    layer: bronze
+    description: "FDA drug recall enforcement data"
+    nodes:
+      - name: fda_drug_recalls
+        read:
+          connection: openfda
+          format: api
+          path: /drug/enforcement.json
+          options:
+            params:
+              limit: 1000
+            
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 1000
+              max_pages: 50
+              stop_on_empty: true
+            
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: openfda_drug
+            
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            
+            rate_limit:
+              requests_per_second: 1
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: fda/drug_recalls.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+
+  - pipeline: bronze_currency_rates
+    layer: bronze
+    description: "Daily currency exchange rates (ECB data)"
+    nodes:
+      - name: currency_rates
+        read:
+          connection: frankfurter
+          format: api
+          path: /latest
+          options:
+            params:
+              from: USD
+              # Gets rates for all currencies
+            
+            pagination:
+              type: none
+            
+            response:
+              items_path: ""  # Returns single object, not array
+              dict_to_list: true  # Convert to list of records
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: frankfurter
+
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: currency/rates_daily.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+
+  - pipeline: bronze_countries
+    layer: bronze
+    description: "Country data (weekly refresh)"
+    nodes:
+      - name: all_countries
+        read:
+          connection: restcountries
+          format: api
+          path: /all
+          options:
+            params:
+              fields: "name,capital,population,region,subregion,currencies,languages"
+            
+            pagination:
+              type: none
+            
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: restcountries
+            
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: reference/countries.parquet
+          mode: overwrite  # Full refresh
+
+  # ========================================
+  # HOURLY PULLS - Requires API Key
+  # ========================================
+  
+  - pipeline: bronze_crypto_markets
+    layer: bronze
+    description: "Crypto market data (CoinGecko - requires API key or works without for limited data)"
+    nodes:
+      - name: crypto_top_250
+        read:
+          connection: coingecko
+          format: api
+          path: /coins/markets
+          options:
+            params:
+              vs_currency: usd
+              order: market_cap_desc
+              per_page: 250
+              page: 1
+              sparkline: "false"
+            
+            pagination:
+              type: page_number
+              page_param: page
+              page_size_param: per_page
+              page_size: 250
+              start_page: 1
+              max_pages: 4  # Top 1000 coins
+            
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _hour: ${date:now:%Y-%m-%d_%H}
+                _source: coingecko
+            
+            retry:
+              max_retries: 5
+              backoff_factor: 3.0
+              retry_codes: [429, 500, 502, 503]
+            
+            rate_limit:
+              requests_per_second: 0.33  # ~20/min (safe for free tier)
+            
+            http:
+              timeout_s: 60
+
+        write:
+          connection: bronze
+          format: parquet
+          path: crypto/markets_hourly.parquet
+          mode: append
+          options:
+            partition_by: [_load_date, _hour]
+
+  - pipeline: bronze_stock_intraday
+    layer: bronze
+    description: "Stock data (AlphaVantage - requires API key, 25 calls/day limit)"
+    nodes:
+      - name: stock_prices
+        read:
+          connection: alphavantage
+          format: api
+          path: /query
+          options:
+            params:
+              function: TIME_SERIES_INTRADAY
+              symbol: AAPL  # Change to stock of interest
+              interval: 5min
+              apikey: demo  # Use 'demo' for testing, replace with real key
+              outputsize: compact  # Last 100 data points
+            
+            pagination:
+              type: none
+            
+            response:
+              items_path: "Time Series (5min)"
+              dict_to_list: true
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _symbol: AAPL
+                _source: alphavantage
+            
+            retry:
+              max_retries: 2
+              backoff_factor: 5.0
+            
+            rate_limit:
+              requests_per_second: 0.016  # ~1 per minute (safe for 25/day)
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: stocks/intraday.parquet
+          mode: append
+          options:
+            partition_by: [_load_date, _symbol]

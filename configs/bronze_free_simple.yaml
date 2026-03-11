@@ -1,0 +1,233 @@
+# 100% Free Bronze Layer - No Auth Required
+# All APIs verified working on 2026-03-08
+
+project: bronze_free_simple
+engine: pandas
+
+connections:
+  # US Government - FDA Data (No auth required)
+  openfda:
+    type: http
+    base_url: "https://api.fda.gov"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # REST Countries (No auth required)
+  restcountries:
+    type: http
+    base_url: "https://restcountries.com/v3.1"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # CoinGecko - Works without key (limited)
+  coingecko:
+    type: http
+    base_url: "https://api.coingecko.com/api/v3"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # Local storage
+  bronze:
+    type: local
+    base_path: D:/data/bronze  # Change to your path
+
+story:
+  connection: bronze
+  path: _monitoring/stories
+
+system:
+  connection: bronze
+  path: _odibi_system
+
+pipelines:
+  # ========================================
+  # FDA Food Recalls - 100% Free, No Auth
+  # ========================================
+  
+  - pipeline: bronze_fda_food_recalls
+    layer: bronze
+    description: "FDA food recall enforcement data"
+    nodes:
+      - name: fda_food_recalls
+        read:
+          connection: openfda
+          format: api
+          path: /food/enforcement.json
+          options:
+            params:
+              limit: 100  # Start small
+            
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 100
+              max_pages: 10
+              stop_on_empty: true
+            
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: openfda
+            
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            
+            rate_limit:
+              requests_per_second: 2
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: fda/food_recalls.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+
+  # ========================================
+  # FDA Drug Recalls - 100% Free, No Auth
+  # ========================================
+  
+  - pipeline: bronze_fda_drug_recalls
+    layer: bronze
+    description: "FDA drug recall enforcement data"
+    nodes:
+      - name: fda_drug_recalls
+        read:
+          connection: openfda
+          format: api
+          path: /drug/enforcement.json
+          options:
+            params:
+              limit: 100
+            
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 100
+              max_pages: 10
+              stop_on_empty: true
+            
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: openfda
+            
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            
+            rate_limit:
+              requests_per_second: 2
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: fda/drug_recalls.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+
+  # ========================================
+  # Countries Reference Data - 100% Free
+  # ========================================
+  
+  - pipeline: bronze_countries
+    layer: bronze
+    description: "Country reference data (weekly refresh)"
+    nodes:
+      - name: all_countries
+        read:
+          connection: restcountries
+          format: api
+          path: /all
+          options:
+            params:
+              fields: "name,capital,population,region,subregion,currencies,languages,area"
+            
+            pagination:
+              type: none
+            
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: restcountries
+            
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            
+            http:
+              timeout_s: 30
+
+        write:
+          connection: bronze
+          format: parquet
+          path: reference/countries.parquet
+          mode: overwrite  # Full refresh weekly
+
+  # ========================================
+  # Crypto Markets - Works without key (limited)
+  # ========================================
+  
+  - pipeline: bronze_crypto_top100
+    layer: bronze
+    description: "Top 100 crypto markets (CoinGecko)"
+    nodes:
+      - name: crypto_markets
+        read:
+          connection: coingecko
+          format: api
+          path: /coins/markets
+          options:
+            params:
+              vs_currency: usd
+              order: market_cap_desc
+              per_page: 100
+              page: 1
+              sparkline: "false"
+              price_change_percentage: "24h,7d"
+            
+            pagination:
+              type: none  # Just top 100 for free tier
+            
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _hour: ${date:now:%Y-%m-%d_%H}
+                _source: coingecko
+            
+            retry:
+              max_retries: 5
+              backoff_factor: 3.0
+              retry_codes: [429, 500, 502, 503]
+            
+            rate_limit:
+              requests_per_second: 0.2  # Conservative for free tier
+            
+            http:
+              timeout_s: 60
+
+        write:
+          connection: bronze
+          format: parquet
+          path: crypto/markets_hourly.parquet
+          mode: append
+          options:
+            partition_by: [_load_date, _hour]

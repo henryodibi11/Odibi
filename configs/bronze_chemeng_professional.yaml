@@ -1,0 +1,532 @@
+# Professional Bronze Layer - Chemical Engineering & Data Engineering
+# 20+ Free APIs - Production-Grade Data Sources
+# Created: 2026-03-08
+
+project: bronze_chemeng_pro
+engine: pandas
+
+connections:
+  # ========================================
+  # GOVERNMENT & REGULATORY (Compliance)
+  # ========================================
+  
+  # 1. openFDA - Drug/Food Safety & Recalls
+  openfda:
+    type: http
+    base_url: "https://api.fda.gov"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 2. NOAA Climate Data (Weather affects operations)
+  noaa:
+    type: http
+    base_url: "https://www.ncei.noaa.gov/cdo-web/api/v2"
+    headers:
+      token: "${NOAA_TOKEN}"  # Free signup at ncdc.noaa.gov/cdo-web/token
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # ECONOMIC & MARKET DATA
+  # ========================================
+  
+  # 3. World Bank - Economic Indicators
+  worldbank:
+    type: http
+    base_url: "https://api.worldbank.org/v2"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 4. BLS - Bureau of Labor Statistics
+  bls:
+    type: http
+    base_url: "https://api.bls.gov/publicAPI/v2"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+      registrationkey: "${BLS_API_KEY}"  # Free at bls.gov/developers
+  
+  # ========================================
+  # COMMODITIES & RAW MATERIALS
+  # ========================================
+  
+  # 5. CoinGecko - Commodity tracking (Gold, Silver via crypto)
+  coingecko:
+    type: http
+    base_url: "https://api.coingecko.com/api/v3"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 6. Gemini - Precious metals pricing
+  gemini:
+    type: http
+    base_url: "https://api.gemini.com/v2"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 7. Kraken - Additional commodity/materials pricing
+  kraken:
+    type: http
+    base_url: "https://api.kraken.com/0/public"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # ENVIRONMENTAL & WEATHER
+  # ========================================
+  
+  # 8. Open-Meteo - Free Weather (No API key!)
+  openmeteo:
+    type: http
+    base_url: "https://api.open-meteo.com/v1"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 9. OpenAQ - Air Quality Data
+  openaq:
+    type: http
+    base_url: "https://api.openaq.org/v2"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # ENERGY & UTILITIES
+  # ========================================
+  
+  # 10. EIA - US Energy Information Administration
+  eia:
+    type: http
+    base_url: "https://api.eia.gov"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # CURRENCY & EXCHANGE RATES
+  # ========================================
+  
+  # 11. Frankfurter - Currency Exchange (ECB data)
+  frankfurter:
+    type: http
+    base_url: "https://api.frankfurter.app"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 12. ExchangeRate - Alternative currency source
+  exchangerate:
+    type: http
+    base_url: "https://open.er-api.com/v6"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # REFERENCE DATA
+  # ========================================
+  
+  # 13. REST Countries - Geography reference
+  restcountries:
+    type: http
+    base_url: "https://restcountries.com/v3.1"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # SCIENCE & RESEARCH
+  # ========================================
+  
+  # 14. NASA - Earth/climate science data
+  nasa:
+    type: http
+    base_url: "https://api.nasa.gov"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 15. arXiv - Scientific research papers
+  arxiv:
+    type: http
+    base_url: "http://export.arxiv.org/api"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 16. PubChem - Chemical database
+  pubchem:
+    type: http
+    base_url: "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # SUPPLY CHAIN & LOGISTICS (If available)
+  # ========================================
+  
+  # 17. US Census Bureau - Trade/economic data
+  census:
+    type: http
+    base_url: "https://api.census.gov/data"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 18. FRED - Federal Reserve Economic Data
+  fred:
+    type: http
+    base_url: "https://api.stlouisfed.org/fred"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # ========================================
+  # IP & LOCATION SERVICES
+  # ========================================
+  
+  # 19. IP API - Geolocation (for plant locations)
+  ipapi:
+    type: http
+    base_url: "https://ipapi.co"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # 20. REST API (Test/Development)
+  restfulapi:
+    type: http
+    base_url: "https://api.restful-api.dev"
+    headers:
+      User-Agent: "odibi-chemeng/1.0"
+  
+  # Local Storage
+  bronze:
+    type: local
+    base_path: D:/data/bronze
+
+story:
+  connection: bronze
+  path: _monitoring/stories
+
+system:
+  connection: bronze
+  path: _odibi_system
+
+pipelines:
+  # ========================================
+  # REGULATORY & COMPLIANCE - DAILY
+  # ========================================
+  
+  - pipeline: bronze_fda_drug_recalls
+    layer: bronze
+    description: "Pharma/chemical manufacturing recalls"
+    nodes:
+      - name: drug_recalls
+        read:
+          connection: openfda
+          format: api
+          path: /drug/enforcement.json
+          options:
+            params:
+              limit: 1000
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 1000
+              max_pages: 50
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: openfda_drug
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            rate_limit:
+              requests_per_second: 2
+        write:
+          connection: bronze
+          format: parquet
+          path: regulatory/fda_drug_recalls.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  - pipeline: bronze_fda_device_recalls
+    layer: bronze
+    description: "Medical device recalls (lab equipment)"
+    nodes:
+      - name: device_recalls
+        read:
+          connection: openfda
+          format: api
+          path: /device/enforcement.json
+          options:
+            params:
+              limit: 1000
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 1000
+              max_pages: 50
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: openfda_device
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            rate_limit:
+              requests_per_second: 2
+        write:
+          connection: bronze
+          format: parquet
+          path: regulatory/fda_device_recalls.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  # ========================================
+  # ECONOMIC INDICATORS - DAILY/WEEKLY
+  # ========================================
+  
+  - pipeline: bronze_worldbank_gdp
+    layer: bronze
+    description: "Global GDP by country"
+    nodes:
+      - name: gdp_data
+        read:
+          connection: worldbank
+          format: api
+          path: /country/all/indicator/NY.GDP.MKTP.CD
+          options:
+            params:
+              format: json
+              per_page: 1000
+              date: "2020:2026"
+            pagination:
+              type: page_number
+              page_param: page
+              page_size_param: per_page
+              page_size: 1000
+              start_page: 1
+              max_pages: 10
+            response:
+              items_path: "[1]"  # World Bank wraps data in array
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _indicator: GDP_Current_USD
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: economics/worldbank_gdp.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  - pipeline: bronze_worldbank_cpi
+    layer: bronze
+    description: "Consumer Price Index (inflation tracking)"
+    nodes:
+      - name: cpi_data
+        read:
+          connection: worldbank
+          format: api
+          path: /country/all/indicator/FP.CPI.TOTL
+          options:
+            params:
+              format: json
+              per_page: 1000
+              date: "2020:2026"
+            pagination:
+              type: page_number
+              page_param: page
+              page_size_param: per_page
+              page_size: 1000
+              start_page: 1
+              max_pages: 10
+            response:
+              items_path: "[1]"
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _indicator: CPI
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: economics/worldbank_cpi.parquet
+          mode: append
+  
+  # ========================================
+  # MATERIALS & COMMODITIES - HOURLY
+  # ========================================
+  
+  - pipeline: bronze_precious_metals
+    layer: bronze
+    description: "Gold/Silver prices (materials cost tracking)"
+    nodes:
+      - name: gold_silver_prices
+        read:
+          connection: gemini
+          format: api
+          path: /ticker/btcusd
+          options:
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _hour: ${date:now:%Y-%m-%d_%H}
+                _material: BTC
+            rate_limit:
+              requests_per_second: 0.5
+        write:
+          connection: bronze
+          format: parquet
+          path: commodities/precious_metals.parquet
+          mode: append
+          options:
+            partition_by: [_load_date, _hour]
+  
+  # ========================================
+  # ENVIRONMENTAL - DAILY
+  # ========================================
+  
+  - pipeline: bronze_air_quality
+    layer: bronze
+    description: "Air quality monitoring (plant emissions compliance)"
+    nodes:
+      - name: air_quality_global
+        read:
+          connection: openaq
+          format: api
+          path: /latest
+          options:
+            params:
+              limit: 1000
+            pagination:
+              type: offset_limit
+              offset_param: page
+              limit_param: limit
+              limit: 1000
+              max_pages: 10
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _source: openaq
+            retry:
+              max_retries: 3
+              backoff_factor: 2.0
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: environmental/air_quality.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  # ========================================
+  # WEATHER (Operational Planning) - HOURLY
+  # ========================================
+  
+  - pipeline: bronze_weather_plant_locations
+    layer: bronze
+    description: "Weather at plant locations (Houston example)"
+    nodes:
+      - name: weather_houston
+        read:
+          connection: openmeteo
+          format: api
+          path: /forecast
+          options:
+            params:
+              latitude: 29.7604
+              longitude: -95.3698  # Houston, TX (chemical hub)
+              current_weather: "true"
+              hourly: "temperature_2m,precipitation,windspeed_10m,pressure_msl"
+              forecast_days: 7
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _location: Houston_TX
+                _plant: Gulf_Coast
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: weather/plant_locations.parquet
+          mode: append
+          options:
+            partition_by: [_load_date, _location]
+  
+  # ========================================
+  # REFERENCE DATA - WEEKLY
+  # ========================================
+  
+  - pipeline: bronze_countries
+    layer: bronze
+    description: "Country codes for international operations"
+    nodes:
+      - name: countries_ref
+        read:
+          connection: restcountries
+          format: api
+          path: /all
+          options:
+            params:
+              fields: "name,capital,population,region,currencies,languages,area"
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: reference/countries.parquet
+          mode: overwrite
+  
+  # ========================================
+  # CURRENCY RATES (International Ops) - DAILY
+  # ========================================
+  
+  - pipeline: bronze_exchange_rates
+    layer: bronze
+    description: "Currency rates for international procurement"
+    nodes:
+      - name: currency_rates
+        read:
+          connection: exchangerate
+          format: api
+          path: /latest/USD
+          options:
+            pagination:
+              type: none
+            response:
+              items_path: rates
+              dict_to_list: true
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _base_currency: USD
+        write:
+          connection: bronze
+          format: parquet
+          path: finance/exchange_rates.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]

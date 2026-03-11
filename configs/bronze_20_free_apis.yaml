@@ -1,0 +1,516 @@
+# 20+ FREE PUBLIC APIs - Verified & Ready
+# No auth required for most, generous free tiers for others
+# Perfect for desktop bronze layer hub
+
+project: bronze_20_apis
+engine: pandas
+
+connections:
+  # ========================================
+  # 100% FREE - NO AUTH REQUIRED (16 APIs)
+  # ========================================
+  
+  # 1. openFDA - US Government
+  openfda:
+    type: http
+    base_url: "https://api.fda.gov"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 2. REST Countries
+  restcountries:
+    type: http
+    base_url: "https://restcountries.com/v3.1"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 3. PokéAPI
+  pokeapi:
+    type: http
+    base_url: "https://pokeapi.co/api/v2"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 4. JSON Placeholder (Test Data)
+  jsonplaceholder:
+    type: http
+    base_url: "https://jsonplaceholder.typicode.com"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 5. Cat Facts
+  catfacts:
+    type: http
+    base_url: "https://catfact.ninja"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 6. Dog API
+  dogapi:
+    type: http
+    base_url: "https://dog.ceo/api"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 7. Advice Slip
+  adviceslip:
+    type: http
+    base_url: "https://api.adviceslip.com"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 8. Kanye Rest (Kanye Quotes)
+  kanyerest:
+    type: http
+    base_url: "https://api.kanye.rest"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 9. Bored API
+  boredapi:
+    type: http
+    base_url: "https://www.boredapi.com/api"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 10. IP API (Geolocation)
+  ipapi:
+    type: http
+    base_url: "https://ipapi.co"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 11. Agify (Predict age from name)
+  agify:
+    type: http
+    base_url: "https://api.agify.io"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 12. Genderize (Predict gender from name)
+  genderize:
+    type: http
+    base_url: "https://api.genderize.io"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 13. Nationalize (Predict nationality from name)
+  nationalize:
+    type: http
+    base_url: "https://api.nationalize.io"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 14. Random User Generator
+  randomuser:
+    type: http
+    base_url: "https://randomuser.me/api"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 15. DiceBear Avatars
+  dicebear:
+    type: http
+    base_url: "https://api.dicebear.com/7.x"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 16. Numbers API (Math facts)
+  numbersapi:
+    type: http
+    base_url: "http://numbersapi.com"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # ========================================
+  # FREE WITH GENEROUS TIERS (5 APIs)
+  # ========================================
+  
+  # 17. CoinGecko (Works without key, better with)
+  coingecko:
+    type: http
+    base_url: "https://api.coingecko.com/api/v3"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 18. NASA (DEMO_KEY works, or get free key)
+  nasa:
+    type: http
+    base_url: "https://api.nasa.gov"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 19. Open-Meteo (Free weather, no key needed)
+  openmeteo:
+    type: http
+    base_url: "https://api.open-meteo.com/v1"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 20. Frankfurter (Currency rates)
+  frankfurter:
+    type: http
+    base_url: "https://api.frankfurter.app"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # 21. Gemini Crypto (No auth)
+  gemini:
+    type: http
+    base_url: "https://api.gemini.com/v2"
+    headers:
+      User-Agent: "odibi-bronze/1.0"
+  
+  # Local Storage
+  bronze:
+    type: local
+    base_path: D:/data/bronze
+
+story:
+  connection: bronze
+  path: _monitoring/stories
+
+system:
+  connection: bronze
+  path: _odibi_system
+
+pipelines:
+  # ========================================
+  # GOVERNMENT & OFFICIAL DATA
+  # ========================================
+  
+  - pipeline: bronze_fda_food
+    layer: bronze
+    nodes:
+      - name: fda_food_recalls
+        read:
+          connection: openfda
+          format: api
+          path: /food/enforcement.json
+          options:
+            params:
+              limit: 100
+            pagination:
+              type: offset_limit
+              offset_param: skip
+              limit_param: limit
+              limit: 100
+              max_pages: 10
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+            rate_limit:
+              requests_per_second: 2
+        write:
+          connection: bronze
+          format: parquet
+          path: government/fda_food_recalls.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  # ========================================
+  # REFERENCE DATA
+  # ========================================
+  
+  - pipeline: bronze_countries
+    layer: bronze
+    nodes:
+      - name: countries
+        read:
+          connection: restcountries
+          format: api
+          path: /all
+          options:
+            params:
+              fields: "name,capital,population,region,currencies,languages"
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+        write:
+          connection: bronze
+          format: parquet
+          path: reference/countries.parquet
+          mode: overwrite
+  
+  # ========================================
+  # ENTERTAINMENT & GAMING
+  # ========================================
+  
+  - pipeline: bronze_pokemon
+    layer: bronze
+    nodes:
+      - name: pokemon_list
+        read:
+          connection: pokeapi
+          format: api
+          path: /pokemon
+          options:
+            params:
+              limit: 100
+              offset: 0
+            pagination:
+              type: offset_limit
+              offset_param: offset
+              limit_param: limit
+              limit: 100
+              max_pages: 5
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: gaming/pokemon.parquet
+          mode: append
+  
+  # ========================================
+  # FINANCIAL DATA
+  # ========================================
+  
+  - pipeline: bronze_crypto_coingecko
+    layer: bronze
+    nodes:
+      - name: crypto_top_100
+        read:
+          connection: coingecko
+          format: api
+          path: /coins/markets
+          options:
+            params:
+              vs_currency: usd
+              per_page: 100
+              page: 1
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _hour: ${date:now:%Y-%m-%d_%H}
+            rate_limit:
+              requests_per_second: 0.2
+        write:
+          connection: bronze
+          format: parquet
+          path: finance/crypto_coingecko.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  - pipeline: bronze_crypto_gemini
+    layer: bronze
+    nodes:
+      - name: gemini_btc
+        read:
+          connection: gemini
+          format: api
+          path: /ticker/btcusd
+          options:
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                _minute: ${date:now:%Y-%m-%d_%H:%M}
+                pair: btcusd
+            rate_limit:
+              requests_per_second: 0.1
+        write:
+          connection: bronze
+          format: parquet
+          path: finance/gemini_ticker.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  # ========================================
+  # RANDOM/FUN DATA (Great for testing!)
+  # ========================================
+  
+  - pipeline: bronze_random_users
+    layer: bronze
+    nodes:
+      - name: random_users
+        read:
+          connection: randomuser
+          format: api
+          path: /
+          options:
+            params:
+              results: 100
+            pagination:
+              type: none
+            response:
+              items_path: results
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: test_data/random_users.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  - pipeline: bronze_cat_facts
+    layer: bronze
+    nodes:
+      - name: cat_facts
+        read:
+          connection: catfacts
+          format: api
+          path: /facts
+          options:
+            params:
+              limit: 100
+            pagination:
+              type: page_number
+              page_param: page
+              page_size_param: limit
+              page_size: 100
+              start_page: 1
+              max_pages: 10
+            response:
+              items_path: data
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+            rate_limit:
+              requests_per_second: 1
+        write:
+          connection: bronze
+          format: parquet
+          path: fun/cat_facts.parquet
+          mode: append
+  
+  - pipeline: bronze_dog_images
+    layer: bronze
+    nodes:
+      - name: dog_breeds
+        read:
+          connection: dogapi
+          format: api
+          path: /breeds/list/all
+          options:
+            pagination:
+              type: none
+            response:
+              items_path: message
+              dict_to_list: true
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+        write:
+          connection: bronze
+          format: parquet
+          path: fun/dog_breeds.parquet
+          mode: overwrite
+  
+  # ========================================
+  # SPACE & SCIENCE
+  # ========================================
+  
+  - pipeline: bronze_nasa_apod
+    layer: bronze
+    nodes:
+      - name: nasa_photo_of_day
+        read:
+          connection: nasa
+          format: api
+          path: /planetary/apod
+          options:
+            params:
+              api_key: DEMO_KEY
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+            rate_limit:
+              requests_per_second: 0.016  # Conservative for DEMO_KEY
+        write:
+          connection: bronze
+          format: parquet
+          path: science/nasa_apod.parquet
+          mode: append
+  
+  # ========================================
+  # WEATHER
+  # ========================================
+  
+  - pipeline: bronze_weather
+    layer: bronze
+    nodes:
+      - name: weather_forecast
+        read:
+          connection: openmeteo
+          format: api
+          path: /forecast
+          options:
+            params:
+              latitude: 40.7128
+              longitude: -74.0060  # New York coordinates
+              current_weather: "true"
+              hourly: "temperature_2m,precipitation"
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+                location: "New York"
+        write:
+          connection: bronze
+          format: parquet
+          path: weather/forecasts.parquet
+          mode: append
+          options:
+            partition_by: [_load_date]
+  
+  # ========================================
+  # NAME ANALYSIS (Demographics)
+  # ========================================
+  
+  - pipeline: bronze_name_demographics
+    layer: bronze
+    nodes:
+      - name: analyze_names
+        read:
+          connection: agify
+          format: api
+          path: /
+          options:
+            params:
+              name: "michael"  # Can loop through common names
+            pagination:
+              type: none
+            response:
+              items_path: ""
+              add_fields:
+                _fetched_at: ${date:now}
+                _load_date: ${date:today}
+        write:
+          connection: bronze
+          format: parquet
+          path: demographics/name_age.parquet
+          mode: append

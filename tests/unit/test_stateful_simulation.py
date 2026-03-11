@@ -227,7 +227,9 @@ def test_pid_controller_basic():
 
     # Should be moving in the right direction (PV increasing toward SP)
     assert final_pv > 50, f"PID should drive PV upward: final_pv={final_pv}"
-    assert final_error < initial_error, f"Error should decrease: initial={initial_error}, final={final_error}"
+    assert final_error < initial_error, (
+        f"Error should decrease: initial={initial_error}, final={final_error}"
+    )
 
 
 def test_pid_controller_with_disturbance():
@@ -286,9 +288,11 @@ def test_pid_controller_with_disturbance():
     # Just verify that PID responds to the step change
     before_step = df[df["row_num"] < 15]
     after_step = df[df["row_num"] >= 15]
-    
+
     # PID should respond to setpoint change - PV should increase after step
-    assert after_step["pv"].iloc[-1] > before_step["pv"].iloc[-1], "PID should respond to SP step increase"
+    assert after_step["pv"].iloc[-1] > before_step["pv"].iloc[-1], (
+        "PID should respond to SP step increase"
+    )
 
 
 def test_battery_soc_integration():

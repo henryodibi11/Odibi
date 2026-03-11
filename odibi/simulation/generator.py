@@ -448,6 +448,20 @@ class SimulationEngine:
         Returns:
             List of row dictionaries
         """
+        # Choose generation strategy based on cross-entity references
+        if self.cross_entity_enabled:
+            return self._generate_timestamp_major()
+        else:
+            return self._generate_entity_major()
+
+    def _generate_entity_major(self) -> List[Dict[str, Any]]:
+        """Generate data using entity-major strategy (all rows for entity 1, then entity 2, etc.).
+
+        This is the original/default strategy, used when no cross-entity references exist.
+
+        Returns:
+            List of row dictionaries
+        """
         from odibi.utils.logging_context import get_logging_context
 
         ctx = get_logging_context()
@@ -490,6 +504,145 @@ class SimulationEngine:
             # Generate rows for this entity
             entity_rows = self._generate_entity_rows(entity_name, entity_idx, entity_rng)
             rows.extend(entity_rows)
+
+        # Apply chaos parameters
+        if self.config.chaos:
+            rows = self._apply_chaos(rows)
+
+        # Sort by timestamp if timestamp column exists
+        timestamp_cols = [c.name for c in self.config.columns if c.generator.type == "timestamp"]
+        if timestamp_cols:
+            rows.sort(key=lambda r: r.get(timestamp_cols[0], ""))
+
+        return rows
+
+    def _generate_timestamp_major(self) -> List[Dict[str, Any]]:
+        """Generate data using timestamp-major strategy (row 0 for all entities, then row 1, etc.).
+
+        This strategy is used when cross-entity references exist, as entities must be
+        generated in dependency order at each timestamp to allow Entity.column references.
+
+        Returns:
+            List of row dictionaries
+        """
+        from odibi.utils.logging_context import get_logging_context
+
+        ctx = get_logging_context()
+        rows = []
+
+        # Create entity-specific RNGs (deterministic based on entity name + seed)
+        entity_rngs = {}
+        for entity_name in self.entity_names:
+            entity_hash = hashlib.md5(entity_name.encode()).hexdigest()[:8]
+            base_entity_seed = self.config.scope.seed + int(entity_hash, 16) % (2**31)
+
+            # Advance RNG for incremental mode
+            if self.hwm_timestamp:
+                rows_before_hwm = int(
+                    (self.effective_start_time - self.start_time).total_seconds()
+                    / self.timestep_seconds
+                )
+                entity_seed = base_entity_seed + rows_before_hwm
+            else:
+                entity_seed = base_entity_seed
+
+            entity_rngs[entity_name] = np.random.default_rng(entity_seed)
+
+        # Initialize random walk state per entity
+        random_walk_current = {}
+        col_map = {col.name: col for col in self.config.columns}
+        for entity_name in self.entity_names:
+            random_walk_current[entity_name] = {}
+            for col_config in self.config.columns:
+                gen = col_config.entity_overrides.get(entity_name, col_config.generator)
+                if isinstance(gen, RandomWalkGeneratorConfig):
+                    if (
+                        entity_name in self.random_walk_state
+                        and col_config.name in self.random_walk_state[entity_name]
+                    ):
+                        random_walk_current[entity_name][col_config.name] = self.random_walk_state[
+                            entity_name
+                        ][col_config.name]
+                    else:
+                        random_walk_current[entity_name][col_config.name] = gen.start
+
+        # Initialize entity state for prev() and stateful functions
+        for entity_name in self.entity_names:
+            if entity_name not in self.entity_state:
+                self.entity_state[entity_name] = {}
+
+        # Generate row by row (timestamp-major loop)
+        for row_idx in range(self.total_rows):
+            row_timestamp = self.effective_start_time + timedelta(
+                seconds=self.timestep_seconds * row_idx
+            )
+
+            # Progress logging
+            if row_idx > 0 and row_idx % 100 == 0:
+                progress_pct = int((row_idx / self.total_rows) * 100)
+                ctx.info(
+                    "Simulation progress (timestamp-major)",
+                    rows_completed=row_idx,
+                    total_rows=self.total_rows,
+                    progress_pct=progress_pct,
+                    entities=len(self.entity_names),
+                )
+
+            # Unbind all entity proxies at start of timestamp
+            for proxy in self.entity_proxies.values():
+                proxy.bind(None)
+
+            current_tick_rows = {}
+
+            # Generate row for each entity in dependency order
+            for entity_idx, entity_name in enumerate(self.entity_generation_order):
+                # Check downtime for this entity
+                if self._is_in_downtime(entity_name, row_timestamp):
+                    continue
+
+                row = {}
+                entity_rng = entity_rngs[entity_name]
+                entity_state = self.entity_state[entity_name]
+                entity_random_walk = random_walk_current[entity_name]
+
+                # Generate columns in dependency order
+                for col_name in self.column_order:
+                    col_config = col_map[col_name]
+                    generator = col_config.entity_overrides.get(entity_name, col_config.generator)
+
+                    # Generate value (passing entity_proxies for cross-entity refs)
+                    value = self._generate_value(
+                        generator,
+                        entity_name,
+                        entity_idx,
+                        row_timestamp,
+                        row_idx,
+                        entity_rng,
+                        row,
+                        entity_random_walk,
+                        entity_state,
+                    )
+
+                    # Apply null_rate
+                    if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
+                        value = None
+
+                    row[col_name] = value
+
+                # Update entity state with current row values for next iteration
+                for col_name in row.keys():
+                    if row[col_name] is not None:
+                        entity_state[col_name] = row[col_name]
+
+                # Store row and bind proxy for downstream entities
+                current_tick_rows[entity_name] = row
+                if entity_name in self.entity_proxies:
+                    self.entity_proxies[entity_name].bind(row)
+
+            # Collect all rows from this timestamp
+            for entity_name in self.entity_generation_order:
+                if entity_name in current_tick_rows:
+                    rows.append(current_tick_rows[entity_name])
 
         # Apply chaos parameters
         if self.config.chaos:
@@ -1123,8 +1276,8 @@ class SimulationEngine:
             "pid": pid,
         }
 
-        # Combine row data with safe builtins
-        namespace = {**row_data, **safe_builtins}
+        # Combine row data with safe builtins and entity proxies
+        namespace = {**row_data, **safe_builtins, **self.entity_proxies}
 
         try:
             # Evaluate expression in restricted namespace
