@@ -178,10 +178,21 @@ class SimulationEngine:
 
         Returns:
             Set of column names referenced in the expression
+
+        Note:
+            Columns referenced within prev() calls are NOT considered dependencies
+            since they reference previous rows, not current row (no circular dependency).
         """
-        # Find all identifiers in the expression
+        # Remove prev() calls to exclude them from dependency analysis
+        # prev('column_name', ...) references PREVIOUS row, not current row
+        expression_without_prev = re.sub(r"prev\s*\([^)]+\)", "", expression)
+
+        # Also remove ema() calls - they reference previous state, not current row
+        expression_without_prev = re.sub(r"ema\s*\([^)]+\)", "", expression_without_prev)
+
+        # Find all identifiers in the remaining expression
         # Match valid Python identifiers
-        identifiers = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", expression)
+        identifiers = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", expression_without_prev)
 
         # Filter to only valid column names (exclude keywords and functions)
         python_keywords = {
