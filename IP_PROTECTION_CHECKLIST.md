@@ -20,18 +20,22 @@
 
 ### Git History
 
-- [ ] **Commit all work** with clear pre-employment timestamps
+- [x] **Commit all work** with clear pre-employment timestamps
   ```bash
   git add .
   git commit -m "feat: stateful simulation (prev/ema/pid) - completed pre-employment March 11, 2026"
   git push origin main
   ```
+  ✅ Done - all Sprint 2 work committed with March 11, 2026 timestamps
 
-- [ ] **Tag release** to timestamp pre-employment state
+- [x] **Tag release** to timestamp pre-employment state
   ```bash
   git tag -a v3.3.0-pre-employment -m "Stateful simulation release - completed before employment"
   git push origin v3.3.0-pre-employment
+  git tag -a v3.3.0 -m "Stateful simulation release"
+  git push origin v3.3.0
   ```
+  ✅ Done - tags v3.3.0 and v3.3.0-pre-employment pushed
 
 ### Repository
 
