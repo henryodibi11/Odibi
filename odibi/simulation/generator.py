@@ -449,7 +449,7 @@ class SimulationEngine:
         if isinstance(generator, RangeGeneratorConfig):
             return self._generate_range(generator, rng)
         elif isinstance(generator, RandomWalkGeneratorConfig):
-            return self._generate_random_walk(generator, rng, random_walk_current)
+            return self._generate_random_walk(generator, rng, random_walk_current, current_row)
         elif isinstance(generator, CategoricalGeneratorConfig):
             return self._generate_categorical(generator, rng)
         elif isinstance(generator, BooleanGeneratorConfig):
@@ -512,6 +512,7 @@ class SimulationEngine:
         config: RandomWalkGeneratorConfig,
         rng: np.random.Generator,
         current_values: Dict[str, float],
+        current_row: Dict[str, Any] = None,
     ) -> float:
         """Generate value using random walk with mean reversion.
 
@@ -524,6 +525,7 @@ class SimulationEngine:
             rng: Random number generator
             current_values: Dict tracking current value per column name.
                             Updated in-place with new value.
+            current_row: Current row data (for mean_reversion_to lookups)
 
         Returns:
             Generated value
@@ -541,11 +543,24 @@ class SimulationEngine:
         else:
             current = current_values.get(col_name, config.start)
 
+        # Determine reversion target (static start or dynamic column)
+        if config.mean_reversion_to is not None and current_row is not None:
+            # Dynamic setpoint from another column
+            if config.mean_reversion_to in current_row:
+                reversion_target = float(current_row[config.mean_reversion_to])
+            else:
+                # Column not yet available in this row (dependency order issue)
+                # Fall back to static start value
+                reversion_target = config.start
+        else:
+            # Static setpoint
+            reversion_target = config.start
+
         # Ornstein-Uhlenbeck step:
-        # dx = mean_reversion * (start - current) * dt + volatility * dW + trend
-        # Where dW is random noise
+        # dx = mean_reversion * (target - current) * dt + volatility * dW + trend
+        # Where dW is random noise, target can be static or dynamic
         noise = rng.normal(0, config.volatility)
-        reversion_pull = config.mean_reversion * (config.start - current)
+        reversion_pull = config.mean_reversion * (reversion_target - current)
         new_value = current + reversion_pull + noise + config.trend
 
         # Apply shock event (sudden process upset)

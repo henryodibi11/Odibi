@@ -1504,7 +1504,7 @@ class RandomWalkGeneratorConfig(BaseModel):
     Uses an Ornstein-Uhlenbeck process with optional trend for realistic
     simulation of controlled process variables (temperatures, pressures, flow rates).
 
-    Example:
+    Example (static setpoint):
     ```yaml
     type: random_walk
     start: 350.0
@@ -1517,6 +1517,28 @@ class RandomWalkGeneratorConfig(BaseModel):
     shock_rate: 0.02
     shock_magnitude: 30.0
     shock_bias: 1.0
+    ```
+
+    Example (dynamic setpoint - temperature tracking ambient):
+    ```yaml
+    - name: ambient_temp_c
+      generator:
+        type: random_walk
+        start: 25.0
+        min: 15.0
+        max: 35.0
+        volatility: 0.3
+        mean_reversion: 0.05
+
+    - name: battery_temp_c
+      generator:
+        type: random_walk
+        start: 28.0
+        min: 20.0
+        max: 40.0
+        volatility: 0.4
+        mean_reversion: 0.1
+        mean_reversion_to: ambient_temp_c  # Drifts toward ambient
     ```
     """
 
@@ -1534,8 +1556,17 @@ class RandomWalkGeneratorConfig(BaseModel):
         ge=0.0,
         le=1.0,
         description=(
-            "Strength of pull back toward start value (0 = pure random walk, "
-            "1 = snap back immediately). Simulates PID-like control."
+            "Strength of pull back toward start value or mean_reversion_to column "
+            "(0 = pure random walk, 1 = snap back immediately). Simulates PID-like control."
+        ),
+    )
+    mean_reversion_to: Optional[str] = Field(
+        default=None,
+        description=(
+            "Column name to use as dynamic setpoint for mean reversion instead of static 'start' value. "
+            "Enables realistic process simulation where the walk tracks a time-varying reference. "
+            "Example: PV that drifts toward a changing SP column, or temperature following ambient. "
+            "If specified, must reference a column defined earlier in dependency order."
         ),
     )
     trend: float = Field(
