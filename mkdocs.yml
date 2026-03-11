@@ -142,15 +142,16 @@ nav:
               - Thermodynamics: guides/thermodynamics.md
           - Anti-Patterns: patterns/anti_patterns.md
       - Common Tasks:
-          - Writing Transformations: guides/writing_transformations.md
-          - Synthetic Data (Simulation): guides/simulation.md
-          - Custom Functions Reference: guides/custom_functions.md
-          - Variable Substitution: guides/variable_substitution.md
-          - Explanation Feature: guides/explanation_feature.md
-          - API Data Sources: guides/api_data_sources.md
-          - Cookbook (Recipes): guides/recipes.md
-          - Testing Pipelines: guides/testing.md
-          - Best Practices: guides/best_practices.md
+           - Writing Transformations: guides/writing_transformations.md
+           - Synthetic Data (Simulation): guides/simulation.md
+           - Process Simulation (ChemE): guides/process_simulation_guide.md
+      - Custom Functions Reference: guides/custom_functions.md
+           - Variable Substitution: guides/variable_substitution.md
+      - Explanation Feature: guides/explanation_feature.md
+      - API Data Sources: guides/api_data_sources.md
+      - Cookbook (Recipes): guides/recipes.md
+      - Testing Pipelines: guides/testing.md
+      - Best Practices: guides/best_practices.md
       - Interfaces:
           - CLI Master Guide: guides/cli_master_guide.md
           - Python API Guide: guides/python_api_guide.md

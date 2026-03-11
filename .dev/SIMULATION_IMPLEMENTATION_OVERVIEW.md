@@ -161,7 +161,7 @@ def generate(self):
     for entity in entities:
         entity_rows = self._generate_entity_rows(entity)  # Includes derived
         rows.extend(entity_rows)
-    
+
     rows = self._apply_chaos(rows)  # Outliers, duplicates, downtime
     return rows
 ```
@@ -342,20 +342,20 @@ read:
         timestep: "5m"
         row_count: 1000
         seed: 42
-      
+
       entities:
         count: 3
         id_prefix: "sensor_"
-      
+
       columns:
         - name: sensor_id
           data_type: string
           generator: {type: constant, value: "{entity_id}"}
-        
+
         - name: timestamp
           data_type: timestamp
           generator: {type: timestamp}
-        
+
         - name: temperature
           data_type: float
           generator: {type: range, min: 60, max: 80}
@@ -368,11 +368,11 @@ columns:
   - name: input
     data_type: float
     generator: {type: range, min: 1, max: 100}
-  
+
   - name: output
     data_type: float
     generator: {type: range, min: 0, max: 100}
-  
+
   - name: efficiency
     data_type: float
     generator:
@@ -408,7 +408,7 @@ read:
         row_count: 24  # 24 hours per run
         seed: 42
       # ... columns ...
-  
+
   incremental:
     mode: stateful
     column: timestamp

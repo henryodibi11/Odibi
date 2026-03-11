@@ -165,7 +165,7 @@ Result: Temperature realistically drifts toward changing ambient conditions.
 | **Examples** | 1 | 1 (solar thermal) |
 | **Complexity** | Medium | Low (clean implementation) |
 
-**Why faster:** 
+**Why faster:**
 - Existing `current_row` infrastructure already in place for derived columns
 - Clean extension point in `_generate_random_walk()`
 - Well-scoped feature with clear implementation path
