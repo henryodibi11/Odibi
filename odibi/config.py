@@ -5027,6 +5027,14 @@ class SystemConfig(BaseModel):
             "Lineage still generated, just built in background."
         ),
     )
+    skip_sync_wait_in_databricks: bool = Field(
+        default=True,
+        description=(
+            "Skip waiting for catalog sync to complete when running in Databricks. "
+            "Databricks clusters stay alive, so background sync threads complete safely. "
+            "Saves ~90s overhead. Set to false to always wait for sync completion."
+        ),
+    )
 
 
 class LineageConfig(BaseModel):

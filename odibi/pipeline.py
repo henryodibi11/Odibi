@@ -2436,16 +2436,31 @@ class PipelineManager:
 
         # Wait for any pending async catalog syncs to complete (with reduced timeout)
         t_sync_start = time.time()
-        sync_timeout = 30.0  # Default reduced timeout for performance
-        if self.project_config and self.project_config.system:
-            sync_timeout = getattr(self.project_config.system, "sync_timeout_seconds", 30.0)
 
-        for name in pipeline_names:
-            pipeline = self._pipelines[name]
-            if hasattr(pipeline, "flush_sync"):
-                # Configurable timeout (default 30s, was 300s)
-                # Sync is incremental, so incomplete syncs will catch up next run
-                pipeline.flush_sync(timeout=sync_timeout)
+        # Check if we should skip waiting in Databricks
+        skip_sync_wait = False
+        if self.project_config and self.project_config.system:
+            skip_in_databricks = getattr(
+                self.project_config.system, "skip_sync_wait_in_databricks", True
+            )
+            if skip_in_databricks and self._is_databricks():
+                skip_sync_wait = True
+                self._ctx.info(
+                    "Running in Databricks - skipping sync wait (threads continue in background)"
+                )
+
+        if not skip_sync_wait:
+            sync_timeout = 30.0  # Default reduced timeout for performance
+            if self.project_config and self.project_config.system:
+                sync_timeout = getattr(self.project_config.system, "sync_timeout_seconds", 30.0)
+
+            for name in pipeline_names:
+                pipeline = self._pipelines[name]
+                if hasattr(pipeline, "flush_sync"):
+                    # Configurable timeout (default 30s, was 300s)
+                    # Sync is incremental, so incomplete syncs will catch up next run
+                    pipeline.flush_sync(timeout=sync_timeout)
+
         t_sync_end = time.time()
         overhead_timings["catalog_sync"] = t_sync_end - t_sync_start
 
@@ -2733,6 +2748,33 @@ class PipelineManager:
                 f"Auto-registration failed (non-fatal): {e}",
                 error_type=type(e).__name__,
             )
+
+    # -------------------------------------------------------------------------
+    # Utility Helpers
+    # -------------------------------------------------------------------------
+
+    def _is_databricks(self) -> bool:
+        """Check if running in Databricks environment.
+
+        Returns:
+            True if running in Databricks, False otherwise
+        """
+        import os
+
+        # Check for Databricks runtime environment variable
+        if os.getenv("DATABRICKS_RUNTIME_VERSION"):
+            return True
+
+        # Check if dbutils is available (Databricks-specific)
+        try:
+            import builtins
+
+            if hasattr(builtins, "dbutils"):
+                return True
+        except Exception:
+            pass
+
+        return False
 
     # -------------------------------------------------------------------------
     # Lineage Helpers

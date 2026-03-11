@@ -1078,26 +1078,104 @@ class CatalogSyncer:
         return df
 
     def _get_last_sync_timestamp(self, table: str) -> Optional[datetime]:
-        """Get last successful sync timestamp for a table.
+        """Get last successful sync timestamp for a table from meta_state.
 
-        Note: CatalogManager doesn't have get_state() method.
-        For now, return None to force full sync each time.
-        TODO: Implement state tracking via meta_state table.
+        Uses meta_state Delta table to track last sync per table.
+        Returns None if no previous sync or on error (forces full sync).
         """
-        # CatalogManager doesn't have get_state() - this was broken
-        # Returning None forces full incremental sync each time (safe, just less optimal)
+        try:
+            key = f"sync_to:{self.config.connection}:{table}:last_timestamp"
+
+            # Query meta_state table in Delta Lake
+            if self.spark:
+                df = self.spark.sql(f"""
+                    SELECT value
+                    FROM delta.`{self.source.tables["meta_state"]}`
+                    WHERE key = '{key}'
+                    LIMIT 1
+                """)
+                rows = df.collect()
+                if rows and rows[0]["value"]:
+                    return datetime.fromisoformat(rows[0]["value"])
+            elif self.source.engine:
+                # Pandas/Polars engine
+                df = self.source.engine.read(
+                    connection=None,
+                    format="delta",
+                    path=self.source.tables["meta_state"],
+                )
+                if not df.empty:
+                    matches = df[df["key"] == key]
+                    if not matches.empty:
+                        return datetime.fromisoformat(matches.iloc[0]["value"])
+        except Exception as e:
+            logger.debug(f"Failed to get last sync timestamp for '{table}': {e}")
+
         return None
 
     def _update_sync_state(self, results: Dict[str, Any]) -> None:
-        """Update sync state with last sync timestamps.
+        """Update sync state with last sync timestamps in meta_state table.
 
-        Note: CatalogManager doesn't have set_state() method.
-        State tracking disabled for now.
-        TODO: Implement via meta_state table writes.
+        Writes to meta_state Delta table to track when each table was last synced.
+        This enables incremental syncs (only new records since last sync).
         """
-        # CatalogManager doesn't have set_state() - this was broken
-        # State tracking disabled (syncs will be full incremental each time)
-        pass
+        now = datetime.now(timezone.utc).isoformat()
+
+        for table, result in results.items():
+            if not result.get("success"):
+                continue
+
+            key = f"sync_to:{self.config.connection}:{table}:last_timestamp"
+
+            try:
+                if self.spark:
+                    # Use Spark SQL MERGE to upsert state
+                    self.spark.sql(f"""
+                        MERGE INTO delta.`{self.source.tables["meta_state"]}` AS target
+                        USING (SELECT '{key}' AS key, '{now}' AS value, CURRENT_TIMESTAMP() AS updated_at) AS source
+                        ON target.key = source.key
+                        WHEN MATCHED THEN UPDATE SET
+                            value = source.value,
+                            updated_at = source.updated_at
+                        WHEN NOT MATCHED THEN INSERT (key, value, updated_at)
+                            VALUES (source.key, source.value, source.updated_at)
+                    """)
+                    logger.debug(f"Updated sync state for {table}: {now}")
+                elif self.source.engine:
+                    # Pandas/Polars engine - read, update, write
+                    import pandas as pd
+
+                    try:
+                        df = self.source.engine.read(
+                            connection=None,
+                            format="delta",
+                            path=self.source.tables["meta_state"],
+                        )
+                    except Exception:
+                        # Table might not exist or be empty
+                        df = pd.DataFrame(columns=["key", "value", "updated_at"])
+
+                    # Update or append
+                    if key in df["key"].values:
+                        df.loc[df["key"] == key, "value"] = now
+                        df.loc[df["key"] == key, "updated_at"] = pd.Timestamp.now()
+                    else:
+                        new_row = pd.DataFrame(
+                            [{"key": key, "value": now, "updated_at": pd.Timestamp.now()}]
+                        )
+                        df = pd.concat([df, new_row], ignore_index=True)
+
+                    # Write back
+                    self.source.engine.write(
+                        df,
+                        connection=None,
+                        format="delta",
+                        path=self.source.tables["meta_state"],
+                        mode="overwrite",
+                    )
+                    logger.debug(f"Updated sync state for {table}: {now}")
+            except Exception as e:
+                logger.debug(f"Failed to update sync state for {table}: {e}")
 
     def _ensure_sql_schema(self, schema: str) -> None:
         """Create SQL Server schema if it doesn't exist."""
