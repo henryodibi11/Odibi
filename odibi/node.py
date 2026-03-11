@@ -320,6 +320,11 @@ class NodeExecutor:
                 # 5. Register & Cache
                 with phase_timer.phase("register"):
                     if result_df is not None:
+                        # Cache Spark DataFrame in memory if cache=true
+                        if config.cache and hasattr(result_df, "cache"):
+                            result_df = result_df.cache()
+                            ctx.debug(f"Cached Spark DataFrame for node '{config.name}'")
+
                         pii_meta = self._calculate_pii(config)
                         self.context.register(
                             config.name, result_df, metadata={"pii_columns": pii_meta}
@@ -778,11 +783,28 @@ class NodeExecutor:
                 ref_pipeline = parts[0] if len(parts) == 2 else None
                 ref_node = parts[1] if len(parts) == 2 else None
 
-                # Try catalog lookup first (read from Delta table - the canonical source)
                 df = None
                 read_from_catalog = False
 
-                if self.catalog_manager:
+                # For Spark: Try temp view first (uses cache if available from previous pipeline)
+                # SparkSession is shared across pipelines, so temp views persist
+                if hasattr(self.engine, "spark") and self.engine.spark and ref_node:
+                    try:
+                        # Check if temp view exists in Spark catalog
+                        tables = [t.name for t in self.engine.spark.catalog.listTables()]
+                        if ref_node in tables:
+                            df = self.engine.spark.table(ref_node)
+                            ctx.debug(
+                                f"Using temp view '{ref_node}' from previous pipeline (cache-optimized)",
+                                input_name=name,
+                                reference=ref,
+                            )
+                    except Exception as e:
+                        ctx.debug(f"Temp view lookup failed for '{ref_node}': {e}")
+
+                # Try catalog lookup (read from Delta table - the canonical source)
+                # This is the fallback if temp view doesn't exist or if not using Spark
+                if df is None and self.catalog_manager:
                     try:
                         read_config = resolve_input_reference(ref, self.catalog_manager)
                         ctx.debug(

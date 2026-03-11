@@ -941,6 +941,9 @@ class Pipeline:
         skip_run_logging = self.performance_config and getattr(
             self.performance_config, "skip_run_logging", False
         )
+        self._ctx.debug(
+            f"[OVERHEAD] Post-pipeline processing started at +{post_pipeline_start - start_time:.2f}s"
+        )
         if self.catalog_manager and not skip_run_logging:
             run_records = []
             for node_result in results.node_results.values():
@@ -1009,6 +1012,7 @@ class Pipeline:
         # =========================================================================
         # LEVERAGE SUMMARY TABLES - Observability Logging
         # =========================================================================
+        t_summary_start = time.time()
         if self.catalog_manager and not dry_run:
             import json
 
@@ -1169,7 +1173,7 @@ class Pipeline:
 
             # Run derived updates (each wrapped independently)
             try:
-                t0 = time.time()
+                t_derived_start = time.time()
                 updater = DerivedUpdater(self.catalog_manager)
                 derived_updates = [
                     ("meta_daily_stats", lambda: updater.update_daily_stats(run_id, pipeline_run)),
@@ -1197,9 +1201,17 @@ class Pipeline:
                     )
                 for dt, fn in derived_updates:
                     updater.apply_derived_update(dt, run_id, fn)
-                self._ctx.debug(f"Derived updates completed in {time.time() - t0:.1f}s")
+                self._ctx.debug(
+                    f"[OVERHEAD] Derived updates completed in {time.time() - t_derived_start:.1f}s"
+                )
             except Exception as e:
                 self._ctx.debug(f"Derived updates failed (non-fatal): {e}")
+
+        t_summary_end = time.time()
+        if self.catalog_manager and not dry_run:
+            self._ctx.debug(
+                f"[OVERHEAD] Summary table logging took {t_summary_end - t_summary_start:.2f}s total"
+            )
 
         # Start story generation in background thread (pure Python/file I/O, safe to parallelize)
         # This runs concurrently with state saving below
@@ -2223,6 +2235,11 @@ class PipelineManager:
         Returns:
             PipelineResults or Dict of results
         """
+        import time
+
+        t_start = time.time()
+        overhead_timings = {}
+
         if pipelines is None:
             pipeline_names = list(self._pipelines.keys())
         elif isinstance(pipelines, str):
@@ -2240,8 +2257,11 @@ class PipelineManager:
                 raise ValueError(f"Pipeline '{name}' not found. Available pipelines: {available}")
 
         # Phase 2: Auto-register pipelines and nodes before execution
+        t_register_start = time.time()
         if self.catalog_manager:
             self._auto_register_pipelines(pipeline_names)
+        t_register_end = time.time()
+        overhead_timings["auto_register"] = t_register_end - t_register_start
 
         self._ctx.info(
             f"Running {len(pipeline_names)} pipeline(s)",
@@ -2251,10 +2271,10 @@ class PipelineManager:
         )
 
         results = {}
+        inter_pipeline_gaps = []
+
         for idx, name in enumerate(pipeline_names):
-            # Invalidate cache before each pipeline so it sees latest outputs
-            if self.catalog_manager:
-                self.catalog_manager.invalidate_cache()
+            t_pre_pipeline = time.time()
 
             self._ctx.info(
                 f"Executing pipeline {idx + 1}/{len(pipeline_names)}: {name}",
@@ -2262,6 +2282,7 @@ class PipelineManager:
                 order=idx + 1,
             )
 
+            t_pipeline_start = time.time()
             results[name] = self._pipelines[name].run(
                 dry_run=dry_run,
                 resume_from_failure=resume_from_failure,
@@ -2286,7 +2307,15 @@ class PipelineManager:
             if result.story_path:
                 self._ctx.debug(f"Story generated: {result.story_path}")
 
+            # Track inter-pipeline overhead (time between pipelines excluding actual execution)
+            if idx > 0:
+                gap = t_pipeline_start - t_pre_pipeline
+                inter_pipeline_gaps.append(gap)
+
+        overhead_timings["inter_pipeline_gaps_total"] = sum(inter_pipeline_gaps)
+
         # Generate combined lineage if configured
+        t_lineage_start = time.time()
         has_story = hasattr(self.project_config, "story") and self.project_config.story
         generate_lineage_enabled = has_story and self.project_config.story.generate_lineage
 
@@ -2314,12 +2343,53 @@ class PipelineManager:
                     self._ctx.warning("Lineage generation returned None")
             except Exception as e:
                 self._ctx.warning(f"Failed to generate combined lineage: {e}")
+        t_lineage_end = time.time()
+        overhead_timings["lineage_generation"] = t_lineage_end - t_lineage_start
 
         # Wait for any pending async catalog syncs to complete
+        t_sync_start = time.time()
         for name in pipeline_names:
             pipeline = self._pipelines[name]
             if hasattr(pipeline, "flush_sync"):
                 pipeline.flush_sync()
+        t_sync_end = time.time()
+        overhead_timings["catalog_sync"] = t_sync_end - t_sync_start
+
+        t_end = time.time()
+        total_overhead = t_end - t_start
+
+        # Calculate actual pipeline execution time
+        actual_execution = sum(r.duration for r in results.values())
+        overhead_timings["total_overhead"] = total_overhead
+        overhead_timings["actual_execution"] = actual_execution
+        overhead_timings["overhead_delta"] = total_overhead - actual_execution
+
+        # Print overhead audit report
+        print("\n" + "=" * 100)
+        print("INTER-PIPELINE OVERHEAD AUDIT")
+        print("=" * 100)
+        print(f"Total wall-clock time:          {total_overhead:>8.2f}s (100.0%)")
+        print(
+            f"Actual pipeline execution:      {actual_execution:>8.2f}s ({100 * actual_execution / total_overhead:>5.1f}%)"
+        )
+        print(
+            f"Total overhead:                 {overhead_timings['overhead_delta']:>8.2f}s ({100 * overhead_timings['overhead_delta'] / total_overhead:>5.1f}%)"
+        )
+        print("-" * 100)
+        print("OVERHEAD BREAKDOWN:")
+        print(
+            f"  Auto-register pipelines:      {overhead_timings.get('auto_register', 0):>8.2f}s ({100 * overhead_timings.get('auto_register', 0) / total_overhead:>5.1f}%)"
+        )
+        print(
+            f"  Inter-pipeline gaps:          {overhead_timings.get('inter_pipeline_gaps_total', 0):>8.2f}s ({100 * overhead_timings.get('inter_pipeline_gaps_total', 0) / total_overhead:>5.1f}%)"
+        )
+        print(
+            f"  Lineage generation:           {overhead_timings.get('lineage_generation', 0):>8.2f}s ({100 * overhead_timings.get('lineage_generation', 0) / total_overhead:>5.1f}%)"
+        )
+        print(
+            f"  Catalog sync flush:           {overhead_timings.get('catalog_sync', 0):>8.2f}s ({100 * overhead_timings.get('catalog_sync', 0) / total_overhead:>5.1f}%)"
+        )
+        print("=" * 100 + "\n")
 
         if len(pipeline_names) == 1:
             return results[pipeline_names[0]]
@@ -2472,9 +2542,15 @@ class PipelineManager:
         try:
             import hashlib
             import json
+            import time
 
+            t_fetch_start = time.time()
             existing_pipelines = self.catalog_manager.get_all_registered_pipelines()
             existing_nodes = self.catalog_manager.get_all_registered_nodes(pipeline_names)
+            t_fetch_end = time.time()
+            self._ctx.debug(
+                f"Auto-register: Fetched existing metadata in {t_fetch_end - t_fetch_start:.2f}s"
+            )
 
             pipeline_records = []
             node_records = []
@@ -2536,18 +2612,22 @@ class PipelineManager:
                         )
 
             if pipeline_records:
+                t_write_p_start = time.time()
                 self.catalog_manager.register_pipelines_batch(pipeline_records)
+                t_write_p_end = time.time()
                 self._ctx.debug(
-                    f"Batch registered {len(pipeline_records)} changed pipeline(s)",
+                    f"Batch registered {len(pipeline_records)} changed pipeline(s) in {t_write_p_end - t_write_p_start:.2f}s",
                     pipelines=[r["pipeline_name"] for r in pipeline_records],
                 )
             else:
                 self._ctx.debug("All pipelines unchanged - skipping registration")
 
             if node_records:
+                t_write_n_start = time.time()
                 self.catalog_manager.register_nodes_batch(node_records)
+                t_write_n_end = time.time()
                 self._ctx.debug(
-                    f"Batch registered {len(node_records)} changed node(s)",
+                    f"Batch registered {len(node_records)} changed node(s) in {t_write_n_end - t_write_n_start:.2f}s",
                     nodes=[r["node_name"] for r in node_records],
                 )
             else:
