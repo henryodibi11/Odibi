@@ -25,6 +25,67 @@ from odibi.config import (
 )
 
 
+class EntityProxy:
+    """Proxy object for cross-entity column references.
+    
+    Allows expressions like "Tank_A.level" to reference another entity's
+    column value at the same timestamp.
+    
+    Example:
+        # In Tank_B's derived expression:
+        expression: "Tank_A.flow_out * 0.5"
+    """
+    
+    def __init__(self, entity_name: str):
+        """Initialize entity proxy.
+        
+        Args:
+            entity_name: Name of the entity this proxy represents
+        """
+        self.entity_name = entity_name
+        self._data: Optional[Dict[str, Any]] = None
+    
+    def bind(self, row_data: Optional[Dict[str, Any]]):
+        """Bind proxy to a specific row's data for the current timestamp.
+        
+        Args:
+            row_data: Dictionary of column values for this entity at current timestamp,
+                     or None to unbind
+        """
+        self._data = row_data
+    
+    def __getattr__(self, column_name: str):
+        """Access column value via dot notation.
+        
+        Args:
+            column_name: Name of column to access
+            
+        Returns:
+            Column value from bound row data
+            
+        Raises:
+            AttributeError: If proxy not bound or column doesn't exist
+        """
+        # Prevent infinite recursion for _data and entity_name
+        if column_name in ("_data", "entity_name"):
+            return object.__getattribute__(self, column_name)
+            
+        if self._data is None:
+            raise AttributeError(
+                f"Entity '{self.entity_name}' row not yet available at this timestamp. "
+                f"Check entity generation order - '{self.entity_name}' must be generated "
+                f"before entities that reference it."
+            )
+        
+        if column_name in self._data:
+            return self._data[column_name]
+        
+        raise AttributeError(
+            f"Entity '{self.entity_name}' has no column '{column_name}'. "
+            f"Available columns: {list(self._data.keys())}"
+        )
+
+
 class SimulationEngine:
     """Engine for generating simulated data according to YAML configuration."""
 
