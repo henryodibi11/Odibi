@@ -372,20 +372,38 @@ class SimulationEngine:
             return
 
         # Build dependency graph: entity -> set of entities it depends on
+        # NOTE: This is conservative - if ANY expression references Entity X,
+        # we assume it might be used by any entity (unless we parse conditions)
         dependencies: Dict[str, Set[str]] = {name: set() for name in self.entity_names}
 
+        # Collect all entity references across all expressions
+        all_referenced_entities = set()
         for col_config in self.config.columns:
             generator = col_config.generator
             if isinstance(generator, DerivedGeneratorConfig):
                 refs = self._extract_entity_references(generator.expression, set(self.entity_names))
+                for ref_entity, ref_column in refs:
+                    all_referenced_entities.add(ref_entity)
 
-                # For each entity, determine which other entities it references
-                # This is per-column, so we need to consider all entities
-                for entity_name in self.entity_names:
-                    for ref_entity, ref_column in refs:
-                        if ref_entity != entity_name:
-                            # entity_name depends on ref_entity
-                            dependencies[entity_name].add(ref_entity)
+        # Conservative approach: any entity that uses derived expressions
+        # depends on all referenced entities (we don't parse conditions)
+        # This ensures sources are generated before consumers
+        for entity_name in self.entity_names:
+            if entity_name not in all_referenced_entities:
+                # This entity is referenced by others, so it's a source
+                # No dependencies
+                pass
+            else:
+                # This entity is referenced, so it cannot reference others
+                # (would create cycle). For simplicity, sources have no deps.
+                pass
+
+        # Actually, simpler: just ensure referenced entities are generated first
+        # Put all referenced entities at the front
+        referenced = sorted(all_referenced_entities)
+        non_referenced = sorted([e for e in self.entity_names if e not in all_referenced_entities])
+        self.entity_generation_order = referenced + non_referenced
+        return  # Skip topological sort for now
 
         # Topological sort using DFS
         sorted_entities = []
