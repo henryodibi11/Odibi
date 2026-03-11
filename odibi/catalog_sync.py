@@ -1078,28 +1078,26 @@ class CatalogSyncer:
         return df
 
     def _get_last_sync_timestamp(self, table: str) -> Optional[datetime]:
-        """Get last successful sync timestamp for a table."""
-        try:
-            key = f"sync_to:{self.config.connection}:{table}:last_timestamp"
-            value = self.source.get_state(key)
-            if value:
-                return datetime.fromisoformat(value)
-        except Exception as e:
-            logger.debug(
-                f"Failed to get last sync timestamp for table '{table}': {type(e).__name__}: {e}"
-            )
+        """Get last successful sync timestamp for a table.
+
+        Note: CatalogManager doesn't have get_state() method.
+        For now, return None to force full sync each time.
+        TODO: Implement state tracking via meta_state table.
+        """
+        # CatalogManager doesn't have get_state() - this was broken
+        # Returning None forces full incremental sync each time (safe, just less optimal)
         return None
 
     def _update_sync_state(self, results: Dict[str, Any]) -> None:
-        """Update sync state with last sync timestamps."""
-        now = datetime.now(timezone.utc).isoformat()
-        for table, result in results.items():
-            if result.get("success"):
-                key = f"sync_to:{self.config.connection}:{table}:last_timestamp"
-                try:
-                    self.source.set_state(key, now)
-                except Exception as e:
-                    logger.debug(f"Failed to update sync state for {table}: {e}")
+        """Update sync state with last sync timestamps.
+
+        Note: CatalogManager doesn't have set_state() method.
+        State tracking disabled for now.
+        TODO: Implement via meta_state table writes.
+        """
+        # CatalogManager doesn't have set_state() - this was broken
+        # State tracking disabled (syncs will be full incremental each time)
+        pass
 
     def _ensure_sql_schema(self, schema: str) -> None:
         """Create SQL Server schema if it doesn't exist."""
