@@ -18,6 +18,8 @@ from odibi.config import (
     IPGeneratorConfig,
     RandomWalkGeneratorConfig,
     RangeGeneratorConfig,
+    ScheduledEvent,
+    ScheduledEventType,
     SequentialGeneratorConfig,
     SimulationConfig,
     TimestampGeneratorConfig,
@@ -641,6 +643,13 @@ class SimulationEngine:
                         entity_state,
                     )
 
+                    # Check for scheduled events that override this value
+                    active_event = self._get_active_scheduled_event(
+                        entity_name, col_name, row_timestamp
+                    )
+                    if active_event and active_event.type == ScheduledEventType.FORCED_VALUE:
+                        value = active_event.value
+
                     # Apply null_rate
                     if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
                         value = None
@@ -741,6 +750,13 @@ class SimulationEngine:
                     entity_state,  # NEW: Pass entity state for stateful functions
                 )
 
+                # Check for scheduled events that override this value
+                active_event = self._get_active_scheduled_event(
+                    entity_name, col_name, row_timestamp
+                )
+                if active_event and active_event.type == ScheduledEventType.FORCED_VALUE:
+                    value = active_event.value
+
                 # Apply null_rate
                 if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
                     value = None
@@ -783,6 +799,54 @@ class SimulationEngine:
                 return True
 
         return False
+
+    def _get_active_scheduled_event(
+        self, entity_name: str, column_name: str, timestamp: datetime
+    ) -> Optional[ScheduledEvent]:
+        """Get active scheduled event for entity/column at given timestamp.
+
+        Args:
+            entity_name: Entity name
+            column_name: Column name
+            timestamp: Timestamp to check
+
+        Returns:
+            Active event with highest priority, or None if no events active
+        """
+        if not self.config.scheduled_events:
+            return None
+
+        active_events = []
+
+        for event in self.config.scheduled_events:
+            # Check if event applies to this entity
+            if event.entity is not None and event.entity != entity_name:
+                continue
+
+            # Check if event applies to this column
+            if event.column != column_name:
+                continue
+
+            # Parse event times
+            start_dt = datetime.fromisoformat(event.start_time.replace("Z", "+00:00"))
+
+            # Check end_time (None = permanent from start_time)
+            if event.end_time is not None:
+                end_dt = datetime.fromisoformat(event.end_time.replace("Z", "+00:00"))
+                if not (start_dt <= timestamp <= end_dt):
+                    continue
+            else:
+                # Permanent event (no end time)
+                if timestamp < start_dt:
+                    continue
+
+            active_events.append(event)
+
+        if not active_events:
+            return None
+
+        # Return highest priority event (if multiple overlap)
+        return max(active_events, key=lambda e: e.priority)
 
     def _generate_value(
         self,

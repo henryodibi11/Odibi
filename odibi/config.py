@@ -1667,6 +1667,72 @@ class DowntimeEvent(BaseModel):
     end_time: str = Field(description="Downtime end timestamp (ISO8601)")
 
 
+class ScheduledEventType(str, Enum):
+    """Types of scheduled events that can modify simulation behavior."""
+
+    FORCED_VALUE = "forced_value"
+    SETPOINT_CHANGE = "setpoint_change"
+    PARAMETER_OVERRIDE = "parameter_override"
+
+
+class ScheduledEvent(BaseModel):
+    """Scheduled event that modifies simulation behavior at specific times.
+
+    Enables realistic process simulation with:
+    - Maintenance windows (forced power=0)
+    - Grid curtailment (forced output reduction)
+    - Setpoint changes (scheduled process changes)
+    - Cleaning cycles (efficiency restoration)
+
+    Example (maintenance window):
+    ```yaml
+    scheduled_events:
+      - type: forced_value
+        entity: Turbine_01
+        column: power_kw
+        value: 0.0
+        start_time: "2026-03-11T14:00:00Z"
+        end_time: "2026-03-11T18:00:00Z"
+    ```
+
+    Example (grid curtailment - all entities):
+    ```yaml
+    scheduled_events:
+      - type: forced_value
+        entity: null  # Applies to all entities
+        column: max_output_pct
+        value: 80.0
+        start_time: "2026-03-11T16:00:00Z"
+        end_time: "2026-03-11T19:00:00Z"
+    ```
+
+    Example (permanent setpoint change):
+    ```yaml
+    scheduled_events:
+      - type: setpoint_change
+        entity: Reactor_01
+        column: temp_setpoint_c
+        value: 370.0
+        start_time: "2026-03-11T12:00:00Z"
+        # No end_time = permanent change
+    ```
+    """
+
+    type: ScheduledEventType = Field(description="Event type")
+    entity: Optional[str] = Field(
+        default=None, description="Entity affected (None = applies to all entities)"
+    )
+    column: str = Field(description="Column name to modify")
+    value: Any = Field(description="Value to apply during event")
+    start_time: str = Field(description="Event start timestamp (ISO8601)")
+    end_time: Optional[str] = Field(
+        default=None, description="Event end timestamp (ISO8601). None = permanent change."
+    )
+    priority: int = Field(
+        default=0, description="Priority for overlapping events (higher = applied last)"
+    )
+
+
 class ChaosConfig(BaseModel):
     """Chaos engineering parameters for realistic data imperfections.
 
@@ -1847,6 +1913,9 @@ class SimulationConfig(BaseModel):
     entities: EntityConfig = Field(description="Entity configuration")
     columns: List[ColumnGeneratorConfig] = Field(description="Column definitions")
     chaos: Optional[ChaosConfig] = Field(default=None, description="Chaos parameters")
+    scheduled_events: List[ScheduledEvent] = Field(
+        default_factory=list, description="Scheduled events that modify simulation behavior"
+    )
 
     @model_validator(mode="after")
     def validate_simulation(self):
