@@ -48,6 +48,10 @@ class SimulationEngine:
         self.random_walk_state = random_walk_state or {}
         self.rng = np.random.default_rng(config.scope.seed)
 
+        # NEW: Per-entity state tracking for prev() and stateful functions
+        # Format: {"entity_name": {"column_name": prev_value, "_pid_column_name": {"integral": 0.0, "prev_error": 0.0}, ...}}
+        self.entity_state: Dict[str, Dict[str, Any]] = {}
+
         # Parse timestep
         self.timestep_seconds = self._parse_timestep(config.scope.timestep)
 
@@ -200,6 +204,10 @@ class SimulationEngine:
             "coalesce",
             "safe_div",
             "safe_mul",
+            # Stateful functions
+            "prev",
+            "ema",
+            "pid",
         }
 
         return {name for name in identifiers if name in all_columns and name not in python_keywords}
@@ -321,6 +329,11 @@ class SimulationEngine:
                 else:
                     random_walk_current[col_config.name] = gen.start
 
+        # NEW: Initialize entity state for prev() and stateful functions
+        if entity_name not in self.entity_state:
+            self.entity_state[entity_name] = {}
+        entity_state = self.entity_state[entity_name]
+
         for row_idx in range(self.total_rows):
             row_timestamp = self.effective_start_time + timedelta(
                 seconds=self.timestep_seconds * row_idx
@@ -349,6 +362,7 @@ class SimulationEngine:
                     entity_rng,
                     row,  # Pass current row for derived columns
                     random_walk_current,
+                    entity_state,  # NEW: Pass entity state for stateful functions
                 )
 
                 # Apply null_rate
@@ -356,6 +370,11 @@ class SimulationEngine:
                     value = None
 
                 row[col_config.name] = value
+
+            # NEW: Update entity state with current row values for next iteration
+            for col_name in row.keys():
+                if row[col_name] is not None:  # Only store non-null values
+                    entity_state[col_name] = row[col_name]
 
             rows.append(row)
 
@@ -399,6 +418,7 @@ class SimulationEngine:
         rng: np.random.Generator,
         current_row: Dict[str, Any] = None,
         random_walk_current: Dict[str, float] = None,
+        entity_state: Dict[str, Any] = None,
     ) -> Any:
         """Generate a single value based on generator configuration.
 
@@ -410,6 +430,7 @@ class SimulationEngine:
             row_idx: Row index
             rng: Random number generator
             current_row: Current row data (for derived columns)
+            entity_state: Entity-specific state for stateful functions
 
         Returns:
             Generated value
@@ -447,7 +468,9 @@ class SimulationEngine:
         elif isinstance(generator, GeoGeneratorConfig):
             return self._generate_geo(generator, rng)
         elif isinstance(generator, DerivedGeneratorConfig):
-            return self._generate_derived(generator, current_row or {})
+            return self._generate_derived(
+                generator, current_row or {}, entity_name, entity_state or {}
+            )
         else:
             raise ValueError(f"Unknown generator type: {type(generator)}")
 
@@ -689,12 +712,20 @@ class SimulationEngine:
             # For now return tuple, caller can split if needed
             return {"lat": lat, "lon": lon}
 
-    def _generate_derived(self, config: DerivedGeneratorConfig, row_data: Dict[str, Any]) -> Any:
+    def _generate_derived(
+        self,
+        config: DerivedGeneratorConfig,
+        row_data: Dict[str, Any],
+        entity_name: str,
+        entity_state: Dict[str, Any],
+    ) -> Any:
         """Generate derived value from expression.
 
         Args:
             config: Derived generator configuration
             row_data: Current row data with already-generated columns
+            entity_name: Current entity name for state tracking
+            entity_state: Entity-specific state dict for stateful functions
 
         Returns:
             Calculated value
@@ -722,6 +753,135 @@ class SimulationEngine:
                 return default
             return a * b
 
+        # NEW: Stateful functions
+        def prev(column_name: str, default=None):
+            """
+            Get previous row value for a column.
+
+            Args:
+                column_name: Name of column to retrieve previous value
+                default: Value to return if no previous row exists
+
+            Returns:
+                Previous row value or default
+
+            Example:
+                # First-order lag: PV moves 10% toward SP each timestep
+                expression: "prev('pv', 0) + 0.1 * (sp - prev('pv', 0))"
+            """
+            return entity_state.get(column_name, default)
+
+        def ema(column_name: str, alpha: float, default=None):
+            """
+            Exponential moving average with smoothing factor alpha.
+
+            Args:
+                column_name: Column to smooth
+                alpha: Smoothing factor (0-1). Higher = more weight to current value
+                default: Initial value if no previous EMA exists
+
+            Returns:
+                Smoothed value
+
+            Example:
+                # Smooth noisy sensor reading
+                expression: "ema('raw_temp', alpha=0.1, default=raw_temp)"
+            """
+            ema_key = f"_ema_{column_name}"
+            current_value = row_data.get(column_name)
+
+            if current_value is None:
+                return entity_state.get(ema_key, default)
+
+            prev_ema = entity_state.get(ema_key)
+            if prev_ema is None:
+                # First value - initialize EMA
+                ema_value = current_value if default is None else default
+            else:
+                # EMA formula: EMA_t = alpha * value_t + (1 - alpha) * EMA_{t-1}
+                ema_value = alpha * current_value + (1 - alpha) * prev_ema
+
+            # Store for next iteration
+            entity_state[ema_key] = ema_value
+            return ema_value
+
+        def pid(
+            pv: float,
+            sp: float,
+            Kp: float = 1.0,
+            Ki: float = 0.0,
+            Kd: float = 0.0,
+            dt: float = 1.0,
+            output_min: float = 0.0,
+            output_max: float = 100.0,
+            anti_windup: bool = True,
+        ):
+            """
+            PID controller with anti-windup.
+
+            Args:
+                pv: Process variable (current measurement)
+                sp: Setpoint (target value)
+                Kp: Proportional gain
+                Ki: Integral gain
+                Kd: Derivative gain
+                dt: Time step in seconds (should match simulation timestep)
+                output_min: Minimum output value
+                output_max: Maximum output value
+                anti_windup: Enable anti-windup (stops integral when saturated)
+
+            Returns:
+                Control output (clamped to [output_min, output_max])
+
+            Example:
+                # PID temperature controller
+                expression: "pid(pv=module_temp_c, sp=temp_setpoint_c, Kp=2.0, Ki=0.1, Kd=0.5, dt=60)"
+            """
+            # Handle None values
+            if pv is None or sp is None:
+                return None
+
+            # Calculate error
+            error = sp - pv
+
+            # Get PID state for this combination
+            pid_key = f"_pid_{id(config)}"  # Unique key per PID expression
+            pid_state = entity_state.get(pid_key, {"integral": 0.0, "prev_error": 0.0})
+
+            # Proportional term
+            p_term = Kp * error
+
+            # Integral term
+            integral = pid_state["integral"]
+            i_term = Ki * integral
+
+            # Derivative term
+            prev_error = pid_state["prev_error"]
+            derivative = (error - prev_error) / dt if dt > 0 else 0.0
+            d_term = Kd * derivative
+
+            # Calculate output
+            output = p_term + i_term + d_term
+
+            # Clamp output
+            clamped_output = max(output_min, min(output_max, output))
+
+            # Update integral (with anti-windup)
+            if anti_windup:
+                # Only update integral if output is not saturated
+                if output_min < clamped_output < output_max:
+                    integral += error * dt
+            else:
+                integral += error * dt
+
+            # Store state for next iteration
+            entity_state[pid_key] = {
+                "integral": integral,
+                "prev_error": error,
+            }
+
+            return clamped_output
+
         safe_builtins = {
             "abs": abs,
             "round": round,
@@ -737,6 +897,10 @@ class SimulationEngine:
             "coalesce": coalesce,
             "safe_div": safe_div,
             "safe_mul": safe_mul,
+            # NEW: Stateful functions
+            "prev": prev,
+            "ema": ema,
+            "pid": pid,
         }
 
         # Combine row data with safe builtins

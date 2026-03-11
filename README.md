@@ -2,6 +2,8 @@
 
 **Declarative data pipelines. YAML in, star schemas out.**
 
+> **Note:** Personal open-source project. See [IP_NOTICE.md](IP_NOTICE.md) for details.
+
 [![CI](https://github.com/henryodibi11/Odibi/workflows/CI/badge.svg)](https://github.com/henryodibi11/Odibi/actions)
 [![PyPI](https://img.shields.io/pypi/v/odibi.svg)](https://pypi.org/project/odibi/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)

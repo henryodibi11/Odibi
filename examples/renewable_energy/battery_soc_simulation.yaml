@@ -1,0 +1,271 @@
+# Battery Energy Storage System (BESS) - State of Charge Simulation
+#
+# Demonstrates stateful simulation with prev() for SOC integration
+# Generic example for renewable energy applications (grid storage, microgrids, etc.)
+# Uses publicly available battery parameters and standard control theory
+#
+# Features:
+# - SOC integration using prev() - tracks charge/discharge over time
+# - PID temperature control for thermal management
+# - Multi-module simulation (realistic battery pack behavior)
+# - Psychrometric HVAC load calculation using CoolProp
+
+nodes:
+  # Generate battery module sensor data with realistic SOC dynamics
+  - name: battery_modules_raw
+    read:
+      format: simulation
+      options:
+        simulation:
+          scope:
+            start_time: "2026-03-11T00:00:00Z"
+            timestep: "1m"          # 1-minute granularity
+            row_count: 120          # 2 hours of data
+            seed: 42
+
+          entities:
+            count: 10               # 10 battery modules in a rack
+            id_prefix: "Module_"
+
+          columns:
+            # Identifiers
+            - name: module_id
+              data_type: string
+              generator:
+                type: constant
+                value: "{entity_id}"
+
+            - name: timestamp
+              data_type: timestamp
+              generator:
+                type: timestamp
+
+            # Battery parameters (constants per module)
+            - name: capacity_ah
+              data_type: float
+              generator:
+                type: constant
+                value: 100.0
+
+            - name: nominal_voltage_v
+              data_type: float
+              generator:
+                type: constant
+                value: 48.0
+
+            # Row counter for charge/discharge cycle switching
+            - name: row_num
+              data_type: int
+              generator:
+                type: derived
+                expression: "prev('row_num', -1) + 1"
+
+            # Operating mode (charge/discharge/idle)
+            - name: operating_mode
+              data_type: string
+              generator:
+                type: derived
+                expression: "'charging' if row_num < 40 else ('discharging' if row_num < 100 else 'idle')"
+
+            # Charge/discharge current (Amperes)
+            # Positive = charging, Negative = discharging
+            - name: charge_current_a
+              data_type: float
+              generator:
+                type: derived
+                expression: "25.0 if operating_mode == 'charging' else (-20.0 if operating_mode == 'discharging' else 0.0)"
+
+            # STATE OF CHARGE INTEGRATION (the killer feature!)
+            # SOC[t] = SOC[t-1] + (I * dt) / Capacity * 100
+            # This requires prev() - impossible without stateful functions
+            - name: soc_pct
+              data_type: float
+              generator:
+                type: derived
+                expression: >
+                  max(0, min(100,
+                    prev('soc_pct', 50) +
+                    (charge_current_a * (1/60)) / capacity_ah * 100
+                  ))
+
+            # Voltage (simplified: varies with SOC and current)
+            - name: voltage_v
+              data_type: float
+              generator:
+                type: derived
+                expression: "nominal_voltage_v * (0.9 + 0.2 * soc_pct / 100) - 0.01 * charge_current_a"
+
+            # Power (kW)
+            - name: power_kw
+              data_type: float
+              generator:
+                type: derived
+                expression: "voltage_v * charge_current_a / 1000"
+
+            # Cumulative energy (kWh) - another integration example
+            - name: energy_kwh
+              data_type: float
+              generator:
+                type: derived
+                expression: "prev('energy_kwh', 0) + abs(power_kw) * (1/60)"
+
+            # THERMAL MODEL
+            # Heat generation from internal resistance
+            - name: heat_generation_w
+              data_type: float
+              generator:
+                type: derived
+                expression: "0.01 * charge_current_a * charge_current_a"  # I^2 * R, R=0.01 ohm
+
+            # Ambient temperature (slow random walk)
+            - name: ambient_temp_c
+              data_type: float
+              generator:
+                type: random_walk
+                start: 25.0
+                drift: 0.001
+                noise: 0.5
+                min: 20.0
+                max: 30.0
+
+            # Module temperature setpoint
+            - name: temp_setpoint_c
+              data_type: float
+              generator:
+                type: constant
+                value: 28.0
+
+            # Module temperature (first-order thermal response)
+            # Temp rises from heat generation, HVAC cooling removes heat
+            - name: module_temp_c
+              data_type: float
+              generator:
+                type: derived
+                expression: >
+                  prev('module_temp_c', 25) +
+                  0.02 * (heat_generation_w / 100) +
+                  0.05 * (ambient_temp_c - prev('module_temp_c', 25)) -
+                  0.03 * (prev('hvac_cooling_pct', 0) / 100) * (prev('module_temp_c', 25) - 20)
+
+            # PID CONTROLLER for HVAC cooling
+            # This is the second killer feature - realistic control simulation
+            - name: hvac_cooling_pct
+              data_type: float
+              generator:
+                type: derived
+                expression: >
+                  pid(
+                    pv=module_temp_c,
+                    sp=temp_setpoint_c,
+                    Kp=5.0,
+                    Ki=0.2,
+                    Kd=1.0,
+                    dt=60,
+                    output_min=0,
+                    output_max=100,
+                    anti_windup=True
+                  )
+
+            # Smoothed temperature for display (EMA example)
+            - name: module_temp_smoothed_c
+              data_type: float
+              generator:
+                type: derived
+                expression: "ema('module_temp_c', alpha=0.4, default=module_temp_c)"
+
+            # Cell voltages (individual cells in module) with small variation
+            - name: cell_voltage_min_v
+              data_type: float
+              generator:
+                type: range
+                min: 3.2
+                max: 3.4
+
+            - name: cell_voltage_max_v
+              data_type: float
+              generator:
+                type: range
+                min: 3.5
+                max: 3.7
+
+            # Cell imbalance metric
+            - name: cell_imbalance_mv
+              data_type: float
+              generator:
+                type: derived
+                expression: "(cell_voltage_max_v - cell_voltage_min_v) * 1000"
+
+            # Battery Management System (BMS) status
+            - name: bms_status
+              data_type: string
+              generator:
+                type: categorical
+                categories: ["normal", "charging", "discharging", "fault"]
+                weights: [0.1, 0.4, 0.4, 0.05]
+
+            # Fault flag (derived from conditions)
+            - name: fault_detected
+              data_type: boolean
+              generator:
+                type: derived
+                expression: "module_temp_c > 35 or cell_imbalance_mv > 200 or soc_pct < 5 or soc_pct > 95"
+
+          # Add realistic sensor noise and faults
+          chaos:
+            outlier_rate: 0.01      # 1% outlier readings (sensor spikes)
+            outlier_factor: 3.0
+            duplicate_rate: 0.005   # 0.5% duplicate timestamps
+
+    # Optional: Add psychrometric calculations for HVAC sizing
+    transform:
+      - name: add_psychrometrics
+        # NOTE: Requires CoolProp installed: pip install CoolProp
+        # psychrometrics:
+        #   dry_bulb_col: ambient_temp_c
+        #   relative_humidity: 60  # Fixed 60% RH
+        #   temperature_unit: degC
+        #   pressure: 101325
+        #   pressure_unit: Pa
+        #   outputs:
+        #     - property: W
+        #       unit: kg/kg
+        #       output_column: humidity_ratio
+        #     - property: H
+        #       unit: kJ/kg
+        #       output_column: enthalpy_kj_kg
+
+    write:
+      connection: local
+      format: parquet
+      path: data/output/battery_modules_soc.parquet
+      mode: overwrite
+
+  # Aggregate to rack-level metrics
+  - name: battery_rack_summary
+    read:
+      connection: local
+      format: parquet
+      path: data/output/battery_modules_soc.parquet
+
+    transform:
+      - sql: >
+          SELECT
+            timestamp,
+            COUNT(*) as module_count,
+            AVG(soc_pct) as avg_soc_pct,
+            MIN(soc_pct) as min_soc_pct,
+            MAX(soc_pct) as max_soc_pct,
+            AVG(module_temp_c) as avg_temp_c,
+            MAX(module_temp_c) as max_temp_c,
+            SUM(power_kw) as total_power_kw,
+            SUM(energy_kwh) as total_energy_kwh,
+            SUM(CASE WHEN fault_detected THEN 1 ELSE 0 END) as modules_with_faults
+          FROM __this__
+          GROUP BY timestamp
+          ORDER BY timestamp
+
+    write:
+      connection: local
+      format: parquet
+      path: data/output/battery_rack_summary.parquet
+      mode: overwrite
