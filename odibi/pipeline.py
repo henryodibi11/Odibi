@@ -1861,6 +1861,72 @@ class Pipeline:
         """
         return self.graph.visualize()
 
+    def _apply_auto_cache(self) -> None:
+        """Apply auto-caching to nodes based on dependency count.
+
+        If auto_cache_threshold is set (default: 3), nodes with N or more
+        downstream dependencies are automatically cached unless explicitly
+        set to cache: false.
+
+        This prevents redundant ADLS re-reads when a node has high fanout.
+        """
+        threshold = self.config.auto_cache_threshold
+
+        if threshold is None:
+            return  # Auto-caching disabled
+
+        # Count downstream dependencies for each node
+        dependency_counts = {}
+        for node in self.config.nodes:
+            dependency_counts[node.name] = 0
+
+        for node in self.config.nodes:
+            # Count how many nodes depend on this one
+            if node.depends_on:
+                for dep in node.depends_on:
+                    if dep in dependency_counts:
+                        dependency_counts[dep] += 1
+
+            # Also check inputs for cross-pipeline/intra-pipeline references
+            if node.inputs:
+                from odibi.references import is_pipeline_reference
+
+                for input_name, ref in node.inputs.items():
+                    if isinstance(ref, str) and is_pipeline_reference(ref):
+                        # Parse $pipeline.node
+                        parts = ref[1:].split(".", 1)
+                        if len(parts) == 2:
+                            ref_pipeline, ref_node = parts
+                            # Only count same-pipeline dependencies
+                            if (
+                                ref_pipeline == self.config.pipeline
+                                and ref_node in dependency_counts
+                            ):
+                                dependency_counts[ref_node] += 1
+
+        # Apply auto-caching to nodes meeting threshold
+        auto_cached_nodes = []
+        for node in self.config.nodes:
+            dep_count = dependency_counts.get(node.name, 0)
+
+            # Only auto-cache if:
+            # 1. Dependency count meets threshold
+            # 2. Node doesn't have explicit cache setting already
+            if dep_count >= threshold and not node.cache:
+                # Check if user explicitly set cache=false (don't override explicit false)
+                # If cache field was never set, node.cache defaults to False
+                # We need to check if it was explicitly set vs defaulted
+                # For now, we'll auto-cache unless user set it (which they can override)
+                node.cache = True
+                auto_cached_nodes.append((node.name, dep_count))
+
+        if auto_cached_nodes:
+            self._ctx.info(
+                f"Auto-cached {len(auto_cached_nodes)} node(s) with {threshold}+ dependencies",
+                auto_cache_threshold=threshold,
+                nodes={name: f"{count} deps" for name, count in auto_cached_nodes},
+            )
+
 
 class PipelineManager:
     """Manages multiple pipelines from a YAML configuration."""
@@ -2755,72 +2821,6 @@ class PipelineManager:
     # -------------------------------------------------------------------------
     # Utility Helpers
     # -------------------------------------------------------------------------
-
-    def _apply_auto_cache(self) -> None:
-        """Apply auto-caching to nodes based on dependency count.
-
-        If auto_cache_threshold is set (default: 3), nodes with N or more
-        downstream dependencies are automatically cached unless explicitly
-        set to cache: false.
-
-        This prevents redundant ADLS re-reads when a node has high fanout.
-        """
-        threshold = self.config.auto_cache_threshold
-
-        if threshold is None:
-            return  # Auto-caching disabled
-
-        # Count downstream dependencies for each node
-        dependency_counts = {}
-        for node in self.config.nodes:
-            dependency_counts[node.name] = 0
-
-        for node in self.config.nodes:
-            # Count how many nodes depend on this one
-            if node.depends_on:
-                for dep in node.depends_on:
-                    if dep in dependency_counts:
-                        dependency_counts[dep] += 1
-
-            # Also check inputs for cross-pipeline/intra-pipeline references
-            if node.inputs:
-                from odibi.references import is_pipeline_reference
-
-                for input_name, ref in node.inputs.items():
-                    if isinstance(ref, str) and is_pipeline_reference(ref):
-                        # Parse $pipeline.node
-                        parts = ref[1:].split(".", 1)
-                        if len(parts) == 2:
-                            ref_pipeline, ref_node = parts
-                            # Only count same-pipeline dependencies
-                            if (
-                                ref_pipeline == self.config.pipeline
-                                and ref_node in dependency_counts
-                            ):
-                                dependency_counts[ref_node] += 1
-
-        # Apply auto-caching to nodes meeting threshold
-        auto_cached_nodes = []
-        for node in self.config.nodes:
-            dep_count = dependency_counts.get(node.name, 0)
-
-            # Only auto-cache if:
-            # 1. Dependency count meets threshold
-            # 2. Node doesn't have explicit cache setting already
-            if dep_count >= threshold and not node.cache:
-                # Check if user explicitly set cache=false (don't override explicit false)
-                # If cache field was never set, node.cache defaults to False
-                # We need to check if it was explicitly set vs defaulted
-                # For now, we'll auto-cache unless user set it (which they can override)
-                node.cache = True
-                auto_cached_nodes.append((node.name, dep_count))
-
-        if auto_cached_nodes:
-            self._ctx.info(
-                f"Auto-cached {len(auto_cached_nodes)} node(s) with {threshold}+ dependencies",
-                auto_cache_threshold=threshold,
-                nodes={name: f"{count} deps" for name, count in auto_cached_nodes},
-            )
 
     def _is_databricks(self) -> bool:
         """Check if running in Databricks environment.
