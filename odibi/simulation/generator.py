@@ -27,59 +27,59 @@ from odibi.config import (
 
 class EntityProxy:
     """Proxy object for cross-entity column references.
-    
+
     Allows expressions like "Tank_A.level" to reference another entity's
     column value at the same timestamp.
-    
+
     Example:
         # In Tank_B's derived expression:
         expression: "Tank_A.flow_out * 0.5"
     """
-    
+
     def __init__(self, entity_name: str):
         """Initialize entity proxy.
-        
+
         Args:
             entity_name: Name of the entity this proxy represents
         """
         self.entity_name = entity_name
         self._data: Optional[Dict[str, Any]] = None
-    
+
     def bind(self, row_data: Optional[Dict[str, Any]]):
         """Bind proxy to a specific row's data for the current timestamp.
-        
+
         Args:
             row_data: Dictionary of column values for this entity at current timestamp,
                      or None to unbind
         """
         self._data = row_data
-    
+
     def __getattr__(self, column_name: str):
         """Access column value via dot notation.
-        
+
         Args:
             column_name: Name of column to access
-            
+
         Returns:
             Column value from bound row data
-            
+
         Raises:
             AttributeError: If proxy not bound or column doesn't exist
         """
         # Prevent infinite recursion for _data and entity_name
         if column_name in ("_data", "entity_name"):
             return object.__getattribute__(self, column_name)
-            
+
         if self._data is None:
             raise AttributeError(
                 f"Entity '{self.entity_name}' row not yet available at this timestamp. "
                 f"Check entity generation order - '{self.entity_name}' must be generated "
                 f"before entities that reference it."
             )
-        
+
         if column_name in self._data:
             return self._data[column_name]
-        
+
         raise AttributeError(
             f"Entity '{self.entity_name}' has no column '{column_name}'. "
             f"Available columns: {list(self._data.keys())}"
@@ -143,6 +143,10 @@ class SimulationEngine:
 
         # Resolve column dependencies for derived columns
         self.column_order = self._resolve_column_dependencies()
+
+        # Detect cross-entity references and build entity dependency DAG
+        self._detect_cross_entity_references()
+        self._build_entity_dependency_dag()
 
     def _parse_timestep(self, timestep: str) -> float:
         """Parse timestep string into seconds.
@@ -283,6 +287,135 @@ class SimulationEngine:
         }
 
         return {name for name in identifiers if name in all_columns and name not in python_keywords}
+
+    def _detect_cross_entity_references(self):
+        """Detect cross-entity references in derived expressions.
+
+        Scans all derived expressions for patterns like 'EntityName.column_name'
+        and validates that referenced entities and columns exist.
+
+        Sets:
+            self.cross_entity_enabled: True if any cross-entity refs found
+            self.entity_proxies: Dict of entity name -> EntityProxy (if enabled)
+
+        Raises:
+            ValueError: If invalid cross-entity references detected
+        """
+        entity_set = set(self.entity_names)
+        cross_entity_refs = set()
+
+        for col_config in self.config.columns:
+            generator = col_config.generator
+            if isinstance(generator, DerivedGeneratorConfig):
+                # Extract entity.column patterns
+                refs = self._extract_entity_references(generator.expression, entity_set)
+                cross_entity_refs.update(refs)
+
+                # Validate: no Entity.prev(...) patterns (not yet supported)
+                if re.search(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*prev\s*\(", generator.expression):
+                    raise ValueError(
+                        f"Column '{col_config.name}' uses cross-entity prev() which is not supported. "
+                        f"Expression: {generator.expression}\n"
+                        f"Use prev() only for the current entity's own columns."
+                    )
+
+        self.cross_entity_enabled = len(cross_entity_refs) > 0
+
+        if self.cross_entity_enabled:
+            # Create entity proxies (reused across all timestamps)
+            self.entity_proxies = {name: EntityProxy(name) for name in self.entity_names}
+        else:
+            self.entity_proxies = {}
+
+    def _extract_entity_references(self, expression: str, known_entities: Set[str]) -> Set[str]:
+        """Extract entity names from cross-entity references in expression.
+
+        Args:
+            expression: Python expression string
+            known_entities: Set of valid entity names
+
+        Returns:
+            Set of (entity_name, column_name) tuples for cross-entity references
+
+        Example:
+            expression = "Tank_A.level + Tank_B.flow * 0.5"
+            known_entities = {"Tank_A", "Tank_B", "Tank_C"}
+            returns: {("Tank_A", "level"), ("Tank_B", "flow")}
+        """
+        # Pattern: EntityName.column_name
+        # Match: identifier followed by dot and another identifier
+        pattern = r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)\b"
+        matches = re.findall(pattern, expression)
+
+        refs = set()
+        for entity_name, column_name in matches:
+            if entity_name in known_entities:
+                refs.add((entity_name, column_name))
+
+        return refs
+
+    def _build_entity_dependency_dag(self):
+        """Build entity dependency DAG and compute generation order.
+
+        Analyzes cross-entity references to determine which entities must be
+        generated before others at each timestamp.
+
+        Sets:
+            self.entity_generation_order: List of entity names in topological order
+
+        Raises:
+            ValueError: If circular cross-entity dependencies detected
+        """
+        if not self.cross_entity_enabled:
+            # No cross-entity refs: use original entity order (doesn't matter)
+            self.entity_generation_order = self.entity_names
+            return
+
+        # Build dependency graph: entity -> set of entities it depends on
+        dependencies: Dict[str, Set[str]] = {name: set() for name in self.entity_names}
+
+        for col_config in self.config.columns:
+            generator = col_config.generator
+            if isinstance(generator, DerivedGeneratorConfig):
+                refs = self._extract_entity_references(generator.expression, set(self.entity_names))
+
+                # For each entity, determine which other entities it references
+                # This is per-column, so we need to consider all entities
+                for entity_name in self.entity_names:
+                    for ref_entity, ref_column in refs:
+                        if ref_entity != entity_name:
+                            # entity_name depends on ref_entity
+                            dependencies[entity_name].add(ref_entity)
+
+        # Topological sort using DFS
+        sorted_entities = []
+        visited = set()
+        visiting = set()
+
+        def visit(entity_name: str, path: List[str]):
+            if entity_name in visited:
+                return
+            if entity_name in visiting:
+                # Circular dependency detected
+                cycle_path = path + [entity_name]
+                cycle_str = " -> ".join(cycle_path)
+                raise ValueError(
+                    f"Circular cross-entity dependency detected: {cycle_str}\n"
+                    f"Entities cannot reference each other in a cycle. "
+                    f"Consider using prev() for feedback loops within an entity."
+                )
+
+            visiting.add(entity_name)
+            for dep_entity in dependencies[entity_name]:
+                visit(dep_entity, path + [entity_name])
+            visiting.remove(entity_name)
+            visited.add(entity_name)
+            sorted_entities.append(entity_name)
+
+        for entity_name in self.entity_names:
+            visit(entity_name, [])
+
+        self.entity_generation_order = sorted_entities
 
     def _generate_entity_names(self) -> List[str]:
         """Generate entity names based on configuration.
