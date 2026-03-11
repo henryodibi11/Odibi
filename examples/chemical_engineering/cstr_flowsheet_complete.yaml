@@ -1,0 +1,334 @@
+# Complete CSTR Flowsheet - Demonstrating ALL Sprint 2 Features
+#
+# Process: Continuous Stirred Tank Reactor (CSTR) → Product Separator → Heat Recovery
+#
+# Features Demonstrated:
+# ✅ prev() - Material and energy balances (integration)
+# ✅ ema() - Sensor smoothing for noisy measurements
+# ✅ pid() - Temperature control with cooling water
+# ✅ mean_reversion_to - Reactor temp tracks cooling water temp (heat loss)
+# ✅ Cross-entity refs - Separator receives CSTR effluent, heat recovery
+# ✅ Scheduled events - Feed composition change, maintenance window
+#
+# Realistic ChemE Simulation - Production Quality
+
+scope:
+  start_time: "2026-03-11T00:00:00Z"
+  timestep: "5m"
+  row_count: 120  # 10 hours of operation
+  seed: 42
+
+entities:
+  names:
+    - CSTR_R101
+    - Separator_V102
+    - Heat_Exchanger_E103
+
+columns:
+  # ========================================================================
+  # Universal Columns (All Entities)
+  # ========================================================================
+  
+  - name: entity_id
+    data_type: string
+    generator:
+      type: constant
+      value: "{entity_id}"
+  
+  - name: timestamp
+    data_type: timestamp
+    generator:
+      type: timestamp
+
+  # ========================================================================
+  # CSTR (Reactor) Columns
+  # ========================================================================
+  
+  # Feed flow rate (kg/hr) - varies with production demand
+  - name: feed_flow_kg_hr
+    data_type: float
+    generator:
+      type: random_walk
+      start: 1000.0
+      min: 800.0
+      max: 1200.0
+      volatility: 20.0
+      mean_reversion: 0.05
+    entity_overrides:
+      Separator_V102:
+        type: constant
+        value: 0.0
+      Heat_Exchanger_E103:
+        type: constant
+        value: 0.0
+
+  # Ambient temperature (°C) - diurnal variation
+  - name: ambient_temp_c
+    data_type: float
+    generator:
+      type: random_walk
+      start: 25.0
+      min: 20.0
+      max: 30.0
+      volatility: 0.3
+      mean_reversion: 0.02
+
+  # Feed temperature (°C) - ambient feed, but preheated by heat recovery
+  - name: feed_temp_c
+    data_type: float
+    generator:
+      type: random_walk
+      start: 25.0
+      min: 20.0
+      max: 30.0
+      volatility: 0.3
+      mean_reversion: 0.3
+      mean_reversion_to: ambient_temp_c  # Feed temp tracks ambient
+    entity_overrides:
+      Separator_V102:
+        type: constant
+        value: 0.0
+      Heat_Exchanger_E103:
+        type: constant
+        value: 0.0
+
+  # Reactor temperature setpoint (°C) - process control target
+  - name: reactor_temp_setpoint_c
+    data_type: float
+    generator:
+      type: constant
+      value: 85.0
+    entity_overrides:
+      Separator_V102:
+        type: constant
+        value: 0.0
+      Heat_Exchanger_E103:
+        type: constant
+        value: 0.0
+
+  # Reactor temperature (°C) - responds to cooling and reaction heat
+  # Uses PREV for integration + MEAN_REVERSION_TO for heat loss to ambient
+  - name: reactor_temp_c
+    data_type: float
+    generator:
+      type: random_walk
+      start: 85.0
+      min: 70.0
+      max: 95.0
+      volatility: 0.5
+      mean_reversion: 0.02
+      mean_reversion_to: ambient_temp_c  # Heat loss to ambient
+    entity_overrides:
+      Separator_V102:
+        type: constant
+        value: 60.0
+      Heat_Exchanger_E103:
+        type: constant
+        value: 40.0
+
+  # Cooling water valve position (%) - PID controller output
+  - name: cooling_valve_pct
+    data_type: float
+    generator:
+      type: derived
+      expression: "pid(pv=reactor_temp_c, sp=reactor_temp_setpoint_c, Kp=3.0, Ki=0.15, Kd=1.0, dt=300, output_min=0, output_max=100, anti_windup=True) if entity_id == 'CSTR_R101' else 0.0"
+
+  # Reactor level (m³) - integration of feed - effluent
+  - name: reactor_level_m3
+    data_type: float
+    generator:
+      type: derived
+      expression: "prev('reactor_level_m3', 5.0) + (feed_flow_kg_hr - effluent_flow_kg_hr) / 1000.0 * (5/60) if entity_id == 'CSTR_R101' else 0.0"
+
+  # Effluent flow (kg/hr) - controlled by level (overflow)
+  # Uses prev('reactor_level_m3') to avoid circular dependency
+  - name: effluent_flow_kg_hr
+    data_type: float
+    generator:
+      type: derived
+      expression: "feed_flow_kg_hr * (prev('reactor_level_m3', 5.0) / 5.0) if entity_id == 'CSTR_R101' else 0.0"
+
+  # Product concentration (wt%) - simple reaction kinetics
+  - name: product_concentration_wt_pct
+    data_type: float
+    generator:
+      type: derived
+      expression: "min(95.0, 50.0 + (reactor_temp_c - 70.0) * 2.0) if entity_id == 'CSTR_R101' else 0.0"
+
+  # Effluent temperature (°C) - same as reactor
+  - name: effluent_temp_c
+    data_type: float
+    generator:
+      type: derived
+      expression: "reactor_temp_c if entity_id == 'CSTR_R101' else 0.0"
+
+  # Raw temperature sensor (noisy)
+  - name: temp_sensor_raw_c
+    data_type: float
+    generator:
+      type: random_walk
+      start: 85.0
+      min: 70.0
+      max: 95.0
+      volatility: 2.0
+      mean_reversion: 0.1
+      mean_reversion_to: reactor_temp_c
+    entity_overrides:
+      Separator_V102:
+        type: constant
+        value: 0.0
+      Heat_Exchanger_E103:
+        type: constant
+        value: 0.0
+
+  # Temperature sensor (EMA smoothed)
+  - name: temp_sensor_smooth_c
+    data_type: float
+    generator:
+      type: derived
+      expression: "ema('temp_sensor_raw_c', alpha=0.2, default=reactor_temp_c) if entity_id == 'CSTR_R101' else 0.0"
+
+  # ========================================================================
+  # Separator Columns - CROSS-ENTITY REFERENCES to CSTR
+  # ========================================================================
+
+  # Separator feed flow - receives CSTR effluent (CROSS-ENTITY REF!)
+  - name: separator_feed_flow_kg_hr
+    data_type: float
+    generator:
+      type: derived
+      expression: "CSTR_R101.effluent_flow_kg_hr if entity_id == 'Separator_V102' else 0.0"
+
+  # Separator feed temp - receives hot CSTR effluent (CROSS-ENTITY REF!)
+  - name: separator_feed_temp_c
+    data_type: float
+    generator:
+      type: derived
+      expression: "CSTR_R101.effluent_temp_c if entity_id == 'Separator_V102' else 0.0"
+
+  # Separator feed concentration (CROSS-ENTITY REF!)
+  - name: separator_feed_concentration_wt_pct
+    data_type: float
+    generator:
+      type: derived
+      expression: "CSTR_R101.product_concentration_wt_pct if entity_id == 'Separator_V102' else 0.0"
+
+  # Product recovery (%) - separation efficiency
+  - name: product_recovery_pct
+    data_type: float
+    generator:
+      type: constant
+      value: 92.0
+    entity_overrides:
+      CSTR_R101:
+        type: constant
+        value: 0.0
+      Heat_Exchanger_E103:
+        type: constant
+        value: 0.0
+
+  # Product output (kg/hr)
+  - name: product_flow_kg_hr
+    data_type: float
+    generator:
+      type: derived
+      expression: "separator_feed_flow_kg_hr * (separator_feed_concentration_wt_pct / 100.0) * (product_recovery_pct / 100.0) if entity_id == 'Separator_V102' else 0.0"
+
+  # ========================================================================
+  # Heat Exchanger - CROSS-ENTITY REFERENCES to CSTR and Separator
+  # ========================================================================
+
+  # Hot side inlet (CSTR effluent before separator) - CROSS-ENTITY REF!
+  - name: hot_side_temp_in_c
+    data_type: float
+    generator:
+      type: derived
+      expression: "CSTR_R101.effluent_temp_c if entity_id == 'Heat_Exchanger_E103' else 0.0"
+
+  # Cold side inlet (fresh feed)
+  - name: cold_side_temp_in_c
+    data_type: float
+    generator:
+      type: derived
+      expression: "ambient_temp_c if entity_id == 'Heat_Exchanger_E103' else 0.0"
+
+  # Heat duty (kW) - proportional to temp difference
+  - name: heat_duty_kw
+    data_type: float
+    generator:
+      type: derived
+      expression: "max(0, (hot_side_temp_in_c - cold_side_temp_in_c) * 5.0) if entity_id == 'Heat_Exchanger_E103' else 0.0"
+
+  # Heat recovery efficiency (%)
+  - name: heat_recovery_efficiency_pct
+    data_type: float
+    generator:
+      type: derived
+      expression: "min(80.0, heat_duty_kw / 200.0 * 100.0) if entity_id == 'Heat_Exchanger_E103' else 0.0"
+
+# ========================================================================
+# Scheduled Events - Realistic Process Operations
+# ========================================================================
+
+scheduled_events:
+  # Maintenance window - CSTR shutdown for cleaning
+  - type: forced_value
+    entity: CSTR_R101
+    column: feed_flow_kg_hr
+    value: 0.0
+    start_time: "2026-03-11T05:00:00Z"
+    end_time: "2026-03-11T06:00:00Z"  # 1-hour maintenance
+
+  # Feed composition change - higher concentration feedstock
+  - type: forced_value
+    entity: CSTR_R101
+    column: feed_flow_kg_hr
+    value: 900.0  # Reduced flow (richer feed)
+    start_time: "2026-03-11T08:00:00Z"
+    end_time: null  # Permanent change
+
+  # Temperature setpoint increase - process optimization
+  - type: forced_value
+    entity: CSTR_R101
+    column: reactor_temp_setpoint_c
+    value: 88.0  # Increase from 85 to 88°C
+    start_time: "2026-03-11T07:00:00Z"
+    end_time: null  # Permanent optimization
+
+# ========================================================================
+# Expected Behavior
+# ========================================================================
+#
+# Timeline:
+# 00:00-05:00 (5 hrs): Normal operation
+#   - Feed flow ~1000 kg/hr
+#   - Reactor temp controlled to 85°C via PID
+#   - Separator receives CSTR effluent (cross-entity!)
+#   - Heat recovery operational
+#
+# 05:00-06:00 (1 hr): Maintenance Window
+#   - CSTR feed forced to 0 (scheduled event!)
+#   - Separator feed drops to 0 (cascade via cross-entity ref)
+#   - Heat duty drops (no hot stream)
+#   - Reactor cools toward ambient
+#
+# 06:00-07:00 (1 hr): Startup after maintenance
+#   - Feed resumes normal random walk
+#   - Temperature PID brings reactor back to 85°C
+#   - Production resumes
+#
+# 07:00+ (3 hrs): Optimized operation
+#   - Setpoint increased to 88°C (scheduled event!)
+#   - PID tracks new setpoint
+#   - Higher conversion at higher temp
+#
+# 08:00+ (2 hrs): Rich feed operation
+#   - Feed flow reduced to 900 kg/hr (scheduled event!)
+#   - Same production with less feed (higher concentration)
+#
+# Demonstrates:
+# - Realistic ChemE process control (PID, integrations, heat balance)
+# - Cascading effects via cross-entity references
+# - Process dynamics (startup, shutdown, optimization)
+# - Scheduled operational changes
+# - Sensor filtering (EMA for noisy measurements)
