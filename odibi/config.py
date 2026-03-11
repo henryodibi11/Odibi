@@ -5011,6 +5011,22 @@ class SystemConfig(BaseModel):
             "Sync is incremental, so incomplete syncs will catch up on next run."
         ),
     )
+    async_derived_updates: bool = Field(
+        default=True,
+        description=(
+            "Run derived table updates (meta_daily_stats, meta_pipeline_health, etc.) "
+            "asynchronously in background thread. Saves ~20-30s per pipeline. "
+            "Updates complete eventually - safe for reporting tables."
+        ),
+    )
+    async_lineage: bool = Field(
+        default=True,
+        description=(
+            "Build lineage incrementally as each pipeline completes, then merge at end. "
+            "Saves ~40s by parallelizing lineage construction with pipeline execution. "
+            "Lineage still generated, just built in background."
+        ),
+    )
 
 
 class LineageConfig(BaseModel):

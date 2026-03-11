@@ -1172,40 +1172,67 @@ class Pipeline:
                 self._ctx.debug(f"Failed to log node runs (non-fatal): {e}")
 
             # Run derived updates (each wrapped independently)
-            try:
-                t_derived_start = time.time()
-                updater = DerivedUpdater(self.catalog_manager)
-                derived_updates = [
-                    ("meta_daily_stats", lambda: updater.update_daily_stats(run_id, pipeline_run)),
-                    ("meta_pipeline_health", lambda: updater.update_pipeline_health(pipeline_run)),
-                ]
-                freshness_sla = getattr(self.config, "freshness_sla", None)
-                if freshness_sla:
-                    freshness_anchor = getattr(self.config, "freshness_anchor", "run_completion")
-                    project_name = (
-                        getattr(self.project_config, "project", None)
-                        if self.project_config
-                        else None
-                    ) or "default"
-                    derived_updates.append(
+            # Check if async mode enabled (default: true)
+            async_derived = True
+            if self.project_config and self.project_config.system:
+                async_derived = getattr(self.project_config.system, "async_derived_updates", True)
+
+            def _run_derived_updates():
+                """Run derived updates (can be sync or async)."""
+                try:
+                    t_derived_start = time.time()
+                    updater = DerivedUpdater(self.catalog_manager)
+                    derived_updates = [
                         (
-                            "meta_sla_status",
-                            lambda: updater.update_sla_status(
-                                project_name,
-                                self.config.pipeline,
-                                owner,  # Uses owner from above (pipeline or project fallback)
-                                freshness_sla,
-                                freshness_anchor,
-                            ),
+                            "meta_daily_stats",
+                            lambda: updater.update_daily_stats(run_id, pipeline_run),
+                        ),
+                        (
+                            "meta_pipeline_health",
+                            lambda: updater.update_pipeline_health(pipeline_run),
+                        ),
+                    ]
+                    freshness_sla = getattr(self.config, "freshness_sla", None)
+                    if freshness_sla:
+                        freshness_anchor = getattr(
+                            self.config, "freshness_anchor", "run_completion"
                         )
+                        project_name = (
+                            getattr(self.project_config, "project", None)
+                            if self.project_config
+                            else None
+                        ) or "default"
+                        derived_updates.append(
+                            (
+                                "meta_sla_status",
+                                lambda: updater.update_sla_status(
+                                    project_name,
+                                    self.config.pipeline,
+                                    owner,  # Uses owner from above (pipeline or project fallback)
+                                    freshness_sla,
+                                    freshness_anchor,
+                                ),
+                            )
+                        )
+                    for dt, fn in derived_updates:
+                        updater.apply_derived_update(dt, run_id, fn)
+                    self._ctx.debug(
+                        f"[OVERHEAD] Derived updates completed in {time.time() - t_derived_start:.1f}s"
                     )
-                for dt, fn in derived_updates:
-                    updater.apply_derived_update(dt, run_id, fn)
-                self._ctx.debug(
-                    f"[OVERHEAD] Derived updates completed in {time.time() - t_derived_start:.1f}s"
-                )
-            except Exception as e:
-                self._ctx.debug(f"Derived updates failed (non-fatal): {e}")
+                except Exception as e:
+                    self._ctx.debug(f"Derived updates failed (non-fatal): {e}")
+
+            if async_derived:
+                # Run in background thread (saves ~20-30s)
+                import threading
+
+                threading.Thread(
+                    target=_run_derived_updates, daemon=True, name="DerivedUpdater"
+                ).start()
+                self._ctx.debug("Derived updates started async")
+            else:
+                # Run synchronously (blocks)
+                _run_derived_updates()
 
         t_summary_end = time.time()
         if self.catalog_manager and not dry_run:
@@ -2272,6 +2299,7 @@ class PipelineManager:
 
         results = {}
         inter_pipeline_gaps = []
+        lineage_futures = []  # Track incremental lineage building
 
         for idx, name in enumerate(pipeline_names):
             t_pre_pipeline = time.time()
@@ -2307,6 +2335,28 @@ class PipelineManager:
             if result.story_path:
                 self._ctx.debug(f"Story generated: {result.story_path}")
 
+            # Start building lineage for this pipeline incrementally (if async enabled)
+            has_story = hasattr(self.project_config, "story") and self.project_config.story
+            generate_lineage_enabled = has_story and self.project_config.story.generate_lineage
+            async_lineage = True
+            if self.project_config and self.project_config.system:
+                async_lineage = getattr(self.project_config.system, "async_lineage", True)
+
+            if generate_lineage_enabled and async_lineage and result.story_path:
+                # Build this pipeline's lineage piece in background
+                from concurrent.futures import ThreadPoolExecutor
+
+                if not hasattr(self, "_lineage_executor"):
+                    self._lineage_executor = ThreadPoolExecutor(
+                        max_workers=3, thread_name_prefix="Lineage"
+                    )
+
+                future = self._lineage_executor.submit(
+                    self._build_pipeline_lineage_piece, name, result.story_path
+                )
+                lineage_futures.append((name, future))
+                self._ctx.debug(f"Started incremental lineage building for {name}")
+
             # Track inter-pipeline overhead (time between pipelines excluding actual execution)
             if idx > 0:
                 gap = t_pipeline_start - t_pre_pipeline
@@ -2318,6 +2368,9 @@ class PipelineManager:
         t_lineage_start = time.time()
         has_story = hasattr(self.project_config, "story") and self.project_config.story
         generate_lineage_enabled = has_story and self.project_config.story.generate_lineage
+        async_lineage = True
+        if self.project_config and self.project_config.system:
+            async_lineage = getattr(self.project_config.system, "async_lineage", True)
 
         self._ctx.debug(
             "Lineage check",
@@ -2331,16 +2384,51 @@ class PipelineManager:
             self.flush_stories()
 
             try:
-                lineage_result = generate_lineage(self.project_config)
-                if lineage_result:
-                    self._ctx.info(
-                        "Combined lineage generated",
-                        nodes=len(lineage_result.nodes),
-                        edges=len(lineage_result.edges),
-                        json_path=lineage_result.json_path,
+                if async_lineage and lineage_futures:
+                    # Merge incrementally-built lineage pieces (fast!)
+                    self._ctx.debug(
+                        f"Waiting for {len(lineage_futures)} incremental lineage pieces..."
                     )
+                    lineage_pieces = []
+                    for pipeline_name, future in lineage_futures:
+                        try:
+                            piece = future.result(timeout=30)  # Should be done already
+                            if piece:
+                                lineage_pieces.append(piece)
+                            self._ctx.debug(f"Got lineage piece for {pipeline_name}")
+                        except Exception as e:
+                            self._ctx.warning(
+                                f"Failed to get lineage piece for {pipeline_name}: {e}"
+                            )
+
+                    # Merge the pieces
+                    if lineage_pieces:
+                        lineage_result = self._merge_lineage_pieces(lineage_pieces)
+                        if lineage_result:
+                            self._ctx.info(
+                                "Combined lineage generated from incremental pieces",
+                                nodes=len(lineage_result.nodes),
+                                edges=len(lineage_result.edges),
+                                json_path=lineage_result.json_path,
+                            )
+                    else:
+                        self._ctx.warning("No lineage pieces generated")
+
+                    # Cleanup executor
+                    if hasattr(self, "_lineage_executor"):
+                        self._lineage_executor.shutdown(wait=False)
                 else:
-                    self._ctx.warning("Lineage generation returned None")
+                    # Synchronous - build entire lineage at once (original behavior)
+                    lineage_result = generate_lineage(self.project_config)
+                    if lineage_result:
+                        self._ctx.info(
+                            "Combined lineage generated",
+                            nodes=len(lineage_result.nodes),
+                            edges=len(lineage_result.edges),
+                            json_path=lineage_result.json_path,
+                        )
+                    else:
+                        self._ctx.warning("Lineage generation returned None")
             except Exception as e:
                 self._ctx.warning(f"Failed to generate combined lineage: {e}")
         t_lineage_end = time.time()
@@ -2645,6 +2733,51 @@ class PipelineManager:
                 f"Auto-registration failed (non-fatal): {e}",
                 error_type=type(e).__name__,
             )
+
+    # -------------------------------------------------------------------------
+    # Lineage Helpers
+    # -------------------------------------------------------------------------
+
+    def _build_pipeline_lineage_piece(self, pipeline_name: str, story_path: str):
+        """Build lineage piece for a single pipeline (runs in background thread).
+
+        Args:
+            pipeline_name: Name of pipeline
+            story_path: Path to generated story file
+
+        Returns:
+            Lineage piece dict or None
+        """
+        try:
+            from odibi.story.lineage_utils import generate_lineage_for_pipeline
+
+            return generate_lineage_for_pipeline(self.project_config, pipeline_name)
+        except Exception as e:
+            self._ctx.warning(f"Failed to build lineage piece for {pipeline_name}: {e}")
+            return None
+
+    def _merge_lineage_pieces(self, pieces: list):
+        """Merge incrementally-built lineage pieces into combined lineage.
+
+        Args:
+            pieces: List of lineage dicts from individual pipelines
+
+        Returns:
+            Combined lineage result
+        """
+        try:
+            from odibi.story.lineage_utils import merge_lineage_pieces
+
+            return merge_lineage_pieces(pieces, self.project_config)
+        except ImportError:
+            # Fallback: If merge function doesn't exist, use original generate_lineage
+            self._ctx.debug("merge_lineage_pieces not available, using generate_lineage")
+            from odibi.story.lineage_utils import generate_lineage
+
+            return generate_lineage(self.project_config)
+        except Exception as e:
+            self._ctx.warning(f"Failed to merge lineage pieces: {e}")
+            return None
 
     # -------------------------------------------------------------------------
     # Phase 5: List/Query Methods
