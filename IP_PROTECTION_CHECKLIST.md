@@ -10,6 +10,7 @@
 
 - [x] All core features implemented on personal time/equipment
 - [x] Stateful simulation (prev/ema/pid) completed March 11, 2026 (pre-employment)
+- [x] Mean-reverting random_walk (mean_reversion_to) completed March 11, 2026 (pre-employment)
 - [x] Thermodynamics module (CoolProp) completed pre-employment
 - [x] Manufacturing transformers completed pre-employment
 - [x] All examples use generic parameters (no company-specific data)
