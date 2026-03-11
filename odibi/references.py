@@ -5,8 +5,8 @@ pipelines to read data from other pipelines' outputs (e.g., bronze -> silver).
 
 Example:
     inputs:
-      events: $read_bronze.opsvisdata_ShiftDowntimeEventsview
-      calendar: $read_bronze.opsvisdata_vw_calender
+      events: $read_bronze.events
+      calendar: $read_bronze.calendar
 """
 
 from typing import Any, Dict, Union
@@ -29,7 +29,7 @@ def resolve_input_reference(
     Resolves $pipeline.node to read configuration.
 
     Args:
-        ref: Reference string like "$read_bronze.opsvisdata_vw_calender"
+        ref: Reference string like "$read_bronze.calendar"
         catalog: CatalogManager instance
 
     Returns:

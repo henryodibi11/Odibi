@@ -202,6 +202,9 @@ class CatalogManager:
         self._outputs_cache: Optional[Dict[str, Dict[str, Any]]] = None
         self._cache_lock = threading.Lock()
 
+        # Bootstrap guard: skip re-checking 18 tables after first successful bootstrap
+        self._bootstrapped = False
+
     @property
     def is_spark_mode(self) -> bool:
         """Check if running in Spark mode."""
@@ -371,7 +374,12 @@ class CatalogManager:
     def bootstrap(self) -> None:
         """
         Ensures all system tables exist. Creates them if missing.
+        Skips existence checks after first successful bootstrap (tables are never deleted).
         """
+        if self._bootstrapped:
+            logger.debug("Bootstrap skipped (already completed this session)")
+            return
+
         if not self.spark and not self.engine:
             logger.warning(
                 "Neither SparkSession nor Engine available. Skipping System Catalog bootstrap."
@@ -419,6 +427,8 @@ class CatalogManager:
         self._ensure_table("meta_daily_stats", self._get_schema_meta_daily_stats())
         self._ensure_table("meta_pipeline_health", self._get_schema_meta_pipeline_health())
         self._ensure_table("meta_sla_status", self._get_schema_meta_sla_status())
+
+        self._bootstrapped = True
 
     def _ensure_table(
         self,
@@ -2939,37 +2949,14 @@ class CatalogManager:
     def get_pipeline_hash(self, pipeline_name: str) -> Optional[str]:
         """
         Retrieves the version hash of a pipeline from the catalog.
+
+        Uses the pipelines cache when available to avoid redundant ADLS reads.
         """
-        if self.spark:
-            try:
-                from pyspark.sql import functions as F
+        cache = self._get_all_pipelines_cached()
+        if cache:
+            data = cache.get(pipeline_name)
+            return data.get("version_hash") if data else None
 
-                df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
-                row = (
-                    df.filter(F.col("pipeline_name") == pipeline_name)
-                    .select("version_hash")
-                    .first()
-                )
-                return row.version_hash if row else None
-            except Exception:
-                return None
-        elif self.engine:
-            df = self._read_local_table(self.tables["meta_pipelines"])
-            if df.empty:
-                return None
-            if "pipeline_name" not in df.columns or "version_hash" not in df.columns:
-                return None
-
-            # Ensure we get the latest one if duplicates exist (though upsert should prevent)
-            # But reading parquet fallback might have duplicates.
-            # Sorting by updated_at desc
-            if "updated_at" in df.columns:
-                df = df.sort_values("updated_at", ascending=False)
-
-            row = df[df["pipeline_name"] == pipeline_name]
-            if not row.empty:
-                return row.iloc[0]["version_hash"]
-            return None
         return None
 
     def get_average_volume(self, node_name: str, days: int = 7) -> Optional[float]:
