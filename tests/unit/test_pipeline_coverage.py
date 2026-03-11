@@ -2351,10 +2351,14 @@ class TestPipelineManagerListQueryWithCatalog:
 class TestPipelineManagerRunLineage:
     def test_run_with_lineage_generation(self):
         """Test lineage generation with async disabled (uses synchronous path)."""
+        from odibi.config import SystemConfig
+
         pc = PipelineConfig(pipeline="p1", nodes=[_make_node_config("n1")])
         mgr, mocks = _make_manager(pipelines=[pc])
         mgr.project_config.story.generate_lineage = True
-        # Disable async lineage to test synchronous path
+        # Ensure system config exists and disable async lineage to test synchronous path
+        if not mgr.project_config.system:
+            mgr.project_config.system = SystemConfig(connection="local", path="_odibi_system")
         mgr.project_config.system.async_lineage = False
         mocks["p1"].run.return_value = PipelineResults(pipeline_name="p1", story_path="/story.json")
 

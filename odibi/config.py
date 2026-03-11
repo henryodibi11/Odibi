@@ -4451,6 +4451,16 @@ class PipelineConfig(BaseModel):
         description="What defines freshness. Only 'run_completion' implemented initially.",
     )
     nodes: List[NodeConfig] = Field(description="List of nodes in this pipeline")
+    auto_cache_threshold: Optional[int] = Field(
+        default=3,
+        ge=2,
+        description=(
+            "Auto-cache nodes with N or more downstream dependencies. "
+            "Prevents redundant ADLS re-reads when a node is used by multiple downstream nodes. "
+            "Default: 3. Set to null to disable auto-caching. "
+            "Individual nodes can override with explicit cache: true/false."
+        ),
+    )
 
     @field_validator("nodes")
     @classmethod

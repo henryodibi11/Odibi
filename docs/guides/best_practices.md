@@ -281,11 +281,40 @@ Use `cache: true` for nodes that are:
 - Expensive to compute
 - Small enough to fit in memory
 
+**Auto-Caching (Default Enabled):**
+
+Odibi automatically caches nodes with 3+ downstream dependencies (configurable):
+
+```yaml
+pipeline:
+  name: silver
+  auto_cache_threshold: 3  # Auto-cache nodes with 3+ dependencies (default)
+  nodes:
+    - name: dim_calendar
+      # Has 10 downstream nodes → automatically cached ✅
+
+    - name: huge_dimension
+      # Has 5 downstream nodes → would be auto-cached...
+      cache: false  # ...but explicit override prevents it ✅
+
+    - name: linear_transform
+      # Has 1 downstream node → not auto-cached (below threshold)
+```
+
+**Manual Caching:**
+
 ```yaml
 - name: dimension_products
   description: "Product dimension - cached for multiple joins"
   read: ...
-  cache: true  # Multiple nodes will join to this
+  cache: true  # Explicit cache for nodes below threshold
+```
+
+**Disable Auto-Caching:**
+
+```yaml
+pipeline:
+  auto_cache_threshold: null  # Disable auto-caching, all manual
 ```
 
 ---
@@ -539,20 +568,20 @@ from odibi import transform
 def validate_business_rules(context, current):
     """Custom business rule validation."""
     errors = []
-    
+
     # Rule 1: Order amount must match line items
     mismatched = current[current['total'] != current['line_items_sum']]
     if len(mismatched) > 0:
         errors.append(f"{len(mismatched)} orders with mismatched totals")
-    
+
     # Rule 2: Future dates not allowed
     future_orders = current[current['order_date'] > pd.Timestamp.now()]
     if len(future_orders) > 0:
         errors.append(f"{len(future_orders)} orders with future dates")
-    
+
     if errors:
         context.log_warning(f"Validation issues: {'; '.join(errors)}")
-    
+
     return current
 ```
 

@@ -96,6 +96,50 @@ params:
   optimize_write: true
 ```
 
+### 🎯 Smart Caching (Auto-Cache)
+
+**What it does:**
+Automatically caches Spark DataFrames for nodes with high downstream fanout (3+ dependencies by default).
+
+**Why use it?**
+- **Prevents ADLS re-reads:** If `dim_calendar` is used by 10 fact tables, it's read from ADLS once and cached in memory.
+- **Cross-pipeline optimization:** When Gold references Silver nodes via `inputs`, it uses the cached temp view instead of re-reading from Delta.
+- **Zero config for common case:** Smart defaults with explicit override available.
+
+**How it works:**
+
+```yaml
+pipeline:
+  name: silver
+  auto_cache_threshold: 3  # Auto-cache nodes with 3+ dependencies (default)
+  nodes:
+    - name: dim_calendar
+      # Used by 10 downstream nodes → automatically cached ✅
+
+    - name: dim_product  
+      # Used by 2 downstream nodes → not cached (below threshold)
+      cache: true  # Manual override to cache it anyway
+
+    - name: huge_dimension
+      # Used by 5 downstream nodes → would be auto-cached...
+      cache: false  # ...but explicit override prevents OOM ✅
+```
+
+**Disable auto-caching entirely:**
+```yaml
+pipeline:
+  auto_cache_threshold: null  # All caching must be explicit
+```
+
+**When NOT to cache:**
+- Tables larger than available cluster memory
+- Nodes with no downstream dependencies
+- Linear pipelines with no fanout
+
+**Performance impact:**
+- Typical Silver pipeline: Saves 5-10 minutes by eliminating redundant ADLS reads
+- Cross-pipeline dependencies: Gold reads from Silver's cache (seconds vs minutes)
+
 ### 🌊 Streaming Support
 
 **What it does:**
@@ -161,6 +205,7 @@ Unlike Pandas (single-threaded), Polars parallelizes operations like groupby, jo
 | :--- | :--- | :--- | :--- |
 | `use_arrow: true` | Pandas | Local processing, large Parquet files | **High** (Speed + Memory) |
 | Parallel I/O | Pandas | Reading split CSV/JSON files | **High** (Linear I/O speedup) |
+| `auto_cache_threshold: 3` | Spark | High-fanout nodes (dims, expensive transforms) | **Very High** (5-10 min savings) |
 | `cluster_by` | Spark | High-cardinality filters, skewed data | **High** (Read performance) |
 | `optimize_write` | Spark | Frequent writes, streaming, "small files" | **High** (Prevents degradation) |
 | `streaming: true` | Spark | Real-time ingestion | **Architectural** |
