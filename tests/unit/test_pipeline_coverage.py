@@ -902,12 +902,23 @@ class TestPipelineManagerRun:
         with pytest.raises(ValueError, match="not found"):
             mgr.run("missing")
 
-    def test_run_with_catalog_invalidates_cache(self):
+    def test_run_with_catalog_does_not_invalidate_cache(self):
+        """Cache invalidation between pipelines was removed for performance.
+
+        Previously, invalidate_cache() was called between each pipeline execution,
+        but this was unnecessary because:
+        1. The caches store metadata (pipeline/node configs), not data
+        2. Metadata doesn't change during execution
+        3. Data flow happens via Delta tables, not metadata caches
+
+        See CACHE_INVALIDATION_AUDIT.md for full analysis.
+        """
         pc = PipelineConfig(pipeline="p1", nodes=[_make_node_config("n1")])
         cat = MagicMock()
         mgr, _ = _make_manager(pipelines=[pc], catalog_manager=cat)
         mgr.run("p1")
-        cat.invalidate_cache.assert_called()
+        # Cache should NOT be invalidated during normal pipeline execution
+        cat.invalidate_cache.assert_not_called()
 
 
 class TestPipelineManagerFlushStories:
