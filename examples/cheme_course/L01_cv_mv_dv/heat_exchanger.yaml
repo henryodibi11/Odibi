@@ -1,0 +1,98 @@
+﻿# L01 Example 2: Heat Exchanger (Multiple CVs)
+# Demonstrates primary CV and secondary constraints
+
+project: heat_exchanger_control
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/heat_exchanger.parquet
+    format: parquet
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: heat_exchanger_pipeline
+    nodes:
+      - name: generate_hx_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "30s"
+                row_count: 2880  # 24 hours
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "HX-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                # DV: Inlet temperature varies
+                - name: inlet_temp_f
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 220.0
+                    drift: 0.0
+                    noise: 1.0
+                    min: 200.0
+                    max: 240.0
+
+                # MV: Coolant flow (controlled)
+                - name: coolant_flow_gpm
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 150.0
+                    drift: 0.0
+                    noise: 2.0
+                    min: 100.0
+                    max: 200.0
+
+                # CV1: Outlet temperature (first-order lag)
+                - name: outlet_temp_f
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('outlet_temp_f', 180.0) +
+                      (0.5 / 5.0) * ((inlet_temp_f - 0.3 * coolant_flow_gpm) - prev('outlet_temp_f', 180.0))
+
+                # Noise for pressure
+                - name: noise
+                  data_type: float
+                  generator:
+                    type: range
+                    min: -0.5
+                    max: 0.5
+                    distribution: normal
+
+                # CV2: Pressure drop (increases with flow)
+                - name: pressure_drop_psi
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "0.001 * coolant_flow_gpm * coolant_flow_gpm + noise"
+
+        write:`n          connection: output

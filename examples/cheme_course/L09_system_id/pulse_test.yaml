@@ -1,0 +1,90 @@
+# L09 Example 2: Pulse Test for System Identification
+# Use pulse input to identify dynamics
+
+project: pulse_test_id
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/pulse_test.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: pulse_test_pipeline
+    nodes:
+      - name: generate_pulse_test
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "2s"
+                row_count: 600
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "PULSE-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                # Pulse input: on from row 100-150
+                - name: pulse_input
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "10.0 if (row_num >= 100 and row_num < 150) else 0.0"
+
+                # Process response to pulse
+                - name: process_response
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('process_response', 0.0) * 0.95 +
+                      pulse_input * 0.5
+
+                # Smoothed response for analysis
+                - name: smoothed_response
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "ema('process_response', 0.1, 0.0)"
+
+                # Peak detector
+                - name: peak_value
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      process_response if process_response > prev('peak_value', 0.0) else prev('peak_value', 0.0)
+
+        write:
+          connection: output

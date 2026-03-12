@@ -69,6 +69,31 @@ nav:
       - Philosophy: philosophy.md
       - Architecture: explanation/architecture.md
       - Medallion Architecture: guides/medallion_architecture.md
+      - ChemE × Data Engineering Course:
+          - 🚀 START HERE: learning/cheme_data_course/START_HERE.md
+          - ✅ COMPLETE - Ready to Use: learning/cheme_data_course/ALL_LESSONS_FIXED_COMPLETE.md
+          - 📖 Course Overview: learning/cheme_data_course/index.md
+          - Part I - Foundations (COMPLETE ✅):
+              - L00 Setup: learning/cheme_data_course/lessons/L00_setup.md
+              - L01 CV/MV/DV: learning/cheme_data_course/lessons/L01_cv_mv_dv.md
+              - L02 DoF + Balances: learning/cheme_data_course/lessons/L02_dof_balances.md
+              - L03 First-Order: learning/cheme_data_course/lessons/L03_first_order.md
+              - L04 FOPTD: learning/cheme_data_course/lessons/L04_foptd.md
+              - L05 Second-Order: learning/cheme_data_course/lessons/L05_second_order.md
+          - Part II - Control + ID (COMPLETE ✅):
+              - L06 PID Basics: learning/cheme_data_course/lessons/L06_pid_basics.md
+              - L07 Tuning: learning/cheme_data_course/lessons/L07_tuning.md
+              - L08 Disturbances: learning/cheme_data_course/lessons/L08_disturbances.md
+              - L09 System ID: learning/cheme_data_course/lessons/L09_system_id.md
+          - Part III - Advanced (COMPLETE ✅):
+              - L10 Interacting Loops: learning/cheme_data_course/lessons/L10_interacting_loops.md
+              - L11 Cascade: learning/cheme_data_course/lessons/L11_cascade.md
+              - L12 Feedforward: learning/cheme_data_course/lessons/L12_feedforward.md
+              - L13 Nonlinearity: learning/cheme_data_course/lessons/L13_nonlinearity.md
+              - L14 MPC-lite: learning/cheme_data_course/lessons/L14_mpc_lite.md
+          - Capstone (COMPLETE ✅):
+              - L15 CSTR Digital Twin: learning/cheme_data_course/lessons/L15_cstr_digital_twin.md
+          - 💡 Solutions: learning/cheme_data_course/solutions/index.md
       - Core Concepts:
           - Pipelines & Nodes: features/pipelines.md
           - Connections: features/connections.md
@@ -151,6 +176,13 @@ nav:
           - Cookbook (Recipes): guides/recipes.md
           - Testing Pipelines: guides/testing.md
           - Best Practices: guides/best_practices.md
+      - Chemical Engineering (ChemE × DE):
+          - 📚 Seborg Textbook Mapping: guides/seborg_textbook_mapping.md
+          - Process Simulation Guide: guides/process_simulation_guide.md
+          - ChemE Simulation Guide: guides/chemical_engineering_simulation_guide.md
+          - Thermodynamics Transformers: guides/thermodynamics.md
+          - Unit Conversion: guides/unit_conversion.md
+          - Renewable Energy: guides/odibi_for_renewable_energy.md
       - Interfaces:
           - CLI Master Guide: guides/cli_master_guide.md
           - Python API Guide: guides/python_api_guide.md

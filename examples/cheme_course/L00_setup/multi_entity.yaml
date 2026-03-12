@@ -1,0 +1,77 @@
+﻿# L00 Example 4: Multi-Entity Simulation
+# Three tanks with independent behavior
+
+project: multi_tank_simulation
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/multi_tank.parquet
+    format: parquet
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: multi_tank_pipeline
+    nodes:
+      - name: generate_multi_tank_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 100
+                seed: 42
+
+              entities:
+                count: 3
+                id_prefix: "TK-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: inlet_flow_gpm
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 50.0
+                    noise: 1.0
+                    min: 40.0
+                    max: 60.0
+
+                - name: outlet_flow_gpm
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 45.0
+                    noise: 0.5
+                    min: 40.0
+                    max: 50.0
+
+                - name: tank_level_ft
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('tank_level_ft', 10.0) +
+                      (inlet_flow_gpm - outlet_flow_gpm) / 100.0
+
+        write:`n          connection: output

@@ -1,0 +1,127 @@
+# L10 Example 1: Interacting Temperature Loops
+# Two temperature zones that influence each other
+
+project: interacting_temps
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/dual_temp.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: dual_temp_pipeline
+    nodes:
+      - name: generate_interacting_loops
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "10s"
+                row_count: 600
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "ZONE-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                # Setpoints
+                - name: zone1_setpoint
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "200.0 if row_num < 150 else 210.0"
+
+                - name: zone2_setpoint
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 180.0
+
+                # Zone 1 temperature (affected by zone 2)
+                - name: zone1_temp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('zone1_temp', 200.0) +
+                      0.1 * (heater1_output - prev('zone1_temp', 200.0)) +
+                      0.05 * (prev('zone2_temp', 180.0) - prev('zone1_temp', 200.0))
+
+                # Zone 2 temperature (affected by zone 1)
+                - name: zone2_temp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('zone2_temp', 180.0) +
+                      0.12 * (heater2_output - prev('zone2_temp', 180.0)) +
+                      0.03 * (prev('zone1_temp', 200.0) - prev('zone2_temp', 180.0))
+
+                # Controllers
+                - name: heater1_output
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        zone1_temp,
+                        zone1_setpoint,
+                        1.5,
+                        0.05,
+                        2.0,
+                        10.0,
+                        0.0,
+                        100.0,
+                        true
+                      )
+
+                - name: heater2_output
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        zone2_temp,
+                        zone2_setpoint,
+                        1.8,
+                        0.06,
+                        1.5,
+                        10.0,
+                        0.0,
+                        100.0,
+                        true
+                      )
+
+        write:
+          connection: output

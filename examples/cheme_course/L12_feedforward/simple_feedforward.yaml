@@ -1,0 +1,120 @@
+# L12 Example 1: Simple Feedforward Control
+# Feedforward compensates for measured disturbance
+
+project: simple_feedforward
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/feedforward.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: feedforward_pipeline
+    nodes:
+      - name: generate_ff_control
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "10s"
+                row_count: 600
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "FF-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                - name: temperature_sp
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 150.0
+
+                # Measured disturbance: inlet flow
+                - name: inlet_flow_gpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "100.0 if row_num < 200 else 120.0"
+
+                # Feedforward compensation (ratio of flow change)
+                - name: ff_component
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "0.5 * (inlet_flow_gpm - 100.0)"
+
+                # Feedback PI controller
+                - name: fb_component
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        prev('temperature', 150.0),
+                        temperature_sp,
+                        2.0,
+                        0.1,
+                        0.0,
+                        10.0,
+                        0.0,
+                        100.0,
+                        true
+                      )
+
+                # Combined FF + FB control
+                - name: steam_valve_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "fb_component + ff_component"
+
+                # Process temperature
+                - name: temperature
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('temperature', 150.0) +
+                      0.1 * steam_valve_pct / 10.0 -
+                      0.05 * (inlet_flow_gpm - 100.0) / 10.0
+
+                - name: error
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "temperature_sp - temperature"
+
+        write:
+          connection: output

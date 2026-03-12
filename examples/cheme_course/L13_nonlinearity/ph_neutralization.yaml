@@ -1,0 +1,114 @@
+# L13 Example 2: pH Neutralization (Highly Nonlinear)
+# pH control is extremely nonlinear near neutrality
+
+project: ph_neutralization
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/ph_control.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: ph_pipeline
+    nodes:
+      - name: generate_ph_control
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "5s"
+                row_count: 600
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "PH-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                - name: ph_setpoint
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 7.0
+
+                # Acid feed (disturbance)
+                - name: acid_feed_gpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "10.0 if row_num < 250 else 12.0"
+
+                # Base addition (manipulated variable)
+                - name: base_flow_gpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        prev('ph_value', 7.0),
+                        ph_setpoint,
+                        2.5,
+                        0.15,
+                        0.5,
+                        5.0,
+                        0.0,
+                        20.0,
+                        true
+                      )
+
+                # Simplified pH calculation (highly nonlinear near pH 7)
+                # Using sigmoid-like function
+                - name: ph_value
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      7.0 + 6.0 * (base_flow_gpm - acid_feed_gpm) /
+                      (10.0 + abs(base_flow_gpm - acid_feed_gpm))
+
+                # Process gain is highly dependent on pH
+                - name: process_gain_estimate
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      1.0 / (1.0 + ((ph_value - 7.0) ** 2))
+
+                - name: ph_error
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "ph_setpoint - ph_value"
+
+        write:
+          connection: output

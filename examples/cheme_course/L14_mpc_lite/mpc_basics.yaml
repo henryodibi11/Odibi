@@ -1,0 +1,121 @@
+# L14 Example 1: MPC Basics - Prediction and Optimization
+# Simplified model predictive control concept
+
+project: mpc_basics
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/mpc_basics.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: mpc_pipeline
+    nodes:
+      - name: generate_mpc_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "30s"
+                row_count: 480
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "MPC-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                # Setpoint trajectory
+                - name: temp_setpoint
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "100.0 if row_num < 150 else 110.0"
+
+                # Predicted future setpoint (lookahead)
+                - name: predicted_sp_10min
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "110.0 if row_num >= 130 else 100.0"
+
+                # MPC calculates optimal move considering future
+                # Simplified: anticipates setpoint change
+                - name: mpc_output
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        prev('temperature', 100.0),
+                        predicted_sp_10min,
+                        3.0,
+                        0.2,
+                        2.0,
+                        30.0,
+                        0.0,
+                        100.0,
+                        true
+                      )
+
+                # Process temperature
+                - name: temperature
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('temperature', 100.0) +
+                      0.08 * (mpc_output - prev('temperature', 100.0))
+
+                # Rate of change constraint
+                - name: rate_of_change
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "temperature - prev('temperature', 100.0)"
+
+                # Soft constraint penalty
+                - name: constraint_violation
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "abs(rate_of_change) if abs(rate_of_change) > 2.0 else 0.0"
+
+                - name: tracking_error
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "temp_setpoint - temperature"
+
+        write:
+          connection: output

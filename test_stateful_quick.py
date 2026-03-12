@@ -1,6 +1,7 @@
 """Quick standalone test for stateful simulation features."""
 
 import sys
+
 sys.path.insert(0, "D:/odibi")
 
 from odibi.config import (
@@ -20,7 +21,7 @@ from odibi.simulation import SimulationEngine
 def test_prev():
     """Test prev() function."""
     print("\n=== Testing prev() function ===")
-    
+
     config = SimulationConfig(
         scope=SimulationScope(
             start_time="2026-01-01T00:00:00Z",
@@ -52,7 +53,7 @@ def test_prev():
     print(f"Generated {len(rows)} rows")
     for i, row in enumerate(rows):
         print(f"  Row {i}: counter={row['counter']}, cumsum={row['cumsum']}")
-    
+
     # Verify cumulative sum: 1, 2, 3, 4, 5
     expected = [1, 2, 3, 4, 5]
     actual = [r["cumsum"] for r in rows]
@@ -63,7 +64,7 @@ def test_prev():
 def test_battery_soc():
     """Test battery SOC integration - THE killer use case."""
     print("\n=== Testing Battery SOC Integration ===")
-    
+
     config = SimulationConfig(
         scope=SimulationScope(
             start_time="2026-01-01T00:00:00Z",
@@ -122,32 +123,40 @@ def test_battery_soc():
     print("\nFirst 5 rows:")
     for i in range(min(5, len(rows))):
         r = rows[i]
-        print(f"  Row {i}: time={r['timestamp']}, current={r['charge_current_a']:6.1f}A, SOC={r['soc_pct']:5.1f}%")
-    
+        print(
+            f"  Row {i}: time={r['timestamp']}, current={r['charge_current_a']:6.1f}A, SOC={r['soc_pct']:5.1f}%"
+        )
+
     print("\nLast 5 rows:")
     for i in range(max(0, len(rows) - 5), len(rows)):
         r = rows[i]
-        print(f"  Row {i}: time={r['timestamp']}, current={r['charge_current_a']:6.1f}A, SOC={r['soc_pct']:5.1f}%")
-    
+        print(
+            f"  Row {i}: time={r['timestamp']}, current={r['charge_current_a']:6.1f}A, SOC={r['soc_pct']:5.1f}%"
+        )
+
     # Verify SOC increases during charging
     charging_start_soc = rows[0]["soc_pct"]
     charging_end_soc = rows[9]["soc_pct"]
     assert charging_end_soc > charging_start_soc, "SOC should increase during charging"
-    
+
     # Verify SOC decreases during discharging
     discharging_start_soc = rows[10]["soc_pct"]
     discharging_end_soc = rows[-1]["soc_pct"]
     assert discharging_end_soc < discharging_start_soc, "SOC should decrease during discharging"
-    
+
     print("\n✓ Battery SOC integration works!")
-    print(f"  Charging: {charging_start_soc:.1f}% → {charging_end_soc:.1f}% (Δ={charging_end_soc - charging_start_soc:.1f}%)")
-    print(f"  Discharging: {discharging_start_soc:.1f}% → {discharging_end_soc:.1f}% (Δ={discharging_end_soc - discharging_start_soc:.1f}%)\n")
+    print(
+        f"  Charging: {charging_start_soc:.1f}% → {charging_end_soc:.1f}% (Δ={charging_end_soc - charging_start_soc:.1f}%)"
+    )
+    print(
+        f"  Discharging: {discharging_start_soc:.1f}% → {discharging_end_soc:.1f}% (Δ={discharging_end_soc - discharging_start_soc:.1f}%)\n"
+    )
 
 
 def test_pid_control():
     """Test PID controller."""
     print("\n=== Testing PID Controller ===")
-    
+
     config = SimulationConfig(
         scope=SimulationScope(
             start_time="2026-01-01T00:00:00Z",
@@ -168,8 +177,7 @@ def test_pid_control():
                 generator=DerivedGeneratorConfig(
                     type="derived",
                     expression=(
-                        "prev('temp_c', 70) + "
-                        "0.05 * (prev('heater_pct', 50) - prev('temp_c', 70))"
+                        "prev('temp_c', 70) + 0.05 * (prev('heater_pct', 50) - prev('temp_c', 70))"
                     ),
                 ),
             ),
@@ -179,8 +187,7 @@ def test_pid_control():
                 generator=DerivedGeneratorConfig(
                     type="derived",
                     expression=(
-                        "pid(pv=temp_c, sp=temp_setpoint_c, "
-                        "Kp=3.0, Ki=0.2, Kd=1.0, dt=30)"
+                        "pid(pv=temp_c, sp=temp_setpoint_c, Kp=3.0, Ki=0.2, Kd=1.0, dt=30)"
                     ),
                 ),
             ),
@@ -195,27 +202,29 @@ def test_pid_control():
     for i in [0, 5, 10, 15, 20, 24]:
         if i < len(rows):
             r = rows[i]
-            print(f"  Row {i:2d}: temp={r['temp_c']:5.2f}°C, heater={r['heater_pct']:5.1f}%, SP=85°C")
-    
+            print(
+                f"  Row {i:2d}: temp={r['temp_c']:5.2f}°C, heater={r['heater_pct']:5.1f}%, SP=85°C"
+            )
+
     initial_temp = rows[0]["temp_c"]
     final_temp = rows[-1]["temp_c"]
     setpoint = 85.0
-    
+
     initial_error = abs(initial_temp - setpoint)
     final_error = abs(final_temp - setpoint)
-    
+
     print("\n✓ PID controller works!")
     print(f"  Initial error: {initial_error:.2f}°C")
     print(f"  Final error: {final_error:.2f}°C")
-    print(f"  Error reduction: {(1 - final_error/initial_error)*100:.1f}%\n")
-    
+    print(f"  Error reduction: {(1 - final_error / initial_error) * 100:.1f}%\n")
+
     assert final_error < initial_error * 0.6, "PID should reduce error"
 
 
 def test_ema():
     """Test EMA smoothing."""
     print("\n=== Testing EMA (Exponential Moving Average) ===")
-    
+
     config = SimulationConfig(
         scope=SimulationScope(
             start_time="2026-01-01T00:00:00Z",
@@ -245,17 +254,18 @@ def test_ema():
     rows = engine.generate()
 
     import statistics
+
     raw_values = [r["raw_temp_c"] for r in rows]
     smoothed_values = [r["smoothed_temp_c"] for r in rows]
-    
+
     raw_stdev = statistics.stdev(raw_values)
     smooth_stdev = statistics.stdev(smoothed_values)
-    
+
     print(f"Generated {len(rows)} rows")
     print(f"Raw temperature std dev: {raw_stdev:.3f}°C")
     print(f"Smoothed temperature std dev: {smooth_stdev:.3f}°C")
-    print(f"Noise reduction: {(1 - smooth_stdev/raw_stdev)*100:.1f}%")
-    
+    print(f"Noise reduction: {(1 - smooth_stdev / raw_stdev) * 100:.1f}%")
+
     assert smooth_stdev < raw_stdev, "EMA should reduce variance"
     print("✓ EMA smoothing works!\n")
 
@@ -266,13 +276,13 @@ if __name__ == "__main__":
         test_battery_soc()
         test_pid_control()
         test_ema()
-        
-        print("\n" + "="*60)
+
+        print("\n" + "=" * 60)
         print("🎉 ALL STATEFUL SIMULATION TESTS PASSED!")
-        print("="*60)
+        print("=" * 60)
         print("\nStateful functions ready for renewable energy applications:")
         print("  ✓ prev() - Access previous row values")
-        print("  ✓ ema() - Exponential moving average")  
+        print("  ✓ ema() - Exponential moving average")
         print("  ✓ pid() - PID controller with anti-windup")
         print("\nYou can now simulate:")
         print("  • Battery SOC integration")
@@ -280,9 +290,10 @@ if __name__ == "__main__":
         print("  • Sensor smoothing and filtering")
         print("  • First-order process dynamics")
         print("  • Any time-dependent process behavior")
-        
+
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

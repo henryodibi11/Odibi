@@ -1,0 +1,125 @@
+# L14 Example 2: Constrained MPC
+# Control with hard constraints on inputs and outputs
+
+project: constrained_mpc
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/constrained_mpc.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: constrained_pipeline
+    nodes:
+      - name: generate_constrained_mpc
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "10s"
+                row_count: 600
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "CMPC-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                - name: pressure_sp_psi
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "100.0 if row_num < 200 else 120.0"
+
+                # Raw controller output (unconstrained)
+                - name: raw_controller_output
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        prev('pressure_psi', 100.0),
+                        pressure_sp_psi,
+                        2.0,
+                        0.1,
+                        1.0,
+                        10.0,
+                        -999.0,
+                        999.0,
+                        false
+                      )
+
+                # Apply hard constraints
+                - name: constrained_output
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      raw_controller_output if (raw_controller_output >= 20.0 and raw_controller_output <= 80.0)
+                      else (20.0 if raw_controller_output < 20.0 else 80.0)
+
+                # Rate limiter: max change per timestep
+                - name: rate_limited_output
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('rate_limited_output', 50.0) +
+                      (5.0 if (constrained_output - prev('rate_limited_output', 50.0)) > 5.0
+                      else (-5.0 if (constrained_output - prev('rate_limited_output', 50.0)) < -5.0
+                      else (constrained_output - prev('rate_limited_output', 50.0))))
+
+                # Process pressure
+                - name: pressure_psi
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('pressure_psi', 100.0) +
+                      0.15 * (rate_limited_output - prev('pressure_psi', 100.0))
+
+                # Constraint status
+                - name: output_constraint_active
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "raw_controller_output != constrained_output"
+
+                - name: rate_constraint_active
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "abs(constrained_output - prev('rate_limited_output', 50.0)) > 4.9"
+
+        write:
+          connection: output

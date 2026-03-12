@@ -1,0 +1,161 @@
+# L15 Example 1: Complete CSTR Digital Twin
+# Mass, energy, and reaction kinetics
+
+project: cstr_digital_twin
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/cstr_twin.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: cstr_twin_pipeline
+    nodes:
+      - name: generate_cstr_twin
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 480
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "CSTR-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                # Inputs
+                - name: feed_flow_gpm
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 50.0
+
+                - name: feed_concentration_molL
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 2.0
+                    drift: 0.0
+                    noise: 0.05
+                    min: 1.8
+                    max: 2.2
+
+                - name: feed_temp_f
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 70.0
+
+                # Temperature setpoint
+                - name: reactor_temp_sp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "150.0 if row_num < 240 else 160.0"
+
+                # Controller for heat input
+                - name: heat_input_btu_min
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        prev('reactor_temp_f', 150.0),
+                        reactor_temp_sp,
+                        100.0,
+                        5.0,
+                        10.0,
+                        60.0,
+                        0.0,
+                        10000.0,
+                        true
+                      )
+
+                # First-order reaction: A -> B, k = 0.05 min^-1 at 150F
+                # Arrhenius: k = k0 * exp(-Ea/RT)
+                - name: reaction_rate_const
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "0.05 * 1.1 ** ((prev('reactor_temp_f', 150.0) - 150.0) / 10.0)"
+
+                # Mass balance for concentration
+                - name: reactor_concentration_molL
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('reactor_concentration_molL', 1.0) +
+                      (60.0 / 500.0) * (feed_flow_gpm / 50.0) *
+                      (feed_concentration_molL - prev('reactor_concentration_molL', 1.0)) -
+                      reaction_rate_const * prev('reactor_concentration_molL', 1.0)
+
+                # Energy balance for temperature
+                - name: reactor_temp_f
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('reactor_temp_f', 150.0) +
+                      (1.0 / (500.0 * 8.34)) *
+                      (feed_flow_gpm * 8.34 * (feed_temp_f - prev('reactor_temp_f', 150.0)) +
+                       heat_input_btu_min +
+                       reaction_rate_const * prev('reactor_concentration_molL', 1.0) * 500.0 * (-15000.0) / 60.0)
+
+                # Conversion
+                - name: conversion_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      100.0 * (feed_concentration_molL - reactor_concentration_molL) /
+                      (feed_concentration_molL + 0.001)
+
+                # Residence time
+                - name: residence_time_min
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "500.0 / feed_flow_gpm"
+
+                # Product concentration
+                - name: product_concentration_molL
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "feed_concentration_molL - reactor_concentration_molL"
+
+        write:
+          connection: output

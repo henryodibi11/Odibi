@@ -1,0 +1,132 @@
+# L11 Example 1: Temperature Cascade Control
+# Primary: outlet temp, Secondary: steam flow
+
+project: temperature_cascade
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/temp_cascade.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: cascade_pipeline
+    nodes:
+      - name: generate_cascade_control
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "10s"
+                row_count: 600
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "CAS-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                # Primary setpoint (outlet temperature)
+                - name: outlet_temp_sp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "180.0 if row_num < 200 else 190.0"
+
+                # Outlet temperature (primary controlled variable)
+                - name: outlet_temp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('outlet_temp', 180.0) +
+                      0.05 * (steam_flow - prev('steam_flow', 1000.0)) / 50.0
+
+                # Primary controller output becomes secondary setpoint
+                - name: steam_flow_sp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        outlet_temp,
+                        outlet_temp_sp,
+                        50.0,
+                        2.0,
+                        5.0,
+                        10.0,
+                        500.0,
+                        2000.0,
+                        true
+                      )
+
+                # Steam flow (secondary controlled variable)
+                - name: steam_flow
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('steam_flow', 1000.0) +
+                      0.3 * (valve_position - prev('steam_flow', 1000.0))
+
+                # Secondary controller (fast loop)
+                - name: valve_position
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        steam_flow,
+                        steam_flow_sp,
+                        0.8,
+                        0.15,
+                        0.1,
+                        10.0,
+                        0.0,
+                        100.0,
+                        true
+                      )
+
+                - name: primary_error
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "outlet_temp_sp - outlet_temp"
+
+                - name: secondary_error
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "steam_flow_sp - steam_flow"
+
+        write:
+          connection: output

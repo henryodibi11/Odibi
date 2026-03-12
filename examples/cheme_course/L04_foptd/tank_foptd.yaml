@@ -1,0 +1,114 @@
+﻿# L04 Example 1: Tank Temperature with FOPTD
+# Demonstrates First-Order Plus Time Delay model
+# NOTE: Time delay implemented using multiple prev() calls (manual shift)
+
+project: tank_temperature_foptd
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/tank_foptd.parquet
+    format: parquet
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: foptd_pipeline
+    nodes:
+      - name: generate_foptd_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 240  # 4 hours
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "TK-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: minutes_elapsed
+                  data_type: float
+                  generator:
+                    type: sequential
+                    start: 0
+                    step: 1
+
+                # ─────────────────────────────────
+                # INPUT: Heater power (step change)
+                # ─────────────────────────────────
+                - name: heater_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "60.0 if minutes_elapsed >= 30.0 else 50.0"
+
+                # ─────────────────────────────────
+                # TIME DELAY (θ = 2 minutes)
+                # Manual implementation using nested prev()
+                # ─────────────────────────────────
+                - name: heater_delayed_1
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "prev('heater_pct', 50.0)"
+
+                - name: heater_delayed
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "prev('heater_delayed_1', 50.0)"
+
+                # ─────────────────────────────────
+                # FIRST-ORDER LAG (K=0.5, τ=10)
+                # ─────────────────────────────────
+                - name: tank_temp_true_f
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('tank_temp_true_f', 100.0) +
+                      (1.0 / 10.0) *
+                      (0.5 * (heater_delayed - 50.0) -
+                       (prev('tank_temp_true_f', 100.0) - 100.0))
+
+                # ─────────────────────────────────
+                # SENSOR (with noise)
+                # ─────────────────────────────────
+                - name: sensor_noise
+                  data_type: float
+                  generator:
+                    type: range
+                    min: -0.3
+                    max: 0.3
+                    distribution: normal
+
+                - name: tank_temp_measured_f
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "tank_temp_true_f + sensor_noise"
+
+        write:`n          connection: output

@@ -1,0 +1,124 @@
+# L12 Example 2: Ratio Control with Feedforward
+# Maintain fixed ratio between two streams
+
+project: ratio_control
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/ratio_control.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: ratio_pipeline
+    nodes:
+      - name: generate_ratio_control
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "5s"
+                row_count: 600
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "RATIO-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                # Wild stream (uncontrolled feed)
+                - name: stream_a_gpm
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 100.0
+                    drift: 0.0
+                    noise: 3.0
+                    min: 80.0
+                    max: 120.0
+
+                # Desired ratio (B/A)
+                - name: ratio_setpoint
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 0.5
+
+                # Feedforward: compute required B flow
+                - name: stream_b_sp_gpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "stream_a_gpm * ratio_setpoint"
+
+                # Actual stream B flow
+                - name: stream_b_gpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('stream_b_gpm', 50.0) +
+                      0.3 * (valve_b_pct - prev('stream_b_gpm', 50.0))
+
+                # Ratio controller
+                - name: valve_b_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        stream_b_gpm,
+                        stream_b_sp_gpm,
+                        1.5,
+                        0.1,
+                        0.5,
+                        5.0,
+                        0.0,
+                        100.0,
+                        true
+                      )
+
+                # Actual ratio
+                - name: actual_ratio
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "stream_b_gpm / (stream_a_gpm + 0.001)"
+
+                - name: ratio_error_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "100.0 * (actual_ratio - ratio_setpoint) / ratio_setpoint"
+
+        write:
+          connection: output

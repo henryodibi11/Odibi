@@ -16,7 +16,7 @@ from odibi.simulation.generator import SimulationGenerator
 def test_basic():
     """Test basic mean_reversion_to functionality."""
     print("\n=== Test 1: Basic mean_reversion_to tracking ===")
-    
+
     config = SimulationConfig.model_validate(
         {
             "entities": [{"name": "reactor", "count": 1}],
@@ -57,14 +57,14 @@ def test_basic():
     df = generator.generate()
 
     print(f"Generated {len(df)} rows")
-    print(f"\nFirst 5 rows:")
+    print("\nFirst 5 rows:")
     print(df[["setpoint", "actual"]].head())
-    print(f"\nLast 5 rows:")
+    print("\nLast 5 rows:")
     print(df[["setpoint", "actual"]].tail())
 
     # Validation
     assert len(df) == 11, f"Expected 11 rows, got {len(df)}"
-    
+
     # Setpoint should increase due to trend
     sp_increase = df["setpoint"].iloc[-1] - df["setpoint"].iloc[0]
     print(f"\nSetpoint increased by: {sp_increase:.2f}°C")
@@ -82,7 +82,7 @@ def test_basic():
 def test_comparison():
     """Compare static vs dynamic mean reversion."""
     print("\n=== Test 2: Static vs Dynamic comparison ===")
-    
+
     # Static reversion
     config_static = SimulationConfig.model_validate(
         {
@@ -178,7 +178,7 @@ def test_comparison():
 def test_renewable_energy():
     """Realistic renewable energy example."""
     print("\n=== Test 3: Renewable energy (battery thermal) ===")
-    
+
     config = SimulationConfig.model_validate(
         {
             "entities": [{"name": "BESS", "count": 1}],
@@ -232,7 +232,7 @@ def test_renewable_energy():
     df = generator.generate()
 
     print(f"Generated {len(df)} rows (5-min intervals over 1 hour)")
-    print(f"\nSample data:")
+    print("\nSample data:")
     print(df[["power_kw", "temp_sp_c", "battery_temp_c", "temp_error_c"]].head(5))
 
     # Setpoint should vary with load
@@ -243,10 +243,10 @@ def test_renewable_energy():
     # Temperature control should be tight
     max_error = df["temp_error_c"].abs().max()
     mean_error = abs(df["temp_error_c"].mean())
-    
+
     print(f"Max temperature error: {max_error:.2f}°C")
     print(f"Mean temperature error: {mean_error:.2f}°C")
-    
+
     assert max_error < 2.0, f"Control too poor: {max_error:.2f}°C"
     assert mean_error < 0.5, f"Control bias too large: {mean_error:.2f}°C"
 
@@ -271,5 +271,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

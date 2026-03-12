@@ -1,0 +1,122 @@
+﻿# L01 Example 1: Mixing Tank pH Control (CV/MV/DV Mapping)
+# Demonstrates controlled, manipulated, and disturbance variables
+
+project: mixing_tank_ph_control
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/mixing_tank_ph.parquet
+    format: parquet
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: mixing_tank_ph_pipeline
+    nodes:
+      - name: generate_ph_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 480  # 8 hours
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "TANK-"
+
+              columns:
+                # Entity identifier
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                # Timestamp
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                # ─────────────────────────────────
+                # DISTURBANCE VARIABLE (DV)
+                # ─────────────────────────────────
+                - name: feed_ph
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 8.5
+                    drift: 0.0
+                    noise: 0.1
+                    min: 7.5
+                    max: 9.5
+
+                # ─────────────────────────────────
+                # MANIPULATED VARIABLE (MV)
+                # ─────────────────────────────────
+                - name: acid_flow_gpm
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 2.0
+                    drift: 0.0
+                    noise: 0.1
+                    min: 0.0
+                    max: 5.0
+
+                # ─────────────────────────────────
+                # CONTROLLED VARIABLE (CV)
+                # ─────────────────────────────────
+                - name: tank_ph
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('tank_ph', 7.0) +
+                      0.1 * (feed_ph - prev('tank_ph', 7.0)) -
+                      0.15 * acid_flow_gpm
+
+                # ─────────────────────────────────
+                # MEASUREMENT (with noise)
+                # ─────────────────────────────────
+                - name: sensor_noise
+                  data_type: float
+                  generator:
+                    type: range
+                    min: -0.05
+                    max: 0.05
+                    distribution: normal
+
+                - name: ph_sensor
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "tank_ph + sensor_noise"
+
+                # ─────────────────────────────────
+                # METADATA
+                # ─────────────────────────────────
+                - name: control_mode
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: ["AUTO", "MANUAL"]
+                    weights: [0.95, 0.05]
+
+        write:
+          connection: output
+          format: parquet
+          path: mixing_tank_ph.parquet
+          mode: overwrite

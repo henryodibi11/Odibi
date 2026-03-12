@@ -1,0 +1,122 @@
+﻿# L03 Example 1: Tank Temperature (First-Order Response)
+# Demonstrates first-order dynamics with step response
+
+project: first_order_tank
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/first_order_tank.parquet
+    format: parquet
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: fo_tank_pipeline
+    nodes:
+      - name: generate_temperature_response
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 600  # 10 hours
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "TK-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                # ──────────────────────────────────
+                # PROCESS PARAMETERS
+                # ──────────────────────────────────
+                - name: time_constant_min
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 10.0
+
+                - name: process_gain
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 2.0
+
+                # ──────────────────────────────────
+                # INPUT (step change at t=60 min)
+                # ──────────────────────────────────
+                - name: minutes_elapsed
+                  data_type: float
+                  generator:
+                    type: sequential
+                    start: 0
+                    step: 1
+
+                - name: steam_flow_lb_hr
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "150.0 if minutes_elapsed >= 60.0 else 100.0"
+
+                # ──────────────────────────────────
+                # OUTPUT (first-order response)
+                # ──────────────────────────────────
+                - name: tank_temp_f
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('tank_temp_f', 200.0) +
+                      (1.0 / time_constant_min) *
+                      (process_gain * steam_flow_lb_hr - prev('tank_temp_f', 200.0))
+
+                # ──────────────────────────────────
+                # SENSOR (with measurement noise)
+                # ──────────────────────────────────
+                - name: noise
+                  data_type: float
+                  generator:
+                    type: range
+                    min: -0.5
+                    max: 0.5
+                    distribution: normal
+
+                - name: temp_sensor_f
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "tank_temp_f + noise"
+
+                # ──────────────────────────────────
+                # KPIs (calculated)
+                # ──────────────────────────────────
+                - name: percent_of_final_value
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      0.0 if minutes_elapsed < 60.0 else
+                      ((tank_temp_f - 200.0) / 100.0) * 100.0
+
+        write:`n          connection: output

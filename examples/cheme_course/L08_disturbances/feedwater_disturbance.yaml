@@ -1,0 +1,106 @@
+# L08 Example 2: Feedwater Disturbance in Heat Exchanger
+# Shows inlet temperature disturbance rejection
+
+project: feedwater_disturbance
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/feedwater_dist.parquet
+    format: parquet
+
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: feedwater_pipeline
+    nodes:
+      - name: generate_hx_disturbance
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "30s"
+                row_count: 480
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "HX-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                - name: outlet_temp_setpoint
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 180.0
+
+                # Inlet temperature disturbance
+                - name: inlet_temp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "120.0 if row_num < 150 else 115.0"
+
+                # Steam flow (manipulated variable)
+                - name: steam_flow_lb_hr
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      pid(
+                        prev('outlet_temp', 180.0),
+                        outlet_temp_setpoint,
+                        3.0,
+                        0.15,
+                        1.0,
+                        30.0,
+                        0.0,
+                        5000.0,
+                        true
+                      )
+
+                # Outlet temperature
+                - name: outlet_temp
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('outlet_temp', 180.0) +
+                      0.015 * steam_flow_lb_hr / 100.0 +
+                      0.3 * (inlet_temp - prev('inlet_temp', 120.0))
+
+                - name: heat_duty_btu_hr
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "steam_flow_lb_hr * 970.0"
+
+        write:
+          connection: output

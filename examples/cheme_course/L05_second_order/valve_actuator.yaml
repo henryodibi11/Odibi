@@ -1,0 +1,101 @@
+﻿# L05 Example 3: Valve Actuator Model
+# Control valve with second-order dynamics (zeta=0.7, fast response)
+
+project: valve_actuator
+engine: pandas
+
+connections:
+  output:
+    type: local
+    path: ./output/valve_actuator.parquet
+    format: parquet
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: valve_pipeline
+    nodes:
+      - name: generate_valve_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "1s"  # 1 second per row
+                row_count: 600  # 600 seconds
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "FCV-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: row_num
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('row_num', -1) + 1"
+
+                - name: milliseconds_elapsed
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "row_num * 100"
+
+                # Controller signal (step from 50% to 80%)
+                - name: controller_signal_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "80.0 if row_num >= 100 else 50.0"
+
+                # Valve parameters (fast, slightly underdamped)
+                - name: zeta
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 0.7  # Slightly underdamped
+
+                - name: omega_n
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 3.0  # rad/sec (fast)
+
+                # State-space (dt = 0.1 sec)
+                - name: velocity
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('velocity', 0.0) +
+                      0.1 *
+                      (-omega_n * omega_n * (prev('valve_position_pct', 50.0) - 50.0) -
+                       2.0 * zeta * omega_n * prev('velocity', 0.0) +
+                       omega_n * omega_n * (controller_signal_pct - 50.0))
+
+                - name: valve_position_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "50.0 + 0.1 * velocity"
+
+        write:`n          connection: output

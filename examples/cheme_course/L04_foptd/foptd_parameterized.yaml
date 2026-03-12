@@ -1,0 +1,125 @@
+﻿# L04 Example 2: Parameterized FOPTD (Config Reuse)
+# Demonstrates parameterization for easy testing of different scenarios
+# NOTE: Delay implemented manually - theta parameter controls number of delay stages
+
+project: foptd_parameterized
+engine: pandas
+
+# ─────────────────────────────────
+# CONFIGURATION (change here!)
+# ─────────────────────────────────
+# NOTE: theta must be 0, 1, 2, or 3 (limited by manual delay implementation)
+
+connections:
+  output:
+    type: local
+    path: ./output/foptd_K0.5_tau10_theta2.parquet
+    format: parquet
+story:
+  connection: output
+  path: stories
+
+system:
+  connection: output
+  path: .odibi/catalog
+
+pipelines:
+  - pipeline: foptd_pipeline
+    nodes:
+      - name: generate_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2024-01-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 240
+                seed: 42
+
+              entities:
+                count: 1
+                id_prefix: "PROCESS-"
+
+              columns:
+                - name: entity_id
+                  data_type: string
+                  generator:
+                    type: constant
+                    value: "{entity_id}"
+
+                - name: timestamp
+                  data_type: timestamp
+                  generator:
+                    type: timestamp
+
+                - name: minutes_elapsed
+                  data_type: float
+                  generator:
+                    type: sequential
+                    start: 0
+                    step: 1
+
+                # Parameters
+                - name: K
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 0.5  # Process gain
+
+                - name: tau
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 10.0  # Time constant
+
+                - name: theta
+                  data_type: int
+                  generator:
+                    type: constant
+                    value: 2  # Dead time (minutes)
+
+                - name: step_size
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 10.0
+
+                - name: step_time_min
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 30.0
+
+                # Input
+                - name: input
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "step_size if minutes_elapsed >= step_time_min else 0.0"
+
+                # Manual delay implementation (2 timesteps)
+                - name: input_delayed_1
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "prev('input', 0.0)"
+
+                - name: input_delayed
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "prev('input_delayed_1', 0.0)"
+
+                # First-order response
+                - name: output
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      prev('output', 0.0) +
+                      (1.0 / tau) *
+                      (K * input_delayed - prev('output', 0.0))
+
+        write:`n          connection: output
