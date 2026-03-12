@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-03-12
+
+### Added
+
+- **🎓 Complete ChemE × Data Engineering Course** (35 working examples, 16 lessons):
+  - **Educational framework**: Teaches chemical engineers both process control (Seborg textbook) and data engineering through hands-on Odibi simulations
+  - **16 comprehensive lessons** (L00-L15): Setup → Basics → First/Second-Order Systems → PID Control → Advanced Topics → Digital Twin
+  - **35 tested YAML examples** (100% success rate): All examples verified with `odibi run`
+  - **Progressive difficulty**: Beginner-friendly (L00-L05) → Intermediate (L06-L09) → Advanced (L10-L14) → Expert (L15)
+  - **Full documentation**: Theory, exercises, solutions, and real-world applications
+  - **Test automation**: `scripts/test_all_cheme_examples.py` validates all 35 examples
+  - **mkdocs integration**: Course accessible via "Learn → ChemE × Data Engineering Course"
+
+- **Process Control Topics Covered**:
+  - L00: Odibi basics, data formats, reproducibility
+  - L01: Control variables (CV/MV/DV), time-series data
+  - L02: Degrees of freedom, mass/energy balances
+  - L03: First-order dynamics, EMA filtering
+  - L04: FOPTD models (first-order plus dead time)
+  - L05: Second-order systems, damping ratios, overshoot
+  - L06: PID controller basics with anti-windup
+  - L07: PID tuning (Ziegler-Nichols, Cohen-Coon)
+  - L08: Disturbance rejection strategies
+  - L09: System identification (step test, pulse test)
+  - L10: Interacting control loops (MIMO systems)
+  - L11: Cascade control (primary/secondary loops)
+  - L12: Feedforward control and ratio control
+  - L13: Nonlinear processes (valve characteristics, pH control)
+  - L14: Model predictive control (MPC) introduction
+  - L15: Complete CSTR digital twin with optimization
+
+- **Validated Simulation Patterns**:
+  - **Row number counter**: `prev('row_num', -1) + 1` for step changes and time-dependent logic
+  - **PID controller**: `pid(pv, sp, Kp, Ki, Kd, dt, min, max, anti_windup)` function
+  - **EMA smoothing**: `ema('column', alpha, default)` for noise filtering
+  - **Stateful computation**: `prev('column', default)` for integration and state tracking
+  - **Mass balance**: Tank level accumulation from flow differences
+  - **Energy balance**: Temperature dynamics from heat input/output
+
+- **Course Documentation**:
+  - `docs/learning/cheme_data_course/START_HERE.md` - Complete course entry point
+  - `docs/learning/cheme_data_course/lessons/` - All 16 lesson files with theory + exercises
+  - `examples/cheme_course/` - All 35 YAML examples organized by lesson
+  - `examples/cheme_course/TEST_RESULTS.md` - Comprehensive test validation report
+  - `docs/guides/seborg_textbook_mapping.md` - Maps Seborg chapters to Odibi examples
+
+### Fixed
+
+- **YAML timestep formats**: Standardized to `1s`, `5s`, `1m` (was: `1sec`, `1min`, `100ms`)
+- **Simulation expressions**: Cannot use pandas methods like `timestamp.shift()` in derived expressions (must use `row_num` counter)
+- **Sequential columns**: Converted to `derived` type for proper evaluation order
+
+### Documentation
+
+- **Self-service learning**: Course designed so business analysts can build pipelines without help
+- **Portfolio ready**: 35+ working examples suitable for LinkedIn/interviews
+- **Production tested**: All examples run on Pandas engine, compatible with Spark/Polars
+
 ## [2.23.0] - 2026-03-11
 
 ### Added
