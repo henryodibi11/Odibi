@@ -109,7 +109,7 @@ Templates are generated directly from Pydantic models—always in sync with code
 ### WSL/Spark Testing (Windows)
 Tests requiring Spark must run through WSL:
 ```bash
-wsl -d Ubuntu-20.04 -- bash -c "cd /mnt/d/odibi && python3.9 -m pytest tests/"
+wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && python3 -m pytest tests/"
 ```
 
 ## Key Patterns
