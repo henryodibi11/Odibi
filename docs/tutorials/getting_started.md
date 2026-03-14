@@ -60,7 +60,7 @@ Instead of writing configuration files from scratch, use the **Odibi Initializer
 Run this command in your terminal:
 
 ```bash
-odibi init-pipeline my_first_project --template local-medallion
+odibi init-pipeline my_first_project --template hello
 ```
 
 This creates a new folder `my_first_project` with a standard structure:
@@ -76,7 +76,7 @@ mv raw_data/customers.csv my_first_project/data/landing/
 mv raw_data/customers.csv my_first_project/data/landing/
 ```
 
-> **Note:** You can also generate a project *from existing data* using `odibi generate-project`, but `init-pipeline` is the recommended way to start fresh.
+> **Note:** `odibi init`, `odibi create`, and `odibi generate-project` are all aliases for `odibi init-pipeline`.
 
 ---
 
@@ -317,4 +317,4 @@ You have successfully built a data pipeline with data validation!
 *   **[Data Validation Guide](../validation/README.md):** Deep dive into all validation options.
 *   **[Spark Engine Tutorial](spark_engine.md):** Scale up with Apache Spark.
 *   **[Azure Connections](azure_connections.md):** Connect to Azure Blob, ADLS, and SQL.
-*   **[Master the CLI](../guides/cli_master_guide.md):** Learn about `odibi stress` and `odibi doctor`.
+*   **[Master the CLI](../guides/cli_master_guide.md):** Learn about `odibi doctor` and advanced CLI commands.

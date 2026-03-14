@@ -74,7 +74,7 @@ odibi run odibi.yaml
 
 # 5. View the Data Story
 odibi story list
-odibi story view --latest
+odibi story last
 ```
 
 #### ✅ Verify
@@ -471,7 +471,7 @@ Expected output:
 You've completed the Junior DE journey! Here's where to go next:
 
 ### Deepen Your Skills
-- [CLI Master Guide](../guides/cli_master_guide.md) - Learn `odibi stress` and advanced debugging
+- [CLI Master Guide](../guides/cli_master_guide.md) - Learn advanced CLI commands and debugging
 - [Writing Transformations](../guides/writing_transformations.md) - Custom Python functions
 - [Dimensional Modeling Tutorial](../tutorials/dimensional_modeling/01_introduction.md) - Star schemas
 

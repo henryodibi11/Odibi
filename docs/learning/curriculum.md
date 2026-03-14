@@ -148,7 +148,7 @@ odibi --version
 Let Odibi create a project structure for you:
 
 ```bash
-odibi init-pipeline my_first_project --template local-medallion
+odibi init my_first_project --template hello
 cd my_first_project
 ```
 
@@ -1199,7 +1199,7 @@ Every pipeline run generates a **Data Story** with:
 
 View your story:
 ```bash
-odibi story show --latest
+odibi story last
 ```
 
 ### 🧪 Self-Check

@@ -124,7 +124,7 @@ odibi run odibi.yaml
 
 **[Type and run]:**
 ```bash
-odibi story view --latest
+odibi story last
 ```
 
 **[Screen: Browser opens with HTML report]**

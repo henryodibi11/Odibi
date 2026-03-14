@@ -309,7 +309,7 @@ odibi run examples/manufacturing/sensor_pipeline.yaml
 # Or use the canonical example
 odibi run docs/examples/canonical/runnable/04_fact_table.yaml
 
-odibi story view --latest
+odibi story last
 ```
 
 **Inspect the Story and answer:**

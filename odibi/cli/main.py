@@ -325,6 +325,86 @@ def main() -> int:
     doctor_path_parser.add_argument("path", help="Path to diagnose")
     doctor_path_parser.add_argument("--format", choices=["auto", "json"], default="auto")
 
+    # odibi init / init-pipeline / create / generate-project
+    from odibi.cli.init_pipeline import add_init_parser
+
+    add_init_parser(subparsers)
+
+    # odibi story (generate, diff, list, last, show)
+    from odibi.cli.story import add_story_parser
+
+    add_story_parser(subparsers)
+
+    # odibi catalog (runs, pipelines, nodes, state, tables, metrics, patterns, stats, sync)
+    from odibi.cli.catalog import add_catalog_parser
+
+    add_catalog_parser(subparsers)
+
+    # odibi lineage (upstream, downstream, impact)
+    from odibi.cli.lineage import add_lineage_parser
+
+    add_lineage_parser(subparsers)
+
+    # odibi schema (history, diff)
+    from odibi.cli.schema import add_schema_parser
+
+    add_schema_parser(subparsers)
+
+    # odibi secrets (init, validate)
+    from odibi.cli.secrets import add_secrets_parser
+
+    add_secrets_parser(subparsers)
+
+    # odibi system (sync, rebuild-summaries, optimize, cleanup)
+    from odibi.cli.system import add_system_parser
+
+    add_system_parser(subparsers)
+
+    # odibi templates (list, show, transformer, schema)
+    from odibi.cli.templates import add_templates_parser
+
+    add_templates_parser(subparsers)
+
+    # odibi list (transformers, patterns, connections) & odibi explain
+    from odibi.cli.list_cmd import add_explain_parser, add_list_parser
+
+    add_list_parser(subparsers)
+    add_explain_parser(subparsers)
+
+    # odibi export (--target airflow|dagster)
+    from odibi.cli.export import add_export_parser
+
+    add_export_parser(subparsers)
+
+    # odibi ui
+    from odibi.cli.ui import add_ui_parser
+
+    add_ui_parser(subparsers)
+
+    # odibi graph
+    graph_parser = subparsers.add_parser("graph", help="Visualize pipeline dependency graph")
+    graph_parser.add_argument("config", help="Path to YAML config file")
+    graph_parser.add_argument("--pipeline", help="Pipeline name (default: first pipeline)")
+    graph_parser.add_argument("--env", help="Environment overrides")
+    graph_parser.add_argument(
+        "--format", choices=["ascii", "dot", "mermaid"], default="ascii", help="Output format"
+    )
+    graph_parser.add_argument("--verbose", action="store_true", help="Show full tracebacks")
+
+    # odibi deploy
+    deploy_parser = subparsers.add_parser(
+        "deploy", help="Deploy pipeline definitions to System Catalog"
+    )
+    deploy_parser.add_argument("config", help="Path to YAML config file")
+    deploy_parser.add_argument("--env", help="Environment overrides")
+
+    # odibi test
+    test_parser = subparsers.add_parser("test", help="Run Odibi unit tests")
+    test_parser.add_argument("path", nargs="?", default=".", help="Test file or directory")
+    test_parser.add_argument(
+        "--snapshot", action="store_true", help="Update snapshot baselines"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -351,6 +431,66 @@ def main() -> int:
         return cmd_doctor(args)
     elif args.command == "doctor-path":
         return cmd_doctor_path(args)
+    elif args.command in ("init-pipeline", "create", "init", "generate-project"):
+        from odibi.cli.init_pipeline import init_pipeline_command
+
+        return init_pipeline_command(args)
+    elif args.command == "story":
+        from odibi.cli.story import story_command
+
+        return story_command(args)
+    elif args.command == "catalog":
+        from odibi.cli.catalog import catalog_command
+
+        return catalog_command(args)
+    elif args.command == "lineage":
+        from odibi.cli.lineage import lineage_command
+
+        return lineage_command(args)
+    elif args.command == "schema":
+        from odibi.cli.schema import schema_command
+
+        return schema_command(args)
+    elif args.command == "secrets":
+        from odibi.cli.secrets import secrets_command
+
+        return secrets_command(args)
+    elif args.command == "system":
+        from odibi.cli.system import system_command
+
+        return system_command(args)
+    elif args.command == "templates":
+        from odibi.cli.templates import templates_command
+
+        return templates_command(args)
+    elif args.command == "list":
+        from odibi.cli.list_cmd import list_command
+
+        return list_command(args)
+    elif args.command == "explain":
+        from odibi.cli.list_cmd import explain_command
+
+        return explain_command(args)
+    elif args.command == "export":
+        from odibi.cli.export import export_command
+
+        return export_command(args)
+    elif args.command == "ui":
+        from odibi.cli.ui import ui_command
+
+        return ui_command(args)
+    elif args.command == "graph":
+        from odibi.cli.graph import graph_command
+
+        return graph_command(args)
+    elif args.command == "deploy":
+        from odibi.cli.deploy import deploy_command
+
+        return deploy_command(args)
+    elif args.command == "test":
+        from odibi.cli.test import test_command
+
+        return test_command(args)
     else:
         parser.print_help()
         return 1

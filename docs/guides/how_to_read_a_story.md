@@ -36,10 +36,10 @@ View stories:
 odibi story list
 
 # Open latest story in browser
-odibi story view --latest
+odibi story last
 
 # Open specific story
-odibi story view my_pipeline_20250111_143000.html
+odibi story show my_pipeline_20250111_143000.html
 ```
 
 ---

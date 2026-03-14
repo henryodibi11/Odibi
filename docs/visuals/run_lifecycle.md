@@ -95,7 +95,7 @@ sequenceDiagram
     
     Executor-->>CLI: Success
     CLI-->>User: ✅ Pipeline completed in 2m 35s
-    User->>CLI: odibi story view --latest
+    User->>CLI: odibi story last
     CLI-->>User: 📖 Opens Story in browser
 ```
 
@@ -413,7 +413,7 @@ odibi graph odibi.yaml
 
 ```bash
 # View last story
-odibi story view --latest
+odibi story last
 
 # Check state
 odibi catalog state odibi.yaml

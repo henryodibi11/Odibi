@@ -74,7 +74,7 @@ Download a sample Data Story:
 ```bash
 # If you have Odibi installed
 odibi run docs/examples/canonical/runnable/01_hello_world.yaml
-odibi story view --latest
+odibi story last
 
 # Or download pre-generated Story
 curl -O https://github.com/henryodibi11/Odibi/raw/main/docs/examples/stories/sample_story.html
@@ -181,7 +181,7 @@ Use the sample Data Story from Module 2 (or generate a new one from Example 4):
 
 ```bash
 odibi run docs/examples/canonical/runnable/04_fact_table.yaml
-odibi story view --latest
+odibi story last
 ```
 
 Answer these questions by reading the Story:

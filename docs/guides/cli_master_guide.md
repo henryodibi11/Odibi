@@ -1,5 +1,5 @@
 # Odibi CLI: Zero to Hero
-> **Ultimate Cheatsheet & Reference (v2.4.0)**
+> **Ultimate Cheatsheet & Reference (v3.4.1)**
 
 The Command Line Interface (CLI) is your primary tool for managing Odibi projects.
 
@@ -8,9 +8,9 @@ The Command Line Interface (CLI) is your primary tool for managing Odibi project
 ## 🟢 Level 1: The Basics
 
 ### 1. Create a New Pipeline File
-Generate a "Master Kitchen Sink" reference file with all features enabled.
+Generate a reference YAML config file with all features enabled.
 ```bash
-odibi create my_pipeline.yaml
+odibi scaffold project my_pipeline
 ```
 
 ### 2. Run a Pipeline
@@ -29,10 +29,24 @@ odibi run my_pipeline.yaml
 ## 🟡 Level 2: Intermediate (Management)
 
 ### 1. Initialize a Full Project
-Don't just create a file; create a full folder structure with best practices (Bronze/Silver/Gold layers).
+Create a full folder structure from a template. Aliases: `init`, `init-pipeline`, `create`, `generate-project`.
+
+**Available Templates:**
+| Template | Description |
+| :--- | :--- |
+| `hello` | Hello World - Simple CSV read/write (start here) |
+| `scd2` | SCD Type 2 - Slowly Changing Dimension pattern |
+| `star-schema` | Star Schema - Full dimensional model with fact table |
+
 ```bash
-# Creates folder 'my_project' with organized subfolders
-odibi init-pipeline my_project --template kitchen-sink
+# Start with the simplest example
+odibi init my_project --template hello
+
+# SCD2 pattern
+odibi init-pipeline my_project --template scd2
+
+# Full star schema project
+odibi init my_project --template star-schema
 ```
 
 ### 2. Validate Configuration
@@ -314,16 +328,23 @@ odibi validate generated_pipeline.yaml
 | Command | Description |
 | :--- | :--- |
 | `run` | Execute a pipeline. |
-| `create` | Create a single YAML config file. |
-| `init-pipeline` | Scaffold a full project directory. |
+| `discover` | Discover data sources. |
+| `scaffold` | Generate scaffolds (`project`, `sql-pipeline`). |
 | `validate` | Check YAML syntax and logic. |
-| `graph` | Visualize pipeline dependencies. |
-| `story` | Manage and compare execution reports (`generate`, `diff`, `list`). |
-| `secrets` | Manage local secure secrets (`init`, `validate`). |
-| `catalog` | Query System Catalog (`runs`, `pipelines`, `nodes`, `state`, `stats`). |
-| `schema` | Schema version tracking (`history`, `diff`). |
+| `doctor` | Run environment diagnostics. |
+| `doctor-path` | Diagnose a path. |
+| `init` / `init-pipeline` | Initialize a new Odibi project from a template. |
+| `story` | Generate and manage pipeline documentation stories (`generate`, `diff`, `list`, `last`, `show`). |
+| `catalog` | Query System Catalog metadata (`runs`, `pipelines`, `nodes`, `state`, `tables`, `metrics`, `patterns`, `stats`, `sync`). |
 | `lineage` | Cross-pipeline lineage (`upstream`, `downstream`, `impact`). |
-| `list` | List available features (`transformers`, `patterns`, `connections`). |
-| `explain` | Get detailed documentation for any feature. |
+| `schema` | Schema version tracking (`history`, `diff`). |
+| `secrets` | Manage secrets and environment variables (`init`, `validate`). |
+| `system` | Manage System Catalog operations (`sync`, `rebuild-summaries`, `optimize`, `cleanup`). |
 | `templates` | Generate YAML templates from Pydantic models (`list`, `show`, `transformer`, `schema`). |
-| `init-vscode` | Setup VS Code environment. |
+| `list` | List available transformers, patterns, or connections. |
+| `explain` | Explain a transformer, pattern, or connection. |
+| `export` | Export pipeline to orchestration code (`--target airflow\|dagster`). |
+| `ui` | Launch observability UI. |
+| `graph` | Visualize pipeline dependency graph (`ascii`, `dot`, `mermaid`). |
+| `deploy` | Deploy pipeline definitions to System Catalog. |
+| `test` | Run Odibi unit tests. |
