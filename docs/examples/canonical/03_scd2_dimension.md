@@ -1,3 +1,13 @@
+---
+title: "Example 3: SCD2 Dimension"
+roles: [jr-de, sr-de]
+tags: [example:intermediate, layer:silver, topic:scd2, topic:history, topic:dimensional-modeling]
+prereqs: [02_incremental_sql.md, ../../patterns/scd2.md, ../../patterns/dimension.md]
+next: [04_fact_table.md, ../../visuals/scd2_timeline.md]
+related: [../../patterns/scd2.md, ../../patterns/dimension.md, 04_fact_table.md]
+time: 20m
+---
+
 # Example 3: SCD2 Dimension (Track History)
 
 Build a customer dimension with full history tracking (Slowly Changing Dimension Type 2).

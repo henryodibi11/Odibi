@@ -1,3 +1,13 @@
+---
+title: Bronze Layer Tutorial
+roles: [jr-de, sr-de, cheme]
+tags: [tutorial:medallion, layer:bronze, topic:ingestion, topic:raw-data]
+prereqs: [getting_started.md, ../guides/medallion_architecture.md]
+next: [silver_layer.md, ../patterns/append_only_raw.md, ../patterns/incremental_stateful.md]
+related: [silver_layer.md, gold_layer.md, ../patterns/append_only_raw.md]
+time: 30m
+---
+
 # Bronze Layer Tutorial
 
 The **Bronze Layer** is where raw data lands. No transformations, no cleaning—just reliable ingestion with traceability.

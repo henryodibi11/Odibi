@@ -1,3 +1,13 @@
+---
+title: "Example 5: Full Pipeline"
+roles: [sr-de]
+tags: [example:advanced, topic:production, topic:validation, topic:quality, topic:alerts]
+prereqs: [04_fact_table.md, ../../validation/README.md, ../../features/quality_gates.md]
+next: [../../guides/production_deployment.md, ../../journeys/senior-data-engineer.md]
+related: [../../validation/contracts.md, ../../features/quarantine.md, ../../features/alerting.md]
+time: 30m
+---
+
 # Example 5: Full Pipeline (Validation + Quarantine + Alerting)
 
 A production-ready pipeline with data contracts, quality gates, quarantine routing, and Slack alerts.

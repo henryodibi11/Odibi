@@ -1,3 +1,13 @@
+---
+title: Silver Layer Tutorial
+roles: [jr-de, sr-de]
+tags: [tutorial:medallion, layer:silver, topic:cleaning, topic:deduplication, topic:scd]
+prereqs: [bronze_layer.md, ../guides/medallion_architecture.md]
+next: [gold_layer.md, ../patterns/merge_upsert.md, ../patterns/scd2.md]
+related: [bronze_layer.md, gold_layer.md, ../patterns/dimension.md]
+time: 35m
+---
+
 # Silver Layer Tutorial
 
 The **Silver Layer** is where data gets cleaned, deduplicated, and conformed. This is your trusted, query-ready data.

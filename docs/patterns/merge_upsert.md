@@ -1,3 +1,13 @@
+---
+title: Merge/Upsert Pattern
+roles: [jr-de, sr-de]
+tags: [pattern:merge, layer:silver, topic:deduplication, topic:idempotency]
+prereqs: [append_only_raw.md]
+next: [scd2.md, dimension.md]
+related: [scd2.md, incremental_stateful.md, sql_server_merge.md]
+time: 25m
+---
+
 # Pattern: Merge/Upsert (Raw → Silver)
 
 **Status:** Core Pattern  

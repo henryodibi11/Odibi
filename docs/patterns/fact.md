@@ -1,3 +1,13 @@
+---
+title: Fact Pattern
+roles: [jr-de, sr-de]
+tags: [pattern:fact, layer:gold, topic:dimensional-modeling, topic:star-schema]
+prereqs: [dimension.md, ../tutorials/dimensional_modeling/04_fact_pattern.md]
+next: [aggregation.md, ../examples/canonical/04_fact_table.md, ../visuals/fact_build_flow.md]
+related: [dimension.md, scd2.md, aggregation.md, ../validation/fk.md]
+time: 35m
+---
+
 # Fact Pattern
 
 The `fact` pattern builds fact tables with automatic surrogate key lookups from dimension tables, orphan handling, grain validation, and measure calculations.

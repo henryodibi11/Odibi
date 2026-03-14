@@ -1,3 +1,13 @@
+---
+title: Spark Engine Tutorial
+roles: [sr-de]
+tags: [tutorial:engine, topic:spark, topic:delta-lake, topic:databricks, topic:scaling]
+prereqs: [getting_started.md, ../guides/decision_guide.md]
+next: [azure_connections.md, ../guides/performance_tuning.md, ../guides/production_deployment.md]
+related: [../guides/performance_tuning.md, ../features/engines.md, ../reference/PARITY_TABLE.md]
+time: 45m
+---
+
 # Getting Started with Spark Engine
 
 This tutorial shows how to use Odibi with Apache Spark for large-scale data processing.

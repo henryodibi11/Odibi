@@ -1,3 +1,13 @@
+---
+title: "Example 2: Incremental SQL"
+roles: [jr-de, sr-de]
+tags: [example:intermediate, layer:bronze, topic:incremental, topic:hwm, format:sql]
+prereqs: [01_hello_world.md, ../../patterns/incremental_stateful.md]
+next: [03_scd2_dimension.md, ../../visuals/incremental_decision_tree.md]
+related: [../../patterns/incremental_stateful.md, ../../patterns/windowed_reprocess.md]
+time: 15m
+---
+
 # Example 2: Incremental SQL Ingestion (Database → Raw with HWM)
 
 Load data from a SQL Server database incrementally using high-water mark (HWM).

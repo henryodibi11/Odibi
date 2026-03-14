@@ -1,3 +1,13 @@
+---
+title: "Example 1: Hello World"
+roles: [ba, jr-de]
+tags: [example:beginner, layer:bronze, format:csv, format:parquet]
+prereqs: [../golden_path.md, ../../guides/installation.md]
+next: [02_incremental_sql.md, ../../tutorials/getting_started.md]
+related: [README.md, ../../patterns/append_only_raw.md]
+time: 10m
+---
+
 # Example 1: Hello World (CSV → Parquet)
 
 The simplest possible Odibi pipeline. Read a CSV, write Parquet.

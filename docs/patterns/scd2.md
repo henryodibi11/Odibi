@@ -1,3 +1,13 @@
+---
+title: SCD Type 2 Pattern
+roles: [jr-de, sr-de, cheme]
+tags: [pattern:scd2, layer:silver, topic:history, topic:dimensions]
+prereqs: [../tutorials/dimensional_modeling/01_introduction.md]
+next: [dimension.md, ../examples/canonical/03_scd2_dimension.md]
+related: [dimension.md, fact.md, merge_upsert.md]
+time: 25m
+---
+
 # SCD Type 2 (Slowly Changing Dimensions)
 
 The **SCD Type 2** pattern allows you to track the full history of changes for a record over time. Unlike a simple update (which overwrites the old value), SCD2 keeps the old version and adds a new version, managing effective dates for you.

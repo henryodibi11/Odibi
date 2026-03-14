@@ -1,3 +1,13 @@
+---
+title: Getting Started (Your First Project)
+roles: [ba, jr-de, cheme]
+tags: [tutorial:beginner, topic:first-pipeline, topic:validation, topic:story]
+prereqs: [../guides/installation.md, ../golden_path.md]
+next: [bronze_layer.md, ../examples/canonical/01_hello_world.md, ../journeys/junior-data-engineer.md]
+related: [../golden_path.md, ../guides/how_to_read_a_story.md, ../examples/canonical/README.md]
+time: 45m
+---
+
 # Getting Started with Odibi
 
 This tutorial will guide you through creating your first data pipeline. By the end, you will have a running project that reads data, cleans it, and generates an audit report ("Data Story").

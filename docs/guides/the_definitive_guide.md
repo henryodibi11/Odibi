@@ -1,8 +1,18 @@
+---
+title: The Definitive Guide
+roles: [jr-de, sr-de]
+tags: [guide:comprehensive, topic:architecture, topic:python-api, topic:deployment]
+prereqs: [../tutorials/getting_started.md, installation.md]
+next: [decision_guide.md, production_deployment.md, ../visuals/odibi_architecture.md]
+related: [python_api_guide.md, cli_master_guide.md, writing_transformations.md]
+time: 2-3 hours
+---
+
 # The Definitive Guide to Odibi
 
-**Version:** 2.4.0
-**Audience:** Data Engineers, Analytics Engineers, Architects
-**Prerequisites:** Basic Python and SQL knowledge
+**Version:** 2.4.0  
+**Audience:** Data Engineers, Analytics Engineers, Architects  
+**Prerequisites:** Basic Python and SQL knowledge  
 **Goal:** From "Hello World" to Enterprise Production
 
 ---

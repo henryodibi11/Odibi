@@ -42,6 +42,7 @@ plugins:
 
 markdown_extensions:
   - attr_list  # Enables {#custom-anchor} syntax for headings
+  - meta  # Enables front-matter support
   - toc:
       permalink: true
   - tables
@@ -50,93 +51,56 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.highlight:
       anchor_linenums: true
+  - pymdownx.snippets:  # Enables include templates
+      base_path: docs/_includes
 
 nav:
-  # ─────────────────────────────────────────────
-  # START HERE - First-run path
-  # ─────────────────────────────────────────────
-  - Start Here:
-      - Home: README.md
-      - Golden Path: golden_path.md
-      - Playbook: playbook/README.md
-      - Installation: guides/installation.md
-      - Quickstart: tutorials/getting_started.md
+  # ═════════════════════════════════════════════════════════════════
+  # START - Quick wins, zero prerequisites
+  # ═════════════════════════════════════════════════════════════════
+  - Start:
+      - 👋 Home: README.md
+      - 🚀 Quickstart (10 min): golden_path.md
+      - 📦 Install: guides/installation.md
+      - 📘 Your First Project: tutorials/getting_started.md
+      - 🎯 Playbook: playbook/README.md
+      - 🆘 Troubleshooting: troubleshooting.md
+      - ❓ FAQ: guides/faq.md
 
-  # ─────────────────────────────────────────────
-  # LEARN - Concepts, architecture, education
-  # ─────────────────────────────────────────────
-  - Learn:
-      - Philosophy: philosophy.md
-      - Architecture: explanation/architecture.md
-      - Medallion Architecture: guides/medallion_architecture.md
-      - ChemE × Data Engineering Course:
-          - 🚀 START HERE: learning/cheme_data_course/START_HERE.md
-          - ✅ COMPLETE - Ready to Use: learning/cheme_data_course/ALL_LESSONS_FIXED_COMPLETE.md
-          - 📖 Course Overview: learning/cheme_data_course/index.md
-          - Part I - Foundations (COMPLETE ✅):
-              - L00 Setup: learning/cheme_data_course/lessons/L00_setup.md
-              - L01 CV/MV/DV: learning/cheme_data_course/lessons/L01_cv_mv_dv.md
-              - L02 DoF + Balances: learning/cheme_data_course/lessons/L02_dof_balances.md
-              - L03 First-Order: learning/cheme_data_course/lessons/L03_first_order.md
-              - L04 FOPTD: learning/cheme_data_course/lessons/L04_foptd.md
-              - L05 Second-Order: learning/cheme_data_course/lessons/L05_second_order.md
-          - Part II - Control + ID (COMPLETE ✅):
-              - L06 PID Basics: learning/cheme_data_course/lessons/L06_pid_basics.md
-              - L07 Tuning: learning/cheme_data_course/lessons/L07_tuning.md
-              - L08 Disturbances: learning/cheme_data_course/lessons/L08_disturbances.md
-              - L09 System ID: learning/cheme_data_course/lessons/L09_system_id.md
-          - Part III - Advanced (COMPLETE ✅):
-              - L10 Interacting Loops: learning/cheme_data_course/lessons/L10_interacting_loops.md
-              - L11 Cascade: learning/cheme_data_course/lessons/L11_cascade.md
-              - L12 Feedforward: learning/cheme_data_course/lessons/L12_feedforward.md
-              - L13 Nonlinearity: learning/cheme_data_course/lessons/L13_nonlinearity.md
-              - L14 MPC-lite: learning/cheme_data_course/lessons/L14_mpc_lite.md
-          - Capstone (COMPLETE ✅):
-              - L15 CSTR Digital Twin: learning/cheme_data_course/lessons/L15_cstr_digital_twin.md
-          - 💡 Solutions: learning/cheme_data_course/solutions/index.md
-      - Core Concepts:
-          - Pipelines & Nodes: features/pipelines.md
-          - Connections: features/connections.md
-          - Engines: features/engines.md
-          - Transformers: features/transformers.md
-          - Loading Patterns: features/patterns.md
-          - Configuration: features/configuration.md
-          - State Management: features/state.md
-          - Simulation: features/simulation.md
-          - Stories: features/stories.md
-          - Orchestration: features/orchestration.md
-          - Bulk Copy (SQL Server): features/bulk_copy.md
-      - Data Engineering 101:
-          - Curriculum: learning/curriculum.md
-          - Data Engineering 101: learning/data_engineering_101.md
-          - Glossary: learning/glossary.md
-      - Dimensional Modeling (Tutorial):
-          - Introduction: tutorials/dimensional_modeling/01_introduction.md
-          - Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
-          - Date Dimension: tutorials/dimensional_modeling/03_date_dimension_pattern.md
-          - Fact Pattern: tutorials/dimensional_modeling/04_fact_pattern.md
-          - Aggregation: tutorials/dimensional_modeling/05_aggregation_pattern.md
-          - Full Star Schema: tutorials/dimensional_modeling/06_full_star_schema.md
-          - Semantic Layer Intro: tutorials/dimensional_modeling/07_semantic_layer_intro.md
-          - Defining Metrics: tutorials/dimensional_modeling/08_defining_metrics.md
-          - Defining Dimensions: tutorials/dimensional_modeling/09_defining_dimensions.md
-          - Querying Metrics: tutorials/dimensional_modeling/10_querying_metrics.md
-          - Materializing Metrics: tutorials/dimensional_modeling/11_materializing_metrics.md
-          - Full Semantic Example: tutorials/dimensional_modeling/12_semantic_full_example.md
-          - FK Validation: tutorials/dimensional_modeling/13_fk_validation.md
+  # ═════════════════════════════════════════════════════════════════
+  # LEARNING JOURNEYS - Persona-based paths (NEW!)
+  # ═════════════════════════════════════════════════════════════════
+  - 🎓 Learning Journeys:
+      - Choose Your Journey: journeys/README.md
+      - 📊 Business Analyst (2-3h): journeys/business-analyst.md
+      - 🎓 Junior Data Engineer (4-6h): journeys/junior-data-engineer.md
+      - 🚀 Senior Data Engineer (1-2d): journeys/senior-data-engineer.md
+      - ⚗️ Chemical Engineer / SME (2-3h): journeys/chemical-engineer.md
 
-  # ─────────────────────────────────────────────
-  # GUIDES - "I need to do X"
-  # ─────────────────────────────────────────────
-  - Guides:
-      - The Definitive Guide: guides/the_definitive_guide.md
-      - Decision Guide: guides/decision_guide.md
-      - Tutorials:
+  # ═════════════════════════════════════════════════════════════════
+  # TUTORIALS - Step-by-step learning
+  # ═════════════════════════════════════════════════════════════════
+  - Tutorials:
+      - Dimensional Modeling:
+          - 01 Introduction: tutorials/dimensional_modeling/01_introduction.md
+          - 02 Dimension Pattern: tutorials/dimensional_modeling/02_dimension_pattern.md
+          - 03 Date Dimension: tutorials/dimensional_modeling/03_date_dimension_pattern.md
+          - 04 Fact Pattern: tutorials/dimensional_modeling/04_fact_pattern.md
+          - 05 Aggregation: tutorials/dimensional_modeling/05_aggregation_pattern.md
+          - 06 Full Star Schema: tutorials/dimensional_modeling/06_full_star_schema.md
+          - 07 Semantic Layer Intro: tutorials/dimensional_modeling/07_semantic_layer_intro.md
+          - 08 Defining Metrics: tutorials/dimensional_modeling/08_defining_metrics.md
+          - 09 Defining Dimensions: tutorials/dimensional_modeling/09_defining_dimensions.md
+          - 10 Querying Metrics: tutorials/dimensional_modeling/10_querying_metrics.md
+          - 11 Materializing Metrics: tutorials/dimensional_modeling/11_materializing_metrics.md
+          - 12 Full Semantic Example: tutorials/dimensional_modeling/12_semantic_full_example.md
+          - 13 FK Validation: tutorials/dimensional_modeling/13_fk_validation.md
+      - Medallion Layers:
           - Bronze Layer: tutorials/bronze_layer.md
           - Silver Layer: tutorials/silver_layer.md
           - Gold Layer: tutorials/gold_layer.md
-          - Spark Engine: tutorials/spark_engine.md
-          - Azure Connections: tutorials/azure_connections.md
+      - Spark Engine: tutorials/spark_engine.md
+      - Azure Connections: tutorials/azure_connections.md
       - Examples (Copy/Paste):
           - Overview: examples/canonical/README.md
           - 1. Hello World: examples/canonical/01_hello_world.md
@@ -144,6 +108,13 @@ nav:
           - 3. SCD2 Dimension: examples/canonical/03_scd2_dimension.md
           - 4. Fact Table: examples/canonical/04_fact_table.md
           - 5. Full Pipeline: examples/canonical/05_full_pipeline.md
+
+  # ═════════════════════════════════════════════════════════════════
+  # HOW-TO GUIDES - Task-oriented ("I need to...")
+  # ═════════════════════════════════════════════════════════════════
+  - How-to Guides:
+      - The Definitive Guide: guides/the_definitive_guide.md
+      - Decision Guide: guides/decision_guide.md
       - Patterns (Problem → Solution):
           - Overview: patterns/README.md
           - Data Loading:
@@ -173,16 +144,10 @@ nav:
           - Variable Substitution: guides/variable_substitution.md
           - Explanation Feature: guides/explanation_feature.md
           - API Data Sources: guides/api_data_sources.md
+          - How to Read a Data Story: guides/how_to_read_a_story.md
           - Cookbook (Recipes): guides/recipes.md
           - Testing Pipelines: guides/testing.md
           - Best Practices: guides/best_practices.md
-      - Chemical Engineering (ChemE × DE):
-          - 📚 Seborg Textbook Mapping: guides/seborg_textbook_mapping.md
-          - Process Simulation Guide: guides/process_simulation_guide.md
-          - ChemE Simulation Guide: guides/chemical_engineering_simulation_guide.md
-          - Thermodynamics Transformers: guides/thermodynamics.md
-          - Unit Conversion: guides/unit_conversion.md
-          - Renewable Energy: guides/odibi_for_renewable_energy.md
       - Interfaces:
           - CLI Master Guide: guides/cli_master_guide.md
           - Python API Guide: guides/python_api_guide.md
@@ -192,10 +157,80 @@ nav:
           - Querying: semantics/query.md
           - Materializing: semantics/materialize.md
           - Running Views: semantics/runner.md
+      - Platform & Scaling:
+          - Decision Guide: guides/decision_guide.md
+          - Performance Tuning: guides/performance_tuning.md
+          - Production Deployment: guides/production_deployment.md
+          - Environments: guides/environments.md
+          - Secrets Management: guides/secrets.md
+          - Azure Setup: guides/setup_azure.md
+          - WSL Setup: guides/wsl_setup.md
+      - Chemical Engineering (ChemE × DE):
+          - 📚 Seborg Textbook Mapping: guides/seborg_textbook_mapping.md
+          - Process Simulation Guide: guides/process_simulation_guide.md
+          - ChemE Simulation Guide: guides/chemical_engineering_simulation_guide.md
+          - Thermodynamics Transformers: guides/thermodynamics.md
+          - Unit Conversion: guides/unit_conversion.md
+          - Renewable Energy: guides/odibi_for_renewable_energy.md
 
-  # ─────────────────────────────────────────────
+  # ═════════════════════════════════════════════════════════════════
+  # CONCEPTS - Understanding-oriented
+  # ═════════════════════════════════════════════════════════════════
+  - Concepts:
+      - Philosophy: philosophy.md
+      - Architecture: explanation/architecture.md
+      - Medallion Architecture: guides/medallion_architecture.md
+      - Core Concepts:
+          - Pipelines & Nodes: features/pipelines.md
+          - Connections: features/connections.md
+          - Engines: features/engines.md
+          - Transformers: features/transformers.md
+          - Loading Patterns: features/patterns.md
+          - Configuration: features/configuration.md
+          - State Management: features/state.md
+          - Simulation: features/simulation.md
+          - Stories: features/stories.md
+          - Orchestration: features/orchestration.md
+          - Bulk Copy (SQL Server): features/bulk_copy.md
+      - Data Engineering 101:
+          - Curriculum: learning/curriculum.md
+          - Data Engineering 101: learning/data_engineering_101.md
+          - Glossary: reference/glossary.md
+      - ChemE × Data Engineering Course:
+          - 🚀 START HERE: learning/cheme_data_course/START_HERE.md
+          - 📖 Course Overview: learning/cheme_data_course/index.md
+          - Part I - Foundations (COMPLETE ✅):
+              - L00 Setup: learning/cheme_data_course/lessons/L00_setup.md
+              - L01 CV/MV/DV: learning/cheme_data_course/lessons/L01_cv_mv_dv.md
+              - L02 DoF + Balances: learning/cheme_data_course/lessons/L02_dof_balances.md
+              - L03 First-Order: learning/cheme_data_course/lessons/L03_first_order.md
+              - L04 FOPTD: learning/cheme_data_course/lessons/L04_foptd.md
+              - L05 Second-Order: learning/cheme_data_course/lessons/L05_second_order.md
+          - Part II - Control + ID (COMPLETE ✅):
+              - L06 PID Basics: learning/cheme_data_course/lessons/L06_pid_basics.md
+              - L07 Tuning: learning/cheme_data_course/lessons/L07_tuning.md
+              - L08 Disturbances: learning/cheme_data_course/lessons/L08_disturbances.md
+              - L09 System ID: learning/cheme_data_course/lessons/L09_system_id.md
+          - Part III - Advanced (COMPLETE ✅):
+              - L10 Interacting Loops: learning/cheme_data_course/lessons/L10_interacting_loops.md
+              - L11 Cascade: learning/cheme_data_course/lessons/L11_cascade.md
+              - L12 Feedforward: learning/cheme_data_course/lessons/L12_feedforward.md
+              - L13 Nonlinearity: learning/cheme_data_course/lessons/L13_nonlinearity.md
+              - L14 MPC-lite: learning/cheme_data_course/lessons/L14_mpc_lite.md
+          - Capstone (COMPLETE ✅):
+              - L15 CSTR Digital Twin: learning/cheme_data_course/lessons/L15_cstr_digital_twin.md
+          - 💡 Solutions: learning/cheme_data_course/solutions/index.md
+
+  # ═════════════════════════════════════════════════════════════════
+  # VISUALS - Diagrams & Decision Trees (NEW!)
+  # ═════════════════════════════════════════════════════════════════
+  - 📊 Visuals:
+      - Odibi in One Picture: visuals/odibi_architecture.md
+      - Incremental Decision Tree: visuals/incremental_decision_tree.md
+
+  # ═════════════════════════════════════════════════════════════════
   # OPERATE - Quality, observability, deployment
-  # ─────────────────────────────────────────────
+  # ═════════════════════════════════════════════════════════════════
   - Operate:
       - Data Quality:
           - Overview: validation/README.md

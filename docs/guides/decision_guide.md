@@ -1,3 +1,13 @@
+---
+title: Decision Guide
+roles: [jr-de, sr-de, cheme]
+tags: [guide:reference, topic:engine-choice, topic:patterns, topic:best-practices]
+prereqs: [installation.md]
+next: [the_definitive_guide.md, ../visuals/incremental_decision_tree.md, ../playbook/README.md]
+related: [../playbook/README.md, performance_tuning.md, best_practices.md]
+time: 15m
+---
+
 # Decision Guide
 
 Rules of thumb for common Odibi decisions.

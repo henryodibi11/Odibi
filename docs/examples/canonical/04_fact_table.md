@@ -1,3 +1,13 @@
+---
+title: "Example 4: Fact Table"
+roles: [jr-de, sr-de]
+tags: [example:intermediate, layer:gold, topic:fact, topic:star-schema, topic:dimensional-modeling]
+prereqs: [03_scd2_dimension.md, ../../patterns/fact.md, ../../patterns/dimension.md]
+next: [05_full_pipeline.md, ../../visuals/fact_build_flow.md]
+related: [../../patterns/fact.md, ../../patterns/dimension.md, ../../validation/fk.md]
+time: 25m
+---
+
 # Example 4: Fact Table (Star Schema)
 
 Build a fact table with automatic surrogate key lookups from dimensions.

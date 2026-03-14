@@ -1,3 +1,13 @@
+---
+title: Gold Layer Tutorial
+roles: [jr-de, sr-de]
+tags: [tutorial:medallion, layer:gold, topic:facts, topic:aggregations, topic:star-schema]
+prereqs: [silver_layer.md, ../patterns/fact.md, ../patterns/dimension.md]
+next: [../patterns/fact.md, ../patterns/aggregation.md, ../examples/canonical/04_fact_table.md]
+related: [silver_layer.md, ../patterns/fact.md, ../semantics/index.md]
+time: 40m
+---
+
 # Gold Layer Tutorial
 
 The **Gold Layer** is where business-ready datasets live. Fact tables, aggregations, and semantic metrics—optimized for consumption.

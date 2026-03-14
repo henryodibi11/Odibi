@@ -1,3 +1,13 @@
+---
+title: Writing Transformations
+roles: [jr-de, sr-de]
+tags: [guide:howto, topic:python, topic:transformations, topic:custom-functions]
+prereqs: [../tutorials/getting_started.md, the_definitive_guide.md]
+next: [custom_functions.md, python_api_guide.md]
+related: [custom_functions.md, the_definitive_guide.md, ../features/transformers.md]
+time: 45m
+---
+
 # Writing Transformation Functions in Odibi
 
 This guide explains how to write custom Python transformation functions for Odibi pipelines, focusing on how to access data and manage state.

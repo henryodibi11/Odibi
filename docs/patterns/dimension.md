@@ -1,3 +1,13 @@
+---
+title: Dimension Pattern
+roles: [jr-de, sr-de]
+tags: [pattern:dimension, layer:silver, topic:dimensional-modeling, topic:scd]
+prereqs: [../tutorials/dimensional_modeling/01_introduction.md]
+next: [scd2.md, fact.md, ../examples/canonical/03_scd2_dimension.md]
+related: [scd2.md, fact.md, date_dimension.md, aggregation.md]
+time: 30m
+---
+
 # Dimension Pattern
 
 The `dimension` pattern builds complete dimension tables with automatic surrogate key generation and SCD (Slowly Changing Dimension) support.

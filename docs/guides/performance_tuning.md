@@ -1,3 +1,13 @@
+---
+title: Performance Tuning Guide
+roles: [sr-de]
+tags: [guide:howto, topic:performance, topic:optimization, topic:spark, topic:delta]
+prereqs: [spark_engine.md, decision_guide.md]
+next: [production_deployment.md, ../features/engines.md]
+related: [production_deployment.md, ../tutorials/spark_engine.md, ../reference/PARITY_TABLE.md]
+time: 30m
+---
+
 # Performance Tuning Guide
 
 Odibi v2.2 introduces a "High-Performance Core" designed to handle everything from local laptop development to petabyte-scale Spark jobs. This guide explains the optimizations available and how to use them.

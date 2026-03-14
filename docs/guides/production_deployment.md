@@ -1,3 +1,13 @@
+---
+title: Production Deployment
+roles: [sr-de]
+tags: [guide:howto, topic:production, topic:deployment, topic:secrets, topic:environments]
+prereqs: [../tutorials/spark_engine.md, performance_tuning.md]
+next: [environments.md, secrets.md, ../features/alerting.md]
+related: [environments.md, secrets.md, setup_azure.md, ../features/orchestration.md]
+time: 60m
+---
+
 # 🏭 Production Deployment
 
 Moving from your laptop to production (e.g., Databricks, Azure Data Factory, Airflow) requires handling secrets, environments, and logging differently.

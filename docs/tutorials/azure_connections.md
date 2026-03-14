@@ -1,3 +1,13 @@
+---
+title: Azure Connections Tutorial
+roles: [sr-de]
+tags: [tutorial:cloud, topic:azure, topic:blob, topic:adls, topic:sql-server]
+prereqs: [spark_engine.md, ../guides/installation.md]
+next: [../guides/setup_azure.md, ../guides/secrets.md, ../guides/production_deployment.md]
+related: [../features/connections.md, ../guides/setup_azure.md, ../guides/secrets.md]
+time: 40m
+---
+
 # Azure Connections Tutorial
 
 This tutorial shows how to connect Odibi to Azure data services: Blob Storage, ADLS Gen2, and Azure SQL.

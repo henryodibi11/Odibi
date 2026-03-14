@@ -1,3 +1,13 @@
+---
+title: Stateful Incremental Loading
+roles: [jr-de, sr-de, cheme]
+tags: [pattern:incremental, layer:bronze, topic:hwm, topic:state-tracking]
+prereqs: [append_only_raw.md, ../guides/decision_guide.md]
+next: [windowed_reprocess.md, ../visuals/incremental_decision_tree.md, ../examples/canonical/02_incremental_sql.md]
+related: [windowed_reprocess.md, smart_read.md, skip_if_unchanged.md]
+time: 20m
+---
+
 # Stateful Incremental Loading
 
 Stateful Incremental Loading is the "Auto-Pilot" mode for ingestion. Unlike **Smart Read (Rolling Window)** which blindly looks back X days, **Stateful Mode** remembers exactly where it left off.
