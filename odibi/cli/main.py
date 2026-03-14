@@ -401,9 +401,7 @@ def main() -> int:
     # odibi test
     test_parser = subparsers.add_parser("test", help="Run Odibi unit tests")
     test_parser.add_argument("path", nargs="?", default=".", help="Test file or directory")
-    test_parser.add_argument(
-        "--snapshot", action="store_true", help="Update snapshot baselines"
-    )
+    test_parser.add_argument("--snapshot", action="store_true", help="Update snapshot baselines")
 
     args = parser.parse_args()
 
