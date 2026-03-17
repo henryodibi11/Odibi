@@ -5,12 +5,11 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Map template names to their relative paths in the repo
-# Templates align with docs/golden_path.md canonical examples
+# Template names → bundled YAML files inside odibi/scaffold/templates/
 TEMPLATE_MAP = {
-    "hello": "docs/examples/canonical/runnable/01_hello_world.yaml",
-    "scd2": "docs/examples/canonical/runnable/03_scd2_dimension.yaml",
-    "star-schema": "docs/examples/canonical/runnable/04_fact_table.yaml",
+    "hello": "hello.yaml",
+    "scd2": "scd2.yaml",
+    "star-schema": "star-schema.yaml",
 }
 
 # Template descriptions for interactive prompt
@@ -82,25 +81,14 @@ def init_pipeline_command(args):
             logger.warning(f"Overwriting existing directory '{project_name}'...")
             shutil.rmtree(target_dir)
 
-    # 2. Find Template File
-    # Assuming we are running from within the installed package or repo
-    # Try to find the repo root relative to this file
-    # This file is in odibi/cli/init_pipeline.py
-    # Repo root is ../../../
-
-    current_file = Path(__file__).resolve()
-    repo_root = current_file.parent.parent.parent
-
-    template_rel_path = TEMPLATE_MAP[template_name]
-    source_path = repo_root / template_rel_path
+    # 2. Find Template File (bundled inside odibi/scaffold/)
+    scaffold_dir = Path(__file__).resolve().parent.parent / "scaffold"
+    template_filename = TEMPLATE_MAP[template_name]
+    source_path = scaffold_dir / "templates" / template_filename
 
     if not source_path.exists():
-        # Fallback: check if we are installed and templates are packaged (not likely in this env but good practice)
-        # For now, just fail if not found in repo structure
         logger.error(f"Template file not found at: {source_path}")
-        logger.error(
-            "Ensure you are running Odibi from the repository root or templates are correctly installed."
-        )
+        logger.error("Odibi installation may be incomplete — scaffold/templates/ is missing.")
         return 1
 
     # 3. Create Project Structure
@@ -126,8 +114,8 @@ def init_pipeline_command(args):
         os.makedirs(target_dir / "logs", exist_ok=True)
         os.makedirs(target_dir / ".github/workflows", exist_ok=True)
 
-        # Copy sample data from canonical examples
-        sample_data_dir = repo_root / "docs/examples/canonical/sample_data"
+        # Copy bundled sample data
+        sample_data_dir = scaffold_dir / "sample_data"
         if sample_data_dir.exists():
             target_sample_dir = target_dir / "sample_data"
             shutil.copytree(sample_data_dir, target_sample_dir)

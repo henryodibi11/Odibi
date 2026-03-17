@@ -160,6 +160,9 @@ where = ["."]
 include = ["odibi*", "odibi_mcp*"]
 exclude = ["tests*"]
 
+[tool.setuptools.package-data]
+"odibi.scaffold" = ["templates/*.yaml", "sample_data/*.csv"]
+
 [tool.black]
 line-length = 100
 target-version = ['py39', 'py310', 'py311']
