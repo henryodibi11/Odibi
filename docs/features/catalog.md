@@ -51,10 +51,10 @@ system:
 connections:
   sql_server:
     type: sql_server
-    server: myserver.database.windows.net
+    host: myserver.database.windows.net
     database: odibi_metadata
     auth:
-      mode: service_principal
+      mode: aad_msi
 ```
 
 The SQL Server backend:
@@ -95,7 +95,7 @@ system:
 connections:
   sql_server:
     type: sql_server
-    server: central-server.database.windows.net
+    host: central-server.database.windows.net
     database: odibi_metadata
   local_dev:
     type: local

@@ -100,7 +100,7 @@ After understanding visuals, apply them:
 - **[Patterns](../patterns/README.md)** - Implementation guides for each pattern
 - **[Canonical Examples](../examples/canonical/README.md)** - Working YAML configs
 - **[Learning Journeys](../journeys/README.md)** - Persona-based learning paths
-- **[How-to Guides](../guides/README.md)** - Task-oriented guides
+- **[How-to Guides](../README.md)** - Task-oriented guides
 
 ---
 

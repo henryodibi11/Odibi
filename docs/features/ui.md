@@ -17,10 +17,6 @@ The UI is a FastAPI application with three main views:
 ```bash
 # Start with a specific config file
 odibi ui config.yaml
-
-# Or set via environment variable
-export ODIBI_CONFIG=config.yaml
-odibi ui
 ```
 
 The server runs on `http://localhost:8000` by default.

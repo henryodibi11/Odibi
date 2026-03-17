@@ -28,11 +28,13 @@ Use `${VAR_NAME}` to inject values from environment variables. This is the recom
 ```yaml
 connections:
   my_database:
-    type: sqlserver
+    type: sql_server
     host: ${DB_HOST}
     database: ${DB_NAME}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}  # Never hardcode passwords!
+    auth:
+      mode: sql_login
+      username: ${DB_USER}
+      password: ${DB_PASSWORD}  # Never hardcode passwords!
 ```
 
 Before running, set the environment variables:

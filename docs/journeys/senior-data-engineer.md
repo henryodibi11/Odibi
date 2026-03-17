@@ -366,7 +366,9 @@ connections:
   warehouse:
     type: sql_server
     host: "${DB_HOST}"
-    password: "${DB_PASSWORD}"  # Auto-redacted in logs
+    auth:
+      mode: sql_login
+      password: "${DB_PASSWORD}"  # Auto-redacted in logs
 ```
 
 Run:
@@ -523,10 +525,10 @@ def complex_aggregation(context: EngineContext, params: dict):
 odibi validate odibi.yaml
 
 # Check environment health
-odibi doctor odibi.yaml
+odibi doctor
 
 # Visualize dependency graph
-odibi graph odibi.yaml --output graph.png
+odibi graph odibi.yaml
 
 # Dry-run (no writes)
 odibi run odibi.yaml --dry-run
@@ -554,7 +556,7 @@ odibi run broken.yaml 2>&1 | tee error.log
 
 Use diagnostics:
 ```bash
-odibi doctor broken.yaml
+odibi doctor
 # Shows: missing_connection is not defined
 ```
 
@@ -670,16 +672,16 @@ You've completed the Senior DE journey! Here's where to level up further:
 ### Advanced Topics
 - [Semantic Layer Guide](../semantics/index.md) - Build metrics on top of your warehouse
 - [Lineage Tracking](../features/lineage.md) - OpenLineage integration
-- [Schema Evolution](../guides/schema_evolution.md) - Handle breaking changes
+- [Schema Evolution](../features/schema_tracking.md) - Handle breaking changes
 - [Testing Pipelines](../guides/testing.md) - Unit and integration tests
 
 ### Platform Engineering
 - [Orchestration](../features/orchestration.md) - Airflow/Prefect integration
-- [CI/CD for Data Pipelines](../guides/cicd.md) ← **New guide**
-- [Databricks Best Practices](../guides/databricks_best_practices.md) ← **New guide**
+- [CI/CD for Data Pipelines](../guides/production_deployment.md)
+- [Databricks Best Practices](../guides/production_deployment.md)
 
 ### Contribute Back
-- [CONTRIBUTING.md](../../CONTRIBUTING.md) - Help improve Odibi
+- [CONTRIBUTING.md](https://github.com/henryodibi11/odibi/blob/main/CONTRIBUTING.md) - Help improve Odibi
 - Share your patterns in GitHub Discussions
 - Write a case study of your production pipeline
 

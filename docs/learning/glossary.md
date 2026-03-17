@@ -132,15 +132,15 @@ validation:
   rules:
     - column: email
       rule: not_null
-      severity: error
+      on_fail: fail
     - column: age
       rule: range
       min: 0
       max: 150
-      severity: warning
+      on_fail: warn
     - column: order_total
       rule: positive
-      severity: error
+      on_fail: fail
 ```
 
 **Why it matters:** Bad data leads to bad decisions. If 20% of your sales records have missing amounts, your revenue reports are wrong. Data quality catches problems before they spread.
@@ -658,7 +658,7 @@ validation:
     - column: email
       rule: regex
       pattern: "^[^@]+@[^@]+\\.[^@]+$"
-      severity: error  # Failures go to quarantine
+      on_fail: fail  # Failures go to quarantine
 ```
 
 **Why it matters:** Without quarantine, bad data silently corrupts your analytics. With quarantine, good data flows through while problems are captured for review and correction.
@@ -897,28 +897,28 @@ validation:
     # Must have a value
     - column: order_id
       rule: not_null
-      severity: error
+      on_fail: fail
 
     # Must be a valid email format
     - column: email
       rule: regex
       pattern: "^[^@]+@[^@]+$"
-      severity: warning
+      on_fail: warn
 
     # Must be a real date
     - column: order_date
       rule: not_in_future
-      severity: error
+      on_fail: fail
 
     # Must be positive
     - column: quantity
       rule: positive
-      severity: error
+      on_fail: fail
 ```
 
-**Severity levels:**
-- `error` - Stop processing, quarantine the row
-- `warning` - Log the issue, continue processing
+**on_fail levels:**
+- `fail` - Stop processing, quarantine the row
+- `warn` - Log the issue, continue processing
 
 **Why it matters:** Bad data in = bad decisions out. Validation catches problems at the door instead of letting them corrupt your analytics.
 

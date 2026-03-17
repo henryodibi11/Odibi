@@ -176,7 +176,7 @@ system:
 **Fixes:**
 ```bash
 # Check current HWM state
-odibi catalog state --config config.yaml
+odibi catalog state config.yaml
 
 # Verify HWM column has no NULLs
 # HWM is set to MAX(column) after successful run
@@ -189,7 +189,7 @@ odibi catalog state --config config.yaml
 **Fix:** Reset state for specific node:
 ```bash
 # View current state
-odibi catalog state --config config.yaml
+odibi catalog state config.yaml
 
 # If needed, delete and re-run (full load)
 # State will be rebuilt on next successful run

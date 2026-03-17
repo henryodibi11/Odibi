@@ -103,6 +103,7 @@ Combine the `sessionize` transformer with `incremental: { mode: "stateful" }` to
     # Tracks the last processed timestamp to only read new events
     incremental:
       mode: "stateful"
+      column: "event_time"
       state_key: "clickstream_hwm"
       watermark_lag: "1h"  # Handle late arriving data
 

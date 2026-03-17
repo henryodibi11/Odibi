@@ -225,12 +225,13 @@ Detects unexpected drops in data volume compared to previous runs.
 validation:
   tests:
     - type: volume_drop
-      max_drop_percentage: 50  # Fail if count drops >50%
+      threshold: 0.5  # Fail if count drops >50%
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `max_drop_percentage` | float | Yes | Maximum allowed drop (0-100) |
+| `threshold` | float | No | Maximum allowed drop as fraction (0.5 = 50% drop). Default: 0.5 |
+| `lookback_days` | int | No | Days of history to average. Default: 7 |
 | `on_fail` | string | No | `fail`, `warn`, or `quarantine` |
 
 ## On-Fail Actions
@@ -410,7 +411,7 @@ nodes:
 
         # Volume monitoring
         - type: volume_drop
-          max_drop_percentage: 30
+          threshold: 0.3
           on_fail: fail
 
       quarantine:

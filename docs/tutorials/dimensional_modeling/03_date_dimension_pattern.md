@@ -71,7 +71,7 @@ engine: pandas
 connections:
   warehouse:
     type: local
-    path: ./warehouse
+    base_path: ./warehouse
 
 story:
   connection: warehouse
@@ -288,7 +288,7 @@ engine: pandas
 connections:
   warehouse:
     type: local
-    path: ./warehouse
+    base_path: ./warehouse
 
 story:
   connection: warehouse

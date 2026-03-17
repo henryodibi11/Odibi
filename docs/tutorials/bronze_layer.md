@@ -163,17 +163,17 @@ nodes:
     contracts:
       - type: row_count
         min: 1                       # Fail if empty
-        severity: error
+        on_fail: fail
     write:
       connection: bronze
       table: raw_orders
       mode: append
 ```
 
-**Severity options:**
-| Severity | Behavior |
-|----------|----------|
-| `error` | Fail the node |
+**on_fail options:**
+| Option | Behavior |
+|--------|----------|
+| `fail` | Fail the node |
 | `warn` | Log warning, continue |
 
 **See:** [Contracts](../reference/yaml_schema.md#contracts-data-quality-gates)
@@ -196,8 +196,8 @@ nodes:
     contracts:
       - type: volume_drop
         threshold: 0.5               # Fail if <50% of previous run
-        lookback_runs: 3             # Compare to last 3 runs
-        severity: error
+        lookback_days: 3             # Days of history to average
+        on_fail: fail
     write:
       connection: bronze
       table: raw_orders
@@ -247,10 +247,12 @@ nodes:
 connections:
   source_db:
     type: sql_server
-    server: server.database.windows.net
+    host: server.database.windows.net
     database: sales
-    user: "${DB_USER}"
-    password: "${DB_PASSWORD}"
+    auth:
+      mode: sql_login
+      username: "${DB_USER}"
+      password: "${DB_PASSWORD}"
 
 nodes:
   - name: raw_orders

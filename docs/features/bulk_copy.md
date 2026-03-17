@@ -83,7 +83,7 @@ connections:
   # SQL Server target
   sql_warehouse:
     type: sql_server
-    server: ${SQL_SERVER}
+    host: ${SQL_SERVER}
     database: ${SQL_DATABASE}
     auth:
       mode: sql_login
@@ -144,7 +144,7 @@ connections:
 
   sql_warehouse:
     type: sql_server
-    server: ${SQL_SERVER}
+    host: ${SQL_SERVER}
     database: ${SQL_DATABASE}
     auth:
       mode: sql_login

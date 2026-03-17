@@ -77,8 +77,8 @@ Creates star schema in `./data/gold/`:
 # Validate config syntax before running
 odibi validate 04_fact_table.yaml
 
-# Run with verbose output
-odibi run 04_fact_table.yaml --verbose
+# Run the pipeline
+odibi run 04_fact_table.yaml
 ```
 
 ## Cleanup

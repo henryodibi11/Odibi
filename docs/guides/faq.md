@@ -7,11 +7,11 @@
 ## 📋 Table of Contents
 
 - [Getting Started](#getting-started)
-- [Engines & Performance](#engines--performance)
-- [Patterns & Transformers](#patterns--transformers)
-- [Data Quality & Validation](#data-quality--validation)
+- [Engines & Performance](#engines-performance)
+- [Patterns & Transformers](#patterns-transformers)
+- [Data Quality & Validation](#data-quality-validation)
 - [Incremental Loading](#incremental-loading)
-- [Production & Deployment](#production--deployment)
+- [Production & Deployment](#production-deployment)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -221,7 +221,7 @@ validation:
     - type: not_null
       columns: [transaction_id]  # Critical
   gate:
-    on_failure: fail  # Must stop
+    on_fail: abort  # Must stop
 
 # vs
 
@@ -230,14 +230,18 @@ validation:
     - type: not_null
       columns: [middle_name]  # Optional
   gate:
-    on_failure: warn  # Log but continue
+    on_fail: warn_and_write  # Log but continue
 
 # vs
 
 validation:
-  gate:
-    on_failure: quarantine
-    quarantine_path: data/quarantine/transactions
+  tests:
+    - type: not_null
+      columns: [transaction_id]
+      on_fail: quarantine
+  quarantine:
+    connection: silver
+    path: quarantine/transactions
 ```
 
 ---
@@ -250,26 +254,32 @@ Use the `fact` pattern with FK validation:
 pattern:
   type: fact
   params:
+    grain: [order_id]
     dimensions:
       - source_column: customer_id
         dimension_table: dim_customer
         dimension_key: customer_id
         surrogate_key: customer_sk
     orphan_handling: unknown  # orphans → SK=0
-    validate_foreign_keys: true  # Fail if dim missing
 ```
 
-Or use the `fk_validation` transformer explicitly:
+Or use the FK validation module for post-pipeline auditing:
 
-```yaml
-transformer:
-  transformer: validate_foreign_keys
-  params:
-    checks:
-      - column: customer_sk
-        reference_table: dim_customer
-        reference_column: customer_sk
-    on_missing: fail  # or warn, quarantine
+```python
+from odibi.validation.fk import FKValidator, RelationshipConfig, RelationshipRegistry
+
+registry = RelationshipRegistry(relationships=[
+    RelationshipConfig(
+        name="orders_to_customers",
+        fact="fact_orders",
+        dimension="dim_customer",
+        fact_key="customer_sk",
+        dimension_key="customer_sk",
+        on_violation="error"
+    )
+])
+validator = FKValidator(registry)
+report = validator.validate_fact(fact_df, "fact_orders", context)
 ```
 
 See [FK Validation Guide](../tutorials/dimensional_modeling/13_fk_validation.md).
@@ -348,7 +358,10 @@ SLACK_WEBHOOK=https://hooks.slack.com/...
 connections:
   warehouse:
     type: sql_server
-    password: "${DB_PASSWORD}"  # Auto-redacted in logs
+    host: "${DB_HOST}"
+    auth:
+      mode: sql_login
+      password: "${DB_PASSWORD}"  # Auto-redacted in logs
 
 alerts:
   - type: slack
@@ -546,14 +559,13 @@ nodes:
 
 ### Q: How do I reset incremental state (force full reload)?
 
+To force a full reload, manually clear the stored state:
+
+1. **Delete the node's state entry** from the state JSON file (or delete the entire state file to reset all nodes).
+2. **Optionally**, update the `initial_value` in your YAML config to set a new starting point.
+3. **Re-run the pipeline:**
+
 ```bash
-# Reset state for specific node
-odibi catalog reset odibi.yaml --node load_events
-
-# Reset all state
-odibi catalog reset odibi.yaml --all
-
-# Then re-run
 odibi run odibi.yaml
 ```
 
@@ -568,4 +580,4 @@ odibi run odibi.yaml
 
 ---
 
-[← Back to Guides](README.md)
+[← Back to Guides](../README.md)

@@ -10,6 +10,8 @@ Odibi's connection system provides:
 - **Environment variables**: Secure secret injection via `${VAR}` syntax
 - **Plugin architecture**: Register custom connection types via factory pattern
 
+> **Note:** This page documents the **runtime connection factory** API (`odibi.connections.factory`), which uses type names like `azure_adls`, `azure_sql`, and flat `auth_mode` fields. For **YAML config-level** connections validated by Pydantic (`odibi.config`), use `type: azure_blob`, `type: sql_server`, and nested `auth:` blocks. See [Azure Setup Guide](../guides/setup_azure.md) and [Configuration Reference](../reference/configuration.md) for Pydantic-valid YAML examples.
+
 ## Built-in Connection Types
 
 | Type | Description |

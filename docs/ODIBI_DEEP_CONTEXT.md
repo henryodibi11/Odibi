@@ -894,10 +894,10 @@ connections:
 | Mode | Required Parameters | Use Case |
 |------|---------------------|----------|
 | `key_vault` | `key_vault_name`, `secret_name` | Production (recommended) |
-| `direct_key` | `account_key` | Development only |
-| `sas_token` | `sas_token` | Limited access scenarios |
-| `service_principal` | `tenant_id`, `client_id`, `client_secret` | Automation/CI |
-| `managed_identity` | (none) | Databricks/Azure VMs |
+| `account_key` | `account_key` | Development only |
+| `sas` | `sas_token` | Limited access scenarios |
+| `connection_string` | `connection_string` | Full connection string |
+| `aad_msi` | (none) | Databricks/Azure VMs |
 
 **Path Resolution:**
 ```python
@@ -920,14 +920,14 @@ conn.configure_spark(spark)  # Sets fs.azure.* configs automatically
 connections:
   sql_prod:
     type: azure_sql
-    server: myserver.database.windows.net
+    host: myserver.database.windows.net
     database: analytics
     auth_mode: aad_msi
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `server` | str | Yes | SQL server hostname |
+| `host` | str | Yes | SQL server hostname |
 | `database` | str | Yes | Database name |
 | `driver` | str | No | Default: `ODBC Driver 18 for SQL Server` |
 | `auth_mode` | str | Yes | `aad_msi`, `sql`, `key_vault` |
@@ -998,9 +998,11 @@ Inject values from environment variables (recommended for secrets):
 ```yaml
 connections:
   database:
-    type: sqlserver
-    password: ${DB_PASSWORD}    # From environment
+    type: sql_server
     host: ${env:DB_HOST}        # Explicit env: prefix (same behavior)
+    auth:
+      mode: sql_login
+      password: ${DB_PASSWORD}    # From environment
 ```
 
 #### Custom Variables: `${vars.name}`
@@ -1476,7 +1478,7 @@ Generate Airflow or Dagster DAGs from odibi pipelines:
 ### 12.1 Airflow Export
 
 ```bash
-odibi export airflow --pipeline my_pipeline --output dags/
+odibi export --target airflow --pipeline my_pipeline --out dags/my_pipeline_dag.py
 ```
 
 Generates a Python DAG file with:
@@ -1487,7 +1489,7 @@ Generates a Python DAG file with:
 ### 12.2 Dagster Export
 
 ```bash
-odibi export dagster --pipeline my_pipeline --output ops/
+odibi export --target dagster --pipeline my_pipeline --out ops/definitions.py
 ```
 
 ---
@@ -1768,10 +1770,10 @@ project/
 from odibi import PipelineManager
 
 # Initialize
-pm = PipelineManager("project.yaml")
+pm = PipelineManager.from_yaml("project.yaml")
 
 # Run pipeline
-results = pm.run("silver_pipeline")
+results = pm.run(pipelines="silver_pipeline")
 
 # Query any node's output via Spark SQL
 spark = pm.engine.spark
@@ -1788,8 +1790,8 @@ print(pm.context.list_names())
 ### 16.2 Debug a Failing Node
 
 ```bash
-# 1. Run with verbose logging
-odibi run pipeline.yaml --log-level DEBUG
+# 1. Run the pipeline
+odibi run pipeline.yaml
 
 # 2. View the execution story
 odibi story last
@@ -1803,8 +1805,8 @@ odibi run pipeline.yaml --node failing_node_name --dry-run
 
 **In Python:**
 ```python
-pm = PipelineManager("project.yaml")
-result = pm.run("pipeline")
+pm = PipelineManager.from_yaml("project.yaml")
+result = pm.run(pipelines="pipeline")
 
 # Get specific node result
 node_result = result.get_node_result("failing_node")
@@ -1901,14 +1903,10 @@ spark = SparkSession.builder.getOrCreate()
 # Configure pipeline with Spark engine
 from odibi import PipelineManager
 
-pm = PipelineManager(
-    "project.yaml",
-    engine="spark",
-    spark_session=spark
-)
+pm = PipelineManager.from_yaml("project.yaml")
 
 # Run
-results = pm.run("my_pipeline")
+results = pm.run(pipelines="my_pipeline")
 
 # Query results as temp views
 spark.sql("SELECT * FROM node_name").display()
@@ -1920,7 +1918,7 @@ spark.sql("CREATE TABLE catalog.schema.table AS SELECT * FROM node_name")
 **Key Differences from Local:**
 - Use `engine="spark"`
 - Pass existing `spark_session`
-- ADLS connections use `managed_identity` auth
+- ADLS connections use `aad_msi` auth
 - Node outputs are temp views queryable via `spark.sql()`
 
 ### 16.6 Incremental Ingestion with High Water Mark
@@ -1954,8 +1952,8 @@ nodes:
 # Run a pipeline
 odibi run pipeline.yaml
 
-# Run specific nodes
-odibi run pipeline.yaml --node node_a --node node_b
+# Run specific node
+odibi run pipeline.yaml --node node_a
 
 # Filter by tag
 odibi run pipeline.yaml --tag silver
@@ -2480,7 +2478,7 @@ context.list_names()
 
 ```bash
 odibi run x.yaml --dry-run      # Validate only
-odibi run x.yaml --log-level DEBUG
+odibi validate x.yaml              # Check config
 odibi story last                # View execution story
 odibi graph x.yaml              # View dependencies
 odibi doctor                    # Check environment
@@ -2564,13 +2562,15 @@ connections:
     type: azure_adls
     account: myaccount
     container: datalake
-    auth_mode: managed_identity
+    auth:
+      mode: aad_msi
 
   sql:
     type: azure_sql
-    server: server.database.windows.net
+    host: server.database.windows.net
     database: db
-    auth_mode: aad_msi
+    auth:
+      mode: aad_msi
 ```
 
 ---

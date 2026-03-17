@@ -563,18 +563,18 @@ Before entering a building, security checks your ID. Data quality validation che
           rules:
             - column: customer_id
               check: not_null
-              severity: error
+              on_fail: fail
             
             - column: email
               check: not_null
-              severity: warn
+              on_fail: warn
             
             - column: email
               check: regex
               pattern: ".*@.*\\..*"
-              severity: error
+              on_fail: quarantine
           
-          on_failure: quarantine  # Bad rows go to quarantine
+          # Bad rows go to quarantine via on_fail: quarantine on individual tests
         
         write:
           connection: local
@@ -639,12 +639,12 @@ Create a complete Silver pipeline that:
           rules:
             - column: customer_id
               check: not_null
-              severity: error
+              on_fail: fail
             - column: email
               check: regex
               pattern: ".*@.*"
-              severity: warn
-          on_failure: quarantine
+              on_fail: warn
+          # Quarantine is set via on_fail: quarantine on individual tests
         
         write:
           connection: local
@@ -1147,18 +1147,18 @@ pipelines:
 ### Handling Failures
 
 ```yaml
-        on_failure: continue  # Options: fail, continue, skip
+        on_fail: warn  # Options: fail, warn, quarantine
 ```
 
 | Action | Behavior |
 |--------|----------|
 | `fail` | Stop entire pipeline (default) |
-| `continue` | Log error, continue to next node |
-| `skip` | Skip downstream nodes that depend on this one |
+| `warn` | Log the issue, continue processing |
+| `quarantine` | Route failing rows to quarantine table |
 
 ### 🧪 Self-Check
 - [ ] What does "exponential backoff" mean?
-- [ ] When would you use `on_failure: continue`?
+- [ ] When would you use `on_fail: warn`?
 
 ---
 

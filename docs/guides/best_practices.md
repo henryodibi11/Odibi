@@ -1,6 +1,6 @@
 # Odibi Best Practices Guide
 
-**Version:** 2.4.0  
+**Version:** 3.4.2  
 **Last Updated:** 2025-12-03  
 **Audience:** Data Engineers, Analytics Engineers, Team Leads
 
@@ -506,7 +506,7 @@ Warn (or fail) if output doesn't meet expectations:
       - type: range
         column: revenue
         min: 0
-    on_failure: warn  # or "error" to fail the pipeline
+    mode: warn  # or "fail" to stop the pipeline
 ```
 
 ### Available Validation Types
@@ -519,17 +519,19 @@ Warn (or fail) if output doesn't meet expectations:
 | `freshness` | Check data recency | `column: updated_at, max_age: "24h"` |
 | `range` | Numeric bounds | `column: amount, min: 0, max: 10000` |
 | `regex` | Pattern matching | `column: email, pattern: "^.+@.+$"` |
-| `referential` | FK validation | `column: customer_id, reference: dim_customer.id` |
-| `custom` | Custom Python function | `function: my_validation_func` |
+| `custom_sql` | Custom SQL assertion | `condition: "col > 0"` |
 
 ### Use Quality Gates for Critical Paths
 
 ```yaml
 - name: load_orders
-  gate:
-    - type: row_count
-      min: 1000
-      on_failure: block  # Stops pipeline if < 1000 rows
+  validation:
+    tests:
+      - type: row_count
+        min: 1000
+    gate:
+      require_pass_rate: 1.0
+      on_fail: abort  # Stops pipeline if validation fails
 ```
 
 ### FK Validation for Fact Tables
@@ -542,16 +544,22 @@ Ensure referential integrity before loading fact tables:
   read:
     connection: staging
     path: orders
-  validation:
-    tests:
-      - type: referential
-        column: customer_id
-        reference: dim_customer.customer_id
-        on_orphan: warn
-      - type: referential
-        column: product_id
-        reference: dim_product.product_id
-        on_orphan: filter  # Remove orphan rows
+  # FK validation is handled by the fact pattern's dimension lookups
+  # See: Fact Pattern → orphan_handling (unknown, reject, quarantine)
+  pattern:
+    type: fact
+    params:
+      grain: [order_id]
+      dimensions:
+        - source_column: customer_id
+          dimension_table: dim_customer
+          dimension_key: customer_id
+          surrogate_key: customer_sk
+        - source_column: product_id
+          dimension_table: dim_product
+          dimension_key: product_id
+          surrogate_key: product_sk
+      orphan_handling: unknown
   write:
     connection: warehouse
     path: fact_orders
@@ -602,11 +610,10 @@ Separate bad data for review instead of failing:
     tests:
       - type: not_null
         columns: [order_id, amount]
-    on_failure: quarantine
+        on_fail: quarantine
     quarantine:
       connection: warehouse
       path: quarantine/orders
-      include_reason: true  # Adds _quarantine_reason column
 ```
 
 ---

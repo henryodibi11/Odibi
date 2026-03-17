@@ -272,7 +272,7 @@ connections:
 
   sql_source:
     type: azure_sql
-    server: myserver.database.windows.net
+    host: myserver.database.windows.net
     database: mydb
 
 pipelines:

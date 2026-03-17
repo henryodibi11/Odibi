@@ -39,8 +39,10 @@ connections:
     type: sql_server
     host: ${SQL_SERVER_HOST}
     database: production
-    username: ${SQL_USER}
-    password: ${SQL_PASSWORD}
+    auth:
+      mode: sql_login
+      username: ${SQL_USER}
+      password: ${SQL_PASSWORD}
   
   lake:
     type: local
@@ -63,11 +65,11 @@ pipelines:
           connection: source_db
           format: jdbc
           table: dbo.orders
-        incremental:
-          mode: stateful
-          column: updated_at
-          # Optional: limit first load to recent data
-          # first_run_lookback: "365d"
+          incremental:
+            mode: stateful
+            column: updated_at
+            # Optional: limit first load to recent data
+            # first_run_lookback: "365d"
         write:
           connection: lake
           format: delta
@@ -137,7 +139,8 @@ bronze_orders.ingest_orders:
 incremental:
   mode: rolling_window
   column: created_at
-  lookback: "7d"  # Always load last 7 days
+  lookback: 7      # Always load last 7 days
+  unit: day
 ```
 
 [→ Pattern: Incremental Stateful](../../patterns/incremental_stateful.md)

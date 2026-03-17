@@ -137,7 +137,7 @@ odibi init-pipeline mytest
 odibi validate odibi.yaml
 odibi run odibi.yaml --dry-run
 odibi run odibi.yaml
-odibi doctor odibi.yaml
+odibi doctor
 odibi story list
 ```
 

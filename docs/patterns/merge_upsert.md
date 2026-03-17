@@ -136,11 +136,12 @@ order_id | product      | qty | created_at          | updated_at          | _cre
     connection: adls_prod
     format: delta
     table: raw.orders
-  transformer: merge
-  params:
-    target: silver.orders
-    keys: [order_id]
-    strategy: upsert
+  pattern:
+    type: merge
+    params:
+      target: silver.orders
+      keys: [order_id]
+      strategy: upsert
 ```
 
 ### Full Config (with Audit Columns)
@@ -154,26 +155,21 @@ order_id | product      | qty | created_at          | updated_at          | _cre
     connection: adls_prod
     format: delta
     table: raw.orders
-  transformer: merge
-  params:
-    target: silver.orders
-    keys: [order_id]
-    strategy: upsert
-    audit_cols:
-      created_col: _created_at
-      updated_col: _updated_at
+  pattern:
+    type: merge
+    params:
+      target: silver.orders
+      keys: [order_id]
+      strategy: upsert
+      audit_cols:
+        created_col: _created_at
+        updated_col: _updated_at
   validation:
-    not_empty: true
-    schema:
-      order_id:
-        type: integer
-        nullable: false
-      product:
-        type: string
-        nullable: false
-      qty:
-        type: integer
-        nullable: false
+    tests:
+      - type: not_null
+        columns: [order_id, product, qty]
+      - type: row_count
+        min: 1
 ```
 
 ### Multi-Key Example (Composite Key)
@@ -185,14 +181,15 @@ order_id | product      | qty | created_at          | updated_at          | _cre
     connection: adls_prod
     format: delta
     table: raw.inventory
-  transformer: merge
-  params:
-    target: silver.inventory
-    keys: [store_id, material_id]  ← Composite key
-    strategy: upsert
-    audit_cols:
-      created_col: created_ts
-      updated_col: updated_ts
+  pattern:
+    type: merge
+    params:
+      target: silver.inventory
+      keys: [store_id, material_id]  # Composite key
+      strategy: upsert
+      audit_cols:
+        created_col: created_ts
+        updated_col: updated_ts
 ```
 
 ---
@@ -311,11 +308,12 @@ order_id | product | _sys_created_ts        | _sys_updated_ts
 Keep only the latest version of each record. This is the default merge pattern.
 
 ```yaml
-transformer: merge
-params:
-  target: silver.customers
-  keys: [customer_id]
-  strategy: upsert
+pattern:
+  type: merge
+  params:
+    target: silver.customers
+    keys: [customer_id]
+    strategy: upsert
 ```
 
 ### Pattern: SCD Type 2 (Full History)
@@ -332,11 +330,12 @@ Then maintain it with a separate pipeline.
 If your table should never have duplicates and you want to avoid updates:
 
 ```yaml
-transformer: merge
-params:
-  target: silver.events
-  keys: [event_id]
-  strategy: append_only
+pattern:
+  type: merge
+  params:
+    target: silver.events
+    keys: [event_id]
+    strategy: append_only
 ```
 
 This inserts new rows but ignores duplicates instead of updating.

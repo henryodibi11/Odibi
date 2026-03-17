@@ -136,8 +136,8 @@ odibi doctor-path <path>
 
 # Existing
 odibi run <file.yaml>
-odibi story show
-odibi graph
+odibi story show <path>
+odibi graph <config>
 ```
 
 ### MCP Tools (for AI)

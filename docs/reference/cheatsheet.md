@@ -7,10 +7,9 @@
 | `odibi run odibi.yaml` | Run the pipeline. |
 | `odibi run odibi.yaml --dry-run` | Validate connections without moving data. |
 | `odibi validate odibi.yaml` | Validate YAML schema, pipeline logic, and transformer params. |
-| `odibi validate odibi.yaml --env prod` | Validate with environment-specific variables. |
 | `odibi doctor` | Check environment and config health. |
 | `odibi story last` | Open the latest run report. |
-| `odibi secrets init` | Create .env template for secrets. |
+| `odibi secrets init odibi.yaml` | Create .env template for secrets. |
 | `odibi graph odibi.yaml` | Visualize pipeline dependencies. |
 | `odibi init my_project --template hello` | Scaffold a new project from a template. |
 | `odibi templates list` | List all template types (connections, patterns, configs). |
@@ -23,7 +22,7 @@
 ## `odibi.yaml` Structure
 
 ```yaml
-version: 1
+version: "1.0.0"
 project: My Project
 engine: pandas          # or 'spark'
 
@@ -58,7 +57,7 @@ pipelines:
         depends_on: [clean_data]
         transform:
           steps:
-            - operation: my_custom_func  # defined in python
+            - function: my_custom_func  # registered Python function
               params:
                 threshold: 10
 
@@ -77,10 +76,10 @@ pipelines:
 ## Python Transformation
 
 ```python
-from odibi.transformations import transformation
+from odibi import transform
 
-@transformation("my_custom_func")
-def my_func(df, threshold=10):
+@transform
+def my_custom_func(df, threshold=10):
     """Docstrings are required!"""
     return df[df['val'] > threshold]
 ```

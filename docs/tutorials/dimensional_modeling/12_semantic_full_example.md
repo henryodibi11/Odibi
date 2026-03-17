@@ -23,8 +23,8 @@ engine: pandas
 
 connections:
   gold:
-    type: delta
-    path: /mnt/data/gold
+    type: local
+    base_path: /mnt/data/gold
 
 pipelines:
   - pipeline: build_warehouse

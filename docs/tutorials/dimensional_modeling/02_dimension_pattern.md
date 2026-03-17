@@ -49,10 +49,10 @@ engine: pandas
 connections:
   source:
     type: local
-    path: ./data
+    base_path: ./data
   warehouse:
     type: local
-    path: ./warehouse
+    base_path: ./warehouse
 
 story:
   connection: warehouse
@@ -145,10 +145,10 @@ engine: pandas
 connections:
   source:
     type: local
-    path: ./data
+    base_path: ./data
   warehouse:
     type: local
-    path: ./warehouse
+    base_path: ./warehouse
 
 story:
   connection: warehouse
@@ -254,10 +254,10 @@ engine: pandas
 connections:
   source:
     type: local
-    path: ./data
+    base_path: ./data
   warehouse:
     type: local
-    path: ./warehouse
+    base_path: ./warehouse
 
 story:
   connection: warehouse
@@ -389,10 +389,10 @@ engine: pandas
 connections:
   source:
     type: local
-    path: ./examples/tutorials/dimensional_modeling/data
+    base_path: ./examples/tutorials/dimensional_modeling/data
   warehouse:
     type: local
-    path: ./warehouse
+    base_path: ./warehouse
 
 story:
   connection: warehouse

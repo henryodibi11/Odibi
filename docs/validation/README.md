@@ -92,14 +92,19 @@ nodes:
 
     # 3. Validation Tests - Check output quality
     validation:
+      mode: warn
       tests:
         - type: range
           column: amount
           min: 0
           max: 1000000
+          on_fail: quarantine
         - type: unique
           columns: [order_id]
-      on_fail: quarantine  # Route bad rows to quarantine
+          on_fail: quarantine
+      quarantine:
+        connection: warehouse
+        path: quarantine/orders
 
       # 4. Quality Gate - Batch-level threshold
       gate:

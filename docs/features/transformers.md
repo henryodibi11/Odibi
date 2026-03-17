@@ -7,7 +7,7 @@ Declarative data transformations with SQL-first semantics, dual-engine support (
 Odibi's transformer system provides:
 - **SQL-First Design**: All core operations leverage SQL for optimal engine performance
 - **Dual-Engine Support**: Seamless execution on Spark or Pandas/DuckDB
-- **Built-in Library**: 30+ production-ready transformers
+- **Built-in Library**: 56 production-ready transformers
 - **Extensibility**: Register custom transforms with the `@transform` decorator
 - **Chained Operations**: Compose multiple transforms in `transform.steps`
 

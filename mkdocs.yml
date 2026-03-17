@@ -6,6 +6,10 @@ repo_name: henryodibi11/Odibi
 edit_uri: edit/main/docs/
 
 docs_dir: docs
+exclude_docs: |
+  _archive/
+  internal/
+  _includes/
 
 theme:
   name: material

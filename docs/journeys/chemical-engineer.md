@@ -258,18 +258,18 @@ nodes:
     # Output validation (after cleaning)
     validation:
       tests:
-        - type: accepted_range
+        - type: range
           column: temperature_c
           min: 100.0
           max: 200.0
-        - type: accepted_range
+        - type: range
           column: pressure_bar
           min: 0.5
           max: 10.0
         - type: not_null
           columns: [pressure_bar]  # After filling nulls
       gate:
-        on_failure: warn  # Log warnings but continue
+        on_fail: warn_and_write  # Log warnings but continue
 ```
 
 **Exercise: Add Quarantine**
@@ -278,10 +278,15 @@ Route bad records to review:
 
 ```yaml
 validation:
+  tests:
+    - type: not_null
+      columns: [pressure_bar, temperature_c]
+      on_fail: quarantine
+  quarantine:
+    connection: local
+    path: data/quarantine/reactor_data
   gate:
-    on_failure: quarantine
-    quarantine_path: data/quarantine/reactor_data
-    quarantine_format: parquet
+    on_fail: write_valid_only
 ```
 
 Now bad rows go to `quarantine/` instead of silently passing.
@@ -472,8 +477,8 @@ You've completed the ChemE/SME journey! Here's where to go next:
 
 ### Collaborate with DEs
 - [Jr Data Engineer Journey](junior-data-engineer.md) - Understand what your DE partners do
-- [Filing Issues Guide](../guides/filing_issues.md) ← **New guide**
-- [Requesting Metrics Guide](../guides/requesting_metrics.md) ← **New guide**
+- [Filing Issues Guide](https://github.com/henryodibi11/odibi/issues)
+- [Requesting Metrics Guide](../semantics/metrics.md)
 
 ### Apply to Your Domain
 - [Thermodynamics Transformers](../guides/thermodynamics.md) - Steam properties, refrigerants

@@ -89,7 +89,8 @@ environments:
         type: azure_adls
         account: mycompanyprod
         container: sales-data
-        auth_mode: managed_identity
+        auth:
+          mode: aad_msi
     story:
       max_sample_rows: 0 # Disable data sampling for security
 
@@ -395,7 +396,7 @@ connections:
     base_path: ./
   sql_server:
     type: sql_server
-    server: central-server.database.windows.net
+    host: central-server.database.windows.net
     database: odibi_metadata
 ```
 

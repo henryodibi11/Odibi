@@ -203,17 +203,17 @@ The explanation appears in the **Node Details** section with full Markdown rende
 
 ## Integration with Explanation Linter
 
-Odibi includes an explanation linter that identifies:
-- Nodes missing explanations
-- TODO placeholders in explanations
-- Incomplete documentation
+Odibi's validation catches incomplete explanations during pipeline validation:
+- Nodes missing explanations generate warnings
+- TODO placeholders in explanations are flagged
+- Incomplete documentation is identified
 
 ```bash
-odibi validate --check-explanations
+odibi validate odibi.yaml
 ```
 
 ## See Also
 
-- [Data Story Guide](../reference/story.md) - Understanding story reports
+- [Data Story Guide](../features/stories.md) - Understanding story reports
 - [YAML Schema Reference](../reference/yaml_schema.md) - Full NodeConfig documentation
 - [Best Practices](best_practices.md) - Pipeline documentation standards

@@ -67,9 +67,11 @@ connections:
     type: sql_server
     host: your-server.database.windows.net
     database: your-database
-    username: ${SQL_USER}        # Use environment variable
-    password: ${SQL_PASSWORD}    # Never hardcode passwords!
     driver: "ODBC Driver 18 for SQL Server"
+    auth:
+      mode: sql_login
+      username: ${SQL_USER}        # Use environment variable
+      password: ${SQL_PASSWORD}    # Never hardcode passwords!
 
 # 2. Then, create a node that syncs data to SQL Server
 nodes:
@@ -689,9 +691,11 @@ connections:
     type: sql_server
     host: your-server.database.windows.net
     database: your-database
-    username: ${SQL_USER}
-    password: ${SQL_PASSWORD}
     driver: "ODBC Driver 18 for SQL Server"
+    auth:
+      mode: sql_login
+      username: ${SQL_USER}
+      password: ${SQL_PASSWORD}
 ```
 
 ### Azure AD Authentication
@@ -702,7 +706,8 @@ connections:
     type: sql_server
     host: your-server.database.windows.net
     database: your-database
-    authentication: ActiveDirectoryInteractive
+    auth:
+      mode: aad_msi
 ```
 
 ---

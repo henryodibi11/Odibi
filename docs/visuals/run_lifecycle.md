@@ -67,11 +67,11 @@ sequenceDiagram
             Engine->>Quality: Run validation tests
             Quality-->>Engine: Pass/Warn/Fail
             
-            alt Validation Fails + on_failure: fail
+            alt Validation Fails + mode: fail
                 Quality-->>Executor: ❌ Stop
             end
             
-            alt Validation Fails + on_failure: quarantine
+            alt Validation Fails + on_fail: quarantine
                 Quality->>Storage: Write bad records to quarantine
             end
         end
@@ -216,8 +216,8 @@ graph TD
     
     I -->|Pass| H
     I -->|Warn| J[Log Warning]
-    I -->|Fail + on_failure:fail| Z
-    I -->|Fail + on_failure:quarantine| K[Split Data]
+    I -->|Fail + mode: fail| Z
+    I -->|Fail + on_fail: quarantine| K[Split Data]
     
     J --> H
     K --> L[Write Good Records]
@@ -388,8 +388,6 @@ odibi run odibi.yaml --node clean_customers
 # Set environment
 odibi run odibi.yaml --env production
 
-# Debug mode (verbose logging)
-odibi run odibi.yaml --log-level DEBUG
 ```
 
 ---
@@ -403,7 +401,7 @@ odibi run odibi.yaml --log-level DEBUG
 odibi validate odibi.yaml
 
 # Check environment health
-odibi doctor odibi.yaml
+odibi doctor
 
 # Visualize DAG
 odibi graph odibi.yaml

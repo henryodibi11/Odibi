@@ -9,7 +9,7 @@
 ## 📑 Table of Contents
 
 1. [The Big Picture](#the-big-picture)
-2. [Configuration Flow (Concept → Execution)](#configuration-flow-concept--execution)
+2. [Configuration Flow (Concept → Execution)](#configuration-flow-concept-execution)
 3. [Three Layers of Configuration](#three-layers-of-configuration)
 4. [Example: Tracing a Pipeline from YAML to Execution](#example-tracing-a-pipeline-from-yaml-to-execution)
 5. [Key Concepts Explained](#key-concepts-explained)

@@ -79,9 +79,9 @@ connections:
     catalog: spark_catalog
     schema: silver
 
-  # Path-based Delta (no catalog)
+  # Path-based Delta (use local connection + format: delta in read/write)
   adls_gold:
-    type: delta
+    type: local
     base_path: abfss://container@account.dfs.core.windows.net/gold
 ```
 
@@ -172,7 +172,8 @@ nodes:
 ```yaml
 performance:
   use_arrow: true              # PyArrow for Pandas UDFs
-  default_parallelism: 200     # Spark partitions
+  spark_config:
+    spark.sql.shuffle.partitions: "200"
   delta_table_properties:
     delta.columnMapping.mode: name
     delta.autoOptimize.optimizeWrite: true
@@ -255,9 +256,10 @@ resources:
 # Databricks notebook cell
 %pip install odibi
 
-from odibi import run_project
+from odibi import PipelineManager
 
-run_project("project.yaml", pipelines=["bronze_ingest"])
+manager = PipelineManager.from_yaml("project.yaml")
+manager.run()
 ```
 
 ## 8. Common Issues
@@ -329,10 +331,9 @@ pip install "odibi[spark]"
 ```yaml
 # Add performance tuning
 performance:
-  spark:
-    conf:
-      spark.sql.shuffle.partitions: "200"
-      spark.sql.files.maxPartitionBytes: "134217728"  # 128MB
+  spark_config:
+    spark.sql.shuffle.partitions: "200"
+    spark.sql.files.maxPartitionBytes: "134217728"  # 128MB
 ```
 
 ### "AnalysisException: Table not found"

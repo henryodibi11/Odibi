@@ -518,7 +518,7 @@ After running this pipeline:
 
 ## Executive Dashboard Views
 
-When using [Catalog Sync](catalog_sync.md) to replicate data to SQL Server, Odibi automatically creates pre-built views optimized for visualization tools.
+When using [Catalog Sync](../guides/catalog_sync.md) to replicate data to SQL Server, Odibi automatically creates pre-built views optimized for visualization tools.
 
 ### Available Views
 

@@ -112,14 +112,14 @@ nodes:
         column: reactor_temp_degc
         min: 50
         max: 100
-        severity: error
+        on_fail: fail
         quarantine: true
 
       - name: flow_rate_check
         test: rate_of_change
         column: feed_flow_gpm
         max_change: 10
-        severity: warning
+        on_fail: warn
 
     transform:
       - name: scd2_controller_tuning

@@ -66,12 +66,12 @@ with DAG(
 
     ingest_orders = BashOperator(
         task_id='ingest_orders',
-        bash_command='odibi run --pipeline process_orders --node ingest_orders',
+        bash_command='odibi run odibi.yaml --pipeline process_orders --node ingest_orders',
     )
 
     validate_orders = BashOperator(
         task_id='validate_orders',
-        bash_command='odibi run --pipeline process_orders --node validate_orders',
+        bash_command='odibi run odibi.yaml --pipeline process_orders --node validate_orders',
     )
 
     # Dependencies
@@ -124,7 +124,7 @@ Each Odibi node becomes a Dagster asset with:
     op_tags={"odibi/pipeline": "process_orders", "odibi/node": "validate_orders"},
 )
 def validate_orders(context: AssetExecutionContext):
-    # Runs: odibi run --pipeline process_orders --node validate_orders
+    # Runs: odibi run odibi.yaml --pipeline process_orders --node validate_orders
     ...
 ```
 

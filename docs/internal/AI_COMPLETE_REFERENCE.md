@@ -46,7 +46,7 @@
 - **Discovery:** ✅ list_schemas, list_tables, profile, get_table_info
 
 ### Azure ADLS
-- **Auth Modes:** key_vault (recommended), direct_key, sas_token, service_principal, managed_identity
+- **Auth Modes:** key_vault (recommended), account_key, sas, connection_string, aad_msi
 - **Formats:** All (CSV, Parquet, JSON, Delta, Excel via delegation)
 - **Partition Detection:** Hive-style (key=value) auto-detected
 - **Discovery:** ✅ list_files, list_folders, detect_partitions, profile

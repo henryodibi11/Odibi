@@ -92,8 +92,8 @@ Source has timestamps?
 When to check?
 ├─► Before processing (source quality) → contracts:
 └─► After processing (output quality) → validation.tests:
-    └─► Need to stop pipeline? → gate.on_failure: fail
-    └─► Soft warning OK? → gate.on_failure: warn
+    └─► Need to stop pipeline? → gate.on_fail: abort
+    └─► Soft warning OK? → gate.on_fail: warn_and_write
 ```
 
 ### Choose Your SCD Type
@@ -139,7 +139,7 @@ Need historical state?
 | Validate config | `odibi validate config.yaml` |
 | View DAG | `odibi graph config.yaml` |
 | Check state | `odibi catalog state config.yaml` |
-| Diagnose issues | `odibi doctor config.yaml` |
+| Diagnose issues | `odibi doctor` |
 | List stories | `odibi story list` |
 
 ---

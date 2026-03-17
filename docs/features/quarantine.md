@@ -51,6 +51,8 @@ nodes:
 | `table` | string | No* | Table name for quarantine |
 | `add_columns` | object | No | Metadata columns to add |
 | `retention_days` | int | No | Days to retain (default: 90) |
+| `max_rows` | int | No | Maximum number of rows to quarantine per run |
+| `sample_fraction` | float | No | Sample fraction of invalid rows to quarantine (0.0-1.0) |
 
 *Either `path` or `table` is required.
 

@@ -20,7 +20,7 @@ This tutorial shows how to connect Odibi to Azure data services: Blob Storage, A
 
 ## 1. Azure Blob Storage
 
-### Service Principal Authentication (Recommended for Production)
+### Account Key Authentication (Recommended for Production)
 
 ```yaml
 connections:
@@ -29,10 +29,8 @@ connections:
     account_name: mystorageaccount
     container: landing
     auth:
-      mode: service_principal
-      tenant_id: "${AZURE_TENANT_ID}"
-      client_id: "${AZURE_CLIENT_ID}"
-      client_secret: "${AZURE_CLIENT_SECRET}"
+      mode: account_key
+      account_key: "${AZURE_STORAGE_KEY}"
 ```
 
 ### Managed Identity (Databricks/Synapse)
@@ -44,7 +42,7 @@ connections:
     account_name: mystorageaccount
     container: landing
     auth:
-      mode: managed_identity
+      mode: aad_msi
 ```
 
 ### SAS Token
@@ -57,7 +55,7 @@ connections:
     container: landing
     auth:
       mode: sas
-      token: "${AZURE_SAS_TOKEN}"
+      sas_token: "${AZURE_SAS_TOKEN}"
 ```
 
 ### Connection String
@@ -82,10 +80,8 @@ connections:
     container: bronze
     is_adls_gen2: true  # Enable hierarchical namespace
     auth:
-      mode: service_principal
-      tenant_id: "${AZURE_TENANT_ID}"
-      client_id: "${AZURE_CLIENT_ID}"
-      client_secret: "${AZURE_CLIENT_SECRET}"
+      mode: account_key
+      account_key: "${AZURE_STORAGE_KEY}"
 ```
 
 ### Delta Lake on ADLS
@@ -105,8 +101,8 @@ connections:
 ```yaml
 connections:
   azure_sql:
-    type: sqlserver
-    server: myserver.database.windows.net
+    type: sql_server
+    host: myserver.database.windows.net
     database: mydb
     auth:
       mode: sql_login
@@ -119,13 +115,14 @@ connections:
 ```yaml
 connections:
   azure_sql:
-    type: sqlserver
-    server: myserver.database.windows.net
+    type: sql_server
+    host: myserver.database.windows.net
     database: mydb
     auth:
       mode: aad_password
-      username: user@company.com
-      password: "${AAD_PASSWORD}"
+      tenant_id: "${AZURE_TENANT_ID}"
+      client_id: "${AZURE_CLIENT_ID}"
+      client_secret: "${AZURE_CLIENT_SECRET}"
 ```
 
 ### Managed Identity
@@ -133,11 +130,11 @@ connections:
 ```yaml
 connections:
   azure_sql:
-    type: sqlserver
-    server: myserver.database.windows.net
+    type: sql_server
+    host: myserver.database.windows.net
     database: mydb
     auth:
-      mode: msi
+      mode: aad_msi
 ```
 
 ## 4. Complete Azure Project
@@ -156,10 +153,9 @@ connections:
     account_name: "${STORAGE_ACCOUNT}"
     container: landing
     auth:
-      mode: service_principal
-      tenant_id: "${AZURE_TENANT_ID}"
-      client_id: "${AZURE_CLIENT_ID}"
-      client_secret: "${AZURE_CLIENT_SECRET}"
+      mode: key_vault
+      key_vault: kv-data
+      secret: storage-account-key
 
   # Bronze layer (Delta)
   bronze:
@@ -173,11 +169,11 @@ connections:
 
   # Source database
   erp_sql:
-    type: sqlserver
-    server: erp-server.database.windows.net
+    type: sql_server
+    host: erp-server.database.windows.net
     database: erp_prod
     auth:
-      mode: msi
+      mode: aad_msi
 
 story:
   connection: landing
@@ -232,8 +228,8 @@ SQL_PASSWORD=secure-password
 # Reference Key Vault secrets with ${kv:secret-name}
 connections:
   azure_sql:
-    type: sqlserver
-    server: myserver.database.windows.net
+    type: sql_server
+    host: myserver.database.windows.net
     database: mydb
     auth:
       mode: sql_login
@@ -297,10 +293,11 @@ connections:
 ```python
 # Synapse notebook
 %%pyspark
-from odibi import run_project
+from odibi import PipelineManager
 
 # Synapse auto-configures ADLS access via linked services
-run_project("/synapse/project.yaml", pipelines=["bronze_ingest"])
+manager = PipelineManager.from_yaml("/synapse/project.yaml")
+manager.run()
 ```
 
 ## Common Issues

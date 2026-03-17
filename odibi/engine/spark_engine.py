@@ -118,10 +118,10 @@ class SparkEngine(Engine):
 
             # Reduce Verbosity
             builder = builder.config(
-                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR, console"
+                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
             )
             builder = builder.config(
-                "spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR, console"
+                "spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
             )
 
             self.spark = spark_session or configure_spark_with_delta_pip(builder).getOrCreate()
@@ -141,7 +141,7 @@ class SparkEngine(Engine):
 
             # Reduce Verbosity
             builder = builder.config(
-                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR, console"
+                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
             )
 
             self.spark = spark_session or builder.getOrCreate()

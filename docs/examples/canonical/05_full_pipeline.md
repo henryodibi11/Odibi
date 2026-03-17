@@ -38,15 +38,17 @@ retry:
 alerts:
   - type: slack
     url: ${SLACK_WEBHOOK_URL}
-    on_events: [on_failure, on_quality_gate_fail]
+    on_events: [on_failure, on_gate_block]
 
 connections:
   source_db:
     type: sql_server
     host: ${SQL_SERVER_HOST}
     database: production
-    username: ${SQL_USER}
-    password: ${SQL_PASSWORD}
+    auth:
+      mode: sql_login
+      username: ${SQL_USER}
+      password: ${SQL_PASSWORD}
 
   lake:
     type: local
@@ -72,6 +74,9 @@ pipelines:
           connection: source_db
           format: jdbc
           table: dbo.orders
+          incremental:
+            mode: stateful
+            column: updated_at
 
         # Fail fast if source is broken
         contracts:
@@ -82,10 +87,6 @@ pipelines:
           - type: freshness
             column: created_at
             max_age: "24h"
-
-        incremental:
-          mode: stateful
-          column: updated_at
 
         write:
           connection: lake
@@ -134,7 +135,7 @@ pipelines:
 
           gate:
             require_pass_rate: 0.95
-            on_failure: warn  # 'fail' to stop pipeline
+            on_fail: warn_and_write  # 'abort' to stop pipeline
 
           quarantine:
             connection: lake

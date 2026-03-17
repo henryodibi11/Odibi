@@ -30,10 +30,12 @@ alerts:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `type` | string | Yes | Alert type: `slack`, `teams`, `webhook` |
+| `type` | string | Yes | Alert type: `slack`, `teams`, `teams_workflow`, `webhook` |
 | `url` | string | Yes | Webhook URL |
 | `on_events` | list | No | Events to trigger on (default: `on_failure`) |
 | `metadata` | object | No | Extra settings (throttling, mentions, etc.) |
+
+> **Note:** `teams_workflow` is an alias for `teams`. Both use Power Automate workflow format.
 
 ## Event Types
 

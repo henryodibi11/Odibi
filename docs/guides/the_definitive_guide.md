@@ -10,7 +10,7 @@ time: 2-3 hours
 
 # The Definitive Guide to Odibi
 
-**Version:** 2.4.0  
+**Version:** 3.4.2  
 **Audience:** Data Engineers, Analytics Engineers, Architects  
 **Prerequisites:** Basic Python and SQL knowledge  
 **Goal:** From "Hello World" to Enterprise Production
@@ -19,15 +19,15 @@ time: 2-3 hours
 
 ## Table of Contents
 
-1.  [Introduction & Philosophy](#1-introduction--philosophy)
+1.  [Introduction & Philosophy](#1-introduction-philosophy)
 2.  [Architecture Deep Dive](#2-architecture-deep-dive)
 3.  [The Object Model (Python API)](#3-the-object-model-python-api)
 4.  [Context, State, and Dependencies](#4-context-state-and-dependencies)
 5.  [Transformation Engineering](#5-transformation-engineering)
-6.  [The Dual Engine: Pandas & Spark](#6-the-dual-engine-pandas--spark)
+6.  [The Dual Engine: Pandas & Spark](#6-the-dual-engine-pandas-spark)
 7.  [Declarative Configuration (YAML)](#7-declarative-configuration-yaml)
 8.  [Observability: Data Stories](#8-observability-data-stories)
-9.  [Reliability & Governance](#9-reliability--governance)
+9.  [Reliability & Governance](#9-reliability-governance)
 10. [Production Deployment Patterns](#10-production-deployment-patterns)
 11. [Comprehensive End-to-End Example](#11-comprehensive-end-to-end-example)
 
@@ -409,7 +409,7 @@ nodes:
 ### 10.2 CI/CD
 Since Odibi logic is Python code and YAML config:
 1.  **Linting:** Run `black` and `ruff` on your `transforms.py`.
-2.  **Validation:** Run a script that loads `ProjectConfig(path="odibi.yaml")` to validate the graph structure *before* deployment.
+2.  **Validation:** Run `odibi validate odibi.yaml` to validate the graph structure *before* deployment.
 3.  **Testing:** Use the Python API to run single nodes with mock data (Unit Tests).
 
 ---

@@ -49,7 +49,7 @@ validation:
     - type: not_null
       columns: [id, name]
   gate:
-    on_failure: warn  # or 'fail'
+    on_fail: warn_and_write  # or 'abort'
 ```
 
 ---
@@ -58,12 +58,12 @@ validation:
 
 | Scenario | Gate Setting |
 |----------|--------------|
-| Development/testing | `on_failure: warn` |
-| Production, non-critical | `on_failure: warn` + alerting |
-| Production, critical data | `on_failure: fail` |
-| Regulatory/compliance | `on_failure: fail` + quarantine |
+| Development/testing | `on_fail: warn_and_write` |
+| Production, non-critical | `on_fail: warn_and_write` + alerting |
+| Production, critical data | `on_fail: abort` |
+| Regulatory/compliance | `on_fail: abort` + quarantine |
 
-**Rule:** Start with `warn`, tighten to `fail` as you trust the data.
+**Rule:** Start with `warn_and_write`, tighten to `abort` as you trust the data.
 
 ---
 
@@ -73,7 +73,7 @@ validation:
 |----------|-------|
 | Local dev | No alerts |
 | Scheduled production jobs | `on_failure` |
-| Critical SLA pipelines | `on_failure` + `on_quality_gate_fail` |
+| Critical SLA pipelines | `on_failure` + `on_gate_block` |
 | All runs (audit trail) | `on_success` + `on_failure` |
 
 **Rule:** Enable alerting when someone needs to act on failure.
@@ -82,7 +82,7 @@ validation:
 alerts:
   - type: slack
     url: ${SLACK_WEBHOOK}
-    on_events: [on_failure, on_quality_gate_fail]
+    on_events: [on_failure, on_gate_block]
 ```
 
 ---

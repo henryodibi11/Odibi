@@ -39,7 +39,7 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 >
 > AI: Let me help you build that. First, I'll check what pattern fits best...
 > [calls list_patterns to see available options]
-> [calls explain with name="scd2" to get details]
+> *calls explain with name="scd2" to get details*
 >
 > The SCD2 pattern is perfect for this. See docs/reference/yaml_schema.md for the structure...
 
@@ -76,7 +76,7 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 >
 > AI: Let me investigate...
 > [calls story_read to see which node failed]
-> [calls node_sample to see output data]
+> *calls node_sample to see output data*
 >
 > I see the issue - the source column is named 'CustomerID' not 'customer_id'.
 > You need to rename it in your transform steps.
@@ -134,8 +134,8 @@ This guide teaches AI assistants how to combine odibi MCP tools to help develope
 > User: "How does validation work in odibi?"
 >
 > AI: Let me explain...
-> [calls explain with name="validation"]
-> [calls get_validation_rules to list all rules]
+> *calls explain with name="validation"*
+> *calls get_validation_rules to list all rules*
 >
 > Odibi has 12 built-in validation rules including not_null, unique, range...
 

@@ -86,6 +86,9 @@ pipelines:
 | `target` | str | For SCD2 | - | Target table path (required to read existing history) |
 | `unknown_member` | bool | No | false | Insert a row with SK=0 for orphan FK handling |
 | `audit` | dict | No | {} | Audit column configuration |
+| `valid_from_col` | str | No | valid_from | Name of the SCD2 start date column |
+| `valid_to_col` | str | No | valid_to | Name of the SCD2 end date column |
+| `is_current_col` | str | No | is_current | Name of the SCD2 current flag column |
 
 ### Audit Config
 
@@ -317,27 +320,32 @@ pattern = DimensionPattern(
     config=node_config  # NodeConfig with params
 )
 
-# Or directly with params dict
-from odibi.patterns.dimension import DimensionPattern
+# Pattern params come from the NodeConfig
+from odibi.config import NodeConfig
 
-pattern = DimensionPattern(params={
-    "natural_key": "customer_id",
-    "surrogate_key": "customer_sk",
-    "scd_type": 2,
-    "track_cols": ["name", "email", "address"],
-    "target": "gold.dim_customer",
-    "unknown_member": True,
-    "audit": {
-        "load_timestamp": True,
-        "source_system": "crm"
+node_config = NodeConfig(
+    name="dim_customer",
+    params={
+        "natural_key": "customer_id",
+        "surrogate_key": "customer_sk",
+        "scd_type": 2,
+        "track_cols": ["name", "email", "address"],
+        "target": "gold.dim_customer",
+        "unknown_member": True,
+        "audit": {
+            "load_timestamp": True,
+            "source_system": "crm"
+        }
     }
-})
+)
+
+pattern = DimensionPattern(engine=my_engine, config=node_config)
 
 # Validate configuration
 pattern.validate()
 
 # Execute pattern
-context = EngineContext(df=source_df, engine_type=EngineType.SPARK)
+context = EngineContext(global_context, source_df, EngineType.SPARK)
 result_df = pattern.execute(context)
 ```
 

@@ -192,19 +192,20 @@ nodes:
       table: raw_orders
     validation:
       tests:
-        - column: order_id
-          test: not_null
-        - column: order_total
-          test: positive
-        - column: customer_id
-          test: not_null
-        - column: order_date
-          test: not_future
+        - type: not_null
+          columns: [order_id, customer_id]
+        - type: range
+          column: order_total
+          min: 0
+        - type: freshness
+          column: order_date
+          max_age: "365d"
       quarantine:
         connection: silver
-        table: _quarantine_orders
+        path: _quarantine_orders
       gate:
         require_pass_rate: 0.95      # Allow 5% failures
+        on_fail: write_valid_only
     write:
       connection: silver
       table: orders
@@ -233,8 +234,7 @@ nodes:
       table: raw_orders
     transform:
       steps:
-        - type: sql
-          query: |
+        - sql: |
             SELECT
               order_id,
               UPPER(TRIM(customer_name)) AS customer_name,
@@ -273,10 +273,15 @@ nodes:
       target: silver.orders
       keys: [order_id]
       strategy: upsert
-    delete_detection:
-      mode: sql_compare              # Compare source to target
-      soft_delete_col: is_deleted    # Flag instead of delete
-      deleted_at_col: deleted_at     # Timestamp of detection
+    transform:
+      steps:
+        - operation: detect_deletes
+          params:
+            mode: sql_compare
+            keys: [order_id]
+            source_connection: bronze
+            source_table: raw_orders
+            soft_delete_col: is_deleted
 ```
 
 **Result:**
@@ -342,8 +347,7 @@ nodes:
         table: raw_order_details
     transform:
       steps:
-        - type: sql
-          query: |
+        - sql: |
             SELECT
               h.order_id,
               h.order_date,

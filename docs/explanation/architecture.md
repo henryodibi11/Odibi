@@ -135,11 +135,9 @@ config.py (no dependencies - pure Pydantic models)
     ↓
 context.py (stores DataFrames)
     ↓
-transformations/ (registry + decorators)
+transformers/ (registry + decorators)
     ↓
-operations/ (uses transformations)
-    ↓
-engine/ (executes operations)
+engine/ (executes transformers)
     ↓
 node.py (uses engine + context)
     ↓
@@ -155,12 +153,12 @@ cli/ (user interface)
 ### Module Relationships
 
 ```
-transformations/
+transformers/
     ├─→ Used by: node.py, story/doc_story.py
     └─→ Uses: registry.py (core)
 
 registry.py
-    ├─→ Used by: transformations/, engine/
+    ├─→ Used by: transformers/, engine/
     └─→ Uses: Nothing (singleton)
 
 state/
@@ -177,14 +175,14 @@ connections/
 
 engine/
     ├─→ Used by: node.py
-    └─→ Uses: connections/, transformations/
+    └─→ Uses: connections/, transformers/
 
 cli/
     ├─→ Used by: Users!
     └─→ Uses: Everything
 ```
 
-**Key insight:** `transformations/` provides the logic, `engine/` provides the horsepower, and `state/` provides the memory.
+**Key insight:** `transformers/` provides the logic, `engine/` provides the horsepower, and `state/` provides the memory.
 
 ---
 
@@ -243,14 +241,14 @@ cli/
 ### Registration (Import Time)
 
 ```python
-# When Python imports odibi/operations/unpivot.py:
+# When Python imports odibi/transformers/unpivot.py:
 
-@transformation("unpivot", category="reshaping")  # ← This runs immediately!
+@transform("unpivot", category="reshaping")  # ← This runs immediately!
 def unpivot(df, ...):
     ...
 
 # What happens:
-# 1. transformation("unpivot", ...) returns a decorator
+# 1. transform("unpivot", ...) returns a decorator
 # 2. Decorator wraps unpivot function
 # 3. Decorator calls registry.register("unpivot", wrapped_unpivot)
 # 4. Registry stores it globally
@@ -392,7 +390,7 @@ op_module = __import__(f"odibi.operations.{operation_name}")
 
 ```python
 # Operations register themselves:
-@transformation("pivot")
+@transform("pivot")
 def pivot(...): ...
 
 # Look up by name:
@@ -678,11 +676,11 @@ df = engine.read(connection, "data.parquet", "parquet")
 
 ```python
 # Built-in:
-@transformation("pivot")
+@transform("pivot")
 def pivot(...): ...
 
 # User-defined:
-@transformation("my_custom_op")
+@transform("my_custom_op")
 def my_custom_op(...): ...
 
 # Both registered the same way!
@@ -695,10 +693,10 @@ def my_custom_op(...): ...
 
 ### Where You Can Extend Odibi
 
-**1. Add New Operations**
+**1. Add New Transformers**
 ```
-Location: odibi/operations/
-Pattern: Use @transformation decorator
+Location: odibi/transformers/
+Pattern: Use @transform decorator
 Impact: Available in all pipelines
 ```
 
@@ -889,7 +887,7 @@ conn.read_sql(f"SELECT * FROM users WHERE id = {user_id}")
 Learn how to build on it:
 - **[Transformation Guide](../guides/writing_transformations.md)** - Create custom operations
 - **[Troubleshooting](../troubleshooting.md)** - Debug issues
-- **Read the code!** Start with `operations/` directory
+- **Read the code!** Start with `transformers/` directory
 
 ---
 

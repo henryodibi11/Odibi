@@ -49,7 +49,7 @@ This phase explores the Command-Line Interface (CLI) of the Odibi framework, foc
    - Defaults like `INFO` log level and `ascii` graph format ensure the CLI works out-of-the-box for common scenarios.
 
 3. **Rich Debugging and Help Features**:
-   - Comprehensive `--log-level` options and epilog examples make debugging intuitive.
+   - Comprehensive help text and epilog examples make debugging intuitive.
    - Error messages are likely verbose, guiding users to correct usage.
 
 ---

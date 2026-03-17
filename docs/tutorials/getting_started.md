@@ -166,6 +166,7 @@ nodes:
       format: csv
       path: customers.csv
     validation:
+      mode: warn  # or "fail" to stop the pipeline
       tests:
         - type: not_null
           columns: [id, name]
@@ -173,7 +174,6 @@ nodes:
           columns: [id]
         - type: row_count
           min: 1
-      on_failure: warn  # or "error" to stop the pipeline
     write:
       connection: raw
       format: parquet

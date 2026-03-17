@@ -117,7 +117,7 @@ odibi catalog state odibi.yaml
 
 ### ✅ Step 15: Quality Gates + Quarantine (15 min)
 **Read:** `docs/features/quality_gates.md` then `docs/features/quarantine.md`  
-**Do:** Set `on_failure: quarantine`, add bad data  
+**Do:** Set `on_fail: quarantine`, add bad data  
 **Discovery:** Do bad rows route to quarantine path?
 
 ---

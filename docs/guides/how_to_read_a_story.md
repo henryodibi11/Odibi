@@ -256,7 +256,7 @@ A junior engineer can understand the pipeline 6 months from now without asking y
 **Questions to Ask:**
 1. Is NULL email acceptable for our business?
 2. Should we add a `fill_nulls` step with a default (e.g., "noemail@unknown.com")?
-3. Should this be upgraded to `on_failure: fail` to enforce completeness?
+3. Should this be upgraded to `on_fail: abort` to enforce completeness?
 
 ---
 
@@ -483,4 +483,4 @@ print(story.get_failed_validations())
 
 ---
 
-[← Back to Guides](README.md)
+[← Back to Guides](../README.md)

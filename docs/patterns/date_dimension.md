@@ -217,10 +217,6 @@ fiscal_year_start_month: 1  # Default
 | `end_date` | str | Yes | - | End date in YYYY-MM-DD format |
 | `fiscal_year_start_month` | int | No | 1 | Month when fiscal year starts (1-12) |
 | `unknown_member` | bool | No | false | Add unknown date row with date_sk=0 |
-| `date_format` | str | No | "%Y-%m-%d" | Format string for date parsing |
-| `week_start_day` | int | No | 1 | First day of week (1=Monday, 7=Sunday) |
-| `include_holidays` | bool | No | false | Generate is_holiday column (requires holiday_country) |
-| `holiday_country` | str | No | "US" | Country code for holiday calendar |
 
 ### Advanced Configuration Example
 
@@ -239,13 +235,6 @@ nodes:
         
         # Unknown member
         unknown_member: true            # Add SK=0 row for orphans
-        
-        # Week configuration
-        week_start_day: 1               # Monday (ISO standard)
-        
-        # Holiday support (if holidays package installed)
-        include_holidays: true
-        holiday_country: "US"
     write:
       connection: warehouse
       path: dim_date

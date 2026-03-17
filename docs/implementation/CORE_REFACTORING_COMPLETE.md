@@ -451,7 +451,7 @@ if result["valid"]:
 ### Future CLI (Easy to Add)
 ```bash
 odibi discover crm_db
-odibi scaffold sql-pipeline --source erp --target lake
+odibi scaffold sql-pipeline my_pipeline --source erp --target lake --tables orders,products
 odibi validate my_pipeline.yaml
 ```
 

@@ -192,6 +192,7 @@ params:
 | `delete_col` | string | No | None | Column indicating soft deletion (boolean) |
 | `use_delta_merge` | bool | No | true | Use Delta MERGE on Spark (falls back to full overwrite if not Delta) |
 | `register_table` | string | No | None | Register as Unity Catalog/metastore table after write (Spark only) |
+| `vacuum_hours` | int | No | None | Hours to retain for VACUUM after SCD2 write (Spark only). Set to 168 for 7 days. None disables VACUUM. |
 
 **Notes:**
 1. **Target specification**: Must provide **either** `target` **OR** both `connection` + `path`

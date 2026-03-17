@@ -83,10 +83,13 @@ We support **DefaultAzureCredential**. This means you don't need to manage keys 
 ```yaml
 connections:
   data_lake:
-    type: azure_adls
-    account: mydatalake
-    auth_mode: key_vault  # Fetches keys from Key Vault automatically
-    key_vault: my-key-vault-name
+    type: azure_blob
+    account_name: mydatalake
+    container: datalake
+    auth:
+      mode: key_vault
+      key_vault_name: my-key-vault-name
+      secret_name: storage-key
 ```
 
 ---

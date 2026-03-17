@@ -159,18 +159,18 @@ validation:
     - type: row_count
       min: 1
   gate:
-    on_failure: fail  # or "warn"
+    on_fail: abort  # or "warn_and_write"
 ```
 
 Questions:
 1. What happens if `customer_id` is NULL in the source?
 2. What happens if the output has duplicate `order_id`?
-3. If `on_failure: warn`, does the pipeline stop?
+3. If `on_fail: warn_and_write`, does the pipeline stop?
 
 #### ✅ Verify
 - [ ] Contracts check **source** data before processing
 - [ ] Validation tests check **output** data after transformation
-- [ ] `on_failure: fail` stops the pipeline; `warn` logs but continues
+- [ ] `on_fail: abort` stops the pipeline; `warn_and_write` logs but writes anyway
 
 ---
 
@@ -214,7 +214,7 @@ Share your answers with a colleague or data engineer. Can you explain:
 
 ### Instructions
 
-1. Download this Story: [`failed_validation_story.html`](../examples/stories/failed_validation_story.html)
+1. Download this Story: `failed_validation_story.html` (generate one using the steps in Module 2)
 2. Open it and find the failed validation test
 3. Write a ticket with:
    - **Node name** that failed
@@ -258,8 +258,8 @@ You've completed the Business Analyst journey! Here's where to go next:
 - [Dimensional Modeling Tutorial](../tutorials/dimensional_modeling/01_introduction.md) - Deeper dive into star schemas
 
 ### Work with Your DE Team
-- [Request a Metric](../guides/requesting_metrics.md) ← **New guide**
-- [How to File Data Quality Issues](../guides/filing_issues.md) ← **New guide**
+- [Request a Metric](../semantics/metrics.md)
+- [How to File Data Quality Issues](https://github.com/henryodibi11/odibi/issues)
 
 ### Advanced (Optional)
 - [Jr Data Engineer Journey](junior-data-engineer.md) - Learn to run pipelines yourself

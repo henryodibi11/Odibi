@@ -163,10 +163,10 @@ engine: pandas
 connections:
   source:
     type: local
-    path: ./examples/tutorials/dimensional_modeling/data
+    base_path: ./examples/tutorials/dimensional_modeling/data
   warehouse:
     type: local
-    path: ./warehouse
+    base_path: ./warehouse
 
 story:
   connection: warehouse
@@ -391,19 +391,19 @@ Run the pipelines in order:
 
 ```bash
 # Build dimensions first
-odibi run --config star_schema.yaml --pipeline build_dimensions
+odibi run star_schema.yaml --pipeline build_dimensions
 
 # Then build facts (requires dimensions)
-odibi run --config star_schema.yaml --pipeline build_facts
+odibi run star_schema.yaml --pipeline build_facts
 
 # Finally build aggregates (requires facts)
-odibi run --config star_schema.yaml --pipeline build_aggregates
+odibi run star_schema.yaml --pipeline build_aggregates
 ```
 
 Or run everything:
 
 ```bash
-odibi run --config star_schema.yaml
+odibi run star_schema.yaml
 ```
 
 ---

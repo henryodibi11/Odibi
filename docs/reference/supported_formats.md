@@ -248,12 +248,13 @@ All formats work seamlessly with cloud storage:
 ```yaml
 connections:
   bronze:
-    type: azure_adls
-    account: mystorageaccount
+    type: azure_blob
+    account_name: mystorageaccount
     container: bronze
-    auth_mode: key_vault
-    key_vault_name: my-vault
-    secret_name: storage-key
+    auth:
+      mode: key_vault
+      key_vault_name: my-vault
+      secret_name: storage-key
 
 pipelines:
   - pipeline: multi_format

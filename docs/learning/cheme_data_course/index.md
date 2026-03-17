@@ -50,12 +50,12 @@ This is a **self-paced, hands-on course** that teaches you:
 - [L06: PID Basics + Constraints](lessons/L06_pid_basics.md) *(60 min)*
 - [L07: Tuning + Anti-windup](lessons/L07_tuning.md) *(60 min)*
 - [L08: Disturbances + Setpoint Strategies](lessons/L08_disturbances.md) *(60 min)*
-- [L09: System Identification (PRBS/ARX)](lessons/L09_identification.md) *(90 min)*
+- [L09: System Identification (PRBS/ARX)](lessons/L09_system_id.md) *(90 min)*
 
 #### Part III: Multiloop + Advanced Topics
 **Learn:** Cascade, feedforward, interactions, gain scheduling, MPC basics
 
-- [L10: Interacting Loops](lessons/L10_interactions.md) *(60 min)*
+- [L10: Interacting Loops](lessons/L10_interacting_loops.md) *(60 min)*
 - [L11: Cascade Control](lessons/L11_cascade.md) *(60 min)*
 - [L12: Feedforward/Ratio Control](lessons/L12_feedforward.md) *(60 min)*
 - [L13: Nonlinearity + Saturation](lessons/L13_nonlinearity.md) *(60 min)*
@@ -64,7 +64,7 @@ This is a **self-paced, hands-on course** that teaches you:
 #### Capstone: Real-World Pipeline
 **Build:** Bronze → Silver → Gold CSTR "digital twin" with lineage and validation
 
-- [L15: Digital Twin Pipeline](lessons/L15_capstone_cstr.md) *(2-3 hours)*
+- [L15: Digital Twin Pipeline](lessons/L15_cstr_digital_twin.md) *(2-3 hours)*
 
 ---
 
@@ -144,10 +144,10 @@ This is a **self-paced, hands-on course** that teaches you:
 ## Course Materials
 
 ### **Textbook Reference:**
-[Seborg → Odibi Mapping Guide](../guides/seborg_textbook_mapping.md) - Complete chapter mapping
+[Seborg → Odibi Mapping Guide](../../guides/seborg_textbook_mapping.md) - Complete chapter mapping
 
 ### **Technical References:**
-- [Process Simulation Guide](../guides/process_simulation_guide.md) - Stateful functions deep dive
+- [Process Simulation Guide](../../guides/process_simulation_guide.md) - Stateful functions deep dive
 - [YAML Schema Reference](../../reference/yaml_schema.md) - All configuration options
 - [Simulation Generators Reference](../../reference/simulation_generators.md) - Generator catalog
 

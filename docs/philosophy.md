@@ -94,6 +94,6 @@ All three engines must produce identical results for the same input. You can dev
 
 ## Contributing
 
-Want to contribute? Read [CONTRIBUTING.md](../CONTRIBUTING.md) first.
+Want to contribute? Read [CONTRIBUTING.md](https://github.com/henryodibi11/odibi/blob/main/CONTRIBUTING.md) first.
 
 Remember: Propose features with evidence from real use cases, not speculation. The Chimera Mindset applies to contributions too.

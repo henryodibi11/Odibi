@@ -165,13 +165,13 @@ graph TB
     Transform --> Validate{Validation<br/>Tests Pass?}
     
     Validate -->|All Pass| Write[✅ Write to Target]
-    Validate -->|Some Fail<br/>on_failure: warn| WriteWarn[⚠️ Write + Log Warnings]
-    Validate -->|Some Fail<br/>on_failure: quarantine| Split[Split Data]
+    Validate -->|Some Fail<br/>mode: warn| WriteWarn[⚠️ Write + Log Warnings]
+    Validate -->|Some Fail<br/>on_fail: quarantine| Split[Split Data]
     
     Split --> Good[✅ Good Records<br/>→ Target]
     Split --> Bad[❌ Bad Records<br/>→ Quarantine]
     
-    Validate -->|Fail<br/>on_failure: fail| AbortValidation[❌ Stop Pipeline]
+    Validate -->|Fail<br/>mode: fail| AbortValidation[❌ Stop Pipeline]
     
     style Contract fill:#f4a261,stroke:#264653,color:#333
     style Validate fill:#e76f51,stroke:#264653,color:#fff

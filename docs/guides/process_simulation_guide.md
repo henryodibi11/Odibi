@@ -634,7 +634,7 @@ columns:
 
 ### Example 3: Complete Flowsheet with All Features
 
-See [examples/chemical_engineering/cstr_flowsheet_complete.yaml](../../examples/chemical_engineering/cstr_flowsheet_complete.yaml)
+See `cstr_flowsheet_complete.yaml`
 
 **This example demonstrates:**
 - ✅ prev() for material/energy balances
@@ -763,6 +763,6 @@ From textbooks or plant data:
 ---
 
 **For questions or examples, see:**
-- [Complete CSTR Flowsheet](../../examples/chemical_engineering/cstr_flowsheet_complete.yaml)
-- [Battery SOC Integration](../../examples/renewable_energy/battery_soc_simulation.yaml)
-- [Solar Thermal Tracking](../../examples/renewable_energy/solar_thermal_tracking.yaml)
+- Complete CSTR Flowsheet (`cstr_flowsheet_complete.yaml`)
+- Battery SOC Integration (`battery_soc_simulation.yaml`)
+- Solar Thermal Tracking (`solar_thermal_tracking.yaml`)

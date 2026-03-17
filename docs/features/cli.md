@@ -25,12 +25,15 @@ odibi run config.yaml
 
 | Flag | Description |
 |------|-------------|
-| `--env` | Environment to use (default: `development`) |
+| `--env` | Environment to apply overrides (e.g., dev, qat, prod) |
 | `--dry-run` | Simulate execution without writing data |
 | `--resume` | Resume from last failure (skip successful nodes) |
 | `--parallel` | Run independent nodes in parallel |
 | `--workers` | Number of worker threads for parallel execution (default: 4) |
 | `--on-error` | Override error handling: `fail_fast`, `fail_later`, `ignore` |
+| `--tag` | Filter nodes by tag (e.g., `--tag daily`) |
+| `--pipeline` | Run a specific pipeline by name |
+| `--node` | Run a specific node by name |
 
 #### Examples
 
@@ -278,19 +281,6 @@ From v3 → v5
   name                           STRING               (unchanged)
 ```
 
-## Global Options
-
-These options are available for all commands:
-
-| Flag | Description |
-|------|-------------|
-| `--log-level` | Set logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` (default: `INFO`) |
-
-```bash
-# Enable debug logging
-odibi run config.yaml --log-level DEBUG
-```
-
 ## Examples
 
 ### Complete Workflow
@@ -321,8 +311,8 @@ odibi catalog runs config.yaml --status FAILED --limit 10
 # Resume from failure
 odibi run config.yaml --resume
 
-# Enable verbose logging
-odibi run config.yaml --log-level DEBUG
+# Run single node for debugging
+odibi run config.yaml --node failing_node --dry-run
 ```
 
 ### Schema Change Impact Assessment

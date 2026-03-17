@@ -85,7 +85,7 @@ odibi story last
 
 **Troubleshooting:**
 - If `odibi init` fails, see [Installation Guide](../guides/installation.md#troubleshooting-installation)
-- If pipeline fails, run `odibi doctor odibi.yaml` for diagnostics
+- If pipeline fails, run `odibi doctor` for diagnostics
 
 ---
 
@@ -237,7 +237,7 @@ odibi graph my_hello_world.yaml
 **Exercise 3: Diagnose Issues**
 
 ```bash
-odibi doctor my_hello_world.yaml
+odibi doctor
 
 # Checks:
 # - Python version
@@ -313,7 +313,7 @@ nodes:
         - type: row_count
           min: 1
       gate:
-        on_failure: fail  # Stop if validation fails
+        on_fail: abort  # Stop if validation fails
     
     write:
       connection: local
@@ -325,7 +325,7 @@ Run and check the Story for validation results.
 
 **Exercise 2: Test Failure Behavior**
 
-1. Change `on_failure: warn`
+1. Change `on_fail: warn_and_write`
 2. Break the data (add duplicate IDs to `my_data.csv`)
 3. Re-run - pipeline completes but logs warnings
 
@@ -369,14 +369,13 @@ Pick ONE pattern that interests you and wire it into Example 5:
 **Option A: Add Merge Logic**
 
 ```yaml
-transformer:
-  transformer: merge
-  params:
-    target:
-      connection: gold
-      path: existing_table
-    keys: [id]
-    strategy: upsert  # insert new, update existing
+transformer: merge
+params:
+  target:
+    connection: gold
+    path: existing_table
+  keys: [id]
+  strategy: upsert  # insert new, update existing
 ```
 
 **Option B: Add Incremental Loading**
@@ -385,10 +384,9 @@ transformer:
 read:
   connection: source
   path: transactions.csv
-  options:
-    incremental:
-      mode: stateful
-      column: updated_at
+  incremental:
+    mode: stateful
+    column: updated_at
 ```
 
 Run the pipeline twice and verify:
@@ -437,7 +435,7 @@ order_id,customer_id,product_id,amount,order_date
    - `order_id` is unique
    - `customer_id` is not null
    - `amount > 0`
-3. **Handle failures**: Use `on_failure: warn` and document WHY in YAML comments
+3. **Handle failures**: Use gate `on_fail: warn_and_write` or test `on_fail: warn` and document WHY in YAML comments
 4. **Generate a Story** with explanation
 
 ### Verification Script

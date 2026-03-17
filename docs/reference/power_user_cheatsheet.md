@@ -143,18 +143,18 @@ Auth mode (pick one):
 
 ```
 Fields needed:
-  server:        ____________________
+  host:          ____________________
   database:      ____________________
 
 Auth mode (pick one):
   [ ] sql_login          → username: ${ENV_VAR}  password: ${ENV_VAR}
-  [ ] managed_identity   → (no extra fields, Databricks/Azure)
+  [ ] aad_msi            → (no extra fields, Databricks/Azure)
 ```
 
 ```yaml
   my_sql:
     type: sql_server
-    server: "${DB_SERVER}"
+    host: "${DB_SERVER}"
     database: "${DB_NAME}"
     auth:
       mode: sql_login
@@ -166,13 +166,13 @@ Auth mode (pick one):
 ```yaml
   source_erp:
     type: sql_server
-    server: "${ERP_SERVER}"
+    host: "${ERP_SERVER}"
     database: "ERP_Production"
     auth: { mode: sql_login, username: "${ERP_USER}", password: "${ERP_PASS}" }
 
   target_analytics:
     type: sql_server
-    server: "${ANALYTICS_SERVER}"
+    host: "${ANALYTICS_SERVER}"
     database: "Analytics_DW"
     auth: { mode: sql_login, username: "${DW_USER}", password: "${DW_PASS}" }
 ```
@@ -1767,7 +1767,7 @@ Where is my data?
 │
 ├─► SQL Server / Azure SQL
 │   ├─► auth.mode: sql_login (username/password in env vars)
-│   └─► auth.mode: managed_identity (Databricks/Azure)
+│   └─► auth.mode: aad_msi (Databricks/Azure)
 │
 └─► REST API
     ├─► auth: bearer / basic / api_key

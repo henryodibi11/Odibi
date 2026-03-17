@@ -244,8 +244,9 @@ odibi catalog state odibi.yaml
 # State: {"event_timestamp": "2025-01-11 09:15:00"}
 # Updated: 2025-01-11 10:00:00
 
-# Reset state (force full reload)
-odibi catalog reset odibi.yaml --node load_events
+# Reset state (force full reload):
+# Delete the state JSON file or remove the node's meta_state entry,
+# then re-run the pipeline.
 ```
 
 ---
@@ -326,7 +327,7 @@ Use this checklist to choose your pattern:
   - No → Must use incremental
 
 - [ ] **Do you need to reprocess historical windows?**
-  - Yes → Use `odibi catalog reset` + stateful with `initial_value`
+  - Yes → Delete the state entry (or state JSON file) and re-run with a new `initial_value`
   - No → Stick with current HWM
 
 - [ ] **Is data immutable after creation?**

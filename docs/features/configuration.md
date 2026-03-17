@@ -423,7 +423,7 @@ environments:
 
 Select environment at runtime:
 ```bash
-odibi run --env production
+odibi run odibi.yaml --env production
 ```
 
 ## Validation

@@ -131,8 +131,8 @@ This ensures you don't need separate "init" and "update" pipelines. One config h
 ### 🏷️ Orchestration Tags
 **Run What You Need.**
 Tags allow you to execute slices of your pipeline.
-*   `odibi run --tag daily` -> Runs all nodes with "daily" tag.
-*   `odibi run --tag critical` -> Runs high-priority nodes.
+*   `odibi run odibi.yaml --tag daily` -> Runs all nodes with "daily" tag.
+*   `odibi run odibi.yaml --tag critical` -> Runs high-priority nodes.
 
 ### 🤖 Choosing Your Logic: Transformer vs. Transform
 

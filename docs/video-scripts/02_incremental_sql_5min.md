@@ -256,4 +256,4 @@ If time allows, add a 30-second Q&A:
 **A:** "Use rolling_window mode instead of stateful. See the Incremental Decision Tree guide."
 
 **Q: "Can I reset the HWM?"**  
-**A:** "Yes! Run `odibi catalog reset` to force a full reload."
+**A:** "Yes! Delete the state JSON file or the node's meta_state entry, then re-run the pipeline to force a full reload."

@@ -250,7 +250,7 @@ python scripts/test_all_cheme_examples.py
 # Failed: 0
 ```
 
-See [TEST_RESULTS.md](../../examples/cheme_course/TEST_RESULTS.md) for detailed validation.
+See `examples/cheme_course/TEST_RESULTS.md` for detailed validation.
 
 ---
 

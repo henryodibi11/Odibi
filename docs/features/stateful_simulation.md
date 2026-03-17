@@ -611,4 +611,4 @@ pid(..., dt=300)  # 5 minutes = 300 seconds
 - [Chemical Engineering Simulation Guide](../guides/chemical_engineering_simulation_guide.md)
 - [Odibi for Renewable Energy](../guides/odibi_for_renewable_energy.md)
 - [Simulation Overview](./simulation.md)
-- [Battery SOC Example](../../examples/renewable_energy/battery_soc_simulation.yaml)
+- Battery SOC Example (`battery_soc_simulation.yaml`)

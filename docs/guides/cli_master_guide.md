@@ -55,11 +55,6 @@ Check if your YAML is valid before running it.
 odibi validate my_pipeline.yaml
 ```
 
-**With environment variables:**
-```bash
-odibi validate my_pipeline.yaml --env prod
-```
-
 **What it checks:**
 - YAML schema validity (required fields, types)
 - Pipeline logic (node dependencies, circular references)
@@ -112,10 +107,10 @@ odibi story diff stories/runs/20231027_120000.json stories/runs/20231027_120500.
 Securely manage local secrets for your pipelines.
 ```bash
 # Initialize secrets store (creates .env.template)
-odibi secrets init
+odibi secrets init odibi.yaml
 
 # Validate all secrets are configured
-odibi secrets validate
+odibi secrets validate odibi.yaml
 ```
 
 ---

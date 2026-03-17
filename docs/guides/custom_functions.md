@@ -46,7 +46,7 @@ That's it — register with `@transform`, reference by name in YAML.
 6. [Transform Step Types](#transform-step-types)
 7. [Recipes](#recipes)
 8. [Engine-Aware Functions](#engine-aware-functions)
-9. [Gotchas & Tips](#gotchas--tips)
+9. [Gotchas & Tips](#gotchas-tips)
 
 ---
 

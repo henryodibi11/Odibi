@@ -110,8 +110,6 @@ assert len(output_df) == 1
 
 ## Source Pools
 
-For deterministic, replayable tests, see [Source Pools Design](../source_pools_design.md).
-
 Source pools provide:
 
 - **Frozen data**: Hash-verified, immutable test datasets
@@ -165,6 +163,5 @@ wsl -d Ubuntu-20.04 -- bash -c "cd /mnt/d/odibi && python3.9 -m pytest tests/ -k
 ## Related
 
 - [Python API Guide](python_api_guide.md) — Programmatic pipeline execution
-- [Source Pools Design](../source_pools_design.md) — Deterministic test data
 - [Best Practices](best_practices.md) — Testing recommendations
 - [Spark Engine Tutorial](../tutorials/spark_engine.md) — Spark-specific setup

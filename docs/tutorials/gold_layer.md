@@ -46,18 +46,18 @@ pipelines:
           params:
             grain: [order_id, line_item_id]
             dimensions:
-              - name: dim_customer
-                lookup_key: customer_id
+              - source_column: customer_id
+                dimension_table: dim_customer
+                dimension_key: customer_id
                 surrogate_key: customer_sk
-                target: silver.dim_customer
-              - name: dim_product
-                lookup_key: product_id
+              - source_column: product_id
+                dimension_table: dim_product
+                dimension_key: product_id
                 surrogate_key: product_sk
-                target: silver.dim_product
-              - name: dim_date
-                lookup_key: order_date
+              - source_column: order_date
+                dimension_table: dim_date
+                dimension_key: full_date
                 surrogate_key: date_sk
-                target: gold.dim_date
             orphan_handling: unknown
         write:
           connection: gold
@@ -85,14 +85,14 @@ nodes:
       params:
         grain: [order_id]            # One row per order
         dimensions:
-          - name: dim_customer
-            lookup_key: customer_id
+          - source_column: customer_id
+            dimension_table: dim_customer
+            dimension_key: customer_id
             surrogate_key: customer_sk
-            target: silver.dim_customer
-          - name: dim_product
-            lookup_key: product_id
+          - source_column: product_id
+            dimension_table: dim_product
+            dimension_key: product_id
             surrogate_key: product_sk
-            target: silver.dim_product
     write:
       connection: gold
       table: fact_orders
@@ -121,17 +121,17 @@ pattern:
   params:
     grain: [order_id]
     dimensions:
-      - name: dim_customer
-        lookup_key: customer_id
+      - source_column: customer_id
+        dimension_table: dim_customer
+        dimension_key: customer_id
         surrogate_key: customer_sk
-        target: silver.dim_customer
     orphan_handling: unknown         # Assign to unknown member
 ```
 
 **Options for `orphan_handling`:**
 | Option | Behavior |
 |--------|----------|
-| `unknown` | Assign SK = -1 (unknown member) |
+| `unknown` | Assign SK = 0 (unknown member) |
 | `quarantine` | Route to quarantine table |
 | `error` | Fail the pipeline |
 | `null` | Set SK = NULL |
@@ -189,14 +189,14 @@ nodes:
     pattern:
       type: aggregation
       params:
-        dimensions: [date_sk, product_sk]
+        grain: [date_sk, product_sk]
         measures:
           - name: total_revenue
-            expression: "SUM(order_total)"
+            expr: "SUM(order_total)"
           - name: order_count
-            expression: "COUNT(*)"
+            expr: "COUNT(*)"
           - name: avg_order_value
-            expression: "AVG(order_total)"
+            expr: "AVG(order_total)"
         incremental: true            # Merge new days
     write:
       connection: gold
@@ -319,7 +319,7 @@ nodes:
     contracts:
       - type: unique
         columns: [order_id, line_item_id]  # Grain columns
-        severity: error
+        on_fail: fail
     pattern:
       type: fact
       params:
