@@ -117,9 +117,7 @@ class SparkEngine(Engine):
             builder = builder.config("spark.sql.adaptive.enabled", "true")
 
             # Reduce Verbosity
-            builder = builder.config(
-                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
-            )
+            builder = builder.config("spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR")
             builder = builder.config(
                 "spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
             )
@@ -140,9 +138,7 @@ class SparkEngine(Engine):
             builder = builder.config("spark.sql.adaptive.enabled", "true")
 
             # Reduce Verbosity
-            builder = builder.config(
-                "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
-            )
+            builder = builder.config("spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR")
 
             self.spark = spark_session or builder.getOrCreate()
             self.spark.sparkContext.setLogLevel("ERROR")
