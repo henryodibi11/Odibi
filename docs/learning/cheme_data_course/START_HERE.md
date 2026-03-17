@@ -1,23 +1,22 @@
 # 🎓 ChemE × Data Engineering Course - START HERE
 
-**Complete self-paced course teaching Chemical Engineers data engineering through process control**
+**A self-paced course teaching Chemical Engineers data engineering through process control**
 
 ---
 
-## ✅ **ALL 16 LESSONS COMPLETE AND TESTED** ✅
+## What's Inside
 
-### **35 Working YAML Examples** (100% tested, 100% passing)
+### **16 Lessons · 35 YAML Examples · ~20-25 Hours**
 
-All lessons include:
-- ✅ Theory recap from Seborg textbook
-- ✅ **Runnable YAML examples** (tested with `odibi run`)
-- ✅ Data engineering concepts explained
-- ✅ Validation patterns and quarantine
-- ✅ Exercises with solution hints
-- ✅ Real plant operation connections
-- ✅ Progressive difficulty from beginner to expert
+Every lesson includes:
+- Theory recap from Seborg textbook
+- **Runnable YAML examples** (use `odibi run` to execute)
+- Data engineering concepts explained
+- Validation patterns and quarantine
+- Exercises with solution hints
+- Real plant operation connections
+- Progressive difficulty from beginner to expert
 
-**Total course time:** ~20-25 hours  
 **Part I time:** ~5 hours (beginner-friendly)
 
 ---
@@ -51,7 +50,7 @@ Open [L00: Setup](lessons/L00_setup.md) and follow along.
 
 ## 📚 Your Learning Path
 
-### **Part I: Foundations** ✅ COMPLETE
+### Part I: Foundations
 
 **[L00: Setup & Basics](lessons/L00_setup.md)** *(45 min)*  
 🎯 Install Odibi, run first pipeline, understand data formats  
@@ -79,7 +78,7 @@ Open [L00: Setup](lessons/L00_setup.md) and follow along.
 
 ---
 
-### **Part II: Feedback Control & System ID** ✅ COMPLETE
+### Part II: Feedback Control & System ID
 
 **[L06: PID Basics](lessons/L06_pid_basics.md)** *(60 min)*  
 🎯 P/I/D actions, `pid()` function, anti-windup  
@@ -99,7 +98,7 @@ Open [L00: Setup](lessons/L00_setup.md) and follow along.
 
 ---
 
-### **Part III: Advanced Control Strategies** ✅ COMPLETE
+### Part III: Advanced Control Strategies
 
 **[L10: Interacting Control Loops](lessons/L10_interacting_loops.md)** *(60 min)*  
 🎯 MIMO systems, loop interactions  
@@ -123,7 +122,7 @@ Open [L00: Setup](lessons/L00_setup.md) and follow along.
 
 ---
 
-### **Capstone: Real-World Digital Twin** ✅ COMPLETE
+### Capstone: Real-World Digital Twin
 
 **[L15: CSTR Digital Twin](lessons/L15_cstr_digital_twin.md)** *(2-3 hours)*  
 🎯 Complete reactor model with mass, energy, kinetics  
@@ -133,52 +132,50 @@ Open [L00: Setup](lessons/L00_setup.md) and follow along.
 
 ## 💪 What You'll Learn
 
-### **After completing this course:**
+### Data Engineering Skills
+- Generate realistic plant time-series data
+- Use CSV, Parquet, and Delta Lake formats
+- Validate data quality with range checks
+- Implement quarantine patterns
+- Build reproducible simulations
+- Handle multi-entity pipelines
 
-**Data Engineering Skills:**
-- ✅ Generate realistic plant time-series data
-- ✅ Use CSV, Parquet, and Delta Lake formats
-- ✅ Validate data quality with range checks
-- ✅ Implement quarantine patterns
-- ✅ Build reproducible simulations
-- ✅ Handle multi-entity pipelines
+### Process Control Skills
+- Map process control to data schemas (CV/MV/DV)
+- Implement mass and energy balances
+- Model first and second-order dynamics
+- Design and tune PID controllers
+- Perform system identification
+- Build cascade and feedforward controllers
+- Handle nonlinear processes
+- Apply basic model predictive control
 
-**Process Control Skills:**
-- ✅ Map process control to data schemas (CV/MV/DV)
-- ✅ Implement mass and energy balances
-- ✅ Model first and second-order dynamics
-- ✅ Design and tune PID controllers
-- ✅ Perform system identification
-- ✅ Build cascade and feedforward controllers
-- ✅ Handle nonlinear processes
-- ✅ Apply basic model predictive control
+### Chemical Engineering
+- CSTR modeling (kinetics, thermodynamics)
+- Heat exchanger dynamics
+- Tank level control
+- pH neutralization
+- Operating point optimization
 
-**Chemical Engineering:**
-- ✅ CSTR modeling (kinetics, thermodynamics)
-- ✅ Heat exchanger dynamics
-- ✅ Tank level control
-- ✅ pH neutralization
-- ✅ Operating point optimization
-
-**Career Skills:**
-- ✅ Portfolio of 35+ working examples
-- ✅ Production-ready data pipelines
-- ✅ Bridge between ChemE and data roles
+### Career Skills
+- Portfolio of 35+ working examples
+- Production-ready data pipelines
+- Bridge between ChemE and data roles
 
 ---
 
-## 🎯 Success Metrics
+## 🎯 What You'll Be Able to Do
 
-**After completing this course, you can:**
+After completing this course, you can:
 
-✅ Build simulations generating millions of rows of realistic process data  
-✅ Implement PID controllers from Seborg textbook  
-✅ Tune controllers using industry methods (Z-N, Cohen-Coon)  
-✅ Model complex systems (CSTR, heat exchangers, cascades)  
-✅ Explain to data engineers: "This is a controlled variable"  
-✅ Explain to process engineers: "This is a Parquet file"  
-✅ Build production-ready data pipelines  
-✅ Create digital twins of chemical processes
+- Build simulations generating millions of rows of realistic process data
+- Implement PID controllers from Seborg textbook
+- Tune controllers using industry methods (Z-N, Cohen-Coon)
+- Model complex systems (CSTR, heat exchangers, cascades)
+- Explain to data engineers: "This is a controlled variable"
+- Explain to process engineers: "This is a Parquet file"
+- Build production-ready data pipelines
+- Create digital twins of chemical processes
 
 ---
 
@@ -187,8 +184,7 @@ Open [L00: Setup](lessons/L00_setup.md) and follow along.
 | Metric | Count |
 |--------|-------|
 | **Total Lessons** | 16 (L00-L15) |
-| **YAML Examples** | 35 working examples |
-| **Test Pass Rate** | 100% (35/35) |
+| **YAML Examples** | 35 |
 | **Course Time** | 20-25 hours |
 | **Exercises** | 40+ hands-on problems |
 | **Seborg Coverage** | Chapters 1-20 |
@@ -218,8 +214,7 @@ examples/cheme_course/
 ├── L13_nonlinearity/    # 2 examples
 ├── L14_mpc_lite/        # 2 examples
 ├── L15_cstr_digital_twin/ # 2 examples
-├── README.md            # Quick reference
-└── TEST_RESULTS.md      # Test validation
+└── README.md            # Quick reference
 ```
 
 **Lesson Documentation:**
@@ -233,24 +228,6 @@ docs/learning/cheme_data_course/
 └── solutions/
     └── index.md         # Solutions hub
 ```
-
----
-
-## 🧪 Testing & Validation
-
-All 35 examples have been tested and verified:
-
-```bash
-# Run the test suite
-python scripts/test_all_cheme_examples.py
-
-# Result:
-# Total: 35
-# Passed: 35 (100%)
-# Failed: 0
-```
-
-See `examples/cheme_course/TEST_RESULTS.md` for detailed validation.
 
 ---
 
@@ -325,9 +302,6 @@ By the end, you have 35+ working examples for LinkedIn/interviews.
 
 ## 🤔 FAQ
 
-**Q: Is everything really complete and tested?**  
-A: Yes! All 35 YAML examples pass `odibi run` with 100% success rate.
-
 **Q: Do I need the Seborg textbook?**  
 A: No! Lessons recap key concepts. But it helps for deeper theory.
 
@@ -366,7 +340,7 @@ A: Yes! All examples work on local Pandas or Databricks Spark.
 
 ## 👉 Get Started Now
 
-### **Recommended Path:**
+### Recommended Path
 
 1. **Read** [Course Overview](index.md) *(10 min)*
 2. **Install** Odibi *(5 min)*
@@ -376,7 +350,7 @@ A: Yes! All examples work on local Pandas or Databricks Spark.
 6. **Master** Part III (L10-L14) for advanced strategies *(5 hours)*
 7. **Build** L15 digital twin capstone project *(2-3 hours)*
 
-### **Alternative Paths:**
+### Alternative Paths
 
 **Path A - Just the Basics (5 hours):**
 L00 → L01 → L02 → L03 → L04 → L05
@@ -392,18 +366,7 @@ L00 → L02 → L15
 
 ---
 
-## ✨ Bottom Line
-
-**You have a COMPLETE, production-tested course ready to use RIGHT NOW.**
-
-- ✅ All 16 lessons built with theory + exercises
-- ✅ All 35 YAML examples tested and working
-- ✅ Beginner to expert progression
-- ✅ Real process control + data engineering skills
-- ✅ Portfolio-ready examples
-
-**Start learning today:**  
-👉 **[L00: Setup & Basics](lessons/L00_setup.md)**
+👉 **[Start with L00: Setup & Basics](lessons/L00_setup.md)**
 
 ---
 

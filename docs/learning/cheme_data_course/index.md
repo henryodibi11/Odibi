@@ -213,10 +213,10 @@ Production-grade CSTR "digital twin":
 - Doesn't teach process control
 
 **This course:**
-- ✅ Process control concepts you'll actually use
-- ✅ Data engineering skills that are immediately practical
-- ✅ Builds on knowledge you already have
-- ✅ Creates unique portfolio content (ChemE + DE)
+- Process control concepts you'll actually use
+- Data engineering skills that are immediately practical
+- Builds on knowledge you already have
+- Creates unique portfolio content (ChemE + DE)
 
 ---
 
@@ -260,17 +260,6 @@ Move to [L01: CV/MV/DV](lessons/L01_cv_mv_dv.md)
 - **Questions?** Open an issue: [github.com/henryodibi11/Odibi/issues](https://github.com/henryodibi11/Odibi/issues)
 - **Found a bug?** Submit a PR
 - **Want to contribute?** Add your own lessons or examples
-
----
-
-## Course Roadmap
-
-**Current Status:** ✅ Curriculum designed, lessons in progress
-
-**Coming Soon:**
-- All 15 lessons with exercises
-- Video walkthroughs (optional)
-- Advanced Part IV: Industrialization (frequency response, RGA, full MPC)
 
 ---
 
