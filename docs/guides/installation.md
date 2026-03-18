@@ -71,7 +71,7 @@ This gives you:
 - ✅ Pandas engine with DuckDB SQL
 - ✅ Local file reading (CSV, Parquet, JSON, Excel)
 - ✅ Delta Lake support (via deltalake)
-- ✅ All 55+ transformers
+- ✅ All 54 transformers
 - ✅ **Unit conversion** (Pint) - built-in, no extra install needed
 - ✅ CLI tools
 

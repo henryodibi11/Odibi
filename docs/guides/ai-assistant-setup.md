@@ -5,7 +5,7 @@ This guide explains how to set up AI coding assistants (Continue, Cline, Amp) to
 ## Overview
 
 Odibi includes an MCP server (`odibi-knowledge`) that gives AI assistants perfect knowledge of:
-- All 52+ transformers and their signatures
+- All 54 transformers and their signatures
 - All 6 DWH patterns (Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension)
 - Exact YAML pipeline structure
 - Framework documentation (2,300+ lines)
@@ -131,7 +131,7 @@ The `AGENTS.md` file in the odibi root provides framework guidance.
 **Knowledge Tools:**
 | Tool | Description |
 |------|-------------|
-| `list_transformers` | List all 52+ transformers |
+| `list_transformers` | List all 54 transformers |
 | `list_patterns` | List all 6 DWH patterns |
 | `list_connections` | List all connection types |
 | `explain(name)` | Get detailed docs for any feature |

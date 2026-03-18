@@ -446,26 +446,18 @@ If a fact references a customer that doesn't exist, the JOIN fails and you lose 
 
 ---
 
-## ODIBI Current State vs Target
+## ODIBI Patterns
 
-### What ODIBI Has Now
+### Implemented Patterns
 
-| Pattern | What It Does | Limitation |
-|---------|--------------|------------|
-| `FactPattern` | Dedup + pass through | No SK lookup, no orphan handling |
-| `SCD2Pattern` | Track history | No auto surrogate key |
-| `MergePattern` | Upsert logic | — |
-| `SnapshotPattern` | Point-in-time capture | — |
-| `generate_surrogate_key` | Hash-based key | Not integrated into patterns |
-
-### What We're Adding
-
-| Pattern | What It Will Do |
-|---------|-----------------|
+| Pattern | What It Does |
+|---------|--------------|
 | `DimensionPattern` | Auto SK + SCD + unknown member + audit columns |
-| `DateDimensionPattern` | Generate complete date dimension |
-| `Enhanced FactPattern` | Auto SK lookups + orphan handling + grain validation |
+| `FactPattern` | Dedup + pass through + SK lookup + orphan handling |
+| `SCD2Pattern` | Track history with automatic surrogate keys |
+| `MergePattern` | Upsert logic |
 | `AggregationPattern` | Declarative GROUP BY + time rollups |
+| `DateDimensionPattern` | Generate complete date dimension |
 
 ### Target: Declarative Dimensional Modeling
 

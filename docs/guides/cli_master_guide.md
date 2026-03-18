@@ -1,5 +1,5 @@
 # Odibi CLI: Zero to Hero
-> **Ultimate Cheatsheet & Reference (v3.4.1)**
+> **Ultimate Cheatsheet & Reference (v3.4.3)**
 
 The Command Line Interface (CLI) is your primary tool for managing Odibi projects.
 
@@ -256,7 +256,7 @@ These commands help AI tools (and developers) discover available features progra
 ### List Available Features
 
 ```bash
-# List all 52+ transformers
+# List all 54 transformers
 odibi list transformers
 
 # List all 6 patterns with descriptions

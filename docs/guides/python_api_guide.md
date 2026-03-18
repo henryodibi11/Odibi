@@ -1,5 +1,5 @@
 # 🐍 Odibi Python API: Zero to Hero
-> **Ultimate Cheatsheet & Reference (v3.4.1)**
+> **Ultimate Cheatsheet & Reference (v3.4.3)**
 
 Welcome to the Python API guide. While the CLI is great for running pipelines, the Python API allows you to **automate**, **test**, and **extend** Odibi deeply into your infrastructure.
 

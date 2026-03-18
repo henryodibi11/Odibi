@@ -57,7 +57,7 @@ pip install odibi
 odibi --version
 ```
 
-**[Show output: "odibi 3.4.2"]**
+**[Show output: "odibi 3.4.3"]**
 
 **Voiceover:**
 "Perfect. Now create your project using the built-in template."

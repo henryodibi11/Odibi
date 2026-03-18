@@ -1,6 +1,6 @@
 # Odibi Best Practices Guide
 
-**Version:** 3.4.2  
+**Version:** 3.4.3  
 **Last Updated:** 2025-12-03  
 **Audience:** Data Engineers, Analytics Engineers, Team Leads
 

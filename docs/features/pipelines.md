@@ -25,7 +25,7 @@ Odibi's pipeline system provides:
 The `Pipeline` class is the executor and orchestrator for a single pipeline. It:
 - Builds a dependency graph from node configurations
 - Resolves execution order via topological sort
-- Manages the execution engine (Pandas or Spark)
+- Manages the execution engine (Pandas, Spark, or Polars)
 - Generates execution stories for observability
 
 ### Node
@@ -74,7 +74,7 @@ Execution results are captured in `PipelineResults`:
 
 ```yaml
 project: MyDataPipeline
-engine: spark  # or 'pandas'
+engine: spark  # or 'pandas' or 'polars'
 
 connections:
   bronze:

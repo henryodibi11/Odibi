@@ -1,8 +1,8 @@
-# Azure Integration Setup Guide (v2.1.0)
+# Azure Integration Setup Guide (v3.4.3)
 
-This guide covers authenticating and connecting Odibi to Azure services (ADLS Gen2, Azure SQL, Key Vault) using the latest **v2.1.0** standards.
+This guide covers authenticating and connecting Odibi to Azure services (ADLS Gen2, Azure SQL, Key Vault) using the latest **v3.4.3** standards.
 
-**Key Features in v2.1.0:**
+**Key Features in v3.4.3:**
 - **Auto-Auth**: Zero-config authentication using Managed Identity or Environment Variables (`DefaultAzureCredential`).
 - **Universal Key Vault**: Retrieve ANY secret (Account Key, SAS Token, SQL Password) from Key Vault by referencing it in the config.
 
@@ -143,7 +143,7 @@ If you use Key Vault references, Odibi needs to authenticate *to the Key Vault* 
 
 | Feature | v2.0 (Old) | v2.1 (New) |
 | :--- | :--- | :--- |
-| **Connection Type** | `azure_adls`, `azure_sql` | `azure_blob`, `sql_server` |
+| **Connection Type** | `azure_blob` | `azure_adls`, `sql_server` |
 | **Auth Mode** | `auth_mode: key_vault` (top-level) | Removed. Use `auth: { key_vault_name: ... }` |
 | **Managed Identity** | Explicit `auth_mode: managed_identity` | Implicit (Auto-Auth) via `DefaultAzureCredential` |
 | **Key Vault** | Limited to specific auth modes | **Universal** (works for any secret in `auth` dict) |

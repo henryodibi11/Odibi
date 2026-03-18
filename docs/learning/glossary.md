@@ -86,9 +86,9 @@ nodes:
 ```yaml
 connections:
   warehouse_db:
-    type: postgres
+    type: sql_server
     host: db.company.com
-    port: 5432
+    port: 1433
     database: analytics
     # Credentials stored securely, not in YAML
 ```

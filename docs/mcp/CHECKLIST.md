@@ -147,7 +147,7 @@
 
 - [x] Update `odibi_mcp/README.md` with new tools
 - [x] Add examples to `docs/mcp/examples/`
-- [x] Update `CHANGELOG.md` with v2.11.0 MCP enhancements
+- [x] Update `CHANGELOG.md` with v3.4.3 MCP enhancements
 - [x] Create `mcp_config.example.yaml`
 - [x] Add MCP config to `odibi init` scaffolding
 

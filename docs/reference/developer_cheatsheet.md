@@ -200,7 +200,7 @@ odibi run project.yaml --env prod         # Run with environment
 odibi run project.yaml --dry-run          # Validate without executing
 
 # Introspection
-odibi list transformers                   # All 56 transformers
+odibi list transformers                   # All 54 transformers
 odibi list patterns                       # All 6 patterns
 odibi list connections                    # All connection types
 odibi explain <name>                      # Detailed docs for any feature

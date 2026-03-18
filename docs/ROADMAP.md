@@ -1,6 +1,6 @@
 # Odibi Roadmap
 
-## Current State (v2.16.0)
+## Current State (v3.4.3)
 
 *Last updated: 2026-02-22*
 
@@ -8,7 +8,7 @@
 |--------|-------|
 | Tests | 4,832 collected, 4,694 passed, 33 skipped, 0 failures |
 | **Test Coverage** | **62%** (target: 80%) |
-| Transformers | 56 |
+| Transformers | 54 |
 | Patterns | 6 (Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension) |
 | Engines | 3 (Pandas/DuckDB, Spark, Polars) |
 | Open Issues | 18 (3 bugs, 6 docs, 5 enhancements, 4 feature requests) |

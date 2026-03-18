@@ -701,7 +701,7 @@ You've completed the Senior DE journey! Here's where to level up further:
 - Public badge and certificate
 - Listed in Certified Professionals directory
 
-*Launching Q2 2025*
+*Coming soon*
 
 ---
 

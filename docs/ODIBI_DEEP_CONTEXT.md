@@ -8,7 +8,7 @@
 
 > **💡 AI/LLM Tip:** Use CLI introspection to discover features programmatically:
 > ```bash
-> odibi list transformers --format json   # All 52+ transformers
+> odibi list transformers --format json   # All 54 transformers
 > odibi list patterns --format json       # All 6 patterns
 > odibi explain <name>                    # Detailed docs + example YAML
 > ```

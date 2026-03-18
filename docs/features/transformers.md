@@ -1,13 +1,13 @@
 # Transformers
 
-Declarative data transformations with SQL-first semantics, dual-engine support (Spark/Pandas), and extensible custom transforms.
+Declarative data transformations with SQL-first semantics, multi-engine support (Pandas/Spark/Polars), and extensible custom transforms.
 
 ## Overview
 
 Odibi's transformer system provides:
 - **SQL-First Design**: All core operations leverage SQL for optimal engine performance
-- **Dual-Engine Support**: Seamless execution on Spark or Pandas/DuckDB
-- **Built-in Library**: 56 production-ready transformers
+- **Multi-Engine Support**: Seamless execution on Pandas/DuckDB, Spark, and Polars
+- **Built-in Library**: 54 production-ready transformers
 - **Extensibility**: Register custom transforms with the `@transform` decorator
 - **Chained Operations**: Compose multiple transforms in `transform.steps`
 
@@ -936,7 +936,7 @@ pipelines:
 
 1. **Use SQL-first transforms** - They push computation to the engine for optimal performance
 2. **Chain with transform.steps** - Compose multiple operations declaratively
-3. **Prefer built-in transforms** - They're tested for dual-engine compatibility
+3. **Prefer built-in transforms** - They're tested for multi-engine compatibility
 4. **Use Pydantic models** - Define parameter schemas for custom transforms
 5. **Handle nulls explicitly** - Use `fill_nulls` or `COALESCE` in derivations
 6. **Document custom transforms** - Include docstrings and param descriptions

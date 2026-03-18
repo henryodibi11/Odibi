@@ -1,9 +1,6 @@
 # Cross-Entity References
 
-**Status:** 🚧 IN DEVELOPMENT  
-**Sprint:** 2 Phase 2  
-**Estimated Effort:** 2-3 days  
-**Complexity:** HIGH
+**Status:** ✅ IMPLEMENTED (v3.3+)
 
 ---
 
@@ -255,23 +252,4 @@ columns:
 
 ---
 
-## Documentation Updates Needed
-
-1. Update `yaml_schema.md` with cross-entity syntax
-2. Add examples to `simulation_guide.md`
-3. Create flowsheet simulation tutorial
-4. Add to AGENTS.md as completed feature
-
----
-
-## Timeline
-
-- **Day 1:** Design + implement EntityProxy + namespace enhancement
-- **Day 2:** Dependency ordering + generation order + validation
-- **Day 3:** Tests + examples + documentation
-
----
-
-## Status: NOT YET IMPLEMENTED
-
-This is a design document. Implementation starts now.
+Cross-entity reference detection is implemented in `simulation/generator.py`.

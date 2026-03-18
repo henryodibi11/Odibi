@@ -464,17 +464,17 @@ system:
 
 connections:
   catalog_storage:
-    type: adls
+    type: azure_adls
     account: "${STORAGE_ACCOUNT}"
     container: metadata
 
   bronze:
-    type: adls
+    type: azure_adls
     account: "${STORAGE_ACCOUNT}"
     container: bronze
 
   silver:
-    type: adls
+    type: azure_adls
     account: "${STORAGE_ACCOUNT}"
     container: silver
 

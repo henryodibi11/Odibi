@@ -10,11 +10,10 @@
 # Key demonstration: Orphan handling - customer_id=999 maps to customer_sk=0
 
 project: sales_star_schema
-
 connections:
   source:
     type: local
-    base_path: ../sample_data
+    base_path: ./sample_data
   gold:
     type: local
     base_path: ./data/gold

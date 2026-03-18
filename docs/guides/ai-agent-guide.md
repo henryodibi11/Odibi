@@ -19,7 +19,7 @@
 
 **Ask yourself:**
 
-1. **Is it a common pattern?** (dimension, fact, scd2, aggregation)
+1. **Is it a common pattern?** (dimension, fact, scd2, merge, aggregation, date_dimension)
    - → Use `apply_pattern_template` (ONE call)
    - Example: Customer dimension, employee history, daily orders
 

@@ -87,7 +87,7 @@ The docstrings in `odibi/config.py` are the source of truth for documentation.
 
 ### Introspection (AI-Friendly CLI)
 ```bash
-odibi list transformers             # List all 56 transformers
+odibi list transformers             # List all 54 transformers
 odibi list patterns                 # List all 6 patterns
 odibi list connections              # List all connection types
 odibi explain <name>                # Get detailed docs for any feature

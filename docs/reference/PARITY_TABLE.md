@@ -1,6 +1,6 @@
 # Engine Parity Table
 
-Comparison of Pandas, Spark, and Polars engine capabilities as of V3.
+Comparison of Pandas, Spark, and Polars engine capabilities as of v3.4.3.
 
 ## Write Modes
 

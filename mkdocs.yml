@@ -203,25 +203,25 @@ nav:
       - ChemE × Data Engineering Course:
           - 🚀 START HERE: learning/cheme_data_course/START_HERE.md
           - 📖 Course Overview: learning/cheme_data_course/index.md
-          - Part I - Foundations (COMPLETE ✅):
+          - Part I - Foundations:
               - L00 Setup: learning/cheme_data_course/lessons/L00_setup.md
               - L01 CV/MV/DV: learning/cheme_data_course/lessons/L01_cv_mv_dv.md
               - L02 DoF + Balances: learning/cheme_data_course/lessons/L02_dof_balances.md
               - L03 First-Order: learning/cheme_data_course/lessons/L03_first_order.md
               - L04 FOPTD: learning/cheme_data_course/lessons/L04_foptd.md
               - L05 Second-Order: learning/cheme_data_course/lessons/L05_second_order.md
-          - Part II - Control + ID (COMPLETE ✅):
+          - Part II - Control + ID:
               - L06 PID Basics: learning/cheme_data_course/lessons/L06_pid_basics.md
               - L07 Tuning: learning/cheme_data_course/lessons/L07_tuning.md
               - L08 Disturbances: learning/cheme_data_course/lessons/L08_disturbances.md
               - L09 System ID: learning/cheme_data_course/lessons/L09_system_id.md
-          - Part III - Advanced (COMPLETE ✅):
+          - Part III - Advanced:
               - L10 Interacting Loops: learning/cheme_data_course/lessons/L10_interacting_loops.md
               - L11 Cascade: learning/cheme_data_course/lessons/L11_cascade.md
               - L12 Feedforward: learning/cheme_data_course/lessons/L12_feedforward.md
               - L13 Nonlinearity: learning/cheme_data_course/lessons/L13_nonlinearity.md
               - L14 MPC-lite: learning/cheme_data_course/lessons/L14_mpc_lite.md
-          - Capstone (COMPLETE ✅):
+          - Capstone:
               - L15 CSTR Digital Twin: learning/cheme_data_course/lessons/L15_cstr_digital_twin.md
           - 💡 Solutions: learning/cheme_data_course/solutions/index.md
 

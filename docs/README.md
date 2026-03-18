@@ -40,7 +40,7 @@ Odibi is a framework for building data pipelines. You describe *what* you want i
 
 - **Declarative**: YAML over imperative Python
 - **Auditable**: Every run generates a "Data Story" (HTML report)
-- **Dual-engine**: Pandas (local) → Spark (production) with zero config changes
+- **Multi-engine**: Pandas (local), Polars (high-performance), Spark (production) with zero config changes
 
 ---
 
@@ -103,4 +103,4 @@ This builds a complete star schema with dimensions, facts, FK lookups, and orpha
 
 ---
 
-*Last updated: January 2025*
+*Last updated: March 2026*

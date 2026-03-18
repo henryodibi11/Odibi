@@ -369,7 +369,7 @@ odibi list connections
 #### Example Output (transformers)
 
 ```
-Available Transformers (52):
+Available Transformers (54):
 ============================================================
   add_prefix                     Adds a prefix to column names.
   aggregate                      Performs grouping and aggregation via SQL.

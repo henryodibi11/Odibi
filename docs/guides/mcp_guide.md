@@ -111,7 +111,7 @@ Use odibi MCP list_transformers
 
 | Tool | Description | Example |
 |------|-------------|---------|
-| `list_transformers` | List all 52+ transformers | `{}` |
+| `list_transformers` | List all 54 transformers | `{}` |
 | `list_patterns` | List all 6 DWH patterns | `{}` |
 | `list_connections` | List connection types | `{}` |
 | `explain` | Get detailed docs for any feature | `{"name": "scd2"}` |

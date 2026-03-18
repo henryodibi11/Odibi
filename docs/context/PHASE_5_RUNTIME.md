@@ -75,7 +75,7 @@ Handles runtime execution for their respective engines:
 
 ### Observations:
 1. **Shared Abstractions, Divergent Implementations**:
-    - The Panda and Polars contexts largely mirror each other, highlighting the community's shift towards supporting Apache Arrow-compatible tech. Polars may become more relevant for users as it scales better in single-node setups.
+    - The Pandas and Polars contexts largely mirror each other, highlighting the community's shift towards supporting Apache Arrow-compatible tech. Polars may become more relevant for users as it scales better in single-node setups.
 
 2. **Advanced Parallelism**:
     - Threading awareness in Spark/Pandas execution patterns ensures that workflows remain performant while maintaining data integrity.

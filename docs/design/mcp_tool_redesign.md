@@ -48,7 +48,7 @@ When an AI agent tries to build an Odibi pipeline today, it must:
 1. Read documentation about YAML structure
 2. Remember correct field names (`read:` not `source:`, `query:` not `sql:`)
 3. Remember valid enum values (`overwrite`, `append`, `upsert`, `append_once`, `merge`)
-4. Know all 56+ transformer names and their parameters
+4. Know all 54 transformer names and their parameters
 5. Know which of the 6 patterns requires which fields
 6. Hand-write YAML with correct indentation
 7. Hope validation passes
@@ -91,7 +91,7 @@ If yes, the tool surface is correct.
 |-------------------|----------|--------------|
 | Smart Discovery tools | `odibi_mcp/tools/smart.py` | `map_environment`, `profile_source`, `profile_folder` with SmartResponse pattern |
 | SmartResponse contracts | `odibi_mcp/contracts/smart.py` | Typed dataclasses with `next_step`, `ready_for` chaining fields |
-| FunctionRegistry | `odibi/registry.py` | All 56+ transformers registered with Pydantic param models |
+| FunctionRegistry | `odibi/registry.py` | All 54 transformers registered with Pydantic param models |
 | Config Pydantic models | `odibi/config.py` (~4500 lines) | `ProjectConfig`, `PipelineConfig`, `NodeConfig`, `ReadConfig`, `WriteConfig`, etc. |
 | Template generator | `odibi/tools/templates.py` | Generates YAML templates from Pydantic models for CLI |
 | YAML validation | `odibi_mcp/tools/yaml_builder.py` | `validate_odibi_config()` with structured error output |
@@ -138,7 +138,7 @@ Never return raw Pydantic `ValidationError` traceback strings.
 
 ### Principle 5: Progressive Disclosure
 
-Don't overwhelm agents with all 56 transformers and all 11 validation types upfront. Let them discover what's available via `list_*` tools, then drill into specifics via `describe_*` tools.
+Don't overwhelm agents with all 54 transformers and all 11 validation types upfront. Let them discover what's available via `list_*` tools, then drill into specifics via `describe_*` tools.
 
 ### Principle 6: Cheap Model Friendly
 
@@ -230,7 +230,7 @@ The FunctionRegistry is ready for MCP exposure. Key methods:
 
 | Method | What It Does | MCP-Ready? |
 |--------|-------------|------------|
-| `list_functions()` | Returns all 56+ registered transformer names | ✅ Yes |
+| `list_functions()` | Returns all 54 registered transformer names | ✅ Yes |
 | `get_function_info(name)` | Returns docstring, params, types, defaults | ✅ Yes |
 | `get_param_model(name)` | Returns Pydantic model for params (if registered) | ✅ Yes |
 | `validate_params(name, params)` | Validates params against model or signature | ✅ Yes |
@@ -335,7 +335,7 @@ New builder tools should follow this same contract pattern.
       "example_yaml": "- function: deduplicate\n  params:\n    columns: [id]\n    keep: first"
     }
   ],
-  "count": 56,
+  "count": 54,
   "categories": {"scd": 3, "merge": 2, "column": 15, "filter": 8, ...}
 }
 ```
@@ -1051,7 +1051,7 @@ Every error includes a `fix` field with a concrete action:
 | `ready_for` chaining | Previous tool returns pre-filled params for next tool | Model copies JSON, no synthesis needed |
 | Structured errors with `fix` | Every error says exactly how to fix it | Model follows instructions, doesn't need to reason |
 | No YAML handling | Model passes JSON params, gets YAML back | No indentation, no quoting, no YAML syntax |
-| Progressive disclosure | `list_transformers` → then `describe_transformer` | Don't overwhelm with 56 transformers at once |
+| Progressive disclosure | `list_transformers` → then `describe_transformer` | Don't overwhelm with 54 transformers at once |
 | Required vs optional | MCP schema marks required params | Model knows what's mandatory |
 
 ### 11.2 Model Tiers and Expected Behavior

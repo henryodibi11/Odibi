@@ -1,9 +1,6 @@
 # Scheduled Events
 
-**Status:** 🚧 IN DEVELOPMENT  
-**Sprint:** 2 Phase 3  
-**Estimated Effort:** 4-6 hours  
-**Complexity:** MEDIUM
+**Status:** ✅ IMPLEMENTED (v3.3+)
 
 ---
 
@@ -195,6 +192,4 @@ Result: All turbines drop to 0 kW from 14:00-15:00, then resume normal operation
 
 ---
 
-## Status: DESIGN COMPLETE
-
-Ready to implement.
+Scheduled events are fully implemented. The `forced_value` event type is supported.

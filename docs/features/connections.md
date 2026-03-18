@@ -17,7 +17,6 @@ Odibi's connection system provides:
 | Type | Description |
 |------|-------------|
 | `local` | Local filesystem or URI-based paths |
-| `local_dbfs` | Databricks File System mock for local development |
 | `azure_adls` | Azure Data Lake Storage Gen2 |
 | `azure_sql` | Azure SQL Database |
 | `http` | HTTP/REST API endpoints |
@@ -83,25 +82,6 @@ connections:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `base_path` | string | `./data` | Base directory for all paths |
-
-## Local DBFS Connection
-
-Mock DBFS for testing Databricks pipelines locally.
-
-```yaml
-connections:
-  dbfs:
-    type: local_dbfs
-    root: .dbfs
-```
-
-Maps `dbfs:/FileStore/data.csv` to `.dbfs/FileStore/data.csv`.
-
-### Config Options
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `root` | string | `.dbfs` | Local directory to use as DBFS root |
 
 ## Azure Data Lake Storage (ADLS) Connection
 

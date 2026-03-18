@@ -21,7 +21,7 @@ If you have columns that are no longer PII (e.g., you hashed them or dropped the
 
 ## 2. Spark Write Modes
 
-**Change:** The Spark engine now supports `upsert` and `append_once` modes, bringing it to parity with the Pandas engine.
+**Change:** The Spark engine now supports `upsert` and `append_once` modes, bringing it to parity with the Pandas and Polars engines.
 
 **Usage:**
 These modes require `keys` to be defined in the `write.options` (or `params` if using a transformer that passes them). They are supported only for **Delta Lake** format.

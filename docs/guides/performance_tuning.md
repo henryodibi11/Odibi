@@ -10,7 +10,7 @@ time: 30m
 
 # Performance Tuning Guide
 
-Odibi v2.2 introduces a "High-Performance Core" designed to handle everything from local laptop development to petabyte-scale Spark jobs. This guide explains the optimizations available and how to use them.
+Odibi v3.4.3 introduces a "High-Performance Core" designed to handle everything from local laptop development to petabyte-scale Spark jobs. This guide explains the optimizations available and how to use them.
 
 ## 🚀 Quick Start
 

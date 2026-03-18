@@ -566,7 +566,7 @@ class DiscoveryLimits(BaseModel):
 | Tool | Description |
 |------|-------------|
 | `suggest_pattern(use_case)` | Recommend pattern for use case |
-| `list_transformers()` | List all 52+ transformers |
+| `list_transformers()` | List all 54 transformers |
 | `list_patterns()` | List all 6 DWH patterns |
 | `list_connections()` | List connection types |
 | `generate_pipeline_yaml(...)` | Generate pipeline YAML |

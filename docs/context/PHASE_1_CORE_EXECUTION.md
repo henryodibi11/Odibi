@@ -100,4 +100,4 @@ This phase reinforces the tightly coupled system design:
 ---
 
 ## Next Steps
-Transition to Phase 2 and analyze the behavioral intricacies within `patterns` to ensure parity between Panda, Spark, and Polars engines.
+Transition to Phase 2 and analyze the behavioral intricacies within `patterns` to ensure parity between Pandas, Spark, and Polars engines.

@@ -10,7 +10,7 @@ time: 2-3 hours
 
 # The Definitive Guide to Odibi
 
-**Version:** 3.4.2  
+**Version:** 3.4.3  
 **Audience:** Data Engineers, Analytics Engineers, Architects  
 **Prerequisites:** Basic Python and SQL knowledge  
 **Goal:** From "Hello World" to Enterprise Production
@@ -24,7 +24,7 @@ time: 2-3 hours
 3.  [The Object Model (Python API)](#3-the-object-model-python-api)
 4.  [Context, State, and Dependencies](#4-context-state-and-dependencies)
 5.  [Transformation Engineering](#5-transformation-engineering)
-6.  [The Dual Engine: Pandas & Spark](#6-the-dual-engine-pandas-spark)
+6.  [The Multi-Engine Architecture: Pandas, Spark & Polars](#6-the-multi-engine-architecture-pandas-spark-polars)
 7.  [Declarative Configuration (YAML)](#7-declarative-configuration-yaml)
 8.  [Observability: Data Stories](#8-observability-data-stories)
 9.  [Reliability & Governance](#9-reliability-governance)
@@ -227,19 +227,19 @@ There are two ways to define logic in a node:
 
 ---
 
-## 6. The Dual Engine: Pandas & Spark
+## 6. The Multi-Engine Architecture: Pandas, Spark & Polars
 
 Odibi abstracts the engine, but knowing how they differ is crucial for performance.
 
 ### 6.1 Comparison
 
-| Feature | Pandas Engine | Spark Engine |
-| :--- | :--- | :--- |
-| **Compute** | Single Node (CPU/RAM bound) | Distributed (Cluster) |
-| **SQL** | DuckDB / PandasQL | Spark SQL (Catalyst) |
-| **IO** | Local FS, S3/Blob (via fsspec) | HDFS, S3, ADLS (Native) |
-| **Setup** | `pip install odibi` | `pip install odibi[spark]` |
-| **Best For** | Dev, Testing, Small Data (<10GB) | Prod, Big Data (TB/PB) |
+| Feature | Pandas Engine | Spark Engine | Polars Engine |
+| :--- | :--- | :--- | :--- |
+| **Compute** | Single Node (CPU/RAM bound) | Distributed (Cluster) | Single Node (Multi-threaded) |
+| **SQL** | DuckDB / PandasQL | Spark SQL (Catalyst) | DuckDB |
+| **IO** | Local FS, S3/Blob (via fsspec) | HDFS, S3, ADLS (Native) | Local FS, S3/Blob |
+| **Setup** | `pip install odibi` | `pip install odibi[spark]` | `pip install odibi[polars]` |
+| **Best For** | Dev, Testing, Small Data (<10GB) | Prod, Big Data (TB/PB) | High-performance single-node |
 
 ### 6.2 Spark-Specific Features
 The Spark engine enables advanced Data Lakehouse features via `odibi.engine.spark_engine.SparkEngine`.
