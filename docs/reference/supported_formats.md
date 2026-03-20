@@ -350,3 +350,45 @@ All formats support:
 ```
 
 Delta Lake supports advanced features like VACUUM and Restore.
+
+---
+
+## Database Formats
+
+In addition to file formats, Odibi supports reading from and writing to SQL databases.
+
+| Format | Read | Write | Merge | Dependencies |
+|--------|------|-------|-------|--------------|
+| **Azure SQL / SQL Server** (`sql_server`, `azure_sql`) | ✅ | ✅ | ✅ | pyodbc, sqlalchemy |
+| **PostgreSQL** (`postgres`, `postgresql`) | ✅ | ✅ | ❌ | psycopg2-binary, sqlalchemy |
+
+### PostgreSQL
+
+**Use Case:** Relational database for local or cloud-hosted analytical workloads
+
+**Read Example:**
+```yaml
+- name: load_from_postgres
+  read:
+    connection: pg_warehouse
+    format: postgres
+    path: public.orders
+```
+
+**Write Example:**
+```yaml
+- name: write_to_postgres
+  write:
+    connection: pg_warehouse
+    format: postgres
+    path: public.order_summary
+    mode: append
+```
+
+**Installation:**
+```bash
+pip install 'odibi[postgres]'
+```
+
+!!! note
+    PostgreSQL does not support `merge` mode. Use `append` or `overwrite` for write operations.

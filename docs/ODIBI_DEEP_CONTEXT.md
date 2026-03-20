@@ -954,7 +954,69 @@ spark.read.format("jdbc").options(**options).option("dbtable", "dbo.Customers").
 
 ---
 
-### 6.4 HTTP Connection
+### 6.4 PostgreSQL Connection
+
+**Class:** `PostgreSQLConnection` in `odibi/connections/postgres.py`
+
+```yaml
+connections:
+  pg_prod:
+    type: postgres
+    host: localhost
+    database: analytics
+    port: 5432
+    sslmode: prefer
+    auth:
+      username: ${PG_USERNAME}
+      password: ${PG_PASSWORD}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `host` | str | Yes | PostgreSQL hostname |
+| `database` | str | Yes | Database name |
+| `port` | int | No | Default: 5432 |
+| `timeout` | int | No | Default: 30 |
+| `sslmode` | str | No | `disable`, `allow`, `prefer` (default), `require`, `verify-ca`, `verify-full` |
+| `username` | str | No | Database username |
+| `password` | str | No | Database password |
+
+**SSL Modes:**
+
+| Mode | Behavior |
+|------|----------|
+| `disable` | No SSL |
+| `prefer` | Try SSL first, fall back to non-SSL **(default)** |
+| `require` | Must use SSL, skip certificate verification |
+| `verify-full` | Must use SSL + verify CA + verify hostname |
+
+**Methods:**
+```python
+# Read data
+df = conn.read_sql("SELECT * FROM public.customers")
+df = conn.read_table("customers", schema="public")
+
+# Write data
+conn.write_table(df, "customers", schema="public", if_exists="replace")
+
+# Execute statements
+conn.execute("TRUNCATE TABLE public.staging")
+
+# Spark JDBC options
+options = conn.get_spark_options()
+spark.read.format("jdbc").options(**options).option("dbtable", "public.customers").load()
+```
+
+**SQL Dialect:** PostgreSQL uses `"double quotes"` for identifiers, `LIMIT` instead of `TOP`, and defaults to the `public` schema (vs `dbo` for SQL Server).
+
+**Installation:**
+```bash
+pip install 'odibi[postgres]'
+```
+
+---
+
+### 6.5 HTTP Connection
 
 **Class:** `HTTPConnection` in `odibi/connections/http.py`
 
@@ -972,7 +1034,7 @@ connections:
 
 **Auth Modes:** `none`, `basic`, `bearer`, `api_key`
 
-### 6.5 Local DBFS Connection
+### 6.6 Local DBFS Connection
 
 For Databricks DBFS paths:
 
@@ -987,7 +1049,7 @@ Supports: `dbfs:/`, `/dbfs/`, and mounted paths.
 
 ---
 
-### 6.6 Variable Substitution
+### 6.7 Variable Substitution
 
 Odibi YAML supports powerful variable substitution for secrets, reusable values, and dynamic dates.
 

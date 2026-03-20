@@ -5,7 +5,7 @@ Unified connection system for accessing local filesystems, cloud storage, databa
 ## Overview
 
 Odibi's connection system provides:
-- **Multiple backends**: Local filesystem, Azure ADLS, Azure SQL, HTTP APIs
+- **Multiple backends**: Local filesystem, Azure ADLS, Azure SQL, PostgreSQL, HTTP APIs
 - **Flexible authentication**: Service principals, managed identity, Key Vault, connection strings
 - **Environment variables**: Secure secret injection via `${VAR}` syntax
 - **Plugin architecture**: Register custom connection types via factory pattern
@@ -19,6 +19,7 @@ Odibi's connection system provides:
 | `local` | Local filesystem or URI-based paths |
 | `azure_adls` | Azure Data Lake Storage Gen2 |
 | `azure_sql` | Azure SQL Database |
+| `postgres` | PostgreSQL database |
 | `http` | HTTP/REST API endpoints |
 | `delta` | Delta Lake tables (path-based or catalog) |
 
@@ -286,6 +287,132 @@ conn.write_table(df, "processed_orders", if_exists="replace")
 conn.execute("DELETE FROM staging WHERE processed = 1")
 ```
 
+## PostgreSQL Connection
+
+PostgreSQL database with standard username/password authentication and optional SSL.
+
+```yaml
+connections:
+  pg_warehouse:
+    type: postgres
+    host: localhost
+    database: analytics
+    port: 5432
+    auth:
+      username: ${PG_USERNAME}
+      password: ${PG_PASSWORD}
+```
+
+### Config Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `host` / `server` | string | Required | PostgreSQL hostname |
+| `database` | string | Required | Database name |
+| `port` | int | `5432` | PostgreSQL port |
+| `timeout` | int | `30` | Connection timeout (seconds) |
+| `sslmode` | string | `prefer` | SSL mode (see below) |
+
+### SSL Modes
+
+| Mode | Behavior |
+|------|----------|
+| `disable` | No SSL |
+| `allow` | Try non-SSL first, fall back to SSL |
+| `prefer` | Try SSL first, fall back to non-SSL **(default)** |
+| `require` | Must use SSL, skip certificate verification |
+| `verify-ca` | Must use SSL + verify server CA certificate |
+| `verify-full` | Must use SSL + verify CA + verify hostname matches |
+
+For local development, `prefer` or `disable` is fine. For production or cloud-hosted PostgreSQL, use `require` or `verify-full`.
+
+### Authentication
+
+PostgreSQL uses standard username/password authentication. Credentials can be provided inline or via the `auth` block:
+
+#### Auth Block (Recommended)
+
+```yaml
+connections:
+  pg_prod:
+    type: postgres
+    host: pg-prod.example.com
+    database: warehouse
+    sslmode: require
+    auth:
+      username: ${PG_USERNAME}
+      password: ${PG_PASSWORD}
+```
+
+#### Inline (Development Only)
+
+```yaml
+connections:
+  pg_dev:
+    type: postgres
+    host: localhost
+    database: devdb
+    username: devuser
+    password: devpass
+```
+
+### Reading from PostgreSQL
+
+```yaml
+pipelines:
+  - pipeline: ingest_from_postgres
+    nodes:
+      - name: read_orders
+        read:
+          connection: pg_warehouse
+          format: postgres
+          path: public.orders
+        write:
+          connection: delta_lake
+          format: delta
+          path: bronze/orders
+          mode: overwrite
+```
+
+The `path` uses `schema.table` notation. If no schema is specified, `public` is used by default.
+
+### Writing to PostgreSQL
+
+```yaml
+      - name: write_summary
+        read:
+          connection: delta_lake
+          format: delta
+          path: gold/order_summary
+        write:
+          connection: pg_warehouse
+          format: postgres
+          path: public.order_summary
+          mode: append
+```
+
+Supported write modes: `append`, `overwrite`. The `merge` mode is **not supported** for PostgreSQL — it is only available for SQL Server (T-SQL MERGE syntax).
+
+### Spark JDBC Integration
+
+When using the Spark engine, Odibi automatically builds JDBC options for PostgreSQL:
+
+```python
+options = conn.get_spark_options()
+# Returns: {"url": "jdbc:postgresql://host:5432/db", "driver": "org.postgresql.Driver", ...}
+```
+
+!!! note
+    Spark requires the PostgreSQL JDBC driver on the classpath. Add it via `--packages org.postgresql:postgresql:42.7.3`.
+
+### Installation
+
+```bash
+pip install 'odibi[postgres]'
+```
+
+This installs `psycopg2-binary` and `sqlalchemy`.
+
 ## HTTP Connection
 
 Connect to REST APIs with various authentication methods.
@@ -454,6 +581,8 @@ Built-in connections are registered via `register_builtins()`:
 | `delta` | `LocalConnection` or `DeltaCatalogConnection` |
 | `sql_server` | `AzureSQL` |
 | `azure_sql` | `AzureSQL` |
+| `postgres` | `PostgreSQLConnection` |
+| `postgresql` | `PostgreSQLConnection` |
 
 ## Complete Examples
 
@@ -494,6 +623,15 @@ connections:
     host: ${SQL_SERVER}
     database: analytics
     auth_mode: aad_msi
+
+  # PostgreSQL database
+  postgres_db:
+    type: postgres
+    host: ${PG_HOST}
+    database: analytics
+    auth:
+      username: ${PG_USERNAME}
+      password: ${PG_PASSWORD}
 
   # External API
   weather_api:
@@ -569,6 +707,7 @@ connections:
 4. **Lazy validation** - Default `validation_mode: lazy` defers validation until first use
 5. **Separate connections** - Use different connections for different security zones
 6. **Register secrets** - Secrets are automatically registered for log redaction
+7. **Use SSL for remote PostgreSQL** - Set `sslmode: require` or `verify-full` for non-localhost connections
 
 ## Troubleshooting
 

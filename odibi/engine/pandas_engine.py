@@ -20,6 +20,7 @@ from odibi.context import Context, PandasContext
 from odibi.engine.base import Engine
 from odibi.enums import EngineType
 from odibi.exceptions import TransformError
+from odibi.connections.sql_utils import is_sql_format
 from odibi.utils.logging_context import get_logging_context
 
 __all__ = ["PandasEngine", "LazyDataset"]
@@ -1276,7 +1277,7 @@ class PandasEngine(Engine):
                     reader = fastavro.reader(f)
                     records = [record for record in reader]
                 return self._process_df(pd.DataFrame(records), post_read_query)
-        elif format in ["sql", "sql_server", "azure_sql"]:
+        elif is_sql_format(format):
             ctx.debug("Reading SQL table", table=str(full_path), format=format)
 
             if not hasattr(connection, "read_table") and not hasattr(connection, "read_sql_query"):
@@ -1287,25 +1288,18 @@ class PandasEngine(Engine):
                 raise ValueError(
                     f"Cannot read SQL table '{full_path}': connection type '{type(connection).__name__}' "
                     "does not support SQL operations. Use a SQL-compatible connection "
-                    "(e.g., SqlServerConnection, AzureSqlConnection)."
+                    "(e.g., AzureSQL, PostgreSQLConnection)."
                 )
 
             table_name = str(full_path)
+            default_schema = getattr(connection, "default_schema", "dbo")
             if "." in table_name:
                 schema, tbl = table_name.split(".", 1)
             else:
-                schema, tbl = "dbo", table_name
-
-            # Build SQL query with optional WHERE clause for incremental pushdown
-            # post_read_query contains the SQL filter condition (e.g., "[DateInserted] > '2025-01-01'")
-            if schema:
-                base_query = f"SELECT * FROM [{schema}].[{tbl}]"
-            else:
-                base_query = f"SELECT * FROM [{tbl}]"
+                schema, tbl = default_schema, table_name
 
             if post_read_query and hasattr(connection, "read_sql_query"):
-                # Treat post_read_query as a WHERE clause condition for SQL pushdown
-                full_query = f"{base_query} WHERE {post_read_query}"
+                full_query = connection.build_select_query(tbl, schema, where=post_read_query)
                 ctx.debug(
                     "Executing SQL query with incremental filter",
                     query=full_query,
@@ -1428,7 +1422,7 @@ class PandasEngine(Engine):
         )
 
         # SQL Server / Azure SQL Support
-        if format in ["sql", "sql_server", "azure_sql"]:
+        if is_sql_format(format):
             ctx.debug("Writing to SQL", table=table, mode=mode)
             return self._write_sql(df, connection, table, mode, options)
 
@@ -1558,6 +1552,13 @@ class PandasEngine(Engine):
 
         # Handle MERGE mode for SQL Server
         if mode == "merge":
+            if getattr(connection, "sql_dialect", "mssql") != "mssql":
+                raise NotImplementedError(
+                    f"SQL MERGE mode is currently only supported for SQL Server connections. "
+                    f"Connection dialect '{getattr(connection, 'sql_dialect', 'unknown')}' "
+                    f"does not support MERGE. Use mode='append' or mode='overwrite' instead."
+                )
+
             merge_keys = options.get("merge_keys")
             merge_options = options.get("merge_options")
 
@@ -1599,8 +1600,14 @@ class PandasEngine(Engine):
                 "total_affected": result.total_affected,
             }
 
-        # Handle enhanced overwrite with strategies
+        # Handle enhanced overwrite with strategies (SQL Server only)
         if mode == "overwrite" and options.get("overwrite_options"):
+            if getattr(connection, "sql_dialect", "mssql") != "mssql":
+                raise NotImplementedError(
+                    f"Enhanced overwrite strategies are currently only supported for SQL Server. "
+                    f"Use standard mode='overwrite' without overwrite_options for "
+                    f"'{getattr(connection, 'sql_dialect', 'unknown')}' connections."
+                )
             from odibi.writers.sql_server_writer import SqlServerMergeWriter
 
             overwrite_options = options.get("overwrite_options")
@@ -1636,10 +1643,11 @@ class PandasEngine(Engine):
             }
 
         # Extract schema from table name if present
+        default_schema = getattr(connection, "default_schema", "dbo")
         if "." in table:
             schema, table_name = table.split(".", 1)
         else:
-            schema, table_name = "dbo", table
+            schema, table_name = default_schema, table
 
         # Map mode to if_exists
         if_exists = "replace"  # overwrite
@@ -2771,9 +2779,8 @@ class PandasEngine(Engine):
             cannot be inferred.
         """
         try:
-            if table and format in ["sql", "sql_server", "azure_sql"]:
-                # SQL Server: Read empty result
-                query = f"SELECT TOP 0 * FROM {table}"
+            if table and is_sql_format(format):
+                query = connection.build_select_query(table, limit=0)
                 df = connection.read_sql(query)
                 return self.get_schema(df)
 

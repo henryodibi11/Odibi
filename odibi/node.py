@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from odibi.config import IncrementalConfig, IncrementalMode, NodeConfig, RetryConfig, WriteMode
+from odibi.connections.sql_utils import is_sql_format
 from odibi.context import Context, EngineContext, _get_unique_view_name
 from odibi.enums import EngineType
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
@@ -577,11 +578,7 @@ class NodeExecutor:
                 )
 
             # Incremental SQL Pushdown: Generate filter for SQL sources
-            if read_config.incremental and read_config.format in [
-                "sql",
-                "sql_server",
-                "azure_sql",
-            ]:
+            if read_config.incremental and is_sql_format(read_config.format):
                 incremental_filter = self._generate_incremental_sql_filter(
                     read_config.incremental, config, ctx
                 )
@@ -943,6 +940,10 @@ class NodeExecutor:
         if format in ("sql_server", "azure_sql", "mssql"):
             return f"[{column}]"
 
+        # PostgreSQL dialects
+        if format in ("postgres", "postgresql"):
+            return f'"{column}"'
+
         # Delta format with Spark engine - uses Spark SQL syntax
         if format == "delta" and engine_name and "spark" in engine_name.lower():
             return f"`{column}`"
@@ -1227,7 +1228,7 @@ class NodeExecutor:
             return df, None
 
         # Skip in-memory filtering for SQL sources (already pushed down)
-        if config.read.format in ["sql", "sql_server", "azure_sql"]:
+        if is_sql_format(config.read.format):
             # Still need to capture HWM for stateful mode
             if inc.mode == IncrementalMode.STATEFUL:
                 state_key = inc.state_key or f"{config.name}_hwm"

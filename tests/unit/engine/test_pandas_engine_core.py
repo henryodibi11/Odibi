@@ -429,6 +429,7 @@ class TestWriteSql:
     def test_write_sql_merge_mode(self):
         engine = PandasEngine()
         conn = Mock()
+        conn.sql_dialect = "mssql"
         df = pd.DataFrame({"id": [1], "val": [10]})
 
         mock_writer = Mock()
@@ -455,6 +456,7 @@ class TestWriteSql:
     def test_write_sql_merge_no_keys_raises(self):
         engine = PandasEngine()
         conn = Mock()
+        conn.sql_dialect = "mssql"
         df = pd.DataFrame({"id": [1]})
         with pytest.raises(ValueError, match="merge_keys"):
             engine._write_sql(df, conn, "tbl", "merge", {})

@@ -147,29 +147,30 @@ The connection factory system allows registering custom connection types.
 | `azure_blob` / `azure_adls` | Azure Blob Storage / ADLS Gen2 |
 | `delta` | Delta Lake tables |
 | `sql_server` / `azure_sql` | SQL Server / Azure SQL |
+| `postgres` / `postgresql` | PostgreSQL |
 
 ### Custom Factory Pattern
 
 ```python
 from odibi.plugins import register_connection_factory, get_connection_factory
 
-def create_postgres_connection(name: str, config: dict):
-    """Create a PostgreSQL connection."""
-    from my_connections import PostgresConnection
+def create_snowflake_connection(name: str, config: dict):
+    """Create a Snowflake connection."""
+    from my_connections import SnowflakeConnection
 
-    return PostgresConnection(
-        host=config["host"],
-        port=config.get("port", 5432),
+    return SnowflakeConnection(
+        account=config["account"],
+        warehouse=config.get("warehouse", "COMPUTE_WH"),
         database=config["database"],
         username=config.get("username"),
         password=config.get("password"),
     )
 
 # Register the factory
-register_connection_factory("postgres", create_postgres_connection)
+register_connection_factory("snowflake", create_snowflake_connection)
 
 # Retrieve a factory (if needed)
-factory = get_connection_factory("postgres")
+factory = get_connection_factory("snowflake")
 ```
 
 ## Auto-Discovery
@@ -243,18 +244,18 @@ For distributable plugins, use Python entry points in `pyproject.toml`:
 
 ```toml
 [project.entry-points."odibi.connections"]
-postgres = "my_plugin.connections:create_postgres_connection"
 snowflake = "my_plugin.connections:create_snowflake_connection"
+clickhouse = "my_plugin.connections:create_clickhouse_connection"
 ```
 
 Or in `setup.py`:
 
 ```python
 setup(
-    name="odibi-postgres-plugin",
+    name="odibi-snowflake-plugin",
     entry_points={
         "odibi.connections": [
-            "postgres = my_plugin.connections:create_postgres_connection",
+            "snowflake = my_plugin.connections:create_snowflake_connection",
         ],
     },
 )

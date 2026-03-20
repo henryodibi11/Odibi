@@ -38,6 +38,9 @@ class AzureSQL(BaseConnection):
     - Read/write operations via SQLAlchemy
     """
 
+    sql_dialect = "mssql"
+    default_schema = "dbo"
+
     def __init__(
         self,
         server: str,
@@ -1375,6 +1378,35 @@ class AzureSQL(BaseConnection):
                 server=self.server,
                 database=self.database,
             )
+
+    def quote_identifier(self, name: str) -> str:
+        """Quote an identifier using SQL Server bracket notation."""
+        return f"[{name}]"
+
+    def qualify_table(self, table_name: str, schema: str = "") -> str:
+        """Build a SQL Server qualified table reference."""
+        schema = schema or self.default_schema
+        if schema:
+            return f"[{schema}].[{table_name}]"
+        return f"[{table_name}]"
+
+    def build_select_query(
+        self,
+        table_name: str,
+        schema: str = "",
+        where: str = "",
+        limit: int = -1,
+        columns: str = "*",
+    ) -> str:
+        """Build a SELECT query using T-SQL syntax."""
+        qualified = self.qualify_table(table_name, schema)
+        if limit >= 0:
+            query = f"SELECT TOP ({limit}) {columns} FROM {qualified}"
+        else:
+            query = f"SELECT {columns} FROM {qualified}"
+        if where:
+            query += f" WHERE {where}"
+        return query
 
     def _sanitize_error(self, error_msg: str) -> str:
         """Remove credentials from error messages to prevent leaks.

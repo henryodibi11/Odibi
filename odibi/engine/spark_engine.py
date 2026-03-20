@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from odibi.enums import EngineType
 from odibi.exceptions import TransformError
+from odibi.connections.sql_utils import is_sql_format
 from odibi.utils.logging_context import get_logging_context
 
 from .base import Engine
@@ -503,7 +504,7 @@ class SparkEngine(Engine):
             ctx.debug(f"Time travel enabled: timestamp {as_of_timestamp}")
 
         # SQL Server / Azure SQL Support
-        if format in ["sql", "sql_server", "azure_sql"]:
+        if is_sql_format(format):
             if streaming:
                 ctx.error("Streaming not supported for SQL Server / Azure SQL")
                 raise ValueError("Streaming not supported for SQL Server / Azure SQL yet.")
@@ -929,7 +930,7 @@ class SparkEngine(Engine):
         )
 
         # SQL Server / Azure SQL Support
-        if format in ["sql", "sql_server", "azure_sql"]:
+        if is_sql_format(format):
             if not hasattr(connection, "get_spark_options"):
                 conn_type = type(connection).__name__
                 msg = f"Connection type '{conn_type}' does not support Spark SQL write"
@@ -945,8 +946,15 @@ class SparkEngine(Engine):
                 ctx.error("SQL format requires 'table' config or 'dbtable' option")
                 raise ValueError("SQL format requires 'table' config or 'dbtable' option")
 
-            # Handle MERGE mode for SQL Server
+            # Handle MERGE mode (SQL Server only)
             if mode == "merge":
+                if getattr(connection, "sql_dialect", "mssql") != "mssql":
+                    raise NotImplementedError(
+                        f"SQL MERGE mode is currently only supported for SQL Server connections. "
+                        f"Connection dialect '{getattr(connection, 'sql_dialect', 'unknown')}' "
+                        f"does not support MERGE. Use mode='append' or mode='overwrite' instead."
+                    )
+
                 merge_keys = options.get("merge_keys")
                 merge_options = options.get("merge_options")
 

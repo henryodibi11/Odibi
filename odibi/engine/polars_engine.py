@@ -16,6 +16,7 @@ try:
 except ImportError:
     pa = None
 
+from odibi.connections.sql_utils import is_sql_format
 from odibi.context import Context
 from odibi.engine.base import Engine
 from odibi.enums import EngineType
@@ -86,7 +87,7 @@ class PolarsEngine(Engine):
         options = options or {}
 
         # SQL Server / Azure SQL Support
-        if format in ["sql", "sql_server", "azure_sql"]:
+        if is_sql_format(format):
             if not hasattr(connection, "read_table") and not hasattr(connection, "read_sql_query"):
                 raise ValueError(
                     f"Cannot read SQL table: connection type '{type(connection).__name__}' "
@@ -95,24 +96,18 @@ class PolarsEngine(Engine):
             table_name = table or path
             if not table_name:
                 raise ValueError("SQL read requires 'table' or 'path' to specify the table name.")
+            default_schema = getattr(connection, "default_schema", "dbo")
             if "." in table_name:
                 schema_name, tbl = table_name.split(".", 1)
             else:
-                schema_name, tbl = "dbo", table_name
+                schema_name, tbl = default_schema, table_name
 
-            # Check for incremental SQL filter in options
             sql_filter = options.get("filter")
 
             if sql_filter and hasattr(connection, "read_sql_query"):
-                # Build query with WHERE clause for SQL pushdown
-                if schema_name:
-                    base_query = f"SELECT * FROM [{schema_name}].[{tbl}]"
-                else:
-                    base_query = f"SELECT * FROM [{tbl}]"
-                full_query = f"{base_query} WHERE {sql_filter}"
+                full_query = connection.build_select_query(tbl, schema_name, where=sql_filter)
                 pdf = connection.read_sql_query(full_query)
             else:
-                # read_table returns Pandas DataFrame
                 pdf = connection.read_table(table_name=tbl, schema=schema_name)
 
             return pl.from_pandas(pdf).lazy()
@@ -313,7 +308,7 @@ class PolarsEngine(Engine):
         """
         options = options or {}
 
-        if format in ["sql", "sql_server", "azure_sql"]:
+        if is_sql_format(format):
             return self._write_sql(df, connection, table, mode, options)
 
         if path:
@@ -411,6 +406,13 @@ class PolarsEngine(Engine):
             )
 
         if mode == "merge":
+            if getattr(connection, "sql_dialect", "mssql") != "mssql":
+                raise NotImplementedError(
+                    f"SQL MERGE mode is currently only supported for SQL Server connections. "
+                    f"Connection dialect '{getattr(connection, 'sql_dialect', 'unknown')}' "
+                    f"does not support MERGE. Use mode='append' or mode='overwrite' instead."
+                )
+
             merge_keys = options.get("merge_keys")
             merge_options = options.get("merge_options")
 
@@ -453,6 +455,12 @@ class PolarsEngine(Engine):
             }
 
         if mode == "overwrite" and options.get("overwrite_options"):
+            if getattr(connection, "sql_dialect", "mssql") != "mssql":
+                raise NotImplementedError(
+                    f"Enhanced overwrite strategies are currently only supported for SQL Server. "
+                    f"Use standard mode='overwrite' without overwrite_options for "
+                    f"'{getattr(connection, 'sql_dialect', 'unknown')}' connections."
+                )
             from odibi.writers.sql_server_writer import SqlServerMergeWriter
 
             overwrite_options = options.get("overwrite_options")
@@ -490,10 +498,11 @@ class PolarsEngine(Engine):
         if isinstance(df, pl.LazyFrame):
             df = df.collect()
 
+        default_schema = getattr(connection, "default_schema", "dbo")
         if "." in table:
             schema, table_name = table.split(".", 1)
         else:
-            schema, table_name = "dbo", table
+            schema, table_name = default_schema, table
 
         if_exists = "replace"
         if mode == "append":
@@ -1150,8 +1159,8 @@ class PolarsEngine(Engine):
         ctx = get_logging_context().with_context(engine="polars")
 
         try:
-            if table and format in ["sql", "sql_server", "azure_sql"]:
-                query = f"SELECT TOP 0 * FROM {table}"
+            if table and is_sql_format(format):
+                query = connection.build_select_query(table, limit=0)
                 df = connection.read_sql(query)
                 return {col: str(dtype) for col, dtype in zip(df.columns, df.dtypes)}
 

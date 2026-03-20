@@ -112,3 +112,59 @@ class BaseConnection(ABC):
             FreshnessResult dict
         """
         raise NotImplementedError(f"{self.__class__.__name__} does not support freshness checks")
+
+    # ============ SQL DIALECT HELPERS (Override in SQL Subclasses) ============
+
+    sql_dialect: str = ""
+    default_schema: str = ""
+
+    def quote_identifier(self, name: str) -> str:
+        """Quote an identifier (table/column name) for this SQL dialect.
+
+        Default implementation returns the name unquoted.
+        SQL subclasses should override with dialect-specific quoting.
+        """
+        return name
+
+    def qualify_table(self, table_name: str, schema: str = "") -> str:
+        """Build a fully qualified table reference.
+
+        Args:
+            table_name: Table name
+            schema: Schema name (uses default_schema if empty)
+
+        Returns:
+            Qualified table reference for this dialect
+        """
+        schema = schema or self.default_schema
+        if schema:
+            return f"{self.quote_identifier(schema)}.{self.quote_identifier(table_name)}"
+        return self.quote_identifier(table_name)
+
+    def build_select_query(
+        self,
+        table_name: str,
+        schema: str = "",
+        where: str = "",
+        limit: int = -1,
+        columns: str = "*",
+    ) -> str:
+        """Build a SELECT query in this connection's SQL dialect.
+
+        Args:
+            table_name: Table name
+            schema: Schema name
+            where: Optional WHERE clause (without 'WHERE' keyword)
+            limit: Row limit (-1 for no limit, 0 for schema-only)
+            columns: Column list (default "*")
+
+        Returns:
+            SQL SELECT statement string
+        """
+        qualified = self.qualify_table(table_name, schema)
+        query = f"SELECT {columns} FROM {qualified}"
+        if where:
+            query += f" WHERE {where}"
+        if limit >= 0:
+            query += f" LIMIT {limit}"
+        return query

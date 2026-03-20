@@ -82,6 +82,20 @@ nav:
       - ⚗️ Chemical Engineer / SME (2-3h): journeys/chemical-engineer.md
 
   # ═════════════════════════════════════════════════════════════════
+  # SIMULATION - Complete simulation documentation
+  # ═════════════════════════════════════════════════════════════════
+  - 🔬 Simulation:
+      - Overview: simulation/index.md
+      - Getting Started: simulation/getting_started.md
+      - Core Concepts: simulation/core_concepts.md
+      - Generators Reference: simulation/generators.md
+      - Stateful Functions: simulation/stateful_functions.md
+      - Advanced Features: simulation/advanced_features.md
+      - Incremental Mode: simulation/incremental.md
+      - Patterns & Recipes: simulation/patterns.md
+      - Process Control & ChemE: simulation/process_simulation.md
+
+  # ═════════════════════════════════════════════════════════════════
   # TUTORIALS - Step-by-step learning
   # ═════════════════════════════════════════════════════════════════
   - Tutorials:

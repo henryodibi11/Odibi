@@ -353,6 +353,84 @@ def create_sql_server_connection(name: str, config: Dict[str, Any]) -> Any:
         raise
 
 
+def create_postgres_connection(name: str, config: Dict[str, Any]) -> Any:
+    """Factory for PostgreSQL Connection."""
+    ctx = get_logging_context()
+    ctx.log_connection(connection_type="postgres", connection_name=name, action="create")
+
+    try:
+        from odibi.connections.postgres import PostgreSQLConnection
+    except ImportError as e:
+        ctx.error(
+            f"Failed to import PostgreSQLConnection for connection '{name}'",
+            connection_name=name,
+            error=str(e),
+        )
+        raise ImportError(
+            "PostgreSQL support requires 'pip install odibi[postgres]'. "
+            "See README.md for installation instructions."
+        )
+
+    host = config.get("host") or config.get("server")
+    if not host:
+        ctx.error(
+            f"Connection '{name}' missing 'host' or 'server'",
+            connection_name=name,
+            config_keys=list(config.keys()),
+        )
+        raise ValueError(
+            f"Connection '{name}' missing 'host' or 'server'. Got keys: {list(config.keys())}"
+        )
+
+    database = config.get("database")
+    if not database:
+        ctx.error(
+            f"Connection '{name}' missing 'database'",
+            connection_name=name,
+            config_keys=list(config.keys()),
+        )
+        raise ValueError(f"Connection '{name}' missing 'database'. Got keys: {list(config.keys())}")
+
+    auth_config = config.get("auth", {})
+    username = auth_config.get("username") or config.get("username")
+    password = auth_config.get("password") or config.get("password")
+
+    if password:
+        logger.register_secret(password)
+        ctx.debug(f"Registered password secret for connection '{name}'", connection_name=name)
+
+    try:
+        connection = PostgreSQLConnection(
+            host=host,
+            database=database,
+            username=username,
+            password=password,
+            port=config.get("port", 5432),
+            timeout=config.get("timeout", 30),
+            sslmode=config.get("sslmode", "prefer"),
+        )
+
+        ctx.log_connection(
+            connection_type="postgres",
+            connection_name=name,
+            action="created",
+            server=host,
+            database=database,
+            port=config.get("port", 5432),
+        )
+        return connection
+
+    except Exception as e:
+        ctx.error(
+            f"Failed to create PostgreSQL connection '{name}'",
+            connection_name=name,
+            server=host,
+            database=database,
+            error=str(e),
+        )
+        raise
+
+
 def register_builtins():
     """Register all built-in connection factories."""
     register_connection_factory("local", create_local_connection)
@@ -365,6 +443,10 @@ def register_builtins():
     # Delta
     register_connection_factory("delta", create_delta_connection)
 
-    # SQL
+    # SQL Server
     register_connection_factory("sql_server", create_sql_server_connection)
     register_connection_factory("azure_sql", create_sql_server_connection)
+
+    # PostgreSQL
+    register_connection_factory("postgres", create_postgres_connection)
+    register_connection_factory("postgresql", create_postgres_connection)
