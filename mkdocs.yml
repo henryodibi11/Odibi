@@ -187,6 +187,7 @@ nav:
       - Core Concepts:
           - Pipelines & Nodes: features/pipelines.md
           - Connections: features/connections.md
+          - Data Exploration: features/data_exploration.md
           - Engines: features/engines.md
           - Transformers: features/transformers.md
           - Loading Patterns: features/patterns.md

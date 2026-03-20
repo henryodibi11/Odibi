@@ -78,6 +78,17 @@ class TableProfile(BaseModel):
     warnings: List[str] = Field(default_factory=list, description="Data quality warnings")
 
 
+class PreviewResult(BaseModel):
+    """Preview of sample rows from a dataset."""
+
+    dataset: DatasetRef
+    columns: List[str] = Field(default_factory=list, description="Column names")
+    rows: List[Dict[str, Any]] = Field(default_factory=list, description="Sample rows as dicts")
+    total_rows: Optional[int] = Field(default=None, description="Total row count if known")
+    truncated: bool = Field(default=False, description="True if more rows exist than returned")
+    format: Optional[str] = Field(default=None, description="Source format (csv, parquet, etc.)")
+
+
 class Relationship(BaseModel):
     """Foreign key or inferred relationship between datasets."""
 

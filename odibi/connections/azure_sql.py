@@ -16,6 +16,8 @@ from odibi.discovery.types import (
     Column,
     DatasetRef,
     FreshnessResult,
+    PreviewResult,
+    Relationship,
     Schema,
     TableProfile,
 )
@@ -1079,6 +1081,175 @@ class AzureSQL(BaseConnection):
         except Exception as e:
             ctx.error("Failed to profile table", schema=schema, table=table_name, error=str(e))
             return {}
+
+    def preview(
+        self, dataset: str, rows: int = 5, columns: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Preview sample rows from a SQL table.
+
+        Args:
+            dataset: Table name (can be "schema.table" or just "table")
+            rows: Number of rows to return (default: 5, max: 100)
+            columns: Specific columns to include (None = all)
+
+        Returns:
+            PreviewResult dict with sample rows
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> preview = conn.preview("dbo.customers", rows=10)
+            >>> for row in preview['rows']:
+            ...     print(row)
+        """
+        ctx = get_logging_context()
+
+        max_rows = min(rows, 100)
+
+        # Parse schema and table name
+        if "." in dataset:
+            parts = dataset.split(".")
+            schema = parts[0]
+            table_name = parts[1]
+        else:
+            schema = "dbo"
+            table_name = dataset
+
+        ctx.info("Previewing table", schema=schema, table=table_name, rows=max_rows)
+
+        try:
+            col_filter = "*"
+            if columns:
+                col_filter = ", ".join(f"[{c}]" for c in columns)
+
+            query = f"SELECT TOP ({max_rows}) {col_filter} FROM [{schema}].[{table_name}]"
+            df = self.read_sql(query)
+
+            # Get total row count
+            total_rows = None
+            try:
+                count_query = """
+                    SELECT SUM(p.rows) AS row_count
+                    FROM sys.tables t
+                    INNER JOIN sys.partitions p ON t.object_id = p.object_id
+                    INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                    WHERE s.name = :schema AND t.name = :table
+                    AND p.index_id IN (0,1)
+                """
+                count_df = self.read_sql(
+                    count_query, params={"schema": schema, "table": table_name}
+                )
+                if not count_df.empty and count_df["row_count"].iloc[0] is not None:
+                    total_rows = int(count_df["row_count"].iloc[0])
+            except Exception:
+                pass
+
+            result = PreviewResult(
+                dataset=DatasetRef(
+                    name=table_name,
+                    namespace=schema,
+                    kind="table",
+                    path=f"{schema}.{table_name}",
+                    row_count=total_rows,
+                ),
+                columns=df.columns.tolist(),
+                rows=df.to_dict(orient="records"),
+                total_rows=total_rows,
+                truncated=(total_rows or 0) > max_rows,
+            )
+
+            ctx.info("Preview complete", schema=schema, table=table_name, rows_returned=len(df))
+            return result.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to preview table", schema=schema, table=table_name, error=str(e))
+            return PreviewResult(
+                dataset=DatasetRef(name=table_name, namespace=schema, kind="table"),
+            ).model_dump()
+
+    def relationships(self, schema: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Discover foreign key relationships in the database.
+
+        Args:
+            schema: Limit to specific schema (default: all schemas)
+
+        Returns:
+            List of Relationship dicts with parent/child table info and key columns
+
+        Example:
+            >>> conn = AzureSQL(server="...", database="mydb")
+            >>> rels = conn.relationships("dbo")
+            >>> for rel in rels:
+            ...     print(f"{rel['child']['name']} -> {rel['parent']['name']}")
+        """
+        ctx = get_logging_context()
+        ctx.info("Discovering relationships", schema=schema or "all")
+
+        query = """
+            SELECT
+                fk.name AS fk_name,
+                ps.name AS parent_schema,
+                pt.name AS parent_table,
+                pc.name AS parent_column,
+                cs.name AS child_schema,
+                ct.name AS child_table,
+                cc.name AS child_column
+            FROM sys.foreign_keys fk
+            INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+            INNER JOIN sys.tables pt ON fk.referenced_object_id = pt.object_id
+            INNER JOIN sys.schemas ps ON pt.schema_id = ps.schema_id
+            INNER JOIN sys.columns pc ON fkc.referenced_object_id = pc.object_id
+                AND fkc.referenced_column_id = pc.column_id
+            INNER JOIN sys.tables ct ON fk.parent_object_id = ct.object_id
+            INNER JOIN sys.schemas cs ON ct.schema_id = cs.schema_id
+            INNER JOIN sys.columns cc ON fkc.parent_object_id = cc.object_id
+                AND fkc.parent_column_id = cc.column_id
+        """
+
+        if schema:
+            query += "\n            WHERE cs.name = :schema OR ps.name = :schema"
+
+        query += "\n            ORDER BY fk.name, fkc.constraint_column_id"
+
+        try:
+            params = {"schema": schema} if schema else None
+            df = self.read_sql(query, params=params)
+
+            if df.empty:
+                ctx.info("No foreign key relationships found", schema=schema or "all")
+                return []
+
+            # Group by FK name to build relationships
+            relationships = []
+            for fk_name, group in df.groupby("fk_name"):
+                first = group.iloc[0]
+                keys = [(row["parent_column"], row["child_column"]) for _, row in group.iterrows()]
+
+                rel = Relationship(
+                    parent=DatasetRef(
+                        name=first["parent_table"],
+                        namespace=first["parent_schema"],
+                        kind="table",
+                        path=f"{first['parent_schema']}.{first['parent_table']}",
+                    ),
+                    child=DatasetRef(
+                        name=first["child_table"],
+                        namespace=first["child_schema"],
+                        kind="table",
+                        path=f"{first['child_schema']}.{first['child_table']}",
+                    ),
+                    keys=keys,
+                    source="declared",
+                    confidence=1.0,
+                    details={"constraint_name": fk_name},
+                )
+                relationships.append(rel.model_dump())
+
+            ctx.info("Relationships discovered", count=len(relationships))
+            return relationships
+
+        except Exception as e:
+            ctx.error("Failed to discover relationships", error=str(e))
+            return []
 
     def get_freshness(
         self,

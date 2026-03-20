@@ -648,6 +648,7 @@ odibi secrets validate config.yaml
 
 ## Related
 
+- [Data Exploration](data_exploration.md) — Preview, profile, and explore data sources
 - [YAML Schema Reference](../reference/yaml_schema.md#connections)
 - [Pipeline Configuration](pipelines.md)
 - [Secrets Management](../guides/secrets.md)

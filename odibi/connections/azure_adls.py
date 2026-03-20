@@ -13,6 +13,7 @@ from odibi.discovery.types import (
     DatasetRef,
     FreshnessResult,
     PartitionInfo,
+    PreviewResult,
     Schema,
     TableProfile,
 )
@@ -938,6 +939,56 @@ class AzureADLS(BaseConnection):
                 dataset=DatasetRef(name=dataset, kind="file"),
                 rows_sampled=0,
                 columns=[],
+            ).model_dump()
+
+    def preview(
+        self, dataset: str, rows: int = 5, columns: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Preview sample rows from an ADLS dataset."""
+        ctx = get_logging_context()
+        ctx.info("Previewing ADLS dataset", dataset=dataset, rows=rows)
+
+        max_rows = min(rows, 100)  # Cap at 100
+
+        try:
+            import pandas as pd
+
+            full_path = self.uri(dataset)
+            storage_opts = self.pandas_storage_options()
+            file_format = detect_file_format(dataset, self._get_fs())
+
+            if file_format == "parquet" or file_format == "delta":
+                df = pd.read_parquet(full_path, storage_options=storage_opts).head(max_rows)
+            elif file_format == "csv":
+                df = pd.read_csv(full_path, storage_options=storage_opts, nrows=max_rows)
+            elif file_format == "json":
+                df = pd.read_json(
+                    full_path, storage_options=storage_opts, lines=True, nrows=max_rows
+                )
+            else:
+                ctx.warning("Unsupported format for preview", format=file_format)
+                return PreviewResult(
+                    dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                ).model_dump()
+
+            if columns:
+                df = df[[c for c in columns if c in df.columns]]
+
+            result = PreviewResult(
+                dataset=DatasetRef(name=dataset, kind="file", format=file_format),
+                columns=df.columns.tolist(),
+                rows=df.head(max_rows).to_dict(orient="records"),
+                truncated=len(df) >= max_rows,
+                format=file_format,
+            )
+
+            ctx.info("Preview complete", rows_returned=len(result.rows))
+            return result.model_dump()
+
+        except Exception as e:
+            ctx.error("Failed to preview dataset", dataset=dataset, error=str(e))
+            return PreviewResult(
+                dataset=DatasetRef(name=dataset, kind="file"),
             ).model_dump()
 
     def detect_partitions(self, path: str = "") -> Dict[str, Any]:

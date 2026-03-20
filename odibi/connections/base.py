@@ -86,6 +86,21 @@ class BaseConnection(ABC):
         """
         raise NotImplementedError(f"{self.__class__.__name__} does not support profiling")
 
+    def preview(
+        self, dataset: str, rows: int = 5, columns: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Preview sample rows from a dataset.
+
+        Args:
+            dataset: Table name or file path
+            rows: Number of rows to return (default: 5, max: 100)
+            columns: Specific columns to include (None = all)
+
+        Returns:
+            PreviewResult dict with sample rows
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not support preview")
+
     def get_freshness(self, dataset: str, timestamp_column: Optional[str] = None) -> Dict[str, Any]:
         """Get data freshness information.
 

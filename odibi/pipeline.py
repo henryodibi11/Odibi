@@ -3008,7 +3008,7 @@ class PipelineManager:
 
     def discover(
         self,
-        connection_name: str,
+        connection_name: Optional[str] = None,
         dataset: Optional[str] = None,
         include_schema: bool = False,
         include_stats: bool = False,
@@ -3021,19 +3021,27 @@ class PipelineManager:
         Convenience method that delegates to connection.discover_catalog(),
         connection.get_schema(), or connection.profile().
 
+        When called without a connection_name, discovers across ALL connections.
+
         Args:
-            connection_name: Name of connection from YAML config
+            connection_name: Name of connection from YAML config (None = all connections)
             dataset: Optional specific dataset to inspect (table name or file path)
             include_schema: Include column schemas (catalog mode)
             include_stats: Include row counts/stats (catalog mode)
             profile: Run detailed profiling (requires dataset)
             sample_rows: Rows to sample for profiling
             **kwargs: Additional connection-specific options
+                - limit: Max datasets per connection (default: 200)
+                - pattern: Filter datasets by pattern (e.g. "*.csv", "fact_*")
+                - columns: Specific columns for profiling
 
         Returns:
             Discovery result dict (CatalogSummary, Schema, or TableProfile)
 
         Examples:
+            # Discover ALL connections at once
+            pm.discover()
+
             # List all tables in a database
             pm.discover("crm_db")
 
@@ -3045,8 +3053,36 @@ class PipelineManager:
 
             # Discover ADLS folder
             pm.discover("raw_adls", dataset="sales/2024/")
+
+            # Search across all connections with a pattern
+            pm.discover(pattern="fact_*")
         """
-        # Get connection
+        # Cross-connection discovery when no connection specified
+        if connection_name is None:
+            results = {}
+            pattern = kwargs.get("pattern", "")
+            limit = kwargs.get("limit", 200)
+            for name, conn in self.connections.items():
+                try:
+                    results[name] = conn.discover_catalog(
+                        include_schema=include_schema,
+                        include_stats=include_stats,
+                        limit=limit,
+                        pattern=pattern,
+                    )
+                except NotImplementedError:
+                    results[name] = {
+                        "connection_type": type(conn).__name__,
+                        "note": "Discovery not supported",
+                    }
+                except Exception as e:
+                    results[name] = {"error": str(e)}
+            return {
+                "connections_scanned": len(results),
+                "results": results,
+            }
+
+        # Single connection discovery
         conn = self.connections.get(connection_name)
 
         if not conn:
@@ -3078,6 +3114,7 @@ class PipelineManager:
                     include_schema=include_schema,
                     include_stats=include_stats,
                     limit=kwargs.get("limit", 200),
+                    pattern=kwargs.get("pattern", ""),
                 )
 
         except NotImplementedError as e:
@@ -3101,6 +3138,162 @@ class PipelineManager:
                     "dataset": dataset,
                 }
             }
+
+    def preview(
+        self,
+        connection_name: str,
+        dataset: str,
+        rows: int = 5,
+        columns: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Preview sample rows from a dataset.
+
+        Args:
+            connection_name: Name of connection from YAML config
+            dataset: Table name or file path to preview
+            rows: Number of rows to return (default: 5, max: 100)
+            columns: Specific columns to include (None = all)
+
+        Returns:
+            PreviewResult dict with sample rows
+
+        Examples:
+            # Preview a SQL table
+            pm.preview("crm_db", "dbo.Orders", rows=10)
+
+            # Preview specific columns
+            pm.preview("crm_db", "dbo.Orders", columns=["order_id", "total"])
+
+            # Preview a CSV file
+            pm.preview("raw_data", "sales/2024.csv")
+        """
+        conn = self.connections.get(connection_name)
+        if not conn:
+            available = list(self.connections.keys())
+            return {
+                "error": {
+                    "code": "CONNECTION_NOT_FOUND",
+                    "message": f"Connection '{connection_name}' not found",
+                    "available_connections": available,
+                }
+            }
+
+        try:
+            return conn.preview(dataset=dataset, rows=rows, columns=columns)
+        except NotImplementedError as e:
+            return {
+                "error": {
+                    "code": "NOT_SUPPORTED",
+                    "message": str(e),
+                    "fix": "This connection type does not support preview",
+                }
+            }
+        except Exception as e:
+            self._ctx.error(f"Preview failed for {connection_name}", error=str(e), dataset=dataset)
+            return {"error": {"code": "PREVIEW_FAILED", "message": str(e)}}
+
+    def freshness(
+        self,
+        connection_name: str,
+        dataset: str,
+        timestamp_column: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Check data freshness for a dataset.
+
+        Args:
+            connection_name: Name of connection from YAML config
+            dataset: Table name or file path
+            timestamp_column: Column to check for max timestamp (SQL only)
+
+        Returns:
+            FreshnessResult dict with last_updated, age_hours, etc.
+
+        Examples:
+            # Check freshness using table metadata
+            pm.freshness("crm_db", "dbo.Orders")
+
+            # Check freshness using a specific timestamp column
+            pm.freshness("crm_db", "dbo.Orders", timestamp_column="order_date")
+
+            # Check file freshness
+            pm.freshness("raw_data", "sales/2024.csv")
+        """
+        conn = self.connections.get(connection_name)
+        if not conn:
+            available = list(self.connections.keys())
+            return {
+                "error": {
+                    "code": "CONNECTION_NOT_FOUND",
+                    "message": f"Connection '{connection_name}' not found",
+                    "available_connections": available,
+                }
+            }
+
+        try:
+            return conn.get_freshness(dataset=dataset, timestamp_column=timestamp_column)
+        except TypeError:
+            # LocalConnection/ADLS don't accept timestamp_column
+            return conn.get_freshness(dataset=dataset)
+        except NotImplementedError as e:
+            return {
+                "error": {
+                    "code": "NOT_SUPPORTED",
+                    "message": str(e),
+                    "fix": "This connection type does not support freshness checks",
+                }
+            }
+        except Exception as e:
+            self._ctx.error(
+                f"Freshness check failed for {connection_name}", error=str(e), dataset=dataset
+            )
+            return {"error": {"code": "FRESHNESS_FAILED", "message": str(e)}}
+
+    def relationships(
+        self,
+        connection_name: str,
+        schema: Optional[str] = None,
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        """Discover foreign key relationships in a SQL database.
+
+        Args:
+            connection_name: Name of SQL connection from YAML config
+            schema: Limit to specific schema (default: all schemas)
+
+        Returns:
+            List of Relationship dicts, or error dict
+
+        Examples:
+            # Discover all FKs
+            pm.relationships("crm_db")
+
+            # FKs in a specific schema
+            pm.relationships("crm_db", schema="dbo")
+        """
+        conn = self.connections.get(connection_name)
+        if not conn:
+            available = list(self.connections.keys())
+            return {
+                "error": {
+                    "code": "CONNECTION_NOT_FOUND",
+                    "message": f"Connection '{connection_name}' not found",
+                    "available_connections": available,
+                }
+            }
+
+        if not hasattr(conn, "relationships"):
+            return {
+                "error": {
+                    "code": "NOT_SUPPORTED",
+                    "message": f"{type(conn).__name__} does not support relationship discovery",
+                    "fix": "Only SQL connections support FK discovery",
+                }
+            }
+
+        try:
+            return conn.relationships(schema=schema)
+        except Exception as e:
+            self._ctx.error(f"Relationship discovery failed for {connection_name}", error=str(e))
+            return {"error": {"code": "DISCOVERY_FAILED", "message": str(e)}}
 
     def scaffold_project(
         self, project_name: str, connections: Dict[str, Dict[str, Any]], **kwargs
