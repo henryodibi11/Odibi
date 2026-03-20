@@ -2342,11 +2342,13 @@ class TestSchemaInference:
         from unittest.mock import MagicMock
 
         conn = MagicMock()
+        conn.build_select_query.return_value = "SELECT TOP (0) * FROM [dbo].[my_table]"
         conn.read_sql.return_value = pd.DataFrame(columns=["id", "name"], dtype="object")
 
         schema = engine.get_table_schema(conn, table="my_table", format="sql_server")
         assert schema is not None
-        conn.read_sql.assert_called_once_with("SELECT TOP 0 * FROM my_table")
+        conn.build_select_query.assert_called_once_with("my_table", limit=0)
+        conn.read_sql.assert_called_once_with("SELECT TOP (0) * FROM [dbo].[my_table]")
 
 
 # ===================================================
@@ -2980,8 +2982,17 @@ class TestReadFileAdvancedFormats:
         query_log = []
 
         class SqlConn:
+            default_schema = "dbo"
+
             def get_path(self, p):
                 return p
+
+            def build_select_query(self, table_name, schema="", where="", limit=-1, columns="*"):
+                schema = schema or self.default_schema
+                query = f"SELECT {columns} FROM [{schema}].[{table_name}]"
+                if where:
+                    query += f" WHERE {where}"
+                return query
 
             def read_sql_query(self, query):
                 query_log.append(query)

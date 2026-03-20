@@ -1545,6 +1545,15 @@ class TestPolarsReadBranches:
         call_log = []
 
         class SqlFilterConnection:
+            default_schema = "dbo"
+
+            def build_select_query(self, table_name, schema="", where="", limit=-1, columns="*"):
+                schema = schema or self.default_schema
+                query = f"SELECT {columns} FROM [{schema}].[{table_name}]"
+                if where:
+                    query += f" WHERE {where}"
+                return query
+
             def read_table(self, table_name, schema="dbo"):
                 return pd.DataFrame({"a": [1]})
 
