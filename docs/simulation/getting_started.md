@@ -338,15 +338,16 @@ nodes:
               generator: {type: range, min: 20.0, max: 35.0}
 
     transform:
-      - operation: derive_columns
-        params:
-          columns:
-            temp_category: >
-              CASE
-                WHEN temperature < 25 THEN 'cold'
-                WHEN temperature < 30 THEN 'normal'
-                ELSE 'hot'
-              END
+      steps:
+        - operation: derive_columns
+          params:
+            columns:
+              temp_category: >
+                CASE
+                  WHEN temperature < 25 THEN 'cold'
+                  WHEN temperature < 30 THEN 'normal'
+                  ELSE 'hot'
+                END
 
     validation:
       mode: warn

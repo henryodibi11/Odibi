@@ -95,16 +95,17 @@ pipelines:
           format: parquet
           path: bronze/orders.parquet
         transform:
-          - operation: derive_columns
-            params:
-              columns:
-                line_total: "quantity * unit_price"
-                order_tier: >
-                  CASE
-                    WHEN quantity * unit_price > 500 THEN 'high'
-                    WHEN quantity * unit_price > 100 THEN 'medium'
-                    ELSE 'low'
-                  END
+          steps:
+            - operation: derive_columns
+              params:
+                columns:
+                  line_total: "quantity * unit_price"
+                  order_tier: >
+                    CASE
+                      WHEN quantity * unit_price > 500 THEN 'high'
+                      WHEN quantity * unit_price > 100 THEN 'medium'
+                      ELSE 'low'
+                    END
         validation:
           mode: warn
           tests:
@@ -127,13 +128,14 @@ pipelines:
           format: parquet
           path: silver/orders.parquet
         transform:
-          - operation: aggregate
-            params:
-              group_by: [product]
-              aggregations:
-                total_revenue: "SUM(line_total)"
-                order_count: "COUNT(order_id)"
-                avg_order_value: "AVG(line_total)"
+          steps:
+            - operation: aggregate
+              params:
+                group_by: [product]
+                aggregations:
+                  total_revenue: "SUM(line_total)"
+                  order_count: "COUNT(order_id)"
+                  avg_order_value: "AVG(line_total)"
         write:
           connection: output
           format: parquet
