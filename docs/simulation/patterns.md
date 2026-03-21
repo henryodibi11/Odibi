@@ -21,7 +21,7 @@ Real-world simulation patterns across manufacturing, operations, IoT, business, 
 This is the entire point of simulation: **decouple pipeline development from data availability.**
 
 ```yaml
-name: sales_pipeline
+project: sales_pipeline
 engine: pandas
 
 connections:
@@ -29,8 +29,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: sales
+  - pipeline: sales
     nodes:
       # ── Bronze: Simulated source ──────────────────────────
       - name: raw_orders
@@ -143,7 +150,7 @@ pipelines:
 Simulate a production line with 5 machines, realistic cycle times, defect rates, and operational events.
 
 ```yaml
-name: production_line
+project: production_line
 engine: pandas
 
 connections:
@@ -151,8 +158,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: production
+  - pipeline: production
     nodes:
       - name: machine_telemetry
         read:
@@ -259,7 +273,7 @@ pipelines:
 Simulate a building management system with 20 sensors across 4 floors measuring temperature, humidity, CO₂, and occupancy.
 
 ```yaml
-name: building_sensors
+project: building_sensors
 engine: pandas
 
 connections:
@@ -267,8 +281,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: bms
+  - pipeline: bms
     nodes:
       - name: sensor_readings
         read:
@@ -382,7 +403,7 @@ pipelines:
 Simulate an e-commerce or ERP order stream with multiple channels, realistic distributions, and incremental daily feeds.
 
 ```yaml
-name: order_stream
+project: order_stream
 engine: pandas
 
 connections:
@@ -390,8 +411,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: orders
+  - pipeline: orders
     nodes:
       - name: daily_orders
         read:
@@ -480,7 +508,7 @@ pipelines:
 Simulate long-running equipment that degrades over time, with periodic cleaning cycles that restore performance.
 
 ```yaml
-name: heat_exchanger_monitoring
+project: heat_exchanger_monitoring
 engine: pandas
 
 connections:
@@ -488,8 +516,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: hx_monitoring
+  - pipeline: hx_monitoring
     nodes:
       - name: hx_data
         read:
@@ -623,7 +658,7 @@ columns:
 Generate continuous demo data that looks like real streaming data. Each pipeline run produces one day of data and appends it to a Delta table. Connect a dashboard and it updates automatically.
 
 ```yaml
-name: dashboard_feed
+project: dashboard_feed
 engine: pandas
 
 connections:
@@ -631,8 +666,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: daily_feed
+  - pipeline: daily_feed
     nodes:
       - name: kpi_data
         read:
@@ -711,7 +753,7 @@ pipelines:
 Simulate multiple interconnected systems where downstream systems consume upstream outputs. Uses cross-entity references to create realistic data flow.
 
 ```yaml
-name: integration_test
+project: integration_test
 engine: pandas
 
 connections:
@@ -719,8 +761,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: multi_system
+  - pipeline: multi_system
     nodes:
       - name: system_data
         read:

@@ -27,7 +27,7 @@ Let's start with the absolute simplest simulation: **1 entity, 3 columns, no cha
 Create a file called `my_first_simulation.yaml`:
 
 ```yaml
-name: my_first_simulation
+project: my_first_simulation
 engine: pandas
 
 connections:
@@ -35,8 +35,15 @@ connections:
     type: local
     base_path: ./data
 
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
 pipelines:
-  - name: first_sim
+  - pipeline: first_sim
     nodes:
       - name: sensor_data
         read:
@@ -75,7 +82,7 @@ pipelines:
 
 | Line | Purpose |
 |------|---------|
-| `name: my_first_simulation` | A human-readable name for this pipeline config |
+| `project: my_first_simulation` | A human-readable name for this project |
 | `engine: pandas` | Use the Pandas engine (good for < 1M rows) |
 | `connections: output:` | Defines where output files go |
 | `type: local` | Write to the local filesystem |
