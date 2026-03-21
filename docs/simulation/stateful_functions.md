@@ -556,7 +556,7 @@ See [Stateful Incremental Loading](../patterns/incremental_stateful.md) for full
 
 ## Related Documentation
 
-- [Simulation Guide](../guides/simulation.md) — complete guide to all generators and simulation features
-- [Simulation Generators Reference](../reference/simulation_generators.md) — quick parameter lookup for all generator types
-- [Process Simulation Guide](../guides/process_simulation_guide.md) — advanced examples with chemical engineering context
-- [Stateful Incremental Loading](../patterns/incremental_stateful.md) — how state persistence works between runs
+- [Generators Reference](generators.md) — all 12 generator types with parameters and examples
+- [Advanced Features](advanced_features.md) — cross-entity references, scheduled events, chaos engineering
+- [Process Simulation](process_simulation.md) — chemical engineering and process control scenarios
+- [Incremental Mode](incremental.md) — continuous data generation with HWM state persistence

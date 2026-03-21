@@ -320,8 +320,8 @@ Model fouling, catalyst deactivation, or equipment aging with a persistent drift
     start: 500.0
     min: 200.0
     max: 600.0
-    drift: -0.05      # Slow decline per timestep
-    noise: 2.0
+    trend: -0.05      # Slow decline per timestep
+    volatility: 2.0
 ```
 
 **Use cases:** Heat exchanger fouling (declining UA), catalyst deactivation (declining conversion), tray efficiency degradation.

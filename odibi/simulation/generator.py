@@ -909,7 +909,7 @@ class SimulationEngine:
             return self._generate_geo(generator, rng)
         elif isinstance(generator, DerivedGeneratorConfig):
             return self._generate_derived(
-                generator, current_row or {}, entity_name, entity_state or {}
+                generator, current_row or {}, entity_name, entity_state or {}, row_idx
             )
         else:
             raise ValueError(f"Unknown generator type: {type(generator)}")
@@ -1173,6 +1173,7 @@ class SimulationEngine:
         row_data: Dict[str, Any],
         entity_name: str,
         entity_state: Dict[str, Any],
+        row_idx: int = 0,
     ) -> Any:
         """Generate derived value from expression.
 
@@ -1181,6 +1182,7 @@ class SimulationEngine:
             row_data: Current row data with already-generated columns
             entity_name: Current entity name for state tracking
             entity_state: Entity-specific state dict for stateful functions
+            row_idx: Row index (0-based) for _row_index variable
 
         Returns:
             Calculated value
@@ -1337,6 +1339,10 @@ class SimulationEngine:
 
             return clamped_output
 
+        def _random():
+            """Generate a random float in [0, 1) for use in expressions."""
+            return float(np.random.default_rng().random())
+
         safe_builtins = {
             "abs": abs,
             "round": round,
@@ -1352,14 +1358,18 @@ class SimulationEngine:
             "coalesce": coalesce,
             "safe_div": safe_div,
             "safe_mul": safe_mul,
-            # NEW: Stateful functions
+            # Stateful functions
             "prev": prev,
             "ema": ema,
             "pid": pid,
+            # Utility functions
+            "random": _random,
         }
 
-        # Combine row data with safe builtins and entity proxies
+        # Combine row data with safe builtins, entity proxies, and context variables
         namespace = {**row_data, **safe_builtins, **self.entity_proxies}
+        namespace["entity_id"] = entity_name
+        namespace["_row_index"] = row_idx
 
         try:
             # Evaluate expression in restricted namespace

@@ -462,6 +462,24 @@ value_if_true if condition else value_if_false
 | `coalesce()` | `coalesce(a, b, ...)` | Return first non-None value |
 | `safe_div()` | `safe_div(a, b, default=None)` | Division handling None and zero |
 | `safe_mul()` | `safe_mul(a, b, default=None)` | Multiplication handling None |
+| `random()` | `random()` | Random float in [0, 1) |
+
+### Context Variables
+
+These variables are automatically available in every derived expression:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `entity_id` | string | Current entity name (e.g., `"sensor_01"`) |
+| `_row_index` | int | Current row index (0-based) |
+
+```yaml
+# Example: battery draining over time
+expression: "max(0, 100 - (_row_index * 0.07))"
+
+# Example: entity-specific logic
+expression: "'high' if entity_id == 'reactor_01' else 'normal'"
+```
 
 ### Stateful Functions
 

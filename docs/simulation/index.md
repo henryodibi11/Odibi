@@ -45,9 +45,9 @@ Work through the simulation docs in order, or jump to what you need:
 | :material-book-open-variant: [Core Concepts](core_concepts.md) | Scope, entities, and columns — the three building blocks |
 | :material-format-list-bulleted-type: [Generators Reference](generators.md) | All 12 generator types with parameters and examples |
 | :material-function-variant: [Stateful Functions](stateful_functions.md) | `prev()`, `ema()`, `pid()` — history-dependent values |
-| :material-puzzle: [Advanced Features](advanced.md) | Cross-entity references, overrides, scheduled events, chaos |
+| :material-puzzle: [Advanced Features](advanced_features.md) | Cross-entity references, overrides, scheduled events, chaos |
 | :material-sync: [Incremental Mode](incremental.md) | Continuous data generation across pipeline runs |
-| :material-chef-hat: [Patterns & Recipes](recipes.md) | Real-world scenarios: IoT fleets, batch reactors, order streams |
+| :material-chef-hat: [Patterns & Recipes](patterns.md) | Real-world scenarios: IoT fleets, batch reactors, order streams |
 | :material-flask: [Process Simulation](process_simulation.md) | ChemE and process control: FOPTD, PID loops, reactor dynamics |
 
 ---

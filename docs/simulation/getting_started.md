@@ -2,9 +2,9 @@
 title: "Getting Started: Your First Simulation"
 roles: [ba, jr-de, cheme]
 tags: [tutorial:beginner, topic:simulation, topic:first-pipeline]
-prereqs: [../guides/installation.md, ../guides/simulation.md]
+prereqs: [../guides/installation.md]
 next: [core_concepts.md, generators.md, patterns.md]
-related: [../guides/simulation.md, ../tutorials/getting_started.md]
+related: [../tutorials/getting_started.md]
 time: 30m
 ---
 

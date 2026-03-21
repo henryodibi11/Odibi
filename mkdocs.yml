@@ -157,7 +157,7 @@ nav:
           - Anti-Patterns: patterns/anti_patterns.md
       - Common Tasks:
           - Writing Transformations: guides/writing_transformations.md
-          - Synthetic Data (Simulation): guides/simulation.md
+          - Synthetic Data (Simulation): simulation/getting_started.md
           - Custom Functions Reference: guides/custom_functions.md
           - Variable Substitution: guides/variable_substitution.md
           - Explanation Feature: guides/explanation_feature.md
@@ -185,7 +185,7 @@ nav:
           - WSL Setup: guides/wsl_setup.md
       - Chemical Engineering (ChemE × DE):
           - 📚 Seborg Textbook Mapping: guides/seborg_textbook_mapping.md
-          - Process Simulation Guide: guides/process_simulation_guide.md
+          - Process Simulation Guide: simulation/process_simulation.md
           - ChemE Simulation Guide: guides/chemical_engineering_simulation_guide.md
           - Thermodynamics Transformers: guides/thermodynamics.md
           - Unit Conversion: guides/unit_conversion.md
@@ -207,7 +207,7 @@ nav:
           - Loading Patterns: features/patterns.md
           - Configuration: features/configuration.md
           - State Management: features/state.md
-          - Simulation: features/simulation.md
+          - Simulation: simulation/index.md
           - Stories: features/stories.md
           - Orchestration: features/orchestration.md
           - Bulk Copy (SQL Server): features/bulk_copy.md
@@ -285,7 +285,7 @@ nav:
       - Configuration: reference/configuration.md
       - Supported Formats: reference/supported_formats.md
       - Engine Parity: reference/PARITY_TABLE.md
-      - Simulation Generators: reference/simulation_generators.md
+      - Simulation Generators: simulation/generators.md
       - Glossary: reference/glossary.md
       - CLI Reference: features/cli.md
       - AI Deep Context: ODIBI_DEEP_CONTEXT.md
