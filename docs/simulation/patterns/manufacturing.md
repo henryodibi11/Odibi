@@ -115,7 +115,7 @@ pipelines:
                 outlier_factor: 2.5
 
         validation:
-          mode: quarantine
+          mode: warn
           tests:
             - type: range
               column: fill_weight_g

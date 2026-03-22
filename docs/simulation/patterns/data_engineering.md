@@ -223,21 +223,21 @@ pipelines:
           path: bronze/schema_test.parquet
         transform:
           steps:
-            - type: rename_columns
+            - operation: rename_columns
               params:
                 mapping:
                   measurement_a: sensor_reading
                   measurement_b: reference_value
-            - type: add_column
+            - operation: add_column
               params:
                 name: delta
                 expression: "sensor_reading - reference_value"
-            - type: add_column
+            - operation: add_column
               params:
                 name: status_label
                 expression: "'ok' if status_code == 0 else 'warn' if status_code == 1 else 'error' if status_code == 2 else 'critical'"
         validation:
-          mode: quarantine
+          mode: warn
           tests:
             - type: not_null
               columns: [sensor_reading, reference_value, delta]

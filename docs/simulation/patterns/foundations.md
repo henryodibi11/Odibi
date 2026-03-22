@@ -688,33 +688,62 @@ pipelines:
     - **Scaling with scope** — combine high entity counts with high row counts to generate millions of rows
     - **Minimal column config** — you only need a few columns to stress-test your infrastructure
 
-Quick recipe for high-volume testing. Perfect for Delta Lake compaction, partition testing, and engine benchmarking. This is a **simulation-only snippet** — wrap it in a full pipeline config (see Pattern 1 for the boilerplate).
+Quick recipe for high-volume testing. This config generates 100,000 rows (10 entities × 10,000 rows each). Scale up `count` and `row_count` for millions of rows — see the tips below.
 
 ```yaml
-scope:
-  start_time: "2026-01-01T00:00:00Z"
-  timestep: "1s"
-  row_count: 10000
-  seed: 42
-entities:
-  count: 1000               # 1,000 entities × 10,000 rows = 10M rows
-  id_prefix: "device_"
-columns:
-  - name: device_id
-    data_type: string
-    generator: {type: constant, value: "{entity_id}"}
-  - name: timestamp
-    data_type: timestamp
-    generator: {type: timestamp}
-  - name: value
-    data_type: float
-    generator: {type: range, min: 0, max: 100}
-  - name: status
-    data_type: string
-    generator:
-      type: categorical
-      values: [ok, warn, error]
-      weights: [0.90, 0.08, 0.02]
+project: stress_test
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: stress
+    nodes:
+      - name: scale_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-01-01T00:00:00Z"
+                timestep: "1s"
+                row_count: 10000
+                seed: 42
+              entities:
+                count: 10
+                id_prefix: "device_"
+              columns:
+                - name: device_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: value
+                  data_type: float
+                  generator: {type: range, min: 0, max: 100}
+                - name: status
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [ok, warn, error]
+                    weights: [0.90, 0.08, 0.02]
+        write:
+          connection: output
+          format: parquet
+          path: bronze/stress_test.parquet
+          mode: overwrite
 ```
 
 **Tips for scale testing:**

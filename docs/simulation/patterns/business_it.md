@@ -677,7 +677,6 @@ pipelines:
                     max: 15.0
                     volatility: 0.5
                     mean_reversion: 0.15
-                    mean_reversion_to: 2.0
                     precision: 1
 
                 - name: humidity_pct

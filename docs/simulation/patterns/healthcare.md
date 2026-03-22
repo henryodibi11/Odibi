@@ -70,7 +70,6 @@ pipelines:
                     max: 180
                     volatility: 1.5
                     mean_reversion: 0.1
-                    mean_reversion_to: 75
                     precision: 0
                   entity_overrides:
                     Patient_Bed_03:        # Deteriorating — HR trending up
@@ -80,7 +79,6 @@ pipelines:
                       max: 180
                       volatility: 2.0
                       mean_reversion: 0.05
-                      mean_reversion_to: 95
                       trend: 0.02
                       precision: 0
 
@@ -94,7 +92,6 @@ pipelines:
                     max: 200
                     volatility: 2.0
                     mean_reversion: 0.1
-                    mean_reversion_to: 120
                     precision: 0
 
                 # Diastolic ~65% of systolic
@@ -114,7 +111,6 @@ pipelines:
                     max: 100
                     volatility: 0.3
                     mean_reversion: 0.2
-                    mean_reversion_to: 97
                     precision: 0
                   entity_overrides:
                     Patient_Bed_03:        # Deteriorating — SpO2 drifting down
@@ -124,7 +120,6 @@ pipelines:
                       max: 100
                       volatility: 0.5
                       mean_reversion: 0.2
-                      mean_reversion_to: 92
                       trend: -0.005
                       precision: 0
 
@@ -149,7 +144,6 @@ pipelines:
                     max: 40.0
                     volatility: 0.05
                     mean_reversion: 0.15
-                    mean_reversion_to: 37.0
                     precision: 1
 
                 # Clinical alert based on MEWS-style thresholds
@@ -182,7 +176,7 @@ pipelines:
 **What makes this realistic:**
 
 - 30-second sampling matches real ICU monitor rates (many monitors sample every 15–30s)
-- Mean reversion keeps vitals in physiological range — heart rate reverts to 75 bpm, SpO2 to 97%
+- Mean reversion keeps vitals in physiological range — heart rate reverts to its `start` value (75 bpm), SpO2 to its `start` value (97%)
 - Patient_Bed_03 has deteriorating trends (rising HR, falling SpO2) — this is what clinical early warning scores detect
 - Critical alert thresholds match Modified Early Warning Score (MEWS) criteria
 - Blood pressure diastolic derived from systolic maintains realistic pulse pressure
@@ -269,7 +263,6 @@ pipelines:
                     max: 39.0
                     volatility: 0.1
                     mean_reversion: 0.2
-                    mean_reversion_to: 37.0
                     precision: 1
 
                 # pH — tightly controlled around 7.2
@@ -282,7 +275,6 @@ pipelines:
                     max: 7.6
                     volatility: 0.02
                     mean_reversion: 0.15
-                    mean_reversion_to: 7.2
                     precision: 2
 
                 # Dissolved oxygen
