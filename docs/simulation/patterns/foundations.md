@@ -20,9 +20,19 @@ These 8 patterns cover the core simulation features. Start here — every later 
     - **Full medallion pipeline** — bronze (simulated) → silver (transform) → gold (aggregate) in one config
     - **The format swap** — when real data arrives, change `format: simulation` to `format: csv` and delete the simulation block. Silver and gold stay unchanged.
 
-**The most common pattern.** Simulate what your upstream source will look like, build the full pipeline (transforms, validation, write), then swap bronze to real data later — silver and gold stay unchanged.
+**The most common pattern.** Simulate what your upstream source will look like, build the full pipeline (transforms, validation, write), then swap bronze to real data later - silver and gold stay unchanged.
 
-This is the entire point of simulation: **decouple pipeline development from data availability.**
+This is the entire point of simulation: **decouple pipeline development from data availability.** You don't need to wait for IT to provision a database connection or for a vendor to send sample files. Define what the data *should* look like, build everything downstream, and swap in the real source when it's ready. One line changes (`format: simulation` to `format: csv`), everything else stays the same.
+
+- **Bronze node** - the simulated source. This is where you define the shape of your upstream data: column names, types, distributions, and volume. When real data arrives, this is the only node that changes.
+- **Silver node** - transforms and validation. Derive new columns, apply business rules, validate data quality. This layer is completely independent of where the data came from.
+- **Gold node** - aggregations and business-ready output. Summarize, pivot, or reshape for dashboards and reports.
+
+!!! info "Why these parameter values?"
+    - **`row_count: 720`:** 30 days of hourly data - enough to build and test transforms without generating an unnecessarily large dataset.
+    - **`seed: 42`:** Makes the simulation reproducible. Run it twice, get the same data - useful for debugging transforms.
+    - **`unit_price` with normal distribution (mean 45, std 25):** Most orders cluster around $45 with a realistic tail of expensive items, rather than a flat uniform spread.
+    - **`product` weights `[0.40, 0.30, 0.20, 0.10]`:** Simulates a Pareto-like distribution where Widget_A is the bestseller and Premium_Z is a niche product.
 
 ```yaml
 project: sales_pipeline
@@ -146,12 +156,35 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "What the output looks like"
+    This config generates **720 rows** (720 timesteps x 1 entity). Here's a sample from the bronze layer:
+
+    | order_id | timestamp            | customer_id                          | product   | quantity | unit_price |
+    |----------|----------------------|--------------------------------------|-----------|----------|------------|
+    | 10001    | 2026-01-01 00:00:00  | a3f7c2d1-8e4b-4f6a-9c1d-5b8e2f7a3c0d | Widget_A  | 7        | 42.30      |
+    | 10002    | 2026-01-01 01:00:00  | b9e1d4f6-2a7c-4b3e-8d5f-1c9a6e4b7d2f | Widget_B  | 3        | 67.15      |
+    | 10003    | 2026-01-01 02:00:00  | c5a8f3b2-6d1e-4c9a-7b4f-3e2d8a5c1f6b | Widget_A  | 12       | 31.88      |
+
+    After silver transforms, `line_total` and `order_tier` columns appear. The gold layer aggregates by product - four rows with total revenue and order count per product.
+
 **When real data arrives:** change the bronze node's `format: simulation` to `format: csv` (or `delta`, or `sql`), point it at your real connection, and delete the `simulation` block. Silver and gold nodes don't change at all.
 
+**What makes this realistic:**
+
+- **The medallion architecture is production-ready.** Bronze, silver, and gold aren't simulation concepts - they're the same layers you'll use with real data. Building them now means zero rework later.
+- **Validation catches problems early.** The `not_null` and `range` tests on the silver layer will catch the same issues in real data that they catch in simulated data.
+- **The format swap is a one-line change.** When your real CSV or database connection is ready, change `format: simulation` to `format: csv` and remove the `simulation` block. Everything downstream stays identical.
+
 !!! example "Try this"
-    - Change `row_count` to `168` (one week) and re-run — notice the gold aggregation still works unchanged
+    - Change `row_count` to `168` (one week) and re-run - notice the gold aggregation still works unchanged
     - Add a `chaos` block under `simulation` with `outlier_rate: 0.01` and see how validation catches the bad rows
-    - Add a `discount_pct` column with `generator: {type: range, min: 0, max: 25}` and derive a `net_total` column
+    - Add a `discount_pct` column with `generator: {type: range, min: 0, max: 25}` and derive a `net_total` column: `"quantity * unit_price * (1 - discount_pct / 100)"`
+    - **Try the format swap:** Copy the config, change bronze to `format: csv`, remove the `simulation` block, and point it at any CSV with the same columns. Silver and gold run without changes.
+
+!!! tip "What would you do with this data?"
+    - **Pipeline development** - Build and test your full ETL pipeline before the source system is ready. When the real data arrives, swap one line and deploy.
+    - **Stakeholder demos** - Show dashboards and reports with realistic data while the real integration is still in progress.
+    - **Validation testing** - Prove that your data quality checks work by injecting chaos into the simulation and confirming the validation layer catches it.
 
 > 📖 **Learn more:** [Getting Started](../getting_started.md) — Build your first simulation in 5 minutes | [Core Concepts](../core_concepts.md) — How scope, entities, and columns work together
 
@@ -166,7 +199,43 @@ pipelines:
     - **`scheduled_events`** — force specific values during time windows (e.g., a maintenance shutdown)
     - **`chaos`** — inject outliers and duplicate rows to simulate real-world data imperfections
 
-Simulate a production line with 5 machines, realistic cycle times, defect rates, and operational events. One machine is the "problem child" with worse performance, and another goes down for scheduled maintenance mid-shift.
+A production line is a sequence of machines that each perform a step in a manufacturing process. In real facilities, every machine has slightly different characteristics - an older machine runs slower, a newer one has tighter tolerances, and they all need maintenance at different times. This pattern simulates a single shift across 5 machines, where one is aging and underperforming, and another goes down for scheduled maintenance mid-shift.
+
+The three key odibi features here are `entity_overrides` (give one machine different behavior), `scheduled_events` (force a maintenance shutdown at a specific time), and `chaos` (inject the kind of data glitches you'd see from real PLC systems).
+
+- **machine_01, _02, _04, _05** - healthy machines operating within spec. Cycle times around 31 seconds, 8-15 units per interval, low defect counts.
+- **machine_03** - the "problem child." An older machine with slower cycle times (mean 38s vs 31s), lower output (5-10 units vs 8-15), and higher defect rates (up to 5 per interval vs 2). This is the machine the shift supervisor keeps an eye on.
+- **machine_02 maintenance window** - a scheduled 2-hour maintenance shutdown from 14:00 to 16:00. During this window, status is forced to "Maintenance" and units_produced is forced to 0.
+
+```mermaid
+flowchart LR
+    M1["machine_01\nCycle: 31s\nHealthy"] --> OUT["Production\nOutput"]
+    M2["machine_02\nCycle: 31s\n14:00-16:00 Maint."] --> OUT
+    M3["machine_03\nCycle: 38s\nProblem Child"] --> OUT
+    M4["machine_04\nCycle: 31s\nHealthy"] --> OUT
+    M5["machine_05\nCycle: 31s\nHealthy"] --> OUT
+
+    style M2 fill:#1a1a2e,stroke:#f0ad4e,color:#ffffff
+    style M3 fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style M1 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style M4 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style M5 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style OUT fill:#006400,stroke:#66ff66,color:#ffffff
+```
+
+!!! info "Units and terms in this pattern"
+    **Cycle time (seconds)** - How long it takes a machine to complete one production cycle. Lower is faster. A healthy machine averages 31 seconds; the aging machine_03 averages 38 seconds.
+
+    **Defect count** - Number of defective units produced per 5-minute interval. A well-maintained machine produces 0-2 defects; machine_03 produces up to 5.
+
+    **PLC (Programmable Logic Controller)** - The computer that controls a machine and sends telemetry data. PLCs occasionally retransmit readings, which is why `duplicate_rate: 0.005` exists in the chaos config.
+
+!!! info "Why these parameter values?"
+    - **`timestep: 5m`:** Most manufacturing MES (Manufacturing Execution Systems) collect data every 1-10 minutes. Five-minute intervals balance resolution with file size.
+    - **`cycle_time_sec` normal distribution (mean 31, std 1.5):** Production machines are consistent but not perfect. A 1.5-second standard deviation means 95% of readings fall between 28-34 seconds.
+    - **machine_03 mean 38s, std 3.0:** An aging machine is both slower *and* less consistent - wider standard deviation reflects wear-related variability.
+    - **Status weights `[0.80, 0.10, 0.07, 0.03]`:** Machines spend most of their time running (80%), with occasional idle periods, changeovers, and rare errors - matching typical OEE (Overall Equipment Effectiveness) profiles.
+    - **`outlier_rate: 0.01`, `duplicate_rate: 0.005`:** Low chaos rates. Real PLC data has occasional sensor spikes and retransmissions, but it's mostly clean.
 
 ```yaml
 project: production_line
@@ -278,17 +347,36 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "What the output looks like"
+    This config generates **960 rows** (192 timesteps x 5 machines). Here's a snapshot at 14:30, during machine_02's maintenance window:
+
+    | machine_id  | timestamp            | cycle_time_sec | units_produced | defect_count | status      |
+    |-------------|----------------------|----------------|----------------|--------------|-------------|
+    | machine_01  | 2026-03-10 14:30:00  | 30.8           | 12             | 1            | Running     |
+    | machine_02  | 2026-03-10 14:30:00  | 31.2           | 0              | 0            | Maintenance |
+    | machine_03  | 2026-03-10 14:30:00  | 39.7           | 7              | 3            | Running     |
+    | machine_04  | 2026-03-10 14:30:00  | 31.5           | 11             | 0            | Running     |
+    | machine_05  | 2026-03-10 14:30:00  | 29.9           | 14             | 1            | Running     |
+
+    Notice machine_02 shows 0 units during maintenance, and machine_03's cycle time is noticeably slower with more defects.
+
 **What makes this realistic:**
 
-- `machine_03` is the "problem child" — slower cycle times, lower output, more defects
-- `machine_02` goes down for scheduled maintenance mid-shift
-- 1% outliers catch extreme cycle times; 0.5% duplicates simulate PLC retransmission
-- Normal distribution on cycle times clusters values around the expected mean
+- **machine_03 is visibly different.** Slower cycle times, lower output, and more defects create a clear signal that stands out in analysis - exactly like a real aging machine on a production floor.
+- **Maintenance creates a data gap, not missing data.** machine_02 doesn't disappear during maintenance - it reports status "Maintenance" with zero production. This is how real MES systems behave: the machine is still reporting, it's just not producing.
+- **Chaos simulates PLC behavior.** The 1% outlier rate creates the occasional wild reading you'd see from a noisy sensor, and 0.5% duplicates simulate the retransmissions that happen when PLC communication hiccups.
+- **Normal distribution on cycle times** clusters values around the mean with realistic variation, rather than the flat spread you'd get from a uniform distribution.
 
 !!! example "Try this"
-    - Add a 6th machine with `entity_overrides` for a brand-new machine (faster cycle times, zero defects)
-    - Move the maintenance window to 10:00–11:00 and add a second maintenance event for `machine_04`
-    - Increase `outlier_rate` to `0.05` and notice how the data becomes less trustworthy — then think about what validation tests you'd add
+    - Add a 6th machine with `entity_overrides` for a brand-new machine (faster cycle times, e.g., mean 28s, and `{type: constant, value: 0}` for defect_count)
+    - Move the maintenance window to 10:00-11:00 and add a second maintenance event for `machine_04`
+    - Increase `outlier_rate` to `0.05` and notice how the data becomes less trustworthy - then think about what validation tests you'd add
+    - Add an `oee_pct` derived column: `"(units_produced / 15.0) * 100"` to calculate a simplified OEE metric per interval
+
+!!! tip "What would you do with this data?"
+    - **OEE dashboard** - Calculate Overall Equipment Effectiveness per machine: availability x performance x quality. machine_03 will score lowest - proving the metric works before real data flows.
+    - **Predictive maintenance** - Use the difference between machine_03's degraded cycle times and healthy baselines to train a model that flags machines approaching failure.
+    - **Shift reporting** - Aggregate units_produced and defect_count by machine and hour to build the shift summary report your floor supervisors need.
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Deep dive on entity overrides, scheduled events, and chaos configuration
 
@@ -303,7 +391,49 @@ pipelines:
     - **`null_rate`** — make a percentage of values NULL to simulate sensors that don't have a capability or intermittently fail
     - **`scheduled_events` with no `end_time`** — create permanent failures (sensor battery dies and never recovers)
 
-Simulate a building management system with 20 sensors across 4 floors measuring temperature, humidity, CO₂, and occupancy. One sensor's battery dies mid-day.
+Modern buildings are full of wireless sensors - temperature, humidity, CO2, occupancy - feeding a Building Management System (BMS) that controls HVAC, lighting, and ventilation. In practice, not every sensor measures every metric (some lack humidity capability), sensors fail unpredictably (battery death, connectivity loss), and the HVAC system creates a characteristic "controlled drift" pattern in temperature data.
+
+This pattern simulates 20 sensors across 4 floors of an office building over 24 hours. The key teaching points are how `random_walk` with `mean_reversion` creates the look of an HVAC-controlled environment, how `null_rate` models sensors with missing capabilities, and how scheduled events with no `end_time` create permanent failures.
+
+- **20 sensors** - distributed across 4 floors with equal probability. Each sensor reports temperature, humidity, CO2, and occupancy every 5 minutes.
+- **Temperature** - controlled by HVAC via `random_walk` with `mean_reversion: 0.15`. The value drifts naturally but gets pulled back toward the setpoint, creating the sawtooth-like pattern you see in real building data.
+- **Humidity** - 15% of sensors lack this capability (`null_rate: 0.15`). Those sensors consistently report NULL for humidity.
+- **CO2** - a random walk that responds to occupancy changes. CO2 rises when rooms fill up and drops when people leave.
+- **sensor_15** - battery dies at 14:00 and never recovers. All readings go to NULL permanently (scheduled event with no `end_time`).
+
+```mermaid
+flowchart TB
+    subgraph Building["Office Building - 20 Sensors"]
+        direction TB
+        F4["Floor 4\n5 sensors\nTemp | Humidity | CO₂ | Occupancy"]
+        F3["Floor 3\n5 sensors\nTemp | Humidity | CO₂ | Occupancy"]
+        F2["Floor 2\n5 sensors\nTemp | Humidity | CO₂ | Occupancy"]
+        F1["Floor 1\n5 sensors\nTemp | Humidity | CO₂ | Occupancy"]
+    end
+    Building --> BMS["BMS\nBuilding Management\nSystem"]
+    DEAD["sensor_15\nBattery dead\n14:00 onward"] -.->|"NULL after 14:00"| BMS
+
+    style DEAD fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style BMS fill:#006400,stroke:#66ff66,color:#ffffff
+    style F1 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style F2 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style F3 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style F4 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+```
+
+!!! info "Units and terms in this pattern"
+    **CO2 (ppm)** - Carbon dioxide concentration in parts per million. Outdoor air is about 420 ppm. A well-ventilated office stays under 800 ppm. Above 1000 ppm, people start to feel drowsy and concentration drops.
+
+    **Mean reversion** - A statistical property where values drift but get pulled back toward a target. In building data, the HVAC system is the "pull" - when temperature rises too high, the AC kicks in and pulls it back.
+
+    **null_rate** - The fraction of values that will be NULL. A `null_rate: 0.15` means 15% of rows will have NULL for that column - simulating sensors that lack a particular capability.
+
+!!! info "Why these parameter values?"
+    - **`count: 20`:** A typical 4-floor office building might have 5-10 sensors per floor. Twenty sensors is realistic without generating an overwhelming dataset.
+    - **Temperature `mean_reversion: 0.15`:** A moderate pull-back rate. Lower values (0.05) let temperature wander further from the setpoint; higher values (0.3+) make it almost constant. 0.15 creates a visible but controlled drift.
+    - **CO2 `mean_reversion: 0.05`:** CO2 changes more slowly than temperature because ventilation systems have longer response times. A lower mean_reversion creates more gradual swings.
+    - **`null_rate: 0.15` on humidity:** Not every sensor in a BMS network has the same capabilities. Budget sensors often skip humidity, so 15% NULL is realistic for a mixed-vendor deployment.
+    - **`outlier_rate: 0.005`:** Very low. Wireless sensor networks have occasional transmission errors, but modern BMS protocols include error checking, so corrupt readings are rare.
 
 ```yaml
 project: building_sensors
@@ -421,18 +551,34 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "What the output looks like"
+    This config generates **5,760 rows** (288 timesteps x 20 sensors). Here's a snapshot showing the variety across sensors:
+
+    | sensor_id  | timestamp            | floor   | temperature_c | humidity_pct | co2_ppm | occupancy |
+    |------------|----------------------|---------|---------------|--------------|---------|-----------|
+    | sensor_01  | 2026-03-10 09:00:00  | Floor_2 | 22.4          | 43.2         | 580     | 18        |
+    | sensor_07  | 2026-03-10 09:00:00  | Floor_1 | 21.8          | NULL         | 510     | 12        |
+    | sensor_15  | 2026-03-10 15:00:00  | Floor_3 | NULL          | NULL         | NULL    | 8         |
+
+    Notice sensor_07 has NULL humidity (lacks the capability), and sensor_15 shows NULL for all measurements after 14:00 (battery death).
+
 **What makes this realistic:**
 
-- `random_walk` with `mean_reversion` simulates HVAC-controlled temperature — it drifts but gets pulled back
-- CO₂ uses a random walk because occupancy changes gradually (not randomly)
-- `null_rate: 0.15` on humidity simulates sensors without that capability
-- `sensor_15` dies at 14:00 (battery failure) — permanent null via scheduled events with no `end_time`
-- Low chaos rates (0.5% outliers, 0.3% duplicates) keep data realistic without being noisy
+- **HVAC-controlled temperature looks right.** `random_walk` with `mean_reversion` creates the characteristic pattern you see in real BMS data - temperature drifts 1-2 degrees, then the system kicks in and pulls it back. A flat constant would look fake; a pure random walk would look uncontrolled.
+- **Missing capabilities vs. missing data are different things.** `null_rate: 0.15` on humidity means some sensors *never* report humidity - a permanent structural gap. sensor_15's battery death is a *failure* - it used to report, now it doesn't. Your pipeline needs to handle both.
+- **CO2 drifts realistically.** A random walk with low mean_reversion creates the gradual rise-and-fall pattern driven by occupancy - fast random noise would look like a broken sensor.
+- **Low chaos rates keep the data trustworthy.** 0.5% outliers and 0.3% duplicates are barely noticeable, which is exactly what real sensor data looks like - mostly clean with occasional glitches.
 
 !!! example "Try this"
     - Increase entity count to `50` and see how the data scales
-    - Add a scheduled HVAC failure on Floor_2: force `temperature_c` to `null` for sensors 5–10 between 16:00–18:00
+    - Add a scheduled HVAC failure on Floor_2: force `temperature_c` to `null` for sensors 5-10 between 16:00-18:00
     - Add a derived `co2_status` column: `"'high' if co2_ppm > 800 else 'normal'"` to practice derived expressions
+    - Add an `air_quality_index` derived column that combines CO2 and humidity into a comfort score
+
+!!! tip "What would you do with this data?"
+    - **Sensor health monitoring** - Detect sensor_15's battery death by flagging sensors where all columns go NULL simultaneously. Build alerts for sensors that haven't reported in 30+ minutes.
+    - **Floor-level comfort analysis** - Aggregate temperature and CO2 by floor and hour. Which floors run hot? Where does CO2 spike above 800 ppm during peak hours?
+    - **Missing data reporting** - Quantify the NULL rate by sensor and column. A 15% NULL rate on humidity is expected (sensor capability); a sudden jump to 50% on temperature indicates a problem.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — All `random_walk` parameters including `mean_reversion` | [Advanced Features](../advanced_features.md) — Scheduled events and chaos config
 
@@ -447,7 +593,25 @@ pipelines:
     - **`derived` expressions with conditionals** — calculate new columns using Python `if/else` logic on other columns
     - **Named entities** — use `names: [web, mobile, store, partner]` instead of `count: 4` for human-readable entity IDs
 
-Simulate an e-commerce or ERP order stream with multiple channels, realistic distributions, and incremental daily feeds. Each run generates one day of orders and appends to the output.
+Every business has transactions. Whether it's an e-commerce platform, a retail chain, or a B2B distributor, the pattern is the same: orders flow in from multiple channels, each with an amount, a status, and metadata about the customer and payment method. This pattern simulates that stream with realistic distributions and incremental daily feeds.
+
+The key feature here is `incremental: stateful`, which lets you run the pipeline repeatedly - each run generates the *next* day of orders and appends them to the output file with no overlaps and no gaps. This is how you'd build a pipeline for a real order stream where data arrives daily.
+
+- **web, mobile, store, partner** - four named sales channels. Using `names` instead of `count` gives you human-readable entity IDs that map directly to business concepts.
+- **amount** - normally distributed around $65 with a long tail of high-value orders. Most orders are modest; a few are large.
+- **order_tier** - derived from amount using conditional logic. No transform step needed - the simulation generates it directly.
+- **status weights** - 82% completed, 10% pending, 5% cancelled, 3% refunded. These ratios match typical e-commerce benchmarks.
+
+!!! info "Units and terms in this pattern"
+    **Incremental mode (stateful)** - The system catalog remembers the last timestamp generated. The next run starts from where the previous one stopped. Combined with `mode: append` on the write, this creates a continuously growing dataset with no gaps.
+
+    **Named entities** - Instead of `count: 5` (which produces `entity_01`, `entity_02`, etc.), `names: [web, mobile, store, partner]` creates entities with business-meaningful IDs.
+
+!!! info "Why these parameter values?"
+    - **`timestep: 2m`:** At 2-minute intervals across 4 channels, each day produces ~2,880 orders. That's realistic for a mid-size e-commerce operation.
+    - **`amount` normal distribution (mean 65, std 45):** Creates the classic long-tail order distribution - most orders are $20-$110, with an occasional $300+ order. Uniform would make every order equally likely, which doesn't match real behavior.
+    - **Status weights `[0.82, 0.10, 0.05, 0.03]`:** Industry benchmarks show ~80-85% order completion rates, ~5% cancellations, and ~2-3% refunds for healthy e-commerce operations.
+    - **`mode: append`:** Each run adds to the existing file. After 30 runs, you have a month of order data - exactly how a production pipeline works.
 
 ```yaml
 project: order_stream
@@ -540,18 +704,34 @@ pipelines:
           mode: append
 ```
 
+!!! example "What the output looks like"
+    This config generates **2,880 rows** per run (720 timesteps x 4 channels). Here's a sample:
+
+    | order_id | source  | timestamp            | customer_id                          | amount | status    | payment_method | order_tier |
+    |----------|---------|----------------------|--------------------------------------|--------|-----------|----------------|------------|
+    | 100001   | web     | 2026-03-01 00:00:00  | d4e8f2a1-7b3c-4d6e-9f1a-2c5b8d3e7f0a | 72.40  | completed | credit_card    | silver     |
+    | 100002   | mobile  | 2026-03-01 00:00:00  | a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d | 23.15  | completed | apple_pay      | bronze     |
+    | 100003   | store   | 2026-03-01 00:00:00  | f9e8d7c6-b5a4-3210-fedc-ba9876543210 | 312.50 | completed | debit_card     | platinum   |
+
+    Run it again and the next batch starts at 2026-03-02 00:00:00 - no gaps, no overlaps.
+
 **What makes this realistic:**
 
-- Named entities (`web`, `mobile`, `store`, `partner`) map to real order channels
-- Normal distribution on `amount` clusters most orders around $65 with a tail of high-value orders
-- Categorical `status` and `payment_method` match real-world ratios
-- `derived` expression creates `order_tier` from amount thresholds — no transform step needed
-- `incremental: stateful` + `mode: append` means each run generates the next day, appending to the existing file
+- **Named entities map to business concepts.** `web`, `mobile`, `store`, `partner` are immediately meaningful to anyone reading the data - no need to look up what `entity_03` means.
+- **Amount distribution matches real behavior.** Normal distribution clusters most orders around $65 with a natural tail of high-value orders. Uniform distribution would make a $5 order just as likely as a $500 order, which doesn't reflect real purchasing patterns.
+- **Derived tier logic runs at generation time.** The `order_tier` column is computed from `amount` during simulation - no separate transform step needed. This demonstrates that simulation columns can reference each other.
+- **Incremental mode creates a growing dataset.** Each run appends the next day. After 30 runs, you have a full month of order history with no manual date management.
 
 !!! example "Try this"
     - Add a `wholesale` channel to the `names` list and see a 5th source appear
-    - Change the `amount` distribution to `uniform` and compare — notice how `normal` is more realistic (most orders cluster around the mean)
+    - Change the `amount` distribution to `uniform` and compare - notice how `normal` is more realistic (most orders cluster around the mean)
     - Add a `discount_pct` column with `{type: range, min: 0, max: 30}` and derive a `net_amount` column: `"amount * (1 - discount_pct / 100)"`
+    - Run the pipeline 3 times and inspect the output - each run adds the next day with no overlaps
+
+!!! tip "What would you do with this data?"
+    - **Channel performance comparison** - Revenue by channel, conversion rates, average order value. Which channel brings the most revenue? Which has the highest cancellation rate?
+    - **Payment method trends** - Track payment method distribution over time. Is Apple Pay growing? Are bank transfers declining?
+    - **Order tier analysis** - What percentage of revenue comes from platinum-tier orders? Use this to justify loyalty programs or premium shipping options.
 
 > 📖 **Learn more:** [Incremental Mode](../incremental.md) — How stateful simulation uses the system catalog to track progress between runs
 
@@ -566,7 +746,39 @@ pipelines:
     - **`mean_reversion_to`** — make a random walk pull toward *another column's value* instead of its own start value
     - **Scheduled events as cleaning cycles** — use `parameter_override` events to reset a degraded value back to baseline
 
-Simulate long-running heat exchangers that degrade over time (fouling buildup), with periodic cleaning cycles that restore performance. One exchanger never gets cleaned — its efficiency degrades further than the others.
+Heat exchangers are everywhere in industry - refineries, chemical plants, power stations, HVAC systems, even your car radiator. Their job is simple: transfer heat from one fluid to another without the fluids mixing. A shell-and-tube heat exchanger, for example, runs hot fluid through a bundle of tubes while cool fluid flows around the outside of the tubes inside a shell. The temperature difference between the two fluids drives heat transfer.
+
+The problem is **fouling**. Over time, deposits build up on the heat transfer surfaces - mineral scale from hard water, coke from thermal decomposition, biological growth in cooling water systems, or corrosion products from the metal itself. This layer of deposits acts as insulation, reducing the heat transfer coefficient and forcing the equipment to work harder to achieve the same duty. A clean heat exchanger might operate at 95% efficiency; after months of fouling, that drops to 75% or lower. The gap between design efficiency and actual efficiency represents wasted energy - and real money.
+
+The solution is **cleaning cycles**. In many facilities, this is CIP (Clean-In-Place) - circulating a chemical cleaning solution through the exchanger without disassembling it. After cleaning, efficiency jumps back to near-design levels, and the fouling cycle starts again. The pattern is characteristic: a slow decline punctuated by sharp recoveries, creating a sawtooth curve over time.
+
+This pattern simulates three heat exchangers over 30 days. Two get scheduled cleaning cycles mid-month; one is neglected and degrades continuously. The simulation uses `trend` for gradual degradation and `parameter_override` scheduled events to reset efficiency during cleaning.
+
+- **HX_01** - cleaned on day 15. Efficiency degrades gradually due to fouling (trend: -0.01 per hour), then jumps back to 94% during the 4-hour cleaning window. After cleaning, the fouling cycle restarts.
+- **HX_02** - cleaned on day 16. Same behavior as HX_01 but one day later, simulating a staggered maintenance schedule (you can't clean everything at once - the plant still needs to run).
+- **HX_03** - never cleaned. Its efficiency degrades continuously for the full 30 days, dropping well below the other two. This is the exchanger that eventually triggers an unplanned shutdown when efficiency gets too low to maintain process temperatures.
+- **design_efficiency_pct** - the constant 95% target. The `mean_reversion_to` parameter on actual_efficiency_pct creates a tug-of-war: fouling pulls efficiency down, while the design spec pulls it back. The trend wins over time, but mean_reversion slows the decline.
+- **energy_loss_kw** - derived from the gap between design and actual efficiency. Every percentage point of lost efficiency costs energy (and money).
+- **needs_cleaning** - a boolean flag that triggers when efficiency drops below 80%. In a real facility, this would generate a work order in the CMMS (Computerized Maintenance Management System).
+
+!!! info "Units and terms in this pattern"
+    **Fouling** - The accumulation of unwanted deposits on heat transfer surfaces. Types include scaling (mineral deposits from hard water), coking (carbonized organic material at high temperatures), biofouling (algae and bacteria in cooling water), and corrosion fouling (oxide layers from metal degradation). Each type has different removal methods.
+
+    **Heat transfer coefficient (U-value)** - Measured in W/m2-K (watts per square meter per degree Kelvin). A clean shell-and-tube exchanger might have U = 500 W/m2-K. Heavy fouling can drop this to U = 200 W/m2-K - a 60% reduction in heat transfer capability. The efficiency percentage in this simulation is a simplified proxy for U-value degradation.
+
+    **CIP (Clean-In-Place)** - Cleaning the exchanger by circulating chemicals (acid, caustic, or specialized solvents) through it without disassembly. A typical CIP takes 2-6 hours. The alternative is mechanical cleaning, which requires pulling the tube bundle out of the shell - a multi-day job that costs 5-10x more.
+
+    **Fouling factor (Rf)** - An engineering parameter added to heat exchanger design calculations to account for expected fouling. Units are m2-K/W. TEMA (Tubular Exchanger Manufacturers Association) publishes standard fouling factors for different services. A higher Rf means thicker deposits and worse performance.
+
+    **Design efficiency vs actual efficiency** - Design efficiency is what the exchanger delivers when clean and operating at design conditions. Actual efficiency is what it delivers right now, with whatever fouling has accumulated. The gap between them is the cost of not cleaning.
+
+!!! info "Why these parameter values?"
+    - **`trend: -0.01`:** At hourly intervals, this produces a ~7 percentage-point efficiency drop over 30 days. That's realistic for moderate fouling in cooling water service. Aggressive services (crude oil preheat, for example) might see `trend: -0.05` or worse.
+    - **`mean_reversion: 0.02` with `mean_reversion_to: design_efficiency_pct`:** Creates the characteristic curve where efficiency drops quickly at first, then the rate of decline slows as the fouling layer reaches a quasi-equilibrium. Without mean_reversion, efficiency would decline linearly - with it, you get the realistic exponential-decay shape.
+    - **`start: 94.0` (not 95.0):** Even a "clean" exchanger doesn't operate at 100% of design. The 1-point gap represents baseline performance losses from age, slight misalignment, and the minimum fouling that persists even after cleaning.
+    - **Cleaning resets to 94.0:** CIP doesn't restore an exchanger to brand-new condition - it removes most deposits but not all. Resetting to 94% (not 95%) reflects this practical reality.
+    - **`min: 60.0`:** A hard floor. In practice, an exchanger below 60% efficiency would be shut down for mechanical cleaning or replacement. This prevents the simulation from generating unrealistically low values.
+    - **HX_03 never cleaned:** This is the control case. Comparing HX_03's continuous decline to HX_01/HX_02's sawtooth pattern shows the value of preventive maintenance - a common analysis in reliability engineering.
 
 ```yaml
 project: heat_exchanger_monitoring
@@ -662,18 +874,54 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "What the output looks like"
+    This config generates **2,160 rows** (720 timesteps x 3 exchangers). Here's a comparison at three points in time showing HX_01's cleaning cycle and HX_03's continuous decline:
+
+    **Day 1 (all exchangers similar):**
+
+    | equipment_id | timestamp            | design_efficiency_pct | actual_efficiency_pct | energy_loss_kw | needs_cleaning |
+    |--------------|----------------------|-----------------------|-----------------------|----------------|----------------|
+    | HX_01        | 2026-01-01 00:00:00  | 95.0                  | 93.8                  | 3.0            | False          |
+    | HX_02        | 2026-01-01 00:00:00  | 95.0                  | 93.5                  | 3.8            | False          |
+    | HX_03        | 2026-01-01 00:00:00  | 95.0                  | 93.9                  | 2.8            | False          |
+
+    **Day 15 (HX_01 just cleaned, HX_03 degrading):**
+
+    | equipment_id | timestamp            | design_efficiency_pct | actual_efficiency_pct | energy_loss_kw | needs_cleaning |
+    |--------------|----------------------|-----------------------|-----------------------|----------------|----------------|
+    | HX_01        | 2026-01-15 10:00:00  | 95.0                  | 94.0                  | 2.5            | False          |
+    | HX_02        | 2026-01-15 10:00:00  | 95.0                  | 86.2                  | 22.0           | False          |
+    | HX_03        | 2026-01-15 10:00:00  | 95.0                  | 84.7                  | 25.8           | False          |
+
+    **Day 30 (HX_03 approaching shutdown threshold):**
+
+    | equipment_id | timestamp            | design_efficiency_pct | actual_efficiency_pct | energy_loss_kw | needs_cleaning |
+    |--------------|----------------------|-----------------------|-----------------------|----------------|----------------|
+    | HX_01        | 2026-01-30 00:00:00  | 95.0                  | 87.1                  | 19.8           | False          |
+    | HX_02        | 2026-01-30 00:00:00  | 95.0                  | 87.8                  | 18.0           | False          |
+    | HX_03        | 2026-01-30 00:00:00  | 95.0                  | 78.3                  | 41.8           | True           |
+
+    The sawtooth pattern is clearly visible: HX_01 and HX_02 show a sharp recovery at cleaning, while HX_03 declines continuously. By day 30, HX_03 has triggered the `needs_cleaning` flag.
+
 **What makes this realistic:**
 
-- `trend: -0.01` causes efficiency to slowly degrade (fouling buildup)
-- `mean_reversion_to: design_efficiency_pct` creates a tug-of-war between degradation and the design spec
-- Scheduled events simulate cleaning cycles that reset efficiency back to 94%
-- `HX_03` never gets cleaned — its efficiency degrades further than the others
-- `energy_loss_kw` is derived in real-time from the gap between design and actual
+- **The sawtooth degradation curve is the real pattern.** If you plot actual_efficiency_pct over time, HX_01 and HX_02 show the classic fouling-then-cleaning sawtooth, while HX_03 shows a continuous decline. This is exactly what you'd see in a reliability engineer's monitoring dashboard.
+- **`trend` vs. `mean_reversion_to` creates the right physics.** In a real exchanger, fouling rate is fastest on clean surfaces (fresh deposits stick easily) and slows as the fouling layer builds up (existing deposits partially insulate the surface from new deposition). The combination of negative trend and mean_reversion toward design_efficiency_pct naturally produces this decelerating curve.
+- **Cleaning doesn't restore to 100%.** Resetting to 94% instead of 95% reflects the practical reality that CIP removes most deposits but not all. Over many cleaning cycles, the baseline slowly drops - a real phenomenon called "irreversible fouling" that eventually requires mechanical cleaning or tube replacement.
+- **Energy loss is a direct dollar figure.** The `energy_loss_kw` column translates abstract efficiency percentages into concrete energy waste. A reliability engineer can multiply this by the cost of energy ($0.08-0.15/kWh) and hours of operation to calculate the cost of deferred maintenance - often the argument that gets cleaning budgets approved.
+- **The neglected exchanger tells a story.** HX_03's continuous decline is the cost of skipping maintenance. By day 30, it's wasting 40+ kW compared to a clean exchanger - and approaching the efficiency floor where process temperatures can't be maintained.
 
 !!! example "Try this"
-    - Change `trend` to `-0.05` to simulate aggressive fouling and watch efficiency drop faster
-    - Add a 4th heat exchanger (`HX_04`) with no cleaning event — compare its degradation curve to `HX_03`
-    - Add a `cost_per_hour` derived column: `"energy_loss_kw * 0.12"` to estimate the dollar cost of fouling
+    - Change `trend` to `-0.05` to simulate aggressive fouling (crude oil preheat service) and watch efficiency drop within days instead of weeks
+    - Add a 4th heat exchanger (`HX_04`) with a cleaning event on day 10 *and* day 25 - simulate a high-fouling service that needs more frequent cleaning
+    - Add a `cost_per_hour` derived column: `"energy_loss_kw * 0.12"` to estimate the dollar cost of fouling per hour
+    - Add a `fouling_rate` derived column: `"max(0, prev('actual_efficiency_pct', 94.0) - actual_efficiency_pct)"` to calculate the instantaneous rate of efficiency loss
+
+!!! tip "What would you do with this data?"
+    - **Optimal cleaning schedule** - Plot efficiency vs. time for each exchanger and calculate the total energy cost of fouling. Compare the cost of cleaning (labor + chemicals + downtime) against the energy savings. The crossover point is your optimal cleaning interval.
+    - **Predictive maintenance model** - Train a model on the efficiency decline rate to predict when each exchanger will hit the 80% threshold. Schedule cleaning *before* the `needs_cleaning` flag triggers, avoiding emergency shutdowns.
+    - **Fouling rate comparison** - If you add exchangers with different fouling rates (by varying `trend`), you can identify which services cause the fastest degradation and prioritize capital projects (e.g., replacing a shell-and-tube with a plate exchanger that's easier to clean).
+    - **Maintenance ROI dashboard** - Compare HX_03's cumulative energy waste against HX_01/HX_02's post-cleaning performance to quantify the value of the cleaning program.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — `random_walk` parameters including `trend` and `mean_reversion_to`
 
@@ -687,7 +935,18 @@ pipelines:
     - **Scaling with scope** — combine high entity counts with high row counts to generate millions of rows
     - **Minimal column config** — you only need a few columns to stress-test your infrastructure
 
-Quick recipe for high-volume testing. This config generates 100,000 rows (10 entities × 10,000 rows each). Scale up `count` and `row_count` for millions of rows — see the tips below.
+At some point you need to stop worrying about what your data looks like and start worrying about whether your pipeline can handle the volume. That's what this pattern is for - pure scale testing. No fancy domain logic, no cross-entity references, just raw row generation to stress-test your infrastructure.
+
+The config below generates 100,000 rows (10 entities x 10,000 rows each) with only 4 columns. That's intentionally minimal - when you're testing write performance, memory usage, or partitioning strategy, you don't need a complex schema. You need volume.
+
+- **10 devices** - generic entities that generate rows in parallel. Scale `count` up to 100, 1000, or 10,000 to multiply your row count
+- **1-second timestep** - the fastest practical interval. Combined with 10,000 rows, that's about 2.8 hours of data per entity
+- **4 columns** - device_id, timestamp, a random value, and a categorical status. Just enough schema to test partitioning by status or time
+
+!!! info "Why these parameter values?"
+    - **10 entities x 10,000 rows = 100K total:** Big enough to measure pipeline performance, small enough to finish in seconds on Pandas. Scale from here.
+    - **1-second timestep:** Matches high-frequency IoT/SCADA data rates. Tests timestamp indexing performance.
+    - **Status weights [90%, 8%, 2%]:** Skewed distribution tests how well partitioning handles uneven partition sizes (the `ok` partition will be 45x larger than `error`).
 
 ```yaml
 project: stress_test
@@ -745,19 +1004,38 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "What the output looks like"
+    This config generates **100,000 rows** (10 entities x 10,000 rows). Here's a sample:
+
+    | device_id  | timestamp            | value  | status |
+    |------------|----------------------|--------|--------|
+    | device_01  | 2026-01-01 00:00:00  | 47.3   | ok     |
+    | device_01  | 2026-01-01 00:00:01  | 82.1   | ok     |
+    | device_01  | 2026-01-01 00:00:02  | 15.9   | warn   |
+    | device_05  | 2026-01-01 00:00:00  | 63.4   | ok     |
+    | device_10  | 2026-01-01 00:00:00  | 91.2   | error  |
+
+    The data is intentionally boring - that's the point. You're testing infrastructure, not domain logic. What matters is: did all 100K rows land in the Parquet file? How fast? How big is the file?
+
 **Tips for scale testing:**
 
-- **Use Spark engine for >1M rows** — set `engine: spark` in your pipeline config
+- **Use Spark engine for >1M rows** - set `engine: spark` in your pipeline config
 - **Add partitioning** for Delta Lake writes: `partition_by: [date_column]`
-- **Test compaction** — write 10M rows in small batches, then run `OPTIMIZE`
-- **Z-ordering** — test query performance with `z_order_by: [device_id]`
-- **Memory planning** — 10M rows × 4 columns ≈ 400MB in memory (Pandas) or distributed (Spark)
-- **Incremental stress** — run 10 times with `row_count: 1000` to test append performance
+- **Test compaction** - write 10M rows in small batches, then run `OPTIMIZE`
+- **Z-ordering** - test query performance with `z_order_by: [device_id]`
+- **Memory planning** - 10M rows x 4 columns is roughly 400MB in memory (Pandas) or distributed (Spark)
+- **Incremental stress** - run 10 times with `row_count: 1000` to test append performance
 
 !!! example "Try this"
-    - Increase `count` to `10000` for 100M rows — but switch to `engine: spark` first
-    - Add `partition_by: [status]` to your write config and compare query performance
-    - Time the generation: `time odibi run scale_test.yaml` to benchmark your machine
+    - **Go big:** Increase `count` to `10000` for 100M rows - but switch to `engine: spark` first. Pandas will run out of memory.
+    - **Test partitioning:** Add `partition_by: [status]` to your write config and compare query performance with and without partitions.
+    - **Benchmark your machine:** Time the generation with `time odibi run scale_test.yaml` and compare Pandas vs Spark at different scales.
+
+!!! tip "What would you do with this data?"
+    - **Write performance benchmarking** - Compare Parquet vs Delta vs CSV write times at 100K, 1M, 10M rows
+    - **Partitioning strategy validation** - Test partition pruning performance on different column choices
+    - **Memory profiling** - Monitor RAM usage during generation to find your machine's practical limit for Pandas
+    - **Incremental append testing** - Run 10 times with `mode: append` and measure how write time changes as the file grows
 
 > 📖 **Learn more:** [Core Concepts](../core_concepts.md) — How `scope` controls data volume
 
@@ -771,7 +1049,26 @@ pipelines:
     - **Incremental + Delta Lake append** — each run generates the next day of data and appends it to a Delta table, creating a continuously growing dataset
     - **Dashboard-ready simulation** — connect a BI tool to the output and it looks like real streaming data
 
-Generate continuous demo data that looks like real streaming data. Each pipeline run produces one day of data and appends it to a Delta table. Connect a dashboard and it updates automatically.
+Here's a scenario every data engineer faces: your stakeholder wants a live dashboard, but the production data pipeline isn't ready yet. You need something that looks real enough to build and demo the dashboard now, then seamlessly swap to real data later.
+
+This pattern solves that by combining simulation with incremental mode. Each pipeline run generates exactly one day of data and appends it to a Delta table. Schedule it with cron or Airflow, and your dashboard updates daily with fresh data - indistinguishable from a real feed. When production data arrives, swap the read node and the dashboard doesn't change at all.
+
+- **3 plants** - plant_north, plant_south, plant_east generate independent KPI streams. Each plant produces 96 rows per day (15-minute intervals)
+- **4 KPIs** - throughput (tons), quality (%), energy (kWh), and downtime (minutes) cover the core operational metrics any manufacturing dashboard would show
+- **Incremental mode** - `incremental: stateful` remembers the last timestamp and picks up from there on the next run. No overlaps, no gaps.
+
+!!! info "Units and terms in this pattern"
+    **Incremental mode (stateful)** - The pipeline remembers where it left off between runs. The system catalog stores the high-water mark (last timestamp), and the next run starts from there. This is how real production pipelines avoid reprocessing data.
+
+    **Delta table** - An open-source storage format that supports ACID transactions, time travel, and efficient appends. Writing with `mode: append` adds new rows without rewriting the entire dataset.
+
+    **KPI (Key Performance Indicator)** - The handful of metrics that tell you whether a plant/process/business is healthy. Throughput, quality, energy, and downtime are the "big four" for manufacturing operations.
+
+!!! info "Why these parameter values?"
+    - **15-minute timestep, 96 rows/day:** Standard SCADA/MES reporting interval. Fine enough for trend analysis, coarse enough to keep file sizes manageable.
+    - **Throughput 80-160 tons:** Typical range for a mid-size manufacturing plant. The `random_walk` with `mean_reversion: 0.1` keeps it drifting realistically around 120 tons.
+    - **Quality 92-99.5%:** Most manufacturing plants operate above 95% quality. The normal distribution centers at 97% with occasional dips.
+    - **Energy derived from throughput:** `throughput_tons * 8.5` creates a realistic correlation - more production means more energy. The `random() * 20` noise adds the variability you'd see from equipment efficiency differences.
 
 ```yaml
 project: dashboard_feed
@@ -855,17 +1152,35 @@ pipelines:
           mode: append
 ```
 
+!!! example "What the output looks like"
+    After one run, you get **288 rows** (96 timesteps x 3 plants). After 7 daily runs, the Delta table has 2,016 rows - a week of operational data:
+
+    | plant_id     | timestamp            | throughput_tons | quality_pct | energy_kwh | downtime_min |
+    |--------------|----------------------|-----------------|-------------|------------|--------------|
+    | plant_north  | 2026-03-01 00:00:00  | 118.5           | 97.2        | 1017.3     | 3            |
+    | plant_south  | 2026-03-01 00:00:00  | 121.3           | 96.8        | 1041.1     | 0            |
+    | plant_east   | 2026-03-01 00:00:00  | 119.7           | 98.1        | 1007.5     | 7            |
+    | plant_north  | 2026-03-01 00:15:00  | 117.2           | 97.5        | 1006.2     | 0            |
+
+    Notice how energy correlates with throughput (that's the derived expression), quality stays tight around 97%, and downtime is sporadic. This is exactly what a stakeholder's dashboard would show.
+
 **How to use this as a dashboard feed:**
 
 1. Schedule the pipeline with cron: `odibi run dashboard_feed.yaml` daily
 2. Each run generates the next 24 hours (incremental mode picks up from the last timestamp)
 3. Dashboard connects to `./data/gold/plant_kpis` (Delta table)
-4. New data appears daily — looks like real streaming data to stakeholders
+4. New data appears daily - looks like real streaming data to stakeholders
 
 !!! example "Try this"
-    - Change `timestep` to `5m` for higher-resolution data (288 rows/day instead of 96)
-    - Add a 4th plant (`plant_west`) to the `names` list
-    - Add an `efficiency_pct` derived column: `"min(100, throughput_tons / (energy_kwh / 8.5) * 100)"` to calculate energy efficiency
+    - **Higher resolution:** Change `timestep` to `5m` for 288 rows/day instead of 96. More granular trends, larger dataset.
+    - **Add a plant:** Add `plant_west` to the `names` list. The dashboard picks up the new plant automatically.
+    - **Calculate efficiency:** Add an `efficiency_pct` derived column: `"min(100, throughput_tons / (energy_kwh / 8.5) * 100)"` to show energy efficiency as a KPI.
+
+!!! tip "What would you do with this data?"
+    - **Executive dashboard** - Connect Power BI or Grafana to the Delta table and build a real-time plant operations dashboard with throughput, quality, and energy KPIs
+    - **Anomaly detection prototype** - Train a model on 30 days of simulated data to flag unusual throughput or energy patterns before deploying on real data
+    - **Report automation** - Build weekly summary reports (average throughput, total downtime, energy cost) that run against the Delta table
+    - **Stakeholder demo** - Show leadership a working dashboard with realistic data while you wait for IT to provision production data access
 
 > 📖 **Learn more:** [Incremental Mode](../incremental.md) — How the system catalog tracks high-water marks between runs
 
@@ -880,7 +1195,36 @@ pipelines:
     - **`prev()` for accumulation** — track a running total (like storage utilization) that grows over time
     - **Multi-system data flow** — model Producer → Processor → Storage with realistic throughput loss at each stage
 
-Simulate multiple interconnected systems where downstream systems consume upstream outputs. System B processes 85% of what System A produces, and System C stores 98% of what System B processes.
+In the real world, systems don't exist in isolation. Your data platform has producers feeding processors feeding storage layers, and each stage loses some data along the way. A message broker drops 2% of messages. A stream processor handles 85% of the throughput before backpressure kicks in. A storage layer fills up over time.
+
+This pattern models that cascading dependency using cross-entity references. System A produces events, System B processes a fraction of them (with latency that increases under load), and System C stores what survives - with utilization creeping upward over 24 hours. It's the simplest possible model of a real data pipeline's flow and loss characteristics.
+
+- **SystemA_Producer** - generates raw events at a variable rate (40-180 events/interval). This is your Kafka topic, API endpoint, or sensor network - the source of truth.
+- **SystemB_Processor** - consumes 85% of System A's output. The 15% loss represents messages that time out, get filtered, or hit processing errors. Latency increases with System A's load (backpressure).
+- **SystemC_Storage** - stores 98% of what System B processed. The 2% gap represents write failures, dedup, or schema validation drops. Storage utilization accumulates over time using `prev()`.
+
+```mermaid
+flowchart LR
+    A["SystemA\nProducer\n~100 events/interval"] -->|"85% throughput"| B["SystemB\nProcessor\nLatency: 50-100ms"]
+    B -->|"98% stored"| C["SystemC\nStorage\nUtilization: 10%→100%"]
+
+    style A fill:#006400,stroke:#66ff66,color:#ffffff
+    style B fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style C fill:#8B0000,stroke:#ff6666,color:#ffffff
+```
+
+!!! info "Units and terms in this pattern"
+    **Cross-entity reference** - The `EntityName.column_name` syntax lets one entity read another entity's value at the same timestep. `SystemA_Producer.output_rate` in System B's expression means "use whatever System A produced at this timestep." Entity generation order matters - System A must be generated before System B.
+
+    **Backpressure** - When a downstream system can't keep up with upstream volume, latency increases. The expression `50 + (SystemA_Producer.output_rate * 0.3)` models this - higher upstream volume means higher processing latency.
+
+    **Accumulation with `prev()`** - `prev('storage_utilization_pct', 10.0)` reads the previous timestep's value. Adding to it each timestep creates a running total that grows over time - like a storage system filling up.
+
+!!! info "Why these parameter values?"
+    - **85% throughput at System B:** A realistic processing yield. Real stream processors lose 5-20% of messages to timeouts, validation failures, and backpressure.
+    - **98% storage at System C:** Storage systems are more reliable than processors, but still drop ~2% to write conflicts, schema issues, or dedup.
+    - **Latency = 50 + output_rate * 0.3:** Base latency of 50ms plus a load-dependent component. At output_rate=100, latency is ~80ms. At 180 (peak), it's ~104ms. This is realistic for a batch processing step.
+    - **Storage utilization starts at 10%:** The `prev()` accumulation means utilization grows from 10% toward 100% over the 24-hour window. At 144 timesteps, it rises about 0.001 * records_stored per step.
 
 ```yaml
 project: integration_test
@@ -983,17 +1327,34 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "What the output looks like"
+    This generates **432 rows** (144 timesteps x 3 entities). Here's one timestep across all three systems - notice how values cascade:
+
+    | system_id            | timestamp            | events_produced | output_rate | processed_count | latency_ms | records_stored | storage_utilization_pct |
+    |----------------------|----------------------|-----------------|-------------|-----------------|------------|----------------|-------------------------|
+    | SystemA_Producer     | 2026-03-10 00:00:00  | 127             | 98.5        | 0.0             | 0.0        | 0.0            | 0.0                     |
+    | SystemB_Processor    | 2026-03-10 00:00:00  | 142             | 105.2       | 83.7            | 79.6       | 0.0            | 0.0                     |
+    | SystemC_Storage      | 2026-03-10 00:00:00  | 89              | 112.3       | 0.0             | 0.0        | 82.0           | 10.1                    |
+
+    The key insight: only System B has non-zero `processed_count` (it references System A), and only System C has non-zero `records_stored` (it references System B). The `if entity_id ==` conditionals keep each metric on the right entity. Storage utilization starts at 10% and climbs throughout the day.
+
 **What makes this realistic:**
 
-- `SystemB_Processor.processed_count` = 85% of `SystemA_Producer.output_rate` — realistic throughput loss
-- `latency_ms` increases with `SystemA`'s load — simulates backpressure
-- `SystemC_Storage.records_stored` = 98% of what `SystemB` processed — 2% dropped
-- `storage_utilization_pct` accumulates over time using `prev()` — storage fills up
+- **Cascading data flow mirrors real architectures.** `SystemB_Processor.processed_count` = 85% of `SystemA_Producer.output_rate` is how Kafka consumers, stream processors, and ETL pipelines actually work - you never process 100% of upstream volume.
+- **Load-dependent latency is real backpressure.** `latency_ms` increases with System A's load. In a real system, when Kafka throughput spikes, your Spark Structured Streaming job's processing time increases proportionally.
+- **Storage fills up over time.** The `prev()` accumulation means `storage_utilization_pct` grows from 10% toward 100% over the 24-hour window. This is exactly how disk monitoring dashboards look - a slow upward ramp until someone adds capacity or purges old data.
+- **The 2% storage drop is realistic.** Schema validation failures, duplicate detection, and write conflicts cause small but consistent data loss at the storage layer.
 
 !!! example "Try this"
-    - Add a `SystemD_Archive` entity that stores 99.5% of `SystemC_Storage.records_stored` — extend the pipeline
-    - Add a `latency_alarm` derived column: `"latency_ms > 100 if entity_id == 'SystemB_Processor' else False"`
-    - Change `SystemA_Producer.output_rate` to use `shock_rate: 0.05` to simulate traffic spikes and watch how latency reacts
+    - **Extend the chain:** Add a `SystemD_Archive` entity that stores 99.5% of `SystemC_Storage.records_stored` - model a data warehouse archival layer
+    - **Add alerting:** Add a `latency_alarm` derived column: `"latency_ms > 100 if entity_id == 'SystemB_Processor' else False"` to flag when backpressure becomes a problem
+    - **Simulate traffic spikes:** Change `SystemA_Producer.output_rate` to use `shock_rate: 0.05` to simulate bursty traffic and watch how latency reacts downstream
+
+!!! tip "What would you do with this data?"
+    - **Data pipeline SLA monitoring** - Calculate end-to-end throughput (System C records_stored / System A output_rate) and track whether your pipeline meets its delivery SLA
+    - **Capacity planning** - Use the storage utilization trend to predict when you'll hit 100% and need to scale storage
+    - **Backpressure alerting** - Set thresholds on `latency_ms` and build alerts that fire before the processor falls too far behind
+    - **Data loss auditing** - Compare total records produced vs. stored to quantify pipeline loss rate over time
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Cross-entity references and entity generation order | [Stateful Functions](../stateful_functions.md) — `prev()` for accumulation patterns
 
