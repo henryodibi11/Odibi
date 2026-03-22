@@ -209,12 +209,12 @@ flowchart LR
     B --> E["Wait Time\n~ queue_depth x 2.5 min"]
     B -->|"8% rate"| F["Escalated"]
 
-    style A fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style B fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#006400,stroke:#66ff66,color:#ffffff
-    style D fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style E fill:#8B4513,stroke:#d4a574,color:#ffffff
-    style F fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style A fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style B fill:#375a7f,stroke:#2c4866,color:#ffffff
+    style C fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style D fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style E fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style F fill:#7952b3,stroke:#5a3d8a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -417,10 +417,10 @@ flowchart TD
     C -->|"&gt; 90%"| G["Critical Alert"]
     B -->|"&gt; 90%"| G
 
-    style A fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#8B4513,stroke:#d4a574,color:#ffffff
-    style F fill:#8B8B00,stroke:#ffff66,color:#ffffff
-    style G fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style A fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style C fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style F fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style G fill:#dc3545,stroke:#a71d2a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -636,10 +636,10 @@ flowchart LR
     E --> H["5xx: Server\n30% of errors"]
     B --> I["Throughput\nRPS = count/60"]
 
-    style A fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#006400,stroke:#66ff66,color:#ffffff
-    style D fill:#8B4513,stroke:#d4a574,color:#ffffff
-    style E fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style A fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style C fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style D fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style E fill:#dc3545,stroke:#a71d2a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -863,10 +863,10 @@ flowchart LR
     E -.->|"tracks"| B
     E -.->|"tracks"| C
 
-    style A fill:#8B4513,stroke:#d4a574,color:#ffffff
-    style B fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#006400,stroke:#66ff66,color:#ffffff
-    style D fill:#00008B,stroke:#6666ff,color:#ffffff
+    style A fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style B fill:#375a7f,stroke:#2c4866,color:#ffffff
+    style C fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style D fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"

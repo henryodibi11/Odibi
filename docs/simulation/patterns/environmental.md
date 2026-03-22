@@ -51,9 +51,9 @@ flowchart LR
 
     OBS --> OUT["weather_stations.parquet\n960 rows\n(96 timesteps x 10 stations)"]
 
-    style NYC fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style OBS fill:#006400,stroke:#66ff66,color:#ffffff
-    style OUT fill:#00008B,stroke:#6666ff,color:#ffffff
+    style NYC fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style OBS fill:#20c997,stroke:#199d76,color:#ffffff
+    style OUT fill:#375a7f,stroke:#2c4866,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -282,13 +282,13 @@ flowchart TB
 
     AQI --> OUT["air_quality.parquet\n672 rows\n(168 hrs x 4 stations)"]
 
-    style DT fill:#006400,stroke:#66ff66,color:#ffffff
-    style IND fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style SUB fill:#006400,stroke:#66ff66,color:#ffffff
-    style HWY fill:#8B4513,stroke:#ff9933,color:#ffffff
-    style AQI fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style HA fill:#555555,stroke:#999999,color:#ffffff
-    style OUT fill:#00008B,stroke:#6666ff,color:#ffffff
+    style DT fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style IND fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style SUB fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style HWY fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style AQI fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style HA fill:#6c757d,stroke:#545b62,color:#ffffff
+    style OUT fill:#375a7f,stroke:#2c4866,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -542,15 +542,15 @@ flowchart TB
 
     GH --> OUT["greenhouse_control.parquet\n576 rows\n(288 timesteps x 2 zones)"]
 
-    style SP fill:#006400,stroke:#66ff66,color:#ffffff
-    style PID fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style VENT fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style TEMP fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style SENSORS fill:#006400,stroke:#66ff66,color:#ffffff
-    style SUN fill:#8B8000,stroke:#ffff66,color:#ffffff
-    style AMB fill:#555555,stroke:#999999,color:#ffffff
-    style VPD_CALC fill:#006400,stroke:#66ff66,color:#ffffff
-    style OUT fill:#00008B,stroke:#6666ff,color:#ffffff
+    style SP fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style PID fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style VENT fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style TEMP fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style SENSORS fill:#20c997,stroke:#199d76,color:#ffffff
+    style SUN fill:#d4a017,stroke:#a67c00,color:#ffffff
+    style AMB fill:#6c757d,stroke:#545b62,color:#ffffff
+    style VPD_CALC fill:#20c997,stroke:#199d76,color:#ffffff
+    style OUT fill:#375a7f,stroke:#2c4866,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"

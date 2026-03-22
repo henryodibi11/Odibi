@@ -41,11 +41,11 @@ flowchart TB
 
     B3 -->|"14:00 - Cardiac Episode"| ALERT["CRITICAL Alert\nRapid Response Team"]
 
-    style B1 fill:#006400,stroke:#66ff66,color:#ffffff
-    style B2 fill:#006400,stroke:#66ff66,color:#ffffff
-    style B3 fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style B4 fill:#006400,stroke:#66ff66,color:#ffffff
-    style ALERT fill:#ff0000,stroke:#ff6666,color:#ffffff
+    style B1 fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style B2 fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style B3 fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style B4 fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style ALERT fill:#dc3545,stroke:#a71d2a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -299,11 +299,11 @@ flowchart LR
 
     Q["Quality Flag\npH 6.9-7.5\nTemp 35.5-38.5°C"] -.->|"Monitors all phases"| Batch
 
-    style I fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style G fill:#006400,stroke:#66ff66,color:#ffffff
-    style H fill:#00008B,stroke:#6666ff,color:#ffffff
-    style P fill:#4B0082,stroke:#9966ff,color:#ffffff
-    style Q fill:#8B4513,stroke:#cc9966,color:#ffffff
+    style I fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style G fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style H fill:#375a7f,stroke:#2c4866,color:#ffffff
+    style P fill:#20c997,stroke:#199d76,color:#ffffff
+    style Q fill:#7952b3,stroke:#5a3d8a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"

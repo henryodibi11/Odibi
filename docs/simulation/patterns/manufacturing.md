@@ -419,10 +419,10 @@ flowchart LR
     B --> C["Order Picking\nevery 5 min\n3 pickers"]
     C --> D["Shipping Bay\nevery 1 hour\nCarrier dispatch"]
 
-    style A fill:#006400,stroke:#66ff66,color:#ffffff
-    style B fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style D fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style A fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style B fill:#375a7f,stroke:#2c4866,color:#ffffff
+    style C fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style D fill:#20c997,stroke:#199d76,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -887,12 +887,12 @@ flowchart LR
     S3 -->|"parts_out"| S4["Station 4\nQC\nFinal inspection"]
     S4 --> OUT["Finished\nGoods"]
 
-    style RAW fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style S1 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style S2 fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style S3 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style S4 fill:#006400,stroke:#66ff66,color:#ffffff
-    style OUT fill:#006400,stroke:#66ff66,color:#ffffff
+    style RAW fill:#6c757d,stroke:#545b62,color:#ffffff
+    style S1 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style S2 fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style S3 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style S4 fill:#7952b3,stroke:#5a3d8a,color:#ffffff
+    style OUT fill:#20c997,stroke:#199d76,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"

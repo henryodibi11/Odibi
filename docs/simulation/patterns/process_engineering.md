@@ -36,11 +36,11 @@ flowchart LR
     C -->|"97% flow\n60% BOD passes"| D["Secondary\nClarifier"]
     D -->|"99% flow\n85% BOD passes"| E["Effluent\n10.7 MGD\nBOD: ~11 mg/L\nTSS: ~6 mg/L"]
 
-    style A fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style B fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#006400,stroke:#66ff66,color:#ffffff
-    style D fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style E fill:#00008B,stroke:#6666ff,color:#ffffff
+    style A fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style B fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style C fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style D fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style E fill:#20c997,stroke:#199d76,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -292,11 +292,11 @@ flowchart LR
     IN["Pipeline In\n~450 psig\n~75 MMSCFD"] --> Station
     Station --> OUT["Pipeline Out\n~1200 psig\n~75 MMSCFD"]
 
-    style IN fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style OUT fill:#006400,stroke:#66ff66,color:#ffffff
-    style C1 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C2 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C3 fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style IN fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style OUT fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style C1 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style C2 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style C3 fill:#dc3545,stroke:#a71d2a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -532,11 +532,11 @@ flowchart LR
     D -->|"cooling_pct\n0-100%"| E["Cooling\nJacket"]
     E -->|"removes heat"| B
 
-    style A fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style B fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style C fill:#006400,stroke:#66ff66,color:#ffffff
-    style D fill:#00008B,stroke:#6666ff,color:#ffffff
-    style E fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style A fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style B fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style C fill:#7952b3,stroke:#5a3d8a,color:#ffffff
+    style D fill:#375a7f,stroke:#2c4866,color:#ffffff
+    style E fill:#20c997,stroke:#199d76,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -774,14 +774,14 @@ flowchart TB
     RECT --- FEED
     FEED --- STRIP
 
-    style COND fill:#00008B,stroke:#6666ff,color:#ffffff
-    style RECT fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style FEED fill:#006400,stroke:#66ff66,color:#ffffff
-    style STRIP fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style REB fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style FEED_IN fill:#006400,stroke:#66ff66,color:#ffffff
-    style DIST fill:#00008B,stroke:#6666ff,color:#ffffff
-    style BOTT fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style COND fill:#20c997,stroke:#199d76,color:#ffffff
+    style RECT fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style FEED fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style STRIP fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style REB fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style FEED_IN fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style DIST fill:#7952b3,stroke:#5a3d8a,color:#ffffff
+    style BOTT fill:#7952b3,stroke:#5a3d8a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -1066,13 +1066,13 @@ flowchart LR
     MU["Makeup Water"] -->|"Replaces losses"| BASIN
     BASIN -->|"Blowdown\n(mineral control)"| DRAIN["Drain"]
 
-    style HX fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style TOP fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style BASIN fill:#00008B,stroke:#6666ff,color:#ffffff
-    style AIR fill:#006400,stroke:#66ff66,color:#ffffff
-    style EXHAUST fill:#555555,stroke:#999999,color:#ffffff
-    style MU fill:#006400,stroke:#66ff66,color:#ffffff
-    style DRAIN fill:#555555,stroke:#999999,color:#ffffff
+    style HX fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style TOP fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style BASIN fill:#20c997,stroke:#199d76,color:#ffffff
+    style AIR fill:#6c757d,stroke:#545b62,color:#ffffff
+    style EXHAUST fill:#6c757d,stroke:#545b62,color:#ffffff
+    style MU fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style DRAIN fill:#6c757d,stroke:#545b62,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -1333,12 +1333,12 @@ flowchart LR
     B ---|"Reactor temp\nramps 25→85°C\n~30 min lag"| TB["🌡️ Ramp Up"]
     C ---|"Reactor temp\nramps 85→30°C\n~30 min lag"| TC["🌡️ Ramp Down"]
 
-    style A fill:#006400,stroke:#66ff66,color:#ffffff
-    style B fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style C fill:#00008B,stroke:#6666ff,color:#ffffff
-    style TA fill:#555555,stroke:#999999,color:#ffffff
-    style TB fill:#555555,stroke:#999999,color:#ffffff
-    style TC fill:#555555,stroke:#999999,color:#ffffff
+    style A fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style B fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style C fill:#20c997,stroke:#199d76,color:#ffffff
+    style TA fill:#6c757d,stroke:#545b62,color:#ffffff
+    style TB fill:#6c757d,stroke:#545b62,color:#ffffff
+    style TC fill:#6c757d,stroke:#545b62,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -1574,12 +1574,12 @@ flowchart LR
     C --> T1
     D --> T1
 
-    style A fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style B fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#006400,stroke:#66ff66,color:#ffffff
-    style D fill:#DAA520,stroke:#FFD700,color:#000000
-    style P fill:#4a4a4a,stroke:#888888,color:#ffffff
-    style T1 fill:#4a4a4a,stroke:#888888,color:#ffffff
+    style A fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style B fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style C fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style D fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style P fill:#6c757d,stroke:#545b62,color:#ffffff
+    style T1 fill:#6c757d,stroke:#545b62,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"

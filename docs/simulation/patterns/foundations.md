@@ -215,12 +215,12 @@ flowchart LR
     M4["machine_04\nCycle: 31s\nHealthy"] --> OUT
     M5["machine_05\nCycle: 31s\nHealthy"] --> OUT
 
-    style M2 fill:#1a1a2e,stroke:#f0ad4e,color:#ffffff
-    style M3 fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style M1 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style M4 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style M5 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style OUT fill:#006400,stroke:#66ff66,color:#ffffff
+    style M2 fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style M3 fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style M1 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style M4 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style M5 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style OUT fill:#20c997,stroke:#199d76,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -413,12 +413,12 @@ flowchart TB
     Building --> BMS["BMS\nBuilding Management\nSystem"]
     DEAD["sensor_15\nBattery dead\n14:00 onward"] -.->|"NULL after 14:00"| BMS
 
-    style DEAD fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style BMS fill:#006400,stroke:#66ff66,color:#ffffff
-    style F1 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style F2 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style F3 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style F4 fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
+    style DEAD fill:#6c757d,stroke:#545b62,color:#ffffff
+    style BMS fill:#375a7f,stroke:#2c4866,color:#ffffff
+    style F1 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style F2 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style F3 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style F4 fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -1208,9 +1208,9 @@ flowchart LR
     A["SystemA\nProducer\n~100 events/interval"] -->|"85% throughput"| B["SystemB\nProcessor\nLatency: 50-100ms"]
     B -->|"98% stored"| C["SystemC\nStorage\nUtilization: 10%→100%"]
 
-    style A fill:#006400,stroke:#66ff66,color:#ffffff
-    style B fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style C fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style A fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style B fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style C fill:#dc3545,stroke:#a71d2a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"

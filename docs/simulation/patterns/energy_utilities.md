@@ -51,9 +51,9 @@ flowchart LR
     A4 --> INV
     INV --> GRID["Grid\nExport"]
 
-    style A3 fill:#8B4513,stroke:#D2691E,color:#ffffff
-    style CLOUD fill:#708090,stroke:#A9A9A9,color:#ffffff
-    style GRID fill:#006400,stroke:#66ff66,color:#ffffff
+    style A3 fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style CLOUD fill:#6c757d,stroke:#545b62,color:#ffffff
+    style GRID fill:#28a745,stroke:#1e7e34,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -288,10 +288,10 @@ flowchart TB
     S2 --> SUB
     S3 --> SUB
 
-    style SOUTH fill:#1a3a1a,stroke:#66ff66,color:#ffffff
-    style NORTH fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style WIND fill:#708090,stroke:#A9A9A9,color:#ffffff
-    style SUB fill:#8B8000,stroke:#FFD700,color:#ffffff
+    style SOUTH fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style NORTH fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style WIND fill:#6c757d,stroke:#545b62,color:#ffffff
+    style SUB fill:#375a7f,stroke:#2c4866,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -518,10 +518,10 @@ flowchart LR
 
     PEAK["Peak Event\n4-8 PM"] -.->|"Force -25A"| BMS
 
-    style BMS fill:#006400,stroke:#66ff66,color:#ffffff
-    style PEAK fill:#8B0000,stroke:#ff6666,color:#ffffff
-    style GRID fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style LOAD fill:#8B8000,stroke:#FFD700,color:#ffffff
+    style BMS fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style PEAK fill:#dc3545,stroke:#a71d2a,color:#ffffff
+    style GRID fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style LOAD fill:#375a7f,stroke:#2c4866,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"

@@ -216,11 +216,11 @@ flowchart LR
     Bronze --> Transform --> Silver --> Validation
     Validation -->|"on_fail"| Quarantine
 
-    style Bronze fill:#8B4513,stroke:#D2691E,color:#ffffff
-    style Transform fill:#1a1a2e,stroke:#4a90d9,color:#ffffff
-    style Silver fill:#C0C0C0,stroke:#808080,color:#000000
-    style Validation fill:#006400,stroke:#66ff66,color:#ffffff
-    style Quarantine fill:#8B0000,stroke:#ff6666,color:#ffffff
+    style Bronze fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style Transform fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
+    style Silver fill:#adb5bd,stroke:#868e96,color:#1a1a1a
+    style Validation fill:#28a745,stroke:#1e7e34,color:#ffffff
+    style Quarantine fill:#dc3545,stroke:#a71d2a,color:#ffffff
 ```
 
 !!! info "Units and terms in this pattern"
@@ -463,12 +463,12 @@ flowchart TB
     B3 --> Silver
 
     style ERP fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
-    style MES fill:#d9944a,stroke:#8a5f2c,color:#ffffff
-    style SCADA fill:#4ad94a,stroke:#2c8a2c,color:#ffffff
-    style B1 fill:#8B4513,stroke:#D2691E,color:#ffffff
-    style B2 fill:#8B4513,stroke:#D2691E,color:#ffffff
-    style B3 fill:#8B4513,stroke:#D2691E,color:#ffffff
-    style Silver fill:#C0C0C0,stroke:#808080,color:#000000
+    style MES fill:#7952b3,stroke:#5a3d8a,color:#ffffff
+    style SCADA fill:#20c997,stroke:#199d76,color:#ffffff
+    style B1 fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style B2 fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style B3 fill:#e8943a,stroke:#b8732e,color:#ffffff
+    style Silver fill:#adb5bd,stroke:#868e96,color:#1a1a1a
 ```
 
 !!! info "Units and terms in this pattern"
