@@ -15,9 +15,7 @@ theme:
   name: material
   features:
     - navigation.tabs
-    - navigation.sections
     - navigation.top
-    - navigation.expand
     - toc.integrate
     - content.code.copy
   palette:
