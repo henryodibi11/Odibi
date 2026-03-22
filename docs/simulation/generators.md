@@ -70,6 +70,26 @@ generator:
 !!! tip
     Use `distribution: normal` with a tight `std_dev` for measurements that cluster around a target (e.g., fill weight, thickness). Use `uniform` for values that are equally likely across a range (e.g., random wait times).
 
+!!! info "Normal vs uniform - when to use which"
+
+    **Uniform** (`distribution: uniform`, the default) means every value in the range is equally likely. Use this when there's no "target" the measurement clusters around.
+
+    - Random wait times between events
+    - Batch IDs or sequence numbers within a range
+    - Anything where 20.0 is just as likely as 35.0
+
+    **Normal** (`distribution: normal`) means values cluster around a center point (the `mean`) and become less likely the further you get from it. Use this when there IS a target or typical value.
+
+    - Fill weight on a packaging line (target: 500g, most bags are 498-502g)
+    - Cycle time on a machine (typical: 31 sec, rarely below 28 or above 35)
+    - Any measurement where quality control keeps things near a target
+
+    **How `std_dev` controls the spread:**
+
+    - Tight `std_dev` (small relative to range) = most values packed near the mean. A `std_dev` of 1.0 on a mean of 96.0 means ~68% of values fall between 95.0-97.0.
+    - Loose `std_dev` (large relative to range) = values spread out more evenly. Starts to look like uniform.
+    - Rule of thumb: set `std_dev` = (max - min) / 6 for a bell curve that rarely hits the edges. Tighten it for more clustering.
+
 ---
 
 ## random_walk
@@ -91,6 +111,53 @@ Generate realistic time-series data where each value depends on the previous val
 | shock_rate | float | No | `0.0` | Probability of a sudden shock per timestep (0.0 = never, 1.0 = every step). Range: 0.0–1.0. |
 | shock_magnitude | float | No | `10.0` | Maximum absolute size of a shock event. The actual shock is drawn uniformly from `[0, shock_magnitude]`. Must be > 0. |
 | shock_bias | float | No | `0.0` | Directional tendency for shocks. +1.0 = always up, -1.0 = always down, 0.0 = either direction. Range: -1.0 to 1.0. |
+
+!!! info "Choosing parameter values - a plain-English guide"
+
+    **volatility** - How jittery the signal is between readings. Think of it as instrument noise.
+
+    - `0.1 - 0.5` = Gentle hum. A well-tuned pressure transmitter on a stable loop.
+    - `1.0 - 3.0` = Moderate wobble. A flow meter on a line with some turbulence.
+    - `5.0+` = Wild swings. A noisy thermocouple or an uncontrolled process.
+    - Rule of thumb: start at 0.5, increase until the signal "looks right" for your process.
+
+    **mean_reversion** - How strongly the value gets pulled back to its setpoint. This is your virtual PID controller strength.
+
+    - `0.0` = No control at all. The value wanders freely (pure random walk).
+    - `0.01 - 0.05` = Gentle guidance. The process drifts but slowly returns - like a tank level with gravity drain.
+    - `0.1 - 0.3` = Steady-state control. A well-tuned PID loop holding a process variable near setpoint.
+    - `0.5+` = Tight control. The value snaps back almost immediately after any disturbance.
+
+    **trend** - A slow, persistent push in one direction. It fights against mean_reversion, creating a tug-of-war.
+
+    - Scale it relative to your signal range. On a signal between 300-400, a trend of `0.001` is imperceptible over 100 rows, but `0.1` will visibly climb within an hour.
+    - `0.001` = Barely noticeable drift. Catalyst slowly losing activity over days.
+    - `0.01 - 0.05` = Noticeable over a shift. Heat exchanger fouling you can see in a daily report.
+    - `0.1+` = Aggressive drift. Equipment degrading fast enough to trigger alarms.
+
+    **shock_rate** - How often a sudden spike hits. Think of random process upsets.
+
+    - `0.0` = Never. Smooth operation.
+    - `0.01 - 0.02` = Rare upsets. One spike every 50-100 readings.
+    - `0.05` = Frequent disturbances. Unstable feed or unreliable upstream equipment.
+    - Pair with `mean_reversion > 0` so the process recovers after each shock. Shocks without recovery aren't realistic.
+
+    **shock_magnitude** - How big the spike is when it happens. The actual shock is drawn randomly from zero up to this value.
+
+    - Scale it to your signal range. If your process runs 300-400, a shock_magnitude of 30 means a spike could push the value up to 30 units away from where it was.
+
+    **shock_bias** - Which direction shocks tend to go.
+
+    - `0.0` = Equal chance of spiking up or down (symmetric disturbances).
+    - `+1.0` = Always spikes up. Exothermic runaways, pressure surges.
+    - `-1.0` = Always spikes down. Sudden cooling, pressure drops, flow interruptions.
+
+    **precision** - How many decimal places to round to. Matches real instrument resolution.
+
+    - `0` = Whole numbers (like a digital counter).
+    - `1` = One decimal place (typical for temperature displays: 72.3 degrees F).
+    - `2` = Two decimal places (typical for pressure gauges: 14.72 psi).
+    - `None` = Full floating-point precision (useful for intermediate calculations).
 
 **Supported data types:** `float`
 
@@ -398,6 +465,15 @@ generator:
 
 Generate calculated columns from other columns using sandboxed Python expressions.
 
+!!! tip "When should I use `derived` vs a simpler generator?"
+
+    Use `derived` when the column's value **depends on other columns** or **changes based on logic**. If the column is independent, use a simpler generator:
+
+    - Temperature that wanders on its own? Use `random_walk`.
+    - Temperature converted from Celsius to Fahrenheit? Use `derived` (because it depends on the Celsius column).
+    - Status that's always one of three values? Use `categorical`.
+    - Alarm flag that's TRUE when temperature exceeds 95? Use `derived` (because it depends on temperature).
+
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
@@ -463,6 +539,27 @@ value_if_true if condition else value_if_false
 | `safe_div()` | `safe_div(a, b, default=None)` | Division handling None and zero |
 | `safe_mul()` | `safe_mul(a, b, default=None)` | Multiplication handling None |
 | `random()` | `random()` | Random float in [0, 1) |
+
+!!! info "When to use safe functions"
+
+    **`safe_div(a, b, default)`** - Use whenever you divide and the denominator could be zero or NULL. Without it, you get a runtime error.
+
+    ```yaml
+    # Without safe_div - crashes if total_units is 0
+    expression: "good_units / total_units * 100"
+
+    # With safe_div - returns 0 instead of crashing
+    expression: "safe_div(good_units, total_units, 0) * 100"
+    ```
+
+    **`coalesce(a, b, ...)`** - Use when upstream columns might have NULLs (from `null_rate`). Returns the first non-None value.
+
+    ```yaml
+    # If primary_temp is NULL, fall back to backup_temp, then to 25.0
+    expression: "coalesce(primary_temp, backup_temp, 25.0)"
+    ```
+
+    **`safe_mul(a, b, default)`** - Use when multiplying values that might be NULL. Returns the default instead of propagating None.
 
 ### Context Variables
 

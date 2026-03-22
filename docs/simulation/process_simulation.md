@@ -2,6 +2,17 @@
 
 ## Overview
 
+!!! info "Not a chemical engineer? You're still in the right place"
+
+    This page uses process control examples (reactors, tanks, heat exchangers), but the concepts apply everywhere:
+
+    - **First-order systems** = anything that responds gradually to a change (room heating up, battery charging, queue draining)
+    - **PID control** = any feedback loop that adjusts an output to hit a target (thermostat, cruise control, autoscaling)
+    - **Material balance** = tracking what goes in, what comes out, and what accumulates (inventory, bank accounts, water tanks)
+    - **Energy balance** = tracking heat or energy flow (server room cooling, battery thermal management)
+
+    The math is the same whether you're modeling a CSTR or a warehouse. Read the plain-English explanations and skip the textbook references if they don't apply to you.
+
 Odibi's simulation engine supports realistic process simulation using stateful functions (`prev`, `ema`, `pid`), first-order dynamics, material and energy balances, and PID control — all defined in YAML. No custom code required.
 
 Whether you're modeling a single CSTR, a multi-unit flowsheet, or a full plant with PID-controlled loops, scheduled maintenance, and sensor noise, the simulation framework provides the building blocks to generate physically plausible time-series data from configuration alone.
@@ -25,6 +36,17 @@ Whether you're modeling a single CSTR, a multi-unit flowsheet, or a full plant w
 **Reference:** Seborg Chapter 5 — Dynamic Response Characteristics
 
 ### Theory
+
+A first-order system is anything that doesn't respond instantly to a change. When you turn up a heater, the room doesn't jump to the new temperature - it gradually approaches it. How fast it gets there depends on the system's "time constant" (tau).
+
+**Real-world examples:**
+
+- Turn up the thermostat: room temperature rises gradually toward the new setting
+- Open a faucet into a tank: water level rises but slows down as it approaches the overflow
+- Increase server load: CPU temperature climbs and eventually plateaus
+- Charge a battery: voltage rises quickly at first, then slows as it approaches full
+
+The math below describes this behavior. The key insight is the ratio `dt/tau` - it controls what fraction of the remaining gap gets closed each timestep. A ratio of 0.2 means "close 20% of the gap each step."
 
 First-order systems respond to input changes according to:
 
@@ -152,6 +174,18 @@ columns:
 
 ### Material Balance
 
+A material balance is just bookkeeping: what comes in, minus what goes out, plus what gets created, minus what gets consumed. The leftover is what accumulates (or depletes) in the system.
+
+**Think of it like a bank account:**
+
+- Deposits (inflow) add to your balance
+- Withdrawals (outflow) subtract from your balance
+- Interest (generation) adds to your balance
+- Fees (consumption) subtract from your balance
+- Your balance at the end = balance at the start + deposits - withdrawals + interest - fees
+
+The same logic applies to a tank (liters of liquid), a reactor (moles of chemical), or a warehouse (units of inventory).
+
 For a well-mixed tank:
 
 ```
@@ -264,9 +298,9 @@ columns:
 
 ## Mean-Reverting Processes
 
-**Reference:** Seborg Chapter 5 — Transfer Function Models
+Some process variables naturally return to a "normal" value after being disturbed. A pressurized tank returns to equilibrium. A heated room cools back toward ambient. A PID-controlled process gets pushed back to setpoint. The `random_walk` generator models this behavior without needing explicit PID control loops - just set the right parameters.
 
-Many process variables naturally revert toward a reference value. The `random_walk` generator provides four parameters for modeling this behavior without explicit PID loops.
+**Reference:** Seborg Chapter 5 — Transfer Function Models
 
 ### `mean_reversion` — PID-Like Control Without PID
 

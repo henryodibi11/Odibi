@@ -235,6 +235,21 @@ options:
 
 Scheduled events modify simulation behavior at specific times. They let you inject maintenance shutdowns, setpoint changes, and capacity restrictions into your generated data.
 
+!!! info "Which event type should I use?"
+
+    | I want to... | Use this | Example |
+    |---|---|---|
+    | Set a column to an exact value during a time window | `forced_value` | Shut down a pump: set `power_kw` to 0 during maintenance |
+    | Change a column's value permanently from a point in time | `setpoint_change` | Increase reactor temperature target from 350 to 370 at 13:00 |
+    | Temporarily change a generator's operating range | `parameter_override` | Cap all power output at 180 kW during grid curtailment |
+
+    **forced_value vs parameter_override - what's the difference?**
+
+    - `forced_value` = "this column is EXACTLY this value." No randomness, no generation - just the value you specify. Every row during the window gets the same value.
+    - `parameter_override` = "change how the generator works." The generator still runs, but with a modified parameter (like a new max value). You still get random variation, just within different bounds.
+
+    Use `forced_value` for shutdowns and hard overrides. Use `parameter_override` for "degraded mode" where the process still runs but differently.
+
 Three event types are available:
 
 ### forced_value
@@ -296,6 +311,21 @@ scheduled_events:
 | `start_time` | string | Yes | — | ISO8601 start time |
 | `end_time` | string | No | `null` (permanent) | ISO8601 end time; omit for permanent changes |
 | `priority` | int | No | `0` | For overlapping events — higher priority is applied last (wins) |
+
+!!! tip "How priority works with overlapping events"
+
+    When two events target the same entity and column at the same time, `priority` decides which one wins. Higher priority is applied last, so it overwrites the lower-priority event.
+
+    **Example:** At 14:00, pump_01 has two events:
+
+    - Event A (priority 0): `forced_value`, power_kw = 0 (maintenance shutdown)
+    - Event B (priority 1): `parameter_override`, power_kw = 180 (grid curtailment)
+
+    Result: Event A is applied first (power = 0), then Event B overwrites it (power = 180). The pump runs at reduced power instead of shutting down.
+
+    If you flip the priorities (A=1, B=0), the pump shuts down because the shutdown event wins.
+
+    **Default priority is 0.** If you don't set priorities and events overlap, the behavior is undefined - always set explicit priorities for overlapping events.
 
 ### Example: 10-Hour Plant Operation
 

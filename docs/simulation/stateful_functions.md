@@ -188,6 +188,17 @@ smoothed = alpha × current + (1 - alpha) × previous_smoothed
 
 **Rule of thumb:** Lower alpha = smoother output but slower to react. Higher alpha = noisier output but faster to react.
 
+!!! info "What alpha actually looks like in the output"
+
+    Imagine a raw temperature signal bouncing between 70 and 80 degrees C, averaging around 75:
+
+    - **alpha = 0.1:** The smoothed signal barely moves. It drifts slowly between 73-77, ignoring most of the bouncing. Great for filtering out noise, but it reacts very slowly to real changes.
+    - **alpha = 0.3:** The smoothed signal follows the general trend but flattens out the spikes. Moves between 72-78. A good default for most sensor filtering.
+    - **alpha = 0.5:** Half current reading, half history. The smoothed signal still tracks the raw signal but with softer edges. You can see the pattern but not the noise.
+    - **alpha = 0.9:** Almost no smoothing. The output looks nearly identical to the raw signal, just slightly less jagged. Only useful when you want minimal filtering.
+
+    **Bottom line:** Start at 0.2-0.3 for most sensor filtering. Only go higher if you need fast reaction to real changes and can tolerate more noise in the output.
+
 ### Example 1: Smoothing Noisy Temperature Readings
 
 A thermocouple reports noisy readings. Use EMA to get a clean signal:
@@ -287,6 +298,37 @@ The controller maintains integral and derivative state per entity across rows.
 | `output_min` | float | No | 0 | Minimum output value |
 | `output_max` | float | No | 100 | Maximum output value |
 | `anti_windup` | bool | No | True | Prevent integral windup when output saturates |
+
+!!! warning "The #1 PID mistake: wrong dt"
+
+    The `dt` parameter must match your simulation's `scope.timestep` **in seconds**:
+
+    | scope.timestep | dt value |
+    |----------------|----------|
+    | `1m` | `60` |
+    | `5m` | `300` |
+    | `1h` | `3600` |
+    | `10s` | `10` |
+
+    If your timestep is `5m` but you set `dt=60`, the PID thinks each step is 1 minute and will over-correct by 5x. If you set `dt=5`, it thinks each step is 5 seconds and will barely respond. Always convert your timestep to seconds.
+
+!!! tip "New to PID? Start here"
+
+    Think of a PID controller as a thermostat with three knobs. The P/I/D terms above describe the math - here's what they mean in practice:
+
+    - **Kp too low?** The process barely responds. Temperature sits above setpoint and nothing happens.
+    - **Kp too high?** The process overshoots and oscillates - valve slams open, then shut, then open.
+    - **Ki too low (or zero)?** The process gets close to setpoint but never quite reaches it. There's always a small offset.
+    - **Ki too high?** The process overshoots badly and takes a long time to settle. The integral "winds up" from accumulated error.
+    - **Kd useful?** Only when you see oscillation that P and I alone can't fix. Skip it for noisy measurements - it amplifies noise.
+
+    **Start with this recipe:**
+
+    1. Set `Ki=0, Kd=0`. Increase `Kp` until the process responds without wild oscillation.
+    2. Add a small `Ki` (try `Kp / 10`). This eliminates any remaining offset from setpoint.
+    3. Only add `Kd` if the process oscillates. Try `Kp / 4`. Skip it entirely for noisy measurements.
+
+    Most simulations work fine with just P and I (set `Kd=0`).
 
 ### Practical Tuning Guide
 
