@@ -74,8 +74,8 @@ pipelines:
                     type: derived
                     expression: >
                       prev('pressure_psi', 50.0) +
-                      0.15 * (compressor_speed - prev('pressure_psi', 50.0)) -
-                      0.02 * (flow_gpm - 100.0)
+                      0.15 * (prev('compressor_speed', 50.0) - prev('pressure_psi', 50.0)) -
+                      0.02 * (prev('flow_gpm', 100.0) - 100.0)
 
                 # Flow (affected by pressure)
                 - name: flow_gpm
@@ -84,8 +84,8 @@ pipelines:
                     type: derived
                     expression: >
                       prev('flow_gpm', 100.0) +
-                      0.2 * (valve_position - prev('flow_gpm', 100.0)) +
-                      0.05 * (pressure_psi - 50.0)
+                      0.2 * (prev('valve_position', 50.0) - prev('flow_gpm', 100.0)) +
+                      0.05 * (prev('pressure_psi', 50.0) - 50.0)
 
                 # Pressure controller
                 - name: compressor_speed
@@ -125,3 +125,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: pressure_flow.parquet
+          mode: overwrite

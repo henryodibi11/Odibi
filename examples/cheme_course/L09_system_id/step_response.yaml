@@ -95,3 +95,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: step_response.parquet
+          mode: overwrite

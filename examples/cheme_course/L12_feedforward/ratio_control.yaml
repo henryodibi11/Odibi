@@ -87,7 +87,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('stream_b_gpm', 50.0) +
-                      0.3 * (valve_b_pct - prev('stream_b_gpm', 50.0))
+                      0.3 * (prev('valve_b_pct', 50.0) - prev('stream_b_gpm', 50.0))
 
                 # Ratio controller
                 - name: valve_b_pct
@@ -122,3 +122,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: ratio_control.parquet
+          mode: overwrite

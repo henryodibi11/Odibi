@@ -2306,6 +2306,7 @@ class PandasEngine(Engine):
                     df=df,
                     engine=self,
                     engine_type=self.engine_type,
+                    sql_executor=self.execute_sql,
                 )
 
                 # Validate and instantiate params

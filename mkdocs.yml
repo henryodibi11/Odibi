@@ -92,7 +92,16 @@ nav:
       - Stateful Functions: simulation/stateful_functions.md
       - Advanced Features: simulation/advanced_features.md
       - Incremental Mode: simulation/incremental.md
-      - Patterns & Recipes: simulation/patterns.md
+      - Patterns & Recipes:
+          - Overview: simulation/patterns/index.md
+          - Foundational (1-8): simulation/patterns/foundations.md
+          - Process & ChemE (9-15): simulation/patterns/process_engineering.md
+          - Energy & Utilities (16-20): simulation/patterns/energy_utilities.md
+          - Manufacturing (21-25): simulation/patterns/manufacturing.md
+          - Environmental (26-28): simulation/patterns/environmental.md
+          - Healthcare (29-30): simulation/patterns/healthcare.md
+          - Business & IT (31-35): simulation/patterns/business_it.md
+          - Data Engineering (36-38): simulation/patterns/data_engineering.md
       - Process Control & ChemE: simulation/process_simulation.md
 
   # ═════════════════════════════════════════════════════════════════

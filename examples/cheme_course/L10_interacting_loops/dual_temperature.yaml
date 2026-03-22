@@ -75,7 +75,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('zone1_temp', 200.0) +
-                      0.1 * (heater1_output - prev('zone1_temp', 200.0)) +
+                      0.1 * (prev('heater1_output', 50.0) - prev('zone1_temp', 200.0)) +
                       0.05 * (prev('zone2_temp', 180.0) - prev('zone1_temp', 200.0))
 
                 # Zone 2 temperature (affected by zone 1)
@@ -85,7 +85,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('zone2_temp', 180.0) +
-                      0.12 * (heater2_output - prev('zone2_temp', 180.0)) +
+                      0.12 * (prev('heater2_output', 50.0) - prev('zone2_temp', 180.0)) +
                       0.03 * (prev('zone1_temp', 200.0) - prev('zone2_temp', 180.0))
 
                 # Controllers
@@ -125,3 +125,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: dual_temperature.parquet
+          mode: overwrite

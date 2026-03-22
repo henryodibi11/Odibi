@@ -95,3 +95,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: cohen_coon.parquet
+          mode: overwrite

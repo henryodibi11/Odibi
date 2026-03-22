@@ -307,19 +307,33 @@ class SimulationEngine:
         cross_entity_refs = set()
 
         for col_config in self.config.columns:
+            # Check base generator
             generator = col_config.generator
             if isinstance(generator, DerivedGeneratorConfig):
-                # Extract entity.column patterns
                 refs = self._extract_entity_references(generator.expression, entity_set)
                 cross_entity_refs.update(refs)
 
-                # Validate: no Entity.prev(...) patterns (not yet supported)
                 if re.search(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*prev\s*\(", generator.expression):
                     raise ValueError(
                         f"Column '{col_config.name}' uses cross-entity prev() which is not supported. "
                         f"Expression: {generator.expression}\n"
                         f"Use prev() only for the current entity's own columns."
                     )
+
+            # Check entity_overrides for cross-entity references
+            for override_gen in col_config.entity_overrides.values():
+                if isinstance(override_gen, DerivedGeneratorConfig):
+                    refs = self._extract_entity_references(override_gen.expression, entity_set)
+                    cross_entity_refs.update(refs)
+
+                    if re.search(
+                        r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*prev\s*\(", override_gen.expression
+                    ):
+                        raise ValueError(
+                            f"Column '{col_config.name}' uses cross-entity prev() which is not supported. "
+                            f"Expression: {override_gen.expression}\n"
+                            f"Use prev() only for the current entity's own columns."
+                        )
 
         self.cross_entity_enabled = len(cross_entity_refs) > 0
 
@@ -356,6 +370,18 @@ class SimulationEngine:
 
         return refs
 
+    def _extract_entity_id_guard(self, expression: str) -> Optional[str]:
+        """Extract entity name from an entity_id guard in a conditional expression.
+
+        Detects patterns like:
+            "... if entity_id == 'SystemB_Processor' else ..."
+
+        Returns:
+            The guarded entity name, or None if no guard found.
+        """
+        match = re.search(r"\bif\s+entity_id\s*==\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", expression)
+        return match.group(1) if match else None
+
     def _build_entity_dependency_dag(self):
         """Build entity dependency DAG and compute generation order.
 
@@ -374,38 +400,27 @@ class SimulationEngine:
             return
 
         # Build dependency graph: entity -> set of entities it depends on
-        # NOTE: This is conservative - if ANY expression references Entity X,
-        # we assume it might be used by any entity (unless we parse conditions)
         dependencies: Dict[str, Set[str]] = {name: set() for name in self.entity_names}
+        entity_set = set(self.entity_names)
 
-        # Collect all entity references across all expressions
-        all_referenced_entities = set()
-        for col_config in self.config.columns:
-            generator = col_config.generator
-            if isinstance(generator, DerivedGeneratorConfig):
-                refs = self._extract_entity_references(generator.expression, set(self.entity_names))
-                for ref_entity, ref_column in refs:
-                    all_referenced_entities.add(ref_entity)
-
-        # Conservative approach: any entity that uses derived expressions
-        # depends on all referenced entities (we don't parse conditions)
-        # This ensures sources are generated before consumers
+        # For each entity, find which other entities it references
         for entity_name in self.entity_names:
-            if entity_name not in all_referenced_entities:
-                # This entity is referenced by others, so it's a source
-                # No dependencies
-                pass
-            else:
-                # This entity is referenced, so it cannot reference others
-                # (would create cycle). For simplicity, sources have no deps.
-                pass
-
-        # Actually, simpler: just ensure referenced entities are generated first
-        # Put all referenced entities at the front
-        referenced = sorted(all_referenced_entities)
-        non_referenced = sorted([e for e in self.entity_names if e not in all_referenced_entities])
-        self.entity_generation_order = referenced + non_referenced
-        return  # Skip topological sort for now
+            for col_config in self.config.columns:
+                # Determine the generator this entity will use for this column
+                generator = col_config.entity_overrides.get(entity_name, col_config.generator)
+                if isinstance(generator, DerivedGeneratorConfig):
+                    # For base generators (not overrides), check for entity_id guards
+                    # e.g. "SystemA.output * 0.85 if entity_id == 'SystemB' else 0"
+                    # Only assign refs to the guarded entity, not all entities
+                    if entity_name not in col_config.entity_overrides:
+                        guarded_entity = self._extract_entity_id_guard(generator.expression)
+                        if guarded_entity and guarded_entity != entity_name:
+                            # This expression is guarded for a different entity; skip
+                            continue
+                    refs = self._extract_entity_references(generator.expression, entity_set)
+                    for ref_entity, ref_column in refs:
+                        if ref_entity != entity_name:
+                            dependencies[entity_name].add(ref_entity)
 
         # Topological sort using DFS
         sorted_entities = []
@@ -624,6 +639,10 @@ class SimulationEngine:
                 entity_rng = entity_rngs[entity_name]
                 entity_state = self.entity_state[entity_name]
                 entity_random_walk = random_walk_current[entity_name]
+
+                # Bind proxy to current row early so self-references work
+                if entity_name in self.entity_proxies:
+                    self.entity_proxies[entity_name].bind(row)
 
                 # Generate columns in dependency order
                 for col_name in self.column_order:
@@ -1354,6 +1373,8 @@ class SimulationEngine:
             "bool": bool,
             "True": True,
             "False": False,
+            "true": True,
+            "false": False,
             "None": None,
             "coalesce": coalesce,
             "safe_div": safe_div,

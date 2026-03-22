@@ -1,13 +1,23 @@
 # Simulation Example - Generate synthetic IoT telemetry data
 # This demonstrates all simulation features without requiring external data sources
 
-name: simulation_demo
+project: simulation_demo
 engine: pandas
 
-connections: {}  # Simulation doesn't require connections
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
 
 pipelines:
-  - name: iot_telemetry_simulation
+  - pipeline: iot_telemetry_simulation
     nodes:
       - name: sensor_telemetry
         read:
@@ -92,29 +102,11 @@ pipelines:
                     start_time: "2026-01-01T10:00:00Z"
                     end_time: "2026-01-01T12:00:00Z"  # sensor_03 offline for 2 hours
 
-        # Transform the simulated data (same as any other source)
-        transform:
-          - operation: derive_columns
-            params:
-              columns:
-                temp_celsius: "temperature"
-                temp_fahrenheit: "(temperature * 9/5) + 32"
-                comfort_index: "CASE WHEN temperature BETWEEN 20 AND 25 AND humidity BETWEEN 40 AND 60 THEN 'comfortable' ELSE 'uncomfortable' END"
-
-        # Validate the simulated data
-        validate:
-          tests:
-            - type: not_null
-              columns: [sensor_id, timestamp]
-            - type: unique
-              columns: [sensor_id, timestamp]
-            - type: accepted_values
-              column: status
-              values: [active, idle, maintenance, error]
-            - type: range
-              column: temperature
-              min: -10  # Allow some outliers outside normal range
-              max: 50
+        write:
+          connection: output
+          format: parquet
+          path: bronze/sensor_telemetry.parquet
+          mode: overwrite
 
 # To run this example:
 # odibi run examples/simulation_example.yaml

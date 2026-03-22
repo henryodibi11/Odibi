@@ -107,3 +107,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: ziegler_nichols.parquet
+          mode: overwrite

@@ -104,3 +104,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: feedwater_disturbance.parquet
+          mode: overwrite

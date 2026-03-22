@@ -119,3 +119,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: mpc_basics.parquet
+          mode: overwrite

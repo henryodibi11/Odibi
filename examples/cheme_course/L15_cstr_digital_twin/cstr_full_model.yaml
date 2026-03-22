@@ -159,3 +159,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: cstr_full_model.parquet
+          mode: overwrite

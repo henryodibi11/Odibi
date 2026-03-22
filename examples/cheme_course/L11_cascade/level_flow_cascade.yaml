@@ -80,7 +80,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('level_ft', 10.0) +
-                      (inlet_flow_gpm - outlet_flow_gpm) / (100.0 * 7.48) * 5.0
+                      (inlet_flow_gpm - prev('outlet_flow_gpm', 100.0)) / (100.0 * 7.48) * 5.0
 
                 # Primary controller: level controls flow setpoint
                 - name: outlet_flow_sp_gpm
@@ -107,7 +107,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('outlet_flow_gpm', 100.0) +
-                      0.4 * (control_valve_pct - prev('outlet_flow_gpm', 100.0))
+                      0.4 * (prev('control_valve_pct', 50.0) - prev('outlet_flow_gpm', 100.0))
 
                 # Secondary controller: flow tracks setpoint
                 - name: control_valve_pct
@@ -129,3 +129,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: level_flow_cascade.parquet
+          mode: overwrite

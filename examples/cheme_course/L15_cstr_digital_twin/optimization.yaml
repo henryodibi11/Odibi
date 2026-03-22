@@ -140,3 +140,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: optimization.parquet
+          mode: overwrite

@@ -75,7 +75,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('process_variable', 75.0) +
-                      0.1 * (controller_output - prev('process_variable', 75.0)) -
+                      0.1 * (prev('controller_output', 50.0) - prev('process_variable', 75.0)) -
                       load_disturbance * 0.05
 
                 # PI controller
@@ -104,3 +104,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: load_disturbance.parquet
+          mode: overwrite

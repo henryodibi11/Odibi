@@ -88,3 +88,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: pulse_test.parquet
+          mode: overwrite

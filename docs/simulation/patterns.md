@@ -98,7 +98,7 @@ pipelines:
           steps:
             - operation: derive_columns
               params:
-                columns:
+                derivations:
                   line_total: "quantity * unit_price"
                   order_tier: >
                     CASE
@@ -133,9 +133,8 @@ pipelines:
               params:
                 group_by: [product]
                 aggregations:
-                  total_revenue: "SUM(line_total)"
-                  order_count: "COUNT(order_id)"
-                  avg_order_value: "AVG(line_total)"
+                  line_total: "sum"
+                  order_id: "count"
         write:
           connection: output
           format: parquet

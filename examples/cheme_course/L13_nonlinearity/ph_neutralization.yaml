@@ -112,3 +112,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: ph_neutralization.parquet
+          mode: overwrite

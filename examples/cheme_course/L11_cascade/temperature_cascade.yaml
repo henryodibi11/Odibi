@@ -69,7 +69,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('outlet_temp', 180.0) +
-                      0.05 * (steam_flow - prev('steam_flow', 1000.0)) / 50.0
+                      0.05 * (prev('steam_flow', 1000.0) - 1000.0) / 50.0
 
                 # Primary controller output becomes secondary setpoint
                 - name: steam_flow_sp
@@ -96,7 +96,7 @@ pipelines:
                     type: derived
                     expression: >
                       prev('steam_flow', 1000.0) +
-                      0.3 * (valve_position - prev('steam_flow', 1000.0))
+                      0.3 * (prev('valve_position', 50.0) - prev('steam_flow', 1000.0))
 
                 # Secondary controller (fast loop)
                 - name: valve_position
@@ -130,3 +130,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: temperature_cascade.parquet
+          mode: overwrite

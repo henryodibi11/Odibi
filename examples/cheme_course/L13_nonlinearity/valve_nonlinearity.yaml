@@ -111,3 +111,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: valve_nonlinearity.parquet
+          mode: overwrite

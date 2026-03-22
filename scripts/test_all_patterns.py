@@ -9,7 +9,6 @@ import re
 import shutil
 import sys
 import tempfile
-import traceback
 
 import yaml
 
@@ -64,9 +63,7 @@ def run_pattern(num, title, yaml_text, tmp_dir):
                 if "validation" in node:
                     val = node["validation"]
                     if "quarantine" in val:
-                        val["quarantine"]["connection"] = list(
-                            config["connections"].keys()
-                        )[0]
+                        val["quarantine"]["connection"] = list(config["connections"].keys())[0]
 
     # Write config to temp file
     config_path = os.path.join(tmp_dir, f"pattern_{num}.yaml")
@@ -82,7 +79,7 @@ def run_pattern(num, title, yaml_text, tmp_dir):
     results = manager.run()
 
     # Check for node failures (PipelineManager.run returns PipelineResults)
-    if hasattr(results, 'failed') and results.failed:
+    if hasattr(results, "failed") and results.failed:
         raise RuntimeError(
             f"Pipeline completed but {len(results.failed)} node(s) failed: "
             f"{', '.join(results.failed)}"
@@ -100,9 +97,7 @@ def safe_cleanup(path):
 
 
 def main():
-    patterns_dir = os.path.join(
-        os.path.dirname(__file__), "..", "docs", "simulation", "patterns"
-    )
+    patterns_dir = os.path.join(os.path.dirname(__file__), "..", "docs", "simulation", "patterns")
     patterns_dir = os.path.abspath(patterns_dir)
 
     md_files = [
@@ -124,10 +119,7 @@ def main():
             continue
         patterns = extract_yaml_blocks(md_path)
         print(f"  {md_file}: found {len(patterns)} patterns")
-        all_patterns.extend(
-            (md_file, num, title, yaml_text)
-            for num, title, yaml_text in patterns
-        )
+        all_patterns.extend((md_file, num, title, yaml_text) for num, title, yaml_text in patterns)
 
     print(f"\nTotal patterns found: {len(all_patterns)}")
     print("=" * 70)
@@ -144,7 +136,6 @@ def main():
             passed.append(num)
         except Exception as e:
             print("FAIL")
-            tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
             err_msg = str(e)[:200]
             print(f"       Error: {err_msg}")
             failed.append((num, title, err_msg))
@@ -157,7 +148,7 @@ def main():
     if passed:
         print(f"  Passed: {', '.join(str(p) for p in sorted(passed))}")
     if failed:
-        print(f"\n  FAILURES:")
+        print("\n  FAILURES:")
         for num, title, err in failed:
             print(f"    Pattern {num}: {title}")
             print(f"      {err}")

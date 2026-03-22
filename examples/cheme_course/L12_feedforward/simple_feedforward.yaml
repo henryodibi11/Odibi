@@ -118,3 +118,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: simple_feedforward.parquet
+          mode: overwrite

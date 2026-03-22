@@ -123,3 +123,6 @@ pipelines:
 
         write:
           connection: output
+          format: parquet
+          path: constrained_control.parquet
+          mode: overwrite
