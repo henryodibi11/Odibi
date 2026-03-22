@@ -146,21 +146,22 @@ columns:
     data_type: float
     generator:
       type: derived
-      expression: "prev('reactor_temp_c', 85.0) + 0.1 * (prev('cooling_pct', 50) - prev('reactor_temp_c', 85.0))"
+      expression: "prev('reactor_temp_c', 85.0) + 0.1 * (120.0 - prev('cooling_pct', 50) * 0.7 - prev('reactor_temp_c', 85.0))"
+      # 0.1 = dt/tau, 120.0 = heat source equilibrium, 0.7 = cooling gain
 
   # PID controller output (cooling water valve)
   - name: cooling_pct
     data_type: float
     generator:
       type: derived
-      expression: "pid(pv=reactor_temp_c, sp=temp_setpoint_c, Kp=3.0, Ki=0.15, Kd=1.0, dt=300, output_min=0, output_max=100, anti_windup=True)"
+      expression: "pid(pv=reactor_temp_c, sp=temp_setpoint_c, Kp=-3.0, Ki=-0.15, Kd=-1.0, dt=300, output_min=0, output_max=100, anti_windup=True)"
 ```
 
 **Tuning Rationale:**
 
-- **Kp = 3.0:** Strong proportional action (reactor temp is critical)
-- **Ki = 0.15:** Moderate integral action (eliminate offset without excessive overshoot)
-- **Kd = 1.0:** Moderate derivative action (dampen temperature swings)
+- **Kp = -3.0:** Strong proportional action, negative for reverse-acting cooling (more output = lower temp)
+- **Ki = -0.15:** Moderate integral action (eliminate offset without excessive overshoot)
+- **Kd = -1.0:** Moderate derivative action (dampen temperature swings)
 - **dt = 300:** 5-minute timestep in seconds
 - **anti_windup = True:** Prevents integral windup when valve saturates
 
@@ -530,15 +531,15 @@ columns:
     data_type: float
     generator:
       type: derived
-      expression: "prev('reactor_temp_c', 90.0) + 0.05 * (prev('cooling_pct', 50) - prev('reactor_temp_c', 90.0)) + 0.2"
-      # 0.05 = process gain, 0.2 = disturbance (heat generation)
+      expression: "prev('reactor_temp_c', 90.0) + 0.05 * (120.0 - prev('cooling_pct', 50) * 0.7 - prev('reactor_temp_c', 90.0))"
+      # 0.05 = dt/tau, 120.0 = heat source, 0.7 = cooling gain
 
   # PI controller (no derivative for noisy temperatures)
   - name: cooling_pct
     data_type: float
     generator:
       type: derived
-      expression: "pid(pv=reactor_temp_c, sp=temp_setpoint_c, Kp=2.0, Ki=0.1, Kd=0.0, dt=60)"
+      expression: "pid(pv=reactor_temp_c, sp=temp_setpoint_c, Kp=-2.0, Ki=-0.1, Kd=0.0, dt=60)"
 ```
 
 **Expected Behavior:**

@@ -299,6 +299,24 @@ The controller maintains integral and derivative state per entity across rows.
 | `output_max` | float | No | 100 | Maximum output value |
 | `anti_windup` | bool | No | True | Prevent integral windup when output saturates |
 
+!!! warning "The #2 PID mistake: wrong sign (direct vs reverse acting)"
+
+    Odibi's `pid()` calculates error as `setpoint - process_variable`. This means:
+
+    - When the process variable is **above** setpoint, error is **negative**
+    - When the process variable is **below** setpoint, error is **positive**
+
+    For **cooling controllers** (more output = lower temperature), you need **negative gains**. Otherwise the PID output goes to zero exactly when you need maximum cooling:
+
+    | Controller type | When PV > SP, I need... | Gains should be... |
+    |-----------------|-------------------------|-------------------|
+    | Cooling (valve, fan, vent) | More output (more cooling) | **Negative** Kp, Ki, Kd |
+    | Heating (heater, steam) | Less output (less heating) | **Positive** Kp, Ki, Kd |
+    | Pump draining a tank | More output (more pumping) | **Negative** Kp, Ki, Kd |
+    | Fill valve into a tank | Less output (less filling) | **Positive** Kp, Ki, Kd |
+
+    **The rule:** If more output should DECREASE the process variable, use negative gains. If more output should INCREASE the process variable, use positive gains.
+
 !!! warning "The #1 PID mistake: wrong dt"
 
     The `dt` parameter must match your simulation's `scope.timestep` **in seconds**:
@@ -380,21 +398,21 @@ columns:
     data_type: float
     generator:
       type: derived
-      expression: "prev('vessel_temp_c', 80.0) + 0.05 * (prev('cooling_valve_pct', 50) * 0.8 - prev('vessel_temp_c', 80.0)) + 0.3"
-      # 0.05 = response speed, 0.8 = valve-to-temp gain, 0.3 = heat disturbance
+      expression: "prev('vessel_temp_c', 80.0) + 0.05 * (90.0 - prev('cooling_valve_pct', 50) * 0.3 - prev('vessel_temp_c', 80.0))"
+      # 0.05 = dt/tau, 90.0 = heat source, 0.3 = cooling gain per % valve
 
   # PID controller output → cooling valve position
   - name: cooling_valve_pct
     data_type: float
     generator:
       type: derived
-      expression: "pid(pv=vessel_temp_c, sp=temp_setpoint_c, Kp=2.0, Ki=0.1, Kd=0.5, dt=60, output_min=0, output_max=100)"
+      expression: "pid(pv=vessel_temp_c, sp=temp_setpoint_c, Kp=-2.0, Ki=-0.1, Kd=-0.5, dt=60, output_min=0, output_max=100)"
 ```
 
 **What happens:**
 
 1. Vessel starts at 80°C (above 75°C setpoint)
-2. PID sees positive error → opens cooling valve
+2. PID detects temp above setpoint - increases cooling output (reverse-acting)
 3. Temperature drops toward 75°C
 4. Integral term eliminates any remaining offset
 5. Derivative term prevents overshoot
@@ -439,7 +457,7 @@ columns:
     data_type: float
     generator:
       type: derived
-      expression: "pid(pv=tank_level_m3, sp=level_setpoint_m3, Kp=3.0, Ki=0.2, Kd=0.0, dt=300, output_min=0, output_max=100)"
+      expression: "pid(pv=tank_level_m3, sp=level_setpoint_m3, Kp=-3.0, Ki=-0.2, Kd=0.0, dt=300, output_min=0, output_max=100)"
 ```
 
 **Why Kd=0 here:** Level measurements are often noisy, and derivative action amplifies noise. For level control, PI (without D) is the standard approach.
@@ -493,15 +511,15 @@ columns:
     data_type: float
     generator:
       type: derived
-      expression: "pid(pv=filtered_temp_c, sp=temp_setpoint_c, Kp=2.0, Ki=0.1, Kd=0.5, dt=60, output_min=0, output_max=100)"
+      expression: "pid(pv=filtered_temp_c, sp=temp_setpoint_c, Kp=-2.0, Ki=-0.1, Kd=-0.5, dt=60, output_min=0, output_max=100)"
 
   # --- Actual process temperature (first-order response to cooling) ---
   - name: actual_temp_c
     data_type: float
     generator:
       type: derived
-      expression: "prev('actual_temp_c', 85.0) + 0.05 * (prev('cooling_pct', 50) * 0.6 - prev('actual_temp_c', 85.0)) + 0.15"
-      # Starts above setpoint; 0.15 = heat generation disturbance
+      expression: "prev('actual_temp_c', 85.0) + 0.05 * (95.0 - prev('cooling_pct', 50) * 0.3 - prev('actual_temp_c', 85.0))"
+      # Starts above setpoint; 95.0 = heat source equilibrium without cooling
 ```
 
 **What's happening:**

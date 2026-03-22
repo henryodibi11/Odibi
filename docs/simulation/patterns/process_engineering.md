@@ -634,6 +634,7 @@ pipelines:
                     expression: "feed_flow_m3_hr * 10.0"
 
                 # PID controller output — cooling water valve position
+                # Reverse-acting: temp ABOVE setpoint = MORE cooling (negative Kp)
                 # Uses prev() to read previous temperature (avoids circular dependency)
                 - name: cooling_pct
                   data_type: float
@@ -641,7 +642,7 @@ pipelines:
                     type: derived
                     expression: >
                       pid(pv=prev('reactor_temp_c', 85.0), sp=temp_setpoint_c,
-                      Kp=2.5, Ki=0.08, Kd=0.5, dt=60,
+                      Kp=-1.5, Ki=-0.05, Kd=-0.3, dt=60,
                       output_min=0, output_max=100)
 
                 # Reactor temperature — first-order response
@@ -669,7 +670,7 @@ pipelines:
                   data_type: boolean
                   generator:
                     type: derived
-                    expression: "reactor_temp_c > 90.0"
+                    expression: "reactor_temp_c > 95.0"
 
               # Feed disturbance at hour 4
               scheduled_events:
@@ -708,6 +709,26 @@ pipelines:
 - **More feed generates more heat generates higher temperature generates more cooling** - the entire causal chain is modeled. Feed flow is the disturbance, heat generation is the effect, temperature is the process variable, and cooling is the manipulated variable. This is the classic cascade you'd draw on a whiteboard in any process control class.
 - **The feed disturbance at hour 4 forces a step change** that tests the controller's ability to reject a load disturbance. In a real plant, this could be an upstream valve opening, a feed pump switching, or a batch tank dumping its contents into the continuous process.
 - **`output_min=0, output_max=100` constrains the valve to 0-100%** - a real valve can't go beyond fully open or fully closed. Without these limits, the PID integral term could "wind up" to absurd values, and when the disturbance clears, the controller would take forever to unwind. This anti-windup protection is critical in real installations.
+
+!!! warning "Why are the PID gains negative?"
+
+    This is the most common PID mistake in simulation. Odibi's `pid()` calculates `error = setpoint - process_variable`:
+
+    - Temperature **above** setpoint (too hot) makes error **negative**
+    - Temperature **below** setpoint (too cold) makes error **positive**
+
+    For a **cooling** controller, when the reactor is too hot, we need **more** cooling output - not less. With positive `Kp`, a negative error produces negative output, which gets clamped to 0. The cooling shuts off exactly when you need it most.
+
+    **Negative gains flip the response:** `Kp=-1.5` times error `-5.0` equals output `+7.5` - the cooling valve opens. This is called **reverse-acting** control. Heating controllers use positive gains (direct-acting).
+
+    | Controller type | PV above SP means... | Gains |
+    |-----------------|----------------------|-------|
+    | Cooling valve, fan, vent | Need MORE output | Negative |
+    | Heater, steam valve | Need LESS output | Positive |
+    | Drain pump | Need MORE output | Negative |
+    | Fill valve | Need LESS output | Positive |
+
+    If your PID output is stuck at 0 or 100 and the process is running away, check your sign convention first.
 
 !!! example "Try this"
     - **Make the controller too aggressive:** Change `Kp` to `5.0` and watch the temperature oscillate around setpoint instead of settling smoothly. This is what happens when a new engineer tunes a loop "for fast response" without considering stability. In a real plant, oscillating temperature means oscillating product quality.

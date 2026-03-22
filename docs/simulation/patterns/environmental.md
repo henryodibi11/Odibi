@@ -513,7 +513,7 @@ Here's what each entity and column represents:
 - **ambient_temp_c** - The outdoor air temperature, modeled as a slow random walk. This is the disturbance variable - the greenhouse controller has to reject this disturbance to maintain the setpoint. A warm ambient temperature means less heating needed (or more ventilation); a cold ambient means the controller must retain heat.
 - **solar_load_w** - Solar radiation hitting the greenhouse, in watts. This is the dominant heat input during the day and the reason greenhouses work at all. The scheduled event forces solar load to 0 at night (the sun sets - obvious, but the simulation needs to be told). During the day, solar load drifts between 0-800 W via random walk, simulating cloud cover variability.
 - **actual_temp_c** - The measured greenhouse air temperature, computed using first-order thermal dynamics via `prev()`. The expression `prev('actual_temp_c', 22.0) + (ambient_temp_c - prev('actual_temp_c', 22.0) + solar_load_w * 0.005) * 0.1` is a discrete approximation of the first-order ODE dT/dt = (1/tau) * (T_ambient - T + Q_solar). The 0.1 factor represents dt/tau where dt=5 min and tau=50 min. The thermal mass of the greenhouse structure (concrete floors, soil beds, water barrels) prevents instant temperature changes.
-- **vent_position_pct** - The PID controller output, 0-100%. The `pid()` function takes actual temperature as the process variable, setpoint as the target, and outputs a vent opening percentage. Kp=5.0 provides proportional response, Ki=0.5 adds integral action to eliminate steady-state offset, Kd=1.0 adds derivative action to dampen oscillation. The 300-second dt matches the 5-minute timestep.
+- **vent_position_pct** - The PID controller output, 0-100%. The `pid()` function takes actual temperature as the process variable, setpoint as the target, and outputs a vent opening percentage. The gains are negative (Kp=-5.0, Ki=-0.5, Kd=-1.0) because this is a reverse-acting controller - when temperature is above setpoint, we want MORE venting, not less. The 300-second dt matches the 5-minute timestep. The vent effect feeds back into the temperature model via `prev('vent_position_pct')`, creating a true closed control loop.
 - **humidity_pct** - Relative humidity inside the greenhouse. Modeled as an independent random walk (not coupled to temperature in this pattern, though in reality they're strongly correlated through the psychrometric relationship). Starts at 70% - typical for a well-managed greenhouse with active ventilation.
 - **soil_moisture_pct** - Soil volumetric water content. A slow random walk with mean reversion - soil moisture changes gradually as plants absorb water and irrigation replenishes it. The 20-90% range spans from "dangerously dry" to "waterlogged."
 - **light_ppfd** - Photosynthetically Active Radiation measured in PPFD (Photosynthetic Photon Flux Density), micromoles of photons per square meter per second. The 0-1200 range covers full shade to direct full sun. Most greenhouse crops need 200-600 PPFD for optimal growth; above 800, some crops experience photoinhibition.
@@ -524,7 +524,7 @@ flowchart TB
     subgraph GH["Greenhouse Structure (Thermal Mass ~50 min)"]
         direction TB
         SP["Setpoint\nDay: 25°C | Night: 18°C\n(DIF = +7°C)"]
-        PID["PID Controller\nKp=5, Ki=0.5, Kd=1.0\ndt=300s"]
+        PID["PID Controller\nKp=-5, Ki=-0.5, Kd=-1.0\ndt=300s"]
         VENT["Vent Position\n0-100%"]
         TEMP["Actual Temp\nprev() + thermal dynamics"]
         SENSORS["Humidity | Soil Moisture\nLight PPFD | VPD"]
@@ -651,14 +651,14 @@ pipelines:
                   data_type: float
                   generator:
                     type: derived
-                    expression: "round(prev('actual_temp_c', 22.0) + (ambient_temp_c - prev('actual_temp_c', 22.0) + solar_load_w * 0.005) * 0.1, 1)"
+                    expression: "round(prev('actual_temp_c', 22.0) + (ambient_temp_c - prev('actual_temp_c', 22.0) + solar_load_w * 0.005 - prev('vent_position_pct', 0) * 0.02) * 0.1, 1)"
 
-                # PID controller: Kp=5, Ki=0.5, Kd=1.0, dt=300s, output 0-100%
+                # PID controller: Kp=-5, Ki=-0.5, Kd=-1.0, dt=300s, output 0-100%
                 - name: vent_position_pct
                   data_type: float
                   generator:
                     type: derived
-                    expression: "round(max(0, min(100, pid(actual_temp_c, temp_setpoint_c, 5.0, 0.5, 1.0, 300, 0, 100, True))), 1)"
+                    expression: "round(max(0, min(100, pid(actual_temp_c, temp_setpoint_c, -5.0, -0.5, -1.0, 300, 0, 100, True))), 1)"
 
                 - name: humidity_pct
                   data_type: float
@@ -745,7 +745,7 @@ pipelines:
 - **Night mode setpoint change is the real DIF strategy.** Every commercial greenhouse climate computer - from Priva to Hoogendoorn to Argus - has day/night setpoint scheduling. The +7 C DIF in this pattern is a conservative value. Some tomato growers in the Netherlands use +10 C DIF to promote generative growth (more fruit, less leaf). The `scheduled_events` in odibi map directly to the "climate recipe" concept in greenhouse automation.
 
 !!! example "Try this"
-    - **Make the controller too aggressive:** Change `Kp` from `5.0` to `15.0` and watch `vent_position_pct` oscillate wildly. The vent will swing between 0% and 100% every few timesteps as the controller overcorrects. Temperature will oscillate around setpoint instead of settling smoothly. This is what happens when a controls technician tunes a loop "for fast response" without considering the thermal mass of the system. Reduce `Kp` back to `3.0` for a sluggish but stable response and compare.
+    - **Make the controller too aggressive:** Change `Kp` from `-5.0` to `-15.0` and watch `vent_position_pct` oscillate wildly. The vent will swing between 0% and 100% every few timesteps as the controller overcorrects. Temperature will oscillate around setpoint instead of settling smoothly. This is what happens when a controls technician tunes a loop "for fast response" without considering the thermal mass of the system. Reduce `Kp` back to `-3.0` for a sluggish but stable response and compare.
     - **Add automatic irrigation:** Add an `irrigation_valve` derived column: `"100.0 if soil_moisture_pct < 40.0 else 0.0"` - a simple on/off controller that opens the valve when soil is dry. Then add the effect: make soil moisture respond to irrigation by adding a feedback term. In real greenhouses, irrigation scheduling is based on solar integral (cumulative daily light), not just soil moisture - but this is a good starting point.
     - **Add CO2 enrichment:** Add a `co2_ppm` column with `random_walk` (start 400, min 350, max 1200) and a scheduled event that forces CO2 to 800 ppm during daytime hours. CO2 enrichment is standard practice in northern European greenhouses - raising CO2 from ambient (400 ppm) to 800-1000 ppm can increase photosynthesis by 20-30%. The economics only work when the greenhouse is closed (winter), because opening vents for cooling releases expensive CO2.
     - **Simulate a ventilation failure:** Add a `scheduled_event` that forces `vent_position_pct` to 0 for 2 hours during peak solar load (noon). With no ventilation and 500+ W of solar input, temperature will climb rapidly. How high does it get before the thermal dynamics saturate? In a real greenhouse, this is a catastrophic failure - temperatures above 35 C for more than an hour can kill sensitive crops.
