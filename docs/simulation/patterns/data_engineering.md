@@ -129,7 +129,7 @@ pipelines:
 **Industry:** Data Engineering | **Difficulty:** Advanced
 
 !!! tip "What you'll learn"
-    - **Simulate → transform → validate loop** — the simulation node generates bronze data, a transform node reshapes it (rename columns, add derived fields), and validation catches schema issues. This is how you test that your silver layer handles schema changes gracefully.
+    - **Simulate → transform → validate loop** — the simulation node generates bronze data, a SQL transform renames columns and adds derived fields, and validation catches schema issues. This is how you test that your silver layer handles schema changes gracefully.
 
 A two-node pipeline implementing the standard medallion architecture: bronze simulation → silver transform. The first node generates raw sensor data, the second reads it back, renames columns, adds derived fields, and validates the result. If you add a new column to bronze that silver doesn't expect, you'll see it pass through (schema evolution). If you remove a column that silver depends on, validation will catch it.
 
@@ -223,19 +223,22 @@ pipelines:
           path: bronze/schema_test.parquet
         transform:
           steps:
-            - operation: rename_columns
-              params:
-                mapping:
-                  measurement_a: sensor_reading
-                  measurement_b: reference_value
-            - operation: add_column
-              params:
-                name: delta
-                expression: "sensor_reading - reference_value"
-            - operation: add_column
-              params:
-                name: status_label
-                expression: "'ok' if status_code == 0 else 'warn' if status_code == 1 else 'error' if status_code == 2 else 'critical'"
+            - sql: >
+                SELECT
+                  source_id,
+                  timestamp,
+                  measurement_a AS sensor_reading,
+                  measurement_b AS reference_value,
+                  status_code,
+                  category,
+                  measurement_a - measurement_b AS delta,
+                  CASE
+                    WHEN status_code = 0 THEN 'ok'
+                    WHEN status_code = 1 THEN 'warn'
+                    WHEN status_code = 2 THEN 'error'
+                    ELSE 'critical'
+                  END AS status_label
+                FROM df
         validation:
           mode: warn
           tests:
