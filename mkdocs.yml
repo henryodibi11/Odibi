@@ -41,6 +41,9 @@ plugins:
             show_root_heading: true
             show_source: true
 
+extra_javascript:
+  - assets/javascripts/mermaid-download.js
+
 markdown_extensions:
   - attr_list  # Enables {#custom-anchor} syntax for headings
   - meta  # Enables front-matter support
