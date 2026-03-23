@@ -420,16 +420,18 @@ pipelines:
 
 !!! tip "What you'll learn"
     - **`random_walk` with `mean_reversion`** — simulate controlled processes where values drift but get pulled back to a setpoint (like HVAC-controlled temperature)
-    - **`null_rate`** — make a percentage of values NULL to simulate sensors that don't have a capability or intermittently fail
+    - **`entity_overrides`** — pin sensors to specific floors and permanently disable capabilities on specific sensors
+    - **`null_rate`** — simulate occasional signal dropout on sensors that have the capability
     - **`scheduled_events` with no `end_time`** — create permanent failures (sensor battery dies and never recovers)
 
 Modern buildings are full of wireless sensors - temperature, humidity, CO2, occupancy - feeding a Building Management System (BMS) that controls HVAC, lighting, and ventilation. In practice, not every sensor measures every metric (some lack humidity capability), sensors fail unpredictably (battery death, connectivity loss), and the HVAC system creates a characteristic "controlled drift" pattern in temperature data.
 
-This pattern simulates 20 sensors across 4 floors of an office building over 24 hours. The key teaching points are how `random_walk` with `mean_reversion` creates the look of an HVAC-controlled environment, how `null_rate` models sensors with missing capabilities, and how scheduled events with no `end_time` create permanent failures.
+This pattern simulates 20 sensors across 4 floors of an office building over 24 hours. The key teaching points are how `entity_overrides` pins sensors to physical locations and models hardware differences, how `random_walk` with `mean_reversion` creates the look of an HVAC-controlled environment, how `null_rate` models random signal glitches, and how scheduled events with no `end_time` create permanent failures.
 
-- **20 sensors** - distributed across 4 floors with equal probability. Each sensor reports temperature, humidity, CO2, and occupancy every 5 minutes.
+- **20 sensors** - pinned to 4 floors via `entity_overrides` (5 per floor). Each sensor reports temperature, humidity, CO2, and occupancy every 5 minutes.
+- **Floor** - assigned per sensor using `entity_overrides` with `constant` generators. A sensor is physically installed on one floor — it doesn't move between readings.
 - **Temperature** - controlled by HVAC via `random_walk` with `mean_reversion: 0.15`. The value drifts naturally but gets pulled back toward the setpoint, creating the sawtooth-like pattern you see in real building data.
-- **Humidity** - 15% of sensors lack this capability (`null_rate: 0.15`). Those sensors consistently report NULL for humidity.
+- **Humidity** - 3 sensors (sensor_04, sensor_12, sensor_18) permanently lack this capability via `entity_overrides` that set the generator to `{type: constant, value: null}`. The remaining sensors have a small `null_rate: 0.02` for occasional signal dropout.
 - **CO2** - a random walk that responds to occupancy changes. CO2 rises when rooms fill up and drops when people leave.
 - **sensor_15** - battery dies at 14:00 and never recovers. All readings go to NULL permanently (scheduled event with no `end_time`).
 
@@ -454,17 +456,17 @@ flowchart TB
 ```
 
 !!! info "Units and terms in this pattern"
-    **CO2 (ppm)** - Carbon dioxide concentration in parts per million. Outdoor air is about 420 ppm. A well-ventilated office stays under 800 ppm. Above 1000 ppm, people start to feel drowsy and concentration drops.
+    **CO2 (ppm)** - Carbon dioxide concentration in parts per million. Outdoor air is about 420 ppm, but even an empty office with HVAC stays around 450 ppm due to recirculated air. A well-ventilated occupied office stays under 800 ppm. Above 1000 ppm, people start to feel drowsy and concentration drops.
 
     **Mean reversion** - A statistical property where values drift but get pulled back toward a target. In building data, the HVAC system is the "pull" - when temperature rises too high, the AC kicks in and pulls it back.
 
-    **null_rate** - The fraction of values that will be NULL. A `null_rate: 0.15` means 15% of rows will have NULL for that column - simulating sensors that lack a particular capability.
+    **null_rate** - The fraction of values that will be randomly NULL per reading. A `null_rate: 0.02` means 2% of rows will have NULL for that column - simulating occasional signal glitches. For permanent capability gaps, use `entity_overrides` with `{type: constant, value: null}` instead.
 
 !!! info "Why these parameter values?"
     - **`count: 20`:** A typical 4-floor office building might have 5-10 sensors per floor. Twenty sensors is realistic without generating an overwhelming dataset.
     - **Temperature `mean_reversion: 0.15`:** A moderate pull-back rate. Lower values (0.05) let temperature wander further from the setpoint; higher values (0.3+) make it almost constant. 0.15 creates a visible but controlled drift.
     - **CO2 `mean_reversion: 0.05`:** CO2 changes more slowly than temperature because ventilation systems have longer response times. A lower mean_reversion creates more gradual swings.
-    - **`null_rate: 0.15` on humidity:** Not every sensor in a BMS network has the same capabilities. Budget sensors often skip humidity, so 15% NULL is realistic for a mixed-vendor deployment.
+    - **`entity_overrides` on humidity:** 3 sensors permanently lack humidity (older hardware). This is modeled with `{type: constant, value: null}` overrides — not `null_rate`, which would randomly drop values on every sensor. The small `null_rate: 0.02` handles occasional signal glitches on the sensors that *do* have humidity hardware.
     - **`outlier_rate: 0.005`:** Very low. Wireless sensor networks have occasional transmission errors, but modern BMS protocols include error checking, so corrupt readings are rare.
 
 ```yaml
@@ -508,12 +510,31 @@ pipelines:
                   data_type: timestamp
                   generator: {type: timestamp}
 
+                # Floor — sensors are physically installed on one floor
                 - name: floor
                   data_type: string
-                  generator:
-                    type: categorical
-                    values: [Floor_1, Floor_2, Floor_3, Floor_4]
-                    weights: [0.25, 0.25, 0.25, 0.25]
+                  generator: {type: constant, value: "Floor_1"}
+                  entity_overrides:
+                    sensor_01: {type: constant, value: "Floor_1"}
+                    sensor_02: {type: constant, value: "Floor_1"}
+                    sensor_03: {type: constant, value: "Floor_1"}
+                    sensor_04: {type: constant, value: "Floor_1"}
+                    sensor_05: {type: constant, value: "Floor_1"}
+                    sensor_06: {type: constant, value: "Floor_2"}
+                    sensor_07: {type: constant, value: "Floor_2"}
+                    sensor_08: {type: constant, value: "Floor_2"}
+                    sensor_09: {type: constant, value: "Floor_2"}
+                    sensor_10: {type: constant, value: "Floor_2"}
+                    sensor_11: {type: constant, value: "Floor_3"}
+                    sensor_12: {type: constant, value: "Floor_3"}
+                    sensor_13: {type: constant, value: "Floor_3"}
+                    sensor_14: {type: constant, value: "Floor_3"}
+                    sensor_15: {type: constant, value: "Floor_3"}
+                    sensor_16: {type: constant, value: "Floor_4"}
+                    sensor_17: {type: constant, value: "Floor_4"}
+                    sensor_18: {type: constant, value: "Floor_4"}
+                    sensor_19: {type: constant, value: "Floor_4"}
+                    sensor_20: {type: constant, value: "Floor_4"}
 
                 # Temperature with mean reversion — HVAC keeps it controlled
                 - name: temperature_c
@@ -527,7 +548,7 @@ pipelines:
                     mean_reversion: 0.15     # HVAC pulls back to setpoint
                     precision: 1
 
-                # Humidity — some sensors don't have this capability
+                # Humidity — 3 sensors lack this capability (older hardware)
                 - name: humidity_pct
                   data_type: float
                   generator:
@@ -537,14 +558,18 @@ pipelines:
                     distribution: normal
                     mean: 45.0
                     std_dev: 8.0
-                  null_rate: 0.15            # 15% of sensors lack humidity
+                  null_rate: 0.02            # 2% random dropout (signal glitches)
+                  entity_overrides:
+                    sensor_04: {type: constant, value: null}
+                    sensor_12: {type: constant, value: null}
+                    sensor_18: {type: constant, value: null}
 
                 - name: co2_ppm
                   data_type: float
                   generator:
                     type: random_walk
-                    start: 420.0
-                    min: 350.0
+                    start: 450.0
+                    min: 450.0
                     max: 1200.0
                     volatility: 5.0
                     mean_reversion: 0.05
@@ -588,16 +613,18 @@ pipelines:
 
     | sensor_id  | timestamp            | floor   | temperature_c | humidity_pct | co2_ppm | occupancy |
     |------------|----------------------|---------|---------------|--------------|---------|-----------|
-    | sensor_01  | 2026-03-10 09:00:00  | Floor_2 | 22.4          | 43.2         | 580     | 18        |
-    | sensor_07  | 2026-03-10 09:00:00  | Floor_1 | 21.8          | NULL         | 510     | 12        |
+    | sensor_01  | 2026-03-10 09:00:00  | Floor_1 | 22.4          | 43.2         | 580     | 18        |
+    | sensor_04  | 2026-03-10 09:00:00  | Floor_1 | 21.8          | NULL         | 510     | 12        |
+    | sensor_07  | 2026-03-10 09:00:00  | Floor_2 | 22.1          | 47.8         | 495     | 15        |
     | sensor_15  | 2026-03-10 15:00:00  | Floor_3 | NULL          | NULL         | NULL    | 8         |
 
-    Notice sensor_07 has NULL humidity (lacks the capability), and sensor_15 shows NULL for all measurements after 14:00 (battery death).
+    Notice sensor_01 always reports Floor_1 (pinned via entity_overrides). sensor_04 has NULL humidity permanently (older hardware without humidity chip). sensor_15 shows NULL for all measurements after 14:00 (battery death).
 
 **What makes this realistic:**
 
 - **HVAC-controlled temperature looks right.** `random_walk` with `mean_reversion` creates the characteristic pattern you see in real BMS data - temperature drifts 1-2 degrees, then the system kicks in and pulls it back. A flat constant would look fake; a pure random walk would look uncontrolled.
-- **Missing capabilities vs. missing data are different things.** `null_rate: 0.15` on humidity means some sensors *never* report humidity - a permanent structural gap. sensor_15's battery death is a *failure* - it used to report, now it doesn't. Your pipeline needs to handle both.
+- **Floors are pinned, not random.** Each sensor is physically installed on one floor via `entity_overrides`. A `categorical` generator would randomly change the floor every reading — that's not how real sensors work.
+- **Missing capabilities vs. signal glitches are modeled separately.** `entity_overrides` on humidity permanently disables 3 sensors (older hardware without humidity chips) — a structural gap. The small `null_rate: 0.02` on the base column simulates occasional signal dropout on sensors that *do* have the capability. sensor_15's battery death is a third type — a *failure* modeled via scheduled events. Your pipeline needs to handle all three.
 - **CO2 drifts realistically.** A random walk with low mean_reversion creates the gradual rise-and-fall pattern driven by occupancy - fast random noise would look like a broken sensor.
 - **Low chaos rates keep the data trustworthy.** 0.5% outliers and 0.3% duplicates are barely noticeable, which is exactly what real sensor data looks like - mostly clean with occasional glitches.
 
@@ -610,12 +637,12 @@ pipelines:
 !!! tip "What would you do with this data?"
     - **Sensor health monitoring** - Detect sensor_15's battery death by flagging sensors where all columns go NULL simultaneously. Build alerts for sensors that haven't reported in 30+ minutes.
     - **Floor-level comfort analysis** - Aggregate temperature and CO2 by floor and hour. Which floors run hot? Where does CO2 spike above 800 ppm during peak hours?
-    - **Missing data reporting** - Quantify the NULL rate by sensor and column. A 15% NULL rate on humidity is expected (sensor capability); a sudden jump to 50% on temperature indicates a problem.
+    - **Missing data reporting** - Quantify the NULL rate by sensor and column. sensor_04/12/18 should be 100% NULL on humidity (no capability); a sudden jump on other sensors indicates a problem.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — All `random_walk` parameters including `mean_reversion` | [Advanced Features](../advanced_features.md) — Scheduled events and chaos config
 
 !!! example "Content extraction"
-    **Core insight:** Real sensor networks have gaps, noise, and drift. The combination of random_walk (for autocorrelation), null_rate (for dropouts), and chaos (for spikes) produces data that passes the squint test.
+    **Core insight:** Real sensor networks have three types of missing data: permanent capability gaps (entity_overrides), random signal glitches (null_rate), and equipment failures (scheduled_events). Modeling them separately teaches students to handle each correctly.
 
     **Real-world problem:** IoT platform engineers need realistic test data for alerting and dashboard development. Clean, uniform data doesn't trigger the edge cases that matter.
 

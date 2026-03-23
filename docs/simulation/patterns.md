@@ -314,12 +314,31 @@ pipelines:
                   data_type: timestamp
                   generator: {type: timestamp}
 
+                # Floor — sensors are physically installed on one floor
                 - name: floor
                   data_type: string
-                  generator:
-                    type: categorical
-                    values: [Floor_1, Floor_2, Floor_3, Floor_4]
-                    weights: [0.25, 0.25, 0.25, 0.25]
+                  generator: {type: constant, value: "Floor_1"}
+                  entity_overrides:
+                    sensor_01: {type: constant, value: "Floor_1"}
+                    sensor_02: {type: constant, value: "Floor_1"}
+                    sensor_03: {type: constant, value: "Floor_1"}
+                    sensor_04: {type: constant, value: "Floor_1"}
+                    sensor_05: {type: constant, value: "Floor_1"}
+                    sensor_06: {type: constant, value: "Floor_2"}
+                    sensor_07: {type: constant, value: "Floor_2"}
+                    sensor_08: {type: constant, value: "Floor_2"}
+                    sensor_09: {type: constant, value: "Floor_2"}
+                    sensor_10: {type: constant, value: "Floor_2"}
+                    sensor_11: {type: constant, value: "Floor_3"}
+                    sensor_12: {type: constant, value: "Floor_3"}
+                    sensor_13: {type: constant, value: "Floor_3"}
+                    sensor_14: {type: constant, value: "Floor_3"}
+                    sensor_15: {type: constant, value: "Floor_3"}
+                    sensor_16: {type: constant, value: "Floor_4"}
+                    sensor_17: {type: constant, value: "Floor_4"}
+                    sensor_18: {type: constant, value: "Floor_4"}
+                    sensor_19: {type: constant, value: "Floor_4"}
+                    sensor_20: {type: constant, value: "Floor_4"}
 
                 # Temperature with mean reversion — HVAC keeps it controlled
                 - name: temperature_c
@@ -333,7 +352,7 @@ pipelines:
                     mean_reversion: 0.15     # HVAC pulls back to setpoint
                     precision: 1
 
-                # Humidity — some sensors don't have this capability
+                # Humidity — 3 sensors lack this capability (older hardware)
                 - name: humidity_pct
                   data_type: float
                   generator:
@@ -343,14 +362,18 @@ pipelines:
                     distribution: normal
                     mean: 45.0
                     std_dev: 8.0
-                  null_rate: 0.15            # 15% of sensors lack humidity
+                  null_rate: 0.02            # 2% random dropout (signal glitches)
+                  entity_overrides:
+                    sensor_04: {type: constant, value: null}
+                    sensor_12: {type: constant, value: null}
+                    sensor_18: {type: constant, value: null}
 
                 - name: co2_ppm
                   data_type: float
                   generator:
                     type: random_walk
-                    start: 420.0
-                    min: 350.0
+                    start: 450.0
+                    min: 450.0
                     max: 1200.0
                     volatility: 5.0
                     mean_reversion: 0.05
@@ -391,9 +414,10 @@ pipelines:
 
 **What makes this realistic:**
 
+- **Floor is pinned per sensor** via `entity_overrides` — sensors don't teleport between floors. 5 sensors per floor, evenly distributed.
 - `random_walk` with `mean_reversion` simulates HVAC-controlled temperature — it drifts but gets pulled back
 - CO₂ uses a random walk because occupancy changes gradually (not randomly)
-- `null_rate: 0.15` on humidity simulates sensors without that capability
+- **Sensor capabilities vs. signal glitches are modeled separately.** `entity_overrides` on humidity permanently disables 3 sensors (older hardware without humidity chips). The small `null_rate: 0.02` on the base column simulates occasional signal dropout on sensors that *do* have the capability.
 - `sensor_15` dies at 14:00 (battery failure) — permanent null via scheduled events with no `end_time`
 - Low chaos rates (0.5% outliers, 0.3% duplicates) keep data realistic without being noisy
 
