@@ -1,6 +1,9 @@
 # Incremental (Continuous) Simulation
 
-**Generate new data on every pipeline run, picking up exactly where the last run left off — using the same High Water Mark (HWM) system as all other Odibi read sources.**
+**Generate new data on every pipeline run, picking up exactly where the last run left off - using the same High Water Mark (HWM) system as all other Odibi read sources.**
+
+!!! example "Why this matters"
+    A simulation that runs once is a demo. A simulation that runs continuously on a schedule, with PID controllers that remember their integral state and random walks that continue from their last position, is a data platform. Incremental mode turns simulation into a continuous data feed - indistinguishable from a real source to everything downstream. Backfill a year of history on the first run, then add a day at a time. Your dashboard never knows the difference.
 
 ---
 

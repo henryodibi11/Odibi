@@ -1,6 +1,9 @@
 # Advanced Features
 
-**Cross-entity references, entity overrides, scheduled events, and chaos engineering — the tools that turn simple simulations into realistic multi-system scenarios.**
+**Cross-entity references, entity overrides, scheduled events, and chaos engineering - the tools that turn simple simulations into realistic multi-system scenarios.**
+
+!!! example "Why this matters"
+    Real systems don't operate in isolation, don't behave identically, don't run 24/7, and don't produce clean data. These four features model exactly that: cross-entity references connect dependent systems, entity overrides create behavioral variation, scheduled events inject operational realism (maintenance, setpoint changes, shutdowns), and chaos engineering adds the data quality problems your pipeline needs to survive. If your test data assumes everything works perfectly, the first real maintenance window will break your dashboard.
 
 These features build on the [Core Concepts](core_concepts.md) (scope, entities, columns) and [Generators](generators.md). If you haven't read those yet, start there.
 

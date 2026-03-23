@@ -3,6 +3,9 @@
 Comprehensive reference for all 12 simulation generator types. Each generator produces
 a specific kind of synthetic data for realistic dataset simulation.
 
+!!! example "Why this matters"
+    Most synthetic data tools generate uniform random noise. Real sensor data is autocorrelated, mean-reverting, and subject to shocks. If your test data doesn't pass the squint test - if an operator would look at the chart and say "that's not real" - your pipeline will surprise you in production. These generators, especially `random_walk`, produce data that behaves like real instruments, not dice rolls.
+
 ---
 
 ## Generator Quick Reference

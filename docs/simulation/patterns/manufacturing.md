@@ -203,6 +203,22 @@ pipelines:
 
 > 📖 **Learn more:** [Validation Tests](../../validation/tests.md) — All 11 validation test types and quarantine configuration
 
+!!! example "Content extraction"
+    **Core insight:** Validation on simulated data closes the loop - simulate messy data, validate it, tune your quality gates, THEN go live. You'd rather find false positives in simulation than in production.
+
+    **Real-world problem:** Quality engineers need to test SPC rules and validation thresholds before the packaging line starts running. Getting the thresholds wrong means rejecting good product or passing bad product.
+
+    **Why it matters:** If your range validation catches too few outliers, bad product ships. If it catches too many, you waste good product. Simulation lets you tune the boundary before it matters.
+
+    **Hook:** "Test your quality gates on synthetic data. If they fail here, they'll fail in production. Better to know now."
+
+    **YouTube angle:** "SPC on synthetic data: simulate a packaging line, apply validation rules, and tune thresholds before the first real package."
+
+!!! tip "Combine with"
+    - Pattern 2 (add entity overrides for machines with different quality profiles)
+    - Pattern 36 (aggressive chaos to stress-test validation rules)
+    - Pattern 1 (full medallion architecture with validation at each layer)
+
 ---
 
 ## Pattern 22: CNC Machine Shop {#pattern-22}
@@ -393,6 +409,22 @@ pipelines:
     - **Machine comparison** - Compare spindle speed, feed rate, and tool wear across all three machines. The lathe should have a distinctly different operating profile than the mills.
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Chaos config and downtime events
+
+!!! example "Content extraction"
+    **Core insight:** downtime_events in chaos simulate real equipment failures - entire rows removed during outage windows. This is different from null injection (missing values) or forced_value (scheduled maintenance).
+
+    **Real-world problem:** Manufacturing engineers need OEE (Overall Equipment Effectiveness) test data that includes real downtime patterns, not just running-state metrics.
+
+    **Why it matters:** OEE availability calculation depends on correctly identifying downtime periods. If your test data never has gaps, your availability calculation is untested.
+
+    **Hook:** "Real machines break down. Downtime events remove entire rows - not just null values. That's how you test OEE calculations."
+
+    **YouTube angle:** "Simulating machine downtime: chaos engineering for manufacturing data, with OEE calculation walkthrough."
+
+!!! tip "Combine with"
+    - Pattern 2 (add entity overrides for machines with different reliability)
+    - Pattern 5 (add degradation leading up to failures)
+    - Pattern 21 (add SPC validation on quality metrics)
 
 ---
 
@@ -667,6 +699,22 @@ pipelines:
 
 > 📖 **Learn more:** [Core Concepts](../core_concepts.md) — Scope, entities, and how multiple pipelines share a project
 
+!!! example "Content extraction"
+    **Core insight:** Multi-pipeline projects model real-world systems where different data sources feed into a unified view. Receipts and issues are separate processes that both affect the same inventory balance.
+
+    **Real-world problem:** Logistics teams need inventory test data that shows the full picture - receipts, issues, stock levels, reorder triggers - not just a snapshot.
+
+    **Why it matters:** Inventory analytics that doesn't integrate receipts and issues can't predict stockouts or overstock. The material balance (in - out = change) is the foundation.
+
+    **Hook:** "Warehouse inventory is just a material balance. Receipts come in, issues go out, and prev() tracks what's left."
+
+    **YouTube angle:** "Inventory tracking from first principles: multi-pipeline simulation of receipts, issues, and running stock balance."
+
+!!! tip "Combine with"
+    - Pattern 15 (tank farm inventory uses the same integration pattern)
+    - Pattern 8 (cross-entity refs for multi-warehouse transfers)
+    - Pattern 7 (incremental mode for daily inventory snapshots)
+
 ---
 
 ## Pattern 24: Food Safety / Cold Chain Monitoring {#pattern-24}
@@ -858,6 +906,22 @@ pipelines:
     - **Alert volume analysis** - Count alerts by level (normal/warning/critical) per entity per day. High alert volume on a specific unit might indicate a failing compressor, while high alert volume across all units might indicate a system-wide calibration issue.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Email generator and boolean generator parameters
+
+!!! example "Content extraction"
+    **Core insight:** The email generator creates realistic contact records for alert routing. Combined with temperature thresholds, this simulates a complete cold chain monitoring system with notification logic.
+
+    **Real-world problem:** Food safety managers need cold chain test data that includes breach events and alert routing. Compliance audits require proof that the monitoring system works.
+
+    **Why it matters:** A cold chain breach that isn't detected costs product, customer trust, and potentially regulatory action. Testing the detection logic on synthetic data prevents real losses.
+
+    **Hook:** "Cold chain monitoring isn't just temperature logging. It's breach detection, alert routing, and compliance documentation. Simulate all three."
+
+    **YouTube angle:** "Cold chain simulation: temperature monitoring, breach detection, and email alerts in a food safety pipeline."
+
+!!! tip "Combine with"
+    - Pattern 3 (add sensor dropouts with null_rate for unreliable loggers)
+    - Pattern 2 (entity overrides for trucks with different insulation quality)
+    - Pattern 36 (add chaos for sensor calibration drift)
 
 ---
 
@@ -1060,6 +1124,22 @@ pipelines:
     - **WIP estimation** - At any timestamp, calculate `Station_1.cumulative_output - Station_4.cumulative_output`. That difference is the approximate WIP on the line. Rising WIP means the bottleneck is getting worse.
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Cross-entity references and entity generation order
+
+!!! example "Content extraction"
+    **Core insight:** Cross-entity station-to-station flow models the sequential dependency of an assembly line. Each station's input is the previous station's output, with realistic throughput loss at each step.
+
+    **Real-world problem:** Manufacturing engineers need line balancing test data that shows bottlenecks, station-to-station variation, and cumulative throughput loss.
+
+    **Why it matters:** An assembly line model where stations are independent can't reveal bottlenecks. The slowest station determines line throughput - cross-entity refs model that constraint.
+
+    **Hook:** "An assembly line is a pipeline. Each station depends on the one before it. Cross-entity references model that naturally."
+
+    **YouTube angle:** "Assembly line simulation: cross-entity station flow, bottleneck identification, and line balancing with odibi."
+
+!!! tip "Combine with"
+    - Pattern 9 (wastewater cascade uses the same multi-stage pattern)
+    - Pattern 2 (add entity overrides for stations with different capabilities)
+    - Pattern 22 (add downtime events for station failures)
 
 ---
 

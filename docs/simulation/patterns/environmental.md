@@ -241,6 +241,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Geo generator bbox and format options
 
+!!! example "Content extraction"
+    **Core insight:** The geo generator with bbox places entities at realistic geographic positions within a bounding box. Combined with multi-sensor entities, this creates spatially distributed observation networks.
+
+    **Real-world problem:** Meteorologists and environmental data engineers need spatially distributed weather test data for model validation, dashboard development, and QC algorithm testing.
+
+    **Why it matters:** Weather data without spatial distribution is just a single thermometer. The value of a network is in comparing measurements across locations - calibration drift at one station, microclimates, spatial interpolation.
+
+    **Hook:** "10 weather stations, each at a real lat/lon within the NYC metro area. Multi-sensor observations every 15 minutes. One YAML config."
+
+    **YouTube angle:** "Building a weather station network simulation: geo positioning, METAR-style observations, and heat index calculations."
+
+!!! tip "Combine with"
+    - Pattern 16 (correlate weather with solar generation)
+    - Pattern 3 (add sensor reliability modeling)
+    - Pattern 7 (incremental mode for continuous weather monitoring)
+
 ---
 
 ## Pattern 27: Air Quality Monitoring {#pattern-27}
@@ -485,6 +501,22 @@ pipelines:
     - **Environmental justice analysis** - Map the four stations by land-use zone and overlay demographic data. Are the highest-polluting zones (industrial, highway) located near lower-income communities? This is the core question in environmental justice research, and having simulated data lets you build the analysis pipeline before working with real (and politically sensitive) data.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Random walk trend parameter
+
+!!! example "Content extraction"
+    **Core insight:** The trend parameter models slow seasonal drift in pollutant levels - ozone buildup in summer, particulate increases in winter. This captures the non-stationary behavior that real air quality data exhibits.
+
+    **Real-world problem:** Environmental agencies need air quality test data for AQI calculation validation, compliance reporting, and public health alert thresholds.
+
+    **Why it matters:** Air quality models trained on stationary data miss seasonal trends. Ozone doesn't behave the same in January as it does in July - trend captures that.
+
+    **Hook:** "Air quality isn't stationary. Ozone builds in summer, particulates spike in winter. The trend parameter models both."
+
+    **YouTube angle:** "Simulating air quality data with seasonal trends: AQI calculation, pollutant modeling, and compliance thresholds."
+
+!!! tip "Combine with"
+    - Pattern 26 (add spatial distribution across monitoring sites)
+    - Pattern 5 (use degradation to model sensor calibration drift)
+    - Pattern 36 (add chaos for instrument failures)
 
 ---
 
@@ -760,6 +792,22 @@ pipelines:
     - **DIF optimization experiment** - Run the simulation multiple times with different night setpoints (16, 17, 18, 19, 20 C) and compare the resulting temperature profiles and VPD patterns. Which DIF gives the best VPD management while still providing meaningful temperature differential? This is a real optimization problem that greenhouse researchers study using exactly this kind of simulation-before-experiment approach.
 
 > 📖 **Learn more:** [Stateful Functions](../stateful_functions.md) — `pid()` for closed-loop control | [Process Simulation](../process_simulation.md) — PID tuning
+
+!!! example "Content extraction"
+    **Core insight:** PID control with mean_reversion_to creates a closed-loop environmental control system - the vent position responds to temperature error, and temperature responds to vent position. This is how real greenhouse automation works.
+
+    **Real-world problem:** AgTech engineers need environmental control test data for greenhouse automation development and crop modeling platforms.
+
+    **Why it matters:** A greenhouse simulation without feedback control produces unrealistic temperature profiles. Real greenhouses maintain setpoints through active control - vents, heaters, shade cloths.
+
+    **Hook:** "A greenhouse PID controller in YAML. Vent position responds to temperature. Temperature responds to vent position. That's a real control loop."
+
+    **YouTube angle:** "Greenhouse automation simulation: PID control, dynamic setpoints, solar gain, and growing degree day calculations."
+
+!!! tip "Combine with"
+    - Pattern 11 (CSTR PID for a more complex control example)
+    - Pattern 26 (add external weather that drives the greenhouse thermal load)
+    - Pattern 7 (incremental mode for continuous crop monitoring)
 
 ---
 

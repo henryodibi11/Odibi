@@ -239,6 +239,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Boolean generator
 
+!!! example "Content extraction"
+    **Core insight:** The boolean generator models binary states like cloud cover. Combined with derived expressions, it creates realistic weather-dependent power output where generation drops during cloudy periods.
+
+    **Real-world problem:** Renewable energy developers need irradiance and generation test data for site analysis, grid planning, and inverter sizing studies.
+
+    **Why it matters:** Solar generation data without cloud transients is unrealistically smooth. Grid planners need to see the variability to size storage correctly.
+
+    **Hook:** "Solar panels don't produce constant power. Clouds happen. Here's how to simulate weather-dependent generation in YAML."
+
+    **YouTube angle:** "Simulating solar farm output: irradiance, cloud cover, panel degradation, and inverter efficiency from a single YAML config."
+
+!!! tip "Combine with"
+    - Pattern 18 (pair solar generation with battery storage)
+    - Pattern 26 (add realistic weather data)
+    - Pattern 7 (incremental mode for continuous generation tracking)
+
 ---
 
 ## Pattern 17: Wind Turbine Fleet {#pattern-17}
@@ -483,6 +499,22 @@ pipelines:
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Entity overrides | [Generators Reference](../generators.md) — Geo generator
 
+!!! example "Content extraction"
+    **Core insight:** Entity overrides at scale give each turbine in a fleet different performance characteristics - hub height effects, site-specific wind patterns, maintenance history. One config, realistic fleet-level variation.
+
+    **Real-world problem:** Wind farm operators need fleet-level performance data that reflects turbine-to-turbine variation for availability analysis and O&M planning.
+
+    **Why it matters:** If every turbine in your test fleet produces identical output, your fleet analytics won't detect underperforming turbines or identify site-specific issues.
+
+    **Hook:** "Every wind turbine in a fleet performs differently. Entity overrides model that variation from one YAML config."
+
+    **YouTube angle:** "Wind farm fleet simulation: geo positioning, per-turbine overrides, and power curve modeling with random_walk."
+
+!!! tip "Combine with"
+    - Pattern 16 (combine wind and solar for hybrid renewable analysis)
+    - Pattern 5 (add blade degradation with trend)
+    - Pattern 26 (add correlated weather conditions)
+
 ---
 
 ## Pattern 18: Battery Energy Storage System (BESS) {#pattern-18}
@@ -696,6 +728,22 @@ pipelines:
 
 > 📖 **Learn more:** [Stateful Functions](../stateful_functions.md) — `prev()` for integration patterns
 
+!!! example "Content extraction"
+    **Core insight:** prev() implements Coulomb counting - integrating charge/discharge current over time to track state of charge. This is the fundamental algorithm used in real battery management systems.
+
+    **Real-world problem:** Energy storage developers need SoC test data for dispatch optimization, degradation modeling, and grid services qualification.
+
+    **Why it matters:** Battery analytics depends on accurate SoC tracking. If your test data doesn't integrate current over time, your dispatch model will overcharge or overdischarge the battery.
+
+    **Hook:** "State of charge is just Coulomb counting - integrating current over time. prev() does exactly that."
+
+    **YouTube angle:** "Battery storage simulation: Coulomb counting, state of charge integration, and thermal modeling using prev() in YAML."
+
+!!! tip "Combine with"
+    - Pattern 16 (pair storage with solar generation)
+    - Pattern 11 (add PID control for thermal management)
+    - Pattern 7 (incremental mode for long-term SoC tracking)
+
 ---
 
 ## Pattern 19: Smart Meter Network {#pattern-19}
@@ -886,6 +934,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — IPv4 generator and subnet notation
 
+!!! example "Content extraction"
+    **Core insight:** High entity counts (50-100+) with the ipv4 generator simulate large-scale utility networks. The simulation scales linearly - same YAML, different entity count.
+
+    **Real-world problem:** Utility data engineers need realistic AMI (advanced metering infrastructure) test data for MDM system testing and rate analysis.
+
+    **Why it matters:** Utility data platforms must handle thousands of meters reporting simultaneously. Testing with 5 meters doesn't reveal the data management challenges of 50,000.
+
+    **Hook:** "50 smart meters, each with a unique IP address and consumption profile. Scale to 5,000 by changing one number."
+
+    **YouTube angle:** "Simulating a smart meter network: ipv4 generator, high entity counts, and utility consumption patterns."
+
+!!! tip "Combine with"
+    - Pattern 6 (scale to thousands of meters for load testing)
+    - Pattern 3 (add sensor dropouts with null_rate)
+    - Pattern 7 (incremental mode for daily meter reads)
+
 ---
 
 ## Pattern 20: EV Charging Stations {#pattern-20}
@@ -1069,6 +1133,22 @@ pipelines:
     - **Fast vs slow revenue comparison** - Calculate total energy and revenue per charger type. DC fast chargers deliver more energy per session but have higher hardware and demand charge costs. AC Level 2 chargers are cheaper to install but generate less revenue per hour. This analysis drives the charger mix decision for new sites.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — UUID generator (v4 vs v5) and email generator
+
+!!! example "Content extraction"
+    **Core insight:** UUID v5 creates deterministic identifiers - same input always produces the same ID. This is how real charging networks assign station IDs (deterministic from location + provider).
+
+    **Real-world problem:** EV charging network operators need session-level test data for utilization analysis, pricing optimization, and grid impact studies.
+
+    **Why it matters:** Random UUIDs break reproducibility. Deterministic UUIDs mean the same station always has the same ID across pipeline runs - essential for SCD2 and merge patterns.
+
+    **Hook:** "Deterministic UUIDs mean station ABC123 is always ABC123 - across runs, across environments. That's how real charging networks work."
+
+    **YouTube angle:** "EV charging station simulation: deterministic UUIDs, session modeling, and geographic positioning with the geo generator."
+
+!!! tip "Combine with"
+    - Pattern 18 (pair charging load with battery storage)
+    - Pattern 35 (multi-leg logistics tracking)
+    - Pattern 4 (incremental mode for continuous session logging)
 
 ---
 

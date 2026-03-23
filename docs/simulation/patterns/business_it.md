@@ -180,6 +180,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Categorical generator with weights
 
+!!! example "Content extraction"
+    **Core insight:** Weighted categoricals model the Pareto distribution in retail - a small number of SKUs drive most sales volume. Combined with derived expressions for tax and totals, this simulates real register logic.
+
+    **Real-world problem:** Retail analysts need transaction test data for basket analysis, category management, and revenue forecasting. Clean, uniform data misses the skew that drives real business decisions.
+
+    **Why it matters:** If every SKU sells equally in your test data, your category management insights are wrong. The 80/20 rule matters and weighted categoricals capture it.
+
+    **Hook:** "Milk outsells organic quinoa 10-to-1. Weighted categoricals model that. Your test data should too."
+
+    **YouTube angle:** "Retail POS simulation: Pareto product mix, derived tax calculations, and loyalty segmentation in YAML."
+
+!!! tip "Combine with"
+    - Pattern 1 (full medallion architecture for a retail pipeline)
+    - Pattern 4 (add incremental mode for continuous transaction logging)
+    - Pattern 23 (pair with inventory to model stock impact)
+
 ---
 
 ## Pattern 32: Call Center / Ticket Queue {#pattern-32}
@@ -385,6 +401,22 @@ pipelines:
     - **CSAT correlation** - Plot satisfaction scores against wait time. At what wait time does CSAT drop below 3.0? That threshold defines your maximum acceptable queue depth.
 
 > 📖 **Learn more:** [Stateful Functions](../stateful_functions.md) — `prev()` for accumulation
+
+!!! example "Content extraction"
+    **Core insight:** prev() tracks queue depth as a running balance - tickets arrive and resolve, and the queue accumulates the difference. This is the same integration pattern used for tank levels, just in a business context.
+
+    **Real-world problem:** Customer service managers need queue simulation data for staffing models, SLA analysis, and service level optimization.
+
+    **Why it matters:** Queue analytics that doesn't model accumulation can't predict when the queue will overflow. Peak hour staffing depends on understanding how queues build and drain.
+
+    **Hook:** "A ticket queue is a tank. Tickets flow in, agents drain them out, and prev() tracks how deep the queue is."
+
+    **YouTube angle:** "Queue dynamics simulation: using prev() for running queue depth, with arrival rates and resolution modeling."
+
+!!! tip "Combine with"
+    - Pattern 15 (tank farm uses the same accumulation pattern)
+    - Pattern 7 (incremental mode for continuous SLA monitoring)
+    - Pattern 2 (entity overrides for different service tiers)
 
 ---
 
@@ -601,6 +633,22 @@ pipelines:
     - **Anomaly detection training** - Use the normal operating hours (00:00-08:00) as training data, then test your model against the degradation hours (08:00-24:00). Can it catch the leak before the threshold-based alert does?
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — IPv4 and email generators
+
+!!! example "Content extraction"
+    **Core insight:** Combining ipv4 and email generators with random_walk CPU/memory metrics creates realistic server monitoring data. Each server has a unique IP, alert email, and independent performance profile.
+
+    **Real-world problem:** DevOps teams need monitoring test data for alerting rule development, capacity planning dashboards, and incident response training.
+
+    **Why it matters:** Monitoring systems tested on flat, uniform data won't detect the gradual CPU creep or memory leak that precedes an outage. Random walks with mean reversion model both.
+
+    **Hook:** "Server metrics aren't random numbers. CPU creeps up, memory leaks slowly, disk fills gradually. Random walks model all three."
+
+    **YouTube angle:** "Server monitoring simulation: CPU walks, memory leaks, disk fill rates, and alert thresholds from YAML."
+
+!!! tip "Combine with"
+    - Pattern 5 (add degradation trends for memory leaks)
+    - Pattern 36 (add chaos for monitoring data quality testing)
+    - Pattern 3 (add null_rate for agent dropout)
 
 ---
 
@@ -827,6 +875,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Range generator with normal distribution
 
+!!! example "Content extraction"
+    **Core insight:** API latency follows a log-normal distribution - most requests are fast, but a long tail of slow requests exists. Combined with categorical error rates, this models real API behavior.
+
+    **Real-world problem:** SaaS engineers need API performance test data for SLO definition, percentile analysis, and capacity planning.
+
+    **Why it matters:** Mean latency is a useless metric. p95 and p99 latencies drive SLO compliance. If your test data is normally distributed, your percentile calculations are wrong.
+
+    **Hook:** "Mean latency is 50ms. p99 is 800ms. If your test data doesn't show that gap, your SLOs are untested."
+
+    **YouTube angle:** "API performance simulation: latency distributions, error rates, and SLO testing with simulated traffic logs."
+
+!!! tip "Combine with"
+    - Pattern 33 (pair API logs with server metrics for correlation)
+    - Pattern 6 (scale to high request volumes for load testing)
+    - Pattern 36 (add chaos for data pipeline stress testing)
+
 ---
 
 ## Pattern 35: Supply Chain Shipments {#pattern-35}
@@ -1048,6 +1112,22 @@ pipelines:
     - **GPS route visualization** - Plot the `location` coordinates on a map. Each leg should cluster in its geographic area. Outliers (chaos-injected GPS glitches) will appear as points far outside the bounding box - exactly the kind of data quality issue a real logistics team needs to filter.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Geo generator and UUID generator | [Advanced Features](../advanced_features.md) — Entity overrides
+
+!!! example "Content extraction"
+    **Core insight:** Combining geo, uuid, and categorical generators creates multi-leg shipment tracking with geographic positioning and status transitions. Each shipment has a unique ID, origin/destination coordinates, and a status progression.
+
+    **Real-world problem:** Supply chain analysts need shipment tracking test data for visibility platforms, transit time analysis, and exception management dashboards.
+
+    **Why it matters:** Supply chain analytics depends on tracking items through multiple legs. Single-leg test data can't test the logic that detects delays, reroutes, or lost shipments.
+
+    **Hook:** "A shipment is a journey with multiple legs. Each leg has a location, a status, and a timestamp. Simulate the full journey."
+
+    **YouTube angle:** "Supply chain simulation: multi-leg tracking with geo coordinates, UUID shipment IDs, and status transitions."
+
+!!! tip "Combine with"
+    - Pattern 20 (EV charging uses similar geo + UUID patterns)
+    - Pattern 8 (cross-entity refs for multi-system logistics)
+    - Pattern 4 (incremental mode for continuous shipment updates)
 
 ---
 

@@ -172,6 +172,22 @@ pipelines:
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Chaos configuration | [Validation Tests](../../validation/tests.md) — Quarantine mode for bad data
 
+!!! example "Content extraction"
+    **Core insight:** Your pipeline works great on clean data - of course it does, you built it with clean data. Chaos engineering with aggressive outlier and duplicate rates is your crash test dummy. If your dedup logic survives 5% outliers, it survives the 0.5% you'll see in production.
+
+    **Real-world problem:** Data engineers find out their pipeline can't handle messy data at 2 AM when the dashboard goes blank. Testing with clean data is testing nothing.
+
+    **Why it matters:** Every real data source produces duplicates (network retransmits), outliers (sensor faults), and late arrivals (batch delivery). If your pipeline has never seen these, it's not production-ready.
+
+    **Hook:** "Your pipeline works on clean data. Congratulations. Now test it on the messy data production will actually send you."
+
+    **YouTube angle:** "Chaos engineering for data pipelines: generate messy data on purpose and watch your validation rules either catch it or fail."
+
+!!! tip "Combine with"
+    - Pattern 1 (build the full medallion pipeline, then chaos-test it)
+    - Pattern 21 (add SPC validation to detect outliers)
+    - Pattern 3 (pair with IoT patterns for realistic sensor data quality)
+
 ---
 
 ## Pattern 37: Schema Evolution Test {#pattern-37}
@@ -415,6 +431,22 @@ pipelines:
     - **Schema diff dashboard** - Compare bronze and silver schemas across pipeline runs. Did new columns appear in bronze? Did silver output change shape? This is the operational view that tells you when schema evolution is happening before it causes a problem.
 
 > 📖 **Learn more:** [Validation Tests](../../validation/tests.md) — Validation modes and quarantine | [Core Concepts](../core_concepts.md) — Multi-node pipelines
+
+!!! example "Content extraction"
+    **Core insight:** Simulation followed by transform followed by validation tests your pipeline's ability to handle structural changes - new columns, changed types, renamed fields. This is the meta-pattern: test the platform, not the domain.
+
+    **Real-world problem:** Schema changes break pipelines silently. A new column from upstream passes bronze, corrupts silver, and produces wrong gold aggregations. You find out when the CEO asks why the dashboard is wrong.
+
+    **Why it matters:** Schema evolution is the #1 cause of silent pipeline failures. If your pipeline doesn't validate schema at each layer, a single column rename upstream can corrupt everything downstream.
+
+    **Hook:** "Schema changes break pipelines silently. This pattern generates the schema change before it happens so you can test your defense."
+
+    **YouTube angle:** "Schema evolution testing: simulate structural data changes and validate your pipeline handles them correctly."
+
+!!! tip "Combine with"
+    - Pattern 1 (test schema evolution across the full medallion architecture)
+    - Pattern 36 (combine schema changes with data quality issues for maximum stress)
+    - Pattern 6 (test schema evolution at scale)
 
 ---
 
@@ -732,6 +764,22 @@ pipelines:
     - **Data freshness monitoring** - Track the latest timestamp from each source. If SCADA stops updating but ERP and MES continue, your silver-layer join will produce rows with stale SCADA data. Build an alert that fires when any source falls behind by more than 2x its expected cadence.
 
 > 📖 **Learn more:** [Core Concepts](../core_concepts.md) — Multi-node pipelines and data flow | [Validation Tests](../../validation/tests.md) — Testing merged data quality
+
+!!! example "Content extraction"
+    **Core insight:** Multiple simulation nodes feeding into a single silver transform tests the hardest data engineering problem: merging data from different sources with different schemas, different cadences, and different quality levels.
+
+    **Real-world problem:** Data platforms merge data from ERP, MES, SCADA, and manual entry systems. Each source has different column names, update frequencies, and reliability. Testing this merge logic requires realistic multi-source data.
+
+    **Why it matters:** A multi-source merge tested against one source is untested. Real merges fail on column mismatches, duplicate keys from different sources, and timing misalignments between feeds.
+
+    **Hook:** "Three sources, three schemas, one silver table. If your merge logic works on this simulation, it'll work on the real thing."
+
+    **YouTube angle:** "Multi-source bronze merge: simulate three different data sources and merge them into a unified silver layer."
+
+!!! tip "Combine with"
+    - Pattern 8 (cross-entity references between the merged sources)
+    - Pattern 36 (add chaos to each source independently)
+    - Pattern 37 (test what happens when one source changes its schema)
 
 ---
 

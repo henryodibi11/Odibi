@@ -188,6 +188,22 @@ pipelines:
 
 > 📖 **Learn more:** [Getting Started](../getting_started.md) — Build your first simulation in 5 minutes | [Core Concepts](../core_concepts.md) — How scope, entities, and columns work together
 
+!!! example "Content extraction"
+    **Core insight:** Simulation decouples pipeline development from data availability. You build, test, and validate the full pipeline before the real source exists.
+
+    **Real-world problem:** Data engineers wait weeks for IT to provision connections. Pipeline development stalls while upstream systems are being built.
+
+    **Why it matters:** If you build against hand-crafted mock CSVs, you're testing against data that doesn't behave like the real thing. Production surprises follow.
+
+    **Hook:** "Most data engineers wait for the data. I build the pipeline first and generate the data myself."
+
+    **YouTube angle:** 5-minute demo: build a full bronze-silver-gold pipeline with no data source. Then swap one line and go live.
+
+!!! tip "Combine with"
+    - **Pattern 36** - Add chaos to test your validation rules
+    - **Pattern 4** - Add incremental mode for continuous feeds
+    - **Pattern 6** - Scale to millions of rows for load testing
+
 ---
 
 ## Pattern 2: Manufacturing Production Line {#pattern-2}
@@ -379,6 +395,22 @@ pipelines:
     - **Shift reporting** - Aggregate units_produced and defect_count by machine and hour to build the shift summary report your floor supervisors need.
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Deep dive on entity overrides, scheduled events, and chaos configuration
+
+!!! example "Content extraction"
+    **Core insight:** Entity overrides let you model behavioral variation - old machines run hotter, break more, and produce differently from new ones. One config, multiple behaviors.
+
+    **Real-world problem:** Manufacturing engineers need test data for MES dashboards, but every machine on the floor behaves differently. Uniform test data misses the variation that matters.
+
+    **Why it matters:** If your anomaly detection trains on uniform data, it won't recognize that machine_03's higher temperature is normal for that asset - it'll flag every reading.
+
+    **Hook:** "Five machines, one YAML config. Each one behaves differently - just like a real production floor."
+
+    **YouTube angle:** How to simulate a production line where the old machine runs hot and breaks down more - entity overrides explained.
+
+!!! tip "Combine with"
+    - **Pattern 21** - Add SPC validation to catch quality issues
+    - **Pattern 5** - Add degradation trends to simulate aging
+    - **Pattern 22** - Add downtime events for maintenance modeling
 
 ---
 
@@ -582,6 +614,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — All `random_walk` parameters including `mean_reversion` | [Advanced Features](../advanced_features.md) — Scheduled events and chaos config
 
+!!! example "Content extraction"
+    **Core insight:** Real sensor networks have gaps, noise, and drift. The combination of random_walk (for autocorrelation), null_rate (for dropouts), and chaos (for spikes) produces data that passes the squint test.
+
+    **Real-world problem:** IoT platform engineers need realistic test data for alerting and dashboard development. Clean, uniform data doesn't trigger the edge cases that matter.
+
+    **Why it matters:** If your gap-filling logic has never seen a 2-hour sensor dropout, the first real outage will produce dashboard gaps nobody planned for.
+
+    **Hook:** "Real sensors drift, spike, and go offline. If your test data doesn't, your pipeline isn't tested."
+
+    **YouTube angle:** Building a realistic IoT sensor network in YAML: random walks, null injection, and scheduled downtime.
+
+!!! tip "Combine with"
+    - **Pattern 26** - Add geographic positioning with the geo generator
+    - **Pattern 7** - Add incremental mode for continuous monitoring
+    - **Pattern 36** - Stress test with aggressive chaos settings
+
 ---
 
 ## Pattern 4: Order / Transaction Data {#pattern-4}
@@ -734,6 +782,22 @@ pipelines:
     - **Order tier analysis** - What percentage of revenue comes from platinum-tier orders? Use this to justify loyalty programs or premium shipping options.
 
 > 📖 **Learn more:** [Incremental Mode](../incremental.md) — How stateful simulation uses the system catalog to track progress between runs
+
+!!! example "Content extraction"
+    **Core insight:** Incremental mode with stateful persistence turns a one-shot generator into a continuous data feed. Each run produces new data that starts where the last run ended.
+
+    **Real-world problem:** Analytics teams need continuous demo data for dashboards, but static datasets don't show time-based patterns or test append logic.
+
+    **Why it matters:** Without incremental mode, each pipeline run regenerates the same data. Your dashboard shows the same day forever instead of accumulating history.
+
+    **Hook:** "My simulation remembers where it left off. Run it daily and it looks like a live transaction stream."
+
+    **YouTube angle:** How to build a live-updating dashboard demo with synthetic data - incremental simulation explained.
+
+!!! tip "Combine with"
+    - **Pattern 7** - Full dashboard feed with Delta Lake append
+    - **Pattern 31** - Add retail-specific product mix
+    - **Pattern 1** - The full medallion swap pattern
 
 ---
 
@@ -925,6 +989,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — `random_walk` parameters including `trend` and `mean_reversion_to`
 
+!!! example "Content extraction"
+    **Core insight:** The trend parameter models slow, persistent drift - fouling, wear, calibration loss. Combined with mean_reversion_to, you get a process variable that chases a degrading target.
+
+    **Real-world problem:** Predictive maintenance teams need training data that shows progressive failure. Point-in-time snapshots don't capture the degradation trajectory.
+
+    **Why it matters:** If your ML model has never seen gradual degradation, it can't distinguish normal variation from the slow decline that precedes equipment failure.
+
+    **Hook:** "Equipment doesn't fail suddenly. It degrades. Here's how to simulate the slow decline from YAML."
+
+    **YouTube angle:** Predictive maintenance data from YAML: simulating equipment degradation with trend and mean_reversion_to.
+
+!!! tip "Combine with"
+    - **Pattern 2** - Add entity overrides for machines aging at different rates
+    - **Pattern 22** - Add downtime events when degradation hits thresholds
+    - **Pattern 14** - Add scheduled cleaning cycles
+
 ---
 
 ## Pattern 6: Stress Test at Scale {#pattern-6}
@@ -1038,6 +1118,22 @@ pipelines:
     - **Incremental append testing** - Run 10 times with `mode: append` and measure how write time changes as the file grows
 
 > 📖 **Learn more:** [Core Concepts](../core_concepts.md) — How `scope` controls data volume
+
+!!! example "Content extraction"
+    **Core insight:** Simulation scales linearly: 100 entities x 10,000 rows = 1 million rows from the same YAML config. This tests your pipeline, Delta Lake compaction, and Spark performance.
+
+    **Real-world problem:** Data platform engineers need to validate performance before production data arrives. You can't wait for a million real records to find out your partition strategy is wrong.
+
+    **Why it matters:** If you've only tested with 1,000 rows, the first million-row production batch will reveal performance problems you could have caught in simulation.
+
+    **Hook:** "One million rows from one YAML config. That's your load test - no production data required."
+
+    **YouTube angle:** Stress testing Delta Lake with synthetic data: generate 10 million rows and test compaction, Z-ordering, and query performance.
+
+!!! tip "Combine with"
+    - **Pattern 7** - Add incremental mode for continuous stress testing
+    - **Pattern 38** - Add multi-source merge for platform testing
+    - **Pattern 1** - Verify the full medallion pipeline at scale
 
 ---
 
@@ -1183,6 +1279,22 @@ pipelines:
     - **Stakeholder demo** - Show leadership a working dashboard with realistic data while you wait for IT to provision production data access
 
 > 📖 **Learn more:** [Incremental Mode](../incremental.md) — How the system catalog tracks high-water marks between runs
+
+!!! example "Content extraction"
+    **Core insight:** Incremental simulation with Delta Lake append creates a continuously updating data source that's indistinguishable from a real feed to everything downstream.
+
+    **Real-world problem:** Demo dashboards go stale after the first meeting. Stakeholders want to see live-updating data, but real sources aren't available yet.
+
+    **Why it matters:** A static demo loses credibility the moment someone asks "is this updating?" Incremental mode means the answer is always yes.
+
+    **Hook:** "Schedule this YAML pipeline daily. Your dashboard updates automatically. Nobody knows the data is synthetic."
+
+    **YouTube angle:** How to build a live demo dashboard with no real data source - scheduled YAML pipeline with incremental mode.
+
+!!! tip "Combine with"
+    - **Pattern 4** - Add transactional data alongside KPIs
+    - **Pattern 1** - The full medallion architecture
+    - **Pattern 6** - Scale to production volumes
 
 ---
 
@@ -1357,6 +1469,22 @@ pipelines:
     - **Data loss auditing** - Compare total records produced vs. stored to quantify pipeline loss rate over time
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Cross-entity references and entity generation order | [Stateful Functions](../stateful_functions.md) — `prev()` for accumulation patterns
+
+!!! example "Content extraction"
+    **Core insight:** Cross-entity references model real-world dependencies where downstream systems consume upstream outputs. The dependency DAG is resolved automatically.
+
+    **Real-world problem:** Integration test data is usually created manually with spreadsheets. It doesn't reflect the actual dependencies between systems.
+
+    **Why it matters:** If System B's test data doesn't depend on System A's output, you're not testing integration - you're testing two isolated systems.
+
+    **Hook:** "Three systems, each depending on the one before it. One YAML config. The dependency graph resolves itself."
+
+    **YouTube angle:** Multi-system integration testing with synthetic data: cross-entity references and dependency DAGs explained.
+
+!!! tip "Combine with"
+    - **Pattern 9** - A more complex cascade with 5 treatment stages
+    - **Pattern 25** - Cross-station flow in manufacturing
+    - **Pattern 36** - Add chaos to test failure propagation
 
 ---
 

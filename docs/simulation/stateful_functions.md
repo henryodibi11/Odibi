@@ -1,6 +1,9 @@
 # Stateful Functions Reference
 
-**Complete reference for `prev()`, `ema()`, and `pid()` — the three stateful functions available in `derived` generator expressions.**
+**Complete reference for `prev()`, `ema()`, and `pid()` - the three stateful functions available in `derived` generator expressions.**
+
+!!! example "Why this matters"
+    Three functions turn a row-by-row data generator into a dynamic system simulator. `prev()` gives you memory (tanks fill up, inventories accumulate). `ema()` gives you smoothing (noisy sensors become clean signals). `pid()` gives you feedback control (outputs adjust to hit targets). Without these, you get snapshots. With them, you get time series that behave like real processes - and they persist state across pipeline runs.
 
 ---
 

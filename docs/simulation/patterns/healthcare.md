@@ -263,6 +263,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — Random walk with mean_reversion_to and trend parameters
 
+!!! example "Content extraction"
+    **Core insight:** High-frequency simulation (1-second to 1-minute intervals) models the continuous monitoring that ICU patients receive. Random walks with tight mean reversion simulate the physiological regulation that keeps vitals within normal ranges.
+
+    **Real-world problem:** Health informatics teams need realistic patient monitoring test data for clinical decision support systems, alarm fatigue research, and EHR integration testing. Real patient data is HIPAA-protected and extremely difficult to obtain.
+
+    **Why it matters:** Clinical alarm systems trained on unrealistic data produce either alarm fatigue (too many false alarms) or missed events (thresholds too loose). Simulation lets you tune alarm logic without patient risk.
+
+    **Hook:** "ICU monitoring data without HIPAA concerns. Heart rate, SpO2, blood pressure - all physiologically realistic, all from YAML."
+
+    **YouTube angle:** "Simulating ICU patient vitals: physiological random walks, alarm thresholds, and clinical decision support testing."
+
+!!! tip "Combine with"
+    - Pattern 3 (add sensor dropouts for monitoring equipment failures)
+    - Pattern 36 (add chaos for artifact detection testing)
+    - Pattern 21 (add validation rules for physiological range checks)
+
 ---
 
 ## Pattern 30: Pharmaceutical Batch Records {#pattern-30}
@@ -525,6 +541,22 @@ pipelines:
     - **Process capability analysis** - Calculate Cp and Cpk for temperature and pH against their specification limits. A Cpk > 1.33 means your process is well-controlled. Below 1.0 and you're routinely hitting spec limits - a red flag for regulators during inspections.
 
 > 📖 **Learn more:** [Stateful Functions](../stateful_functions.md) — `prev()` for growth curves | [Advanced Features](../advanced_features.md) — Scheduled events for recipe phases
+
+!!! example "Content extraction"
+    **Core insight:** Sequential batch IDs with scheduled recipe phases model the structured, auditable batch manufacturing process required by FDA 21 CFR Part 11. Each batch follows the same recipe but with natural process variation.
+
+    **Real-world problem:** Pharmaceutical manufacturers need batch record test data for MES validation, batch review systems, and regulatory inspection preparation. Real batch data is proprietary and GMP-controlled.
+
+    **Why it matters:** Pharma batch analytics must detect deviation from recipe parameters. If your test data is perfectly on-target, your deviation detection is untested. The simulation adds realistic variation within spec.
+
+    **Hook:** "FDA-style batch records from YAML. Sequential batch IDs, recipe phases, and process variation within GMP limits."
+
+    **YouTube angle:** "Pharmaceutical batch simulation: recipe phases, sequential IDs, and process variation for GMP compliance testing."
+
+!!! tip "Combine with"
+    - Pattern 14 (batch reactor with scheduled setpoint changes)
+    - Pattern 21 (SPC validation on critical quality attributes)
+    - Pattern 11 (add PID control for reactor temperature within each batch phase)
 
 ---
 

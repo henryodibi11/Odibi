@@ -137,6 +137,20 @@ odibi run my_first_simulation.yaml
 
 You'll see output confirming **100 rows** written to `./data/bronze/sensors.parquet`.
 
+**Here's what your data looks like:**
+
+| sensor_id | timestamp | temperature |
+|-----------|-----------|-------------|
+| sensor_01 | 2026-01-01 00:00:00 | 27.3 |
+| sensor_01 | 2026-01-01 00:05:00 | 22.8 |
+| sensor_01 | 2026-01-01 00:10:00 | 31.1 |
+| sensor_01 | 2026-01-01 00:15:00 | 24.6 |
+| sensor_01 | 2026-01-01 00:20:00 | 29.4 |
+| ... | ... | ... |
+| sensor_01 | 2026-01-01 08:15:00 | 33.2 |
+
+100 rows of realistic sensor data - from 20 lines of YAML. No Python, no Faker, no hand-crafted CSV. The same config works on Pandas, Spark, and Polars.
+
 !!! tip "connection: null"
     Simulation doesn't read from any external source, so `connection: null` is all you need. No connection definition required for the read side.
 

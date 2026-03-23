@@ -1,8 +1,11 @@
 # Simulation
 
-**Generate realistic synthetic data for any domain — manufacturing, operations, IoT, process control, business — directly in your pipeline YAML. No code needed.**
+**Generate realistic synthetic data for any domain - manufacturing, operations, IoT, process control, business - directly in your pipeline YAML. No code needed.**
 
-Simulation is Odibi's built-in data generator. Define what you need in YAML, and the framework produces time-series, categorical, relational, and process data that behaves like the real thing. Swap to real sources later — your downstream pipeline stays unchanged.
+Simulation is Odibi's built-in data generator. Define what you need in YAML, and the framework produces time-series, categorical, relational, and process data that behaves like the real thing. Swap to real sources later - your downstream pipeline stays unchanged.
+
+!!! info "Who built this"
+    Odibi was built by a chemical engineer turned data engineer - the only DE on an analytics team in operations, not IT. Simulation exists because I needed realistic process data and couldn't wait for IT to provision it. I know what a PID controller is, what a material balance looks like, and what happens when your test data doesn't behave like the real thing. Every pattern in this library comes from a real problem I've solved. The unique angle: this isn't just a data tool. It's an engineering tool built by someone who understands both sides.
 
 ```yaml title="A taste of simulation"
 read:
@@ -41,8 +44,9 @@ Work through the simulation docs in order, or jump to what you need:
 
 | Page | What You'll Learn |
 |---|---|
+| :material-star: [Why Odibi Simulation](positioning.md) | What makes this different and why it matters |
 | :material-rocket-launch: [Getting Started](getting_started.md) | Your first simulation in 5 minutes |
-| :material-book-open-variant: [Core Concepts](core_concepts.md) | Scope, entities, and columns — the three building blocks |
+| :material-book-open-variant: [Core Concepts](core_concepts.md) | Scope, entities, and columns - the three building blocks |
 | :material-format-list-bulleted-type: [Generators Reference](generators.md) | All 12 generator types with parameters and examples |
 | :material-function-variant: [Stateful Functions](stateful_functions.md) | `prev()`, `ema()`, `pid()` — history-dependent values |
 | :material-puzzle: [Advanced Features](advanced_features.md) | Cross-entity references, overrides, scheduled events, chaos |

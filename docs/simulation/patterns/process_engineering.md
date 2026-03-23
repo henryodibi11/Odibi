@@ -260,6 +260,22 @@ pipelines:
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) - Cross-entity references and how entity generation order determines data availability
 
+!!! example "Content extraction"
+    **Core insight:** A treatment plant is a cascade - each stage depends on the previous stage's output. Cross-entity references enforce physical constraints automatically: effluent can't be dirtier than influent.
+
+    **Real-world problem:** Environmental engineers need test data for SCADA dashboards and permit compliance reports. Real plant data is regulated and hard to share.
+
+    **Why it matters:** A simulation that doesn't model the cascade produces physically impossible data - flows that increase downstream, concentrations that rise after treatment.
+
+    **Hook:** "I simulated a wastewater treatment plant in 80 lines of YAML. Five stages, realistic removal rates, and a storm event at 2 AM."
+
+    **YouTube angle:** "How a wastewater plant actually works - explained through a simulation config. Chemical engineer teaches environmental engineering AND data engineering."
+
+!!! tip "Combine with"
+    - **Pattern 8** - simpler cross-entity example to learn the syntax first
+    - **Pattern 36** - add chaos to test SCADA data quality
+    - **Pattern 7** - add incremental mode for continuous plant monitoring
+
 ---
 
 ## Pattern 10: Compressor Station Monitoring {#pattern-10}
@@ -491,6 +507,22 @@ pipelines:
     - **Anomaly detection with chaos outliers** - The 0.8% outlier rate creates realistic sensor noise. Build a model that distinguishes real process upsets (surge events, bearing degradation) from sensor artifacts (outliers). This is the hard problem in industrial data science - and having labeled "chaos" data lets you validate your approach.
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — `random_walk` shock parameters (`shock_rate`, `shock_magnitude`, `shock_bias`)
+
+!!! example "Content extraction"
+    **Core insight:** Shock events model real process upsets - pressure surges, seal failures, thermal events. The shock_rate/shock_magnitude/shock_bias parameters let you control frequency, severity, and direction.
+
+    **Real-world problem:** Operations engineers need alarm management test data that includes realistic process upsets, not just steady-state noise.
+
+    **Why it matters:** If your alarm system has never seen a realistic pressure surge followed by recovery, the first real upset will either flood operators with alarms or miss the event entirely.
+
+    **Hook:** "Pressure surges don't follow normal distributions. They're sudden, directional, and recoverable. Here's how to simulate them."
+
+    **YouTube angle:** "Simulating process upsets: shock events, directional bias, and alarm logic in a compressor station."
+
+!!! tip "Combine with"
+    - **Pattern 5** - add degradation trends for compressor fouling
+    - **Pattern 11** - add PID control for pressure regulation
+    - **Pattern 22** - add downtime events for maintenance windows
 
 ---
 
@@ -746,6 +778,22 @@ pipelines:
     - **Predictive maintenance model** - If you add a slow drift to the cooling effectiveness (multiply `cooling_pct * 0.3` by a decreasing factor over time to simulate fouling), you can train a model to detect when the cooling jacket needs cleaning before temperature control degrades.
 
 > 📖 **Learn more:** [Stateful Functions](../stateful_functions.md) — `pid()` parameters and anti-windup | [Process Simulation](../process_simulation.md) — PID control theory and tuning guidelines
+
+!!! example "Content extraction"
+    **Core insight:** pid() in YAML implements a real discrete PID controller with anti-windup. Negative gains for reverse-acting loops (cooling = more output lowers temperature) is exactly how industrial controllers work.
+
+    **Real-world problem:** Process control engineers need realistic closed-loop data for tuning studies and control system validation. Open-loop test data can't test controller behavior.
+
+    **Why it matters:** If your PID sign convention is wrong, the controller drives the process away from setpoint instead of toward it. This is the most common PID bug in simulation.
+
+    **Hook:** "I defined a PID controller in YAML. Negative gains for cooling. Anti-windup. It converges on setpoint - no Python required."
+
+    **YouTube angle:** "PID control explained through YAML: direct vs reverse acting, anti-windup, and why your gains need to be negative for cooling."
+
+!!! tip "Combine with"
+    - **Pattern 13** - add EMA smoothing before the PID input
+    - **Pattern 14** - add scheduled setpoint changes for batch operations
+    - **Pattern 28** - another PID example in a greenhouse context
 
 ---
 
@@ -1055,6 +1103,22 @@ pipelines:
 
 > 📖 **Learn more:** [Generators Reference](../generators.md) — `mean_reversion_to` for dynamic setpoint tracking | [Process Simulation](../process_simulation.md) — Energy balance examples
 
+!!! example "Content extraction"
+    **Core insight:** mean_reversion_to creates dynamic setpoint tracking - a process variable that follows a changing reference column rather than reverting to a static start value. This models real control system behavior.
+
+    **Real-world problem:** Distillation operators need training data that shows how column temperatures respond to feed changes and reflux adjustments.
+
+    **Why it matters:** Static setpoint simulation can't show the dynamic response to process changes. Real columns track changing conditions - simulation should too.
+
+    **Hook:** "mean_reversion_to lets a column temperature chase a changing setpoint. That's how real distillation control works."
+
+    **YouTube angle:** "Dynamic setpoint tracking in simulation: how mean_reversion_to models a distillation column following feed composition changes."
+
+!!! tip "Combine with"
+    - **Pattern 5** - add tray fouling with the trend parameter
+    - **Pattern 9** - connect to a downstream treatment system
+    - **Pattern 11** - add PID control for reflux ratio
+
 ---
 
 ## Pattern 13: Cooling Tower {#pattern-13}
@@ -1320,6 +1384,22 @@ pipelines:
 
 > 📖 **Learn more:** [Stateful Functions](../stateful_functions.md) — `ema()` parameters and how smoothing works
 
+!!! example "Content extraction"
+    **Core insight:** ema() filters noisy sensor readings into clean signals. In real plants, raw sensor data is always noisy - you need smoothing before it's useful for control or trending.
+
+    **Real-world problem:** Process engineers see noisy raw data in historians and need to understand what filtering was applied. Smooth test data doesn't teach them to recognize noise vs. signal.
+
+    **Why it matters:** If your dashboard shows raw sensor data without smoothing, operators will chase noise. If it shows only smoothed data, they'll miss real transients.
+
+    **Hook:** "Raw sensor data is always noisy. EMA smoothing separates the signal from the noise - and you can see both in the same simulation."
+
+    **YouTube angle:** "Signal vs noise: using EMA smoothing on simulated sensor data, with side-by-side raw and filtered plots."
+
+!!! tip "Combine with"
+    - **Pattern 11** - feed smoothed data into a PID controller
+    - **Pattern 26** - add EMA to weather station readings
+    - **Pattern 3** - add null_rate for sensor dropout alongside noise
+
 ---
 
 ## Pattern 14: Batch Reactor with Recipe {#pattern-14}
@@ -1562,6 +1642,22 @@ pipelines:
     - **Pressure-temperature correlation** - Plot `pressure_bar` vs. `reactor_temp_c` and verify the linear relationship above 60 degrees C. In a real reactor, deviations from this expected P-T curve could indicate a leak (pressure lower than expected), an unexpected side reaction producing extra gas (pressure higher than expected), or a blocked vent.
 
 > 📖 **Learn more:** [Advanced Features](../advanced_features.md) — Scheduled events with `forced_value` | [Process Simulation](../process_simulation.md) — First-order system dynamics
+
+!!! example "Content extraction"
+    **Core insight:** Scheduled events model recipe phases - setpoint changes, hold periods, ramp rates. This is exactly how real batch control systems (ISA-88) work.
+
+    **Real-world problem:** Pharma and specialty chemical engineers need batch record test data that shows phase transitions, not just steady-state operation.
+
+    **Why it matters:** Batch analytics depends on detecting phase boundaries. If your test data is one continuous steady state, your phase detection logic is untested.
+
+    **Hook:** "A batch recipe is a sequence of setpoint changes. Scheduled events model exactly that - ISA-88 in YAML."
+
+    **YouTube angle:** "Batch reactor simulation: recipe phases, setpoint changes, and hold periods - modeled with scheduled events."
+
+!!! tip "Combine with"
+    - **Pattern 30** - pharma batch records with sequential IDs
+    - **Pattern 11** - add PID control within each recipe phase
+    - **Pattern 5** - add degradation between cleaning cycles
 
 ---
 
@@ -1814,6 +1910,22 @@ pipelines:
     - **Temperature correction for custody transfer** - Apply API MPMS Chapter 11 temperature correction factors to convert observed volume (at tank temperature) to standard volume (at 60 degrees F). A tank reading 8,000 bbl at 90 degrees F actually contains less product at standard conditions than the same reading at 70 degrees F. This correction is legally required for commercial transactions.
 
 > 📖 **Learn more:** [Stateful Functions](../stateful_functions.md) — `prev()` for integration and accumulation patterns | [Process Simulation](../process_simulation.md) — Material balance theory and examples
+
+!!! example "Content extraction"
+    **Core insight:** prev() integrates flow rates into tank levels over time - the discrete approximation of a material balance. This is the fundamental building block of any inventory or accumulation system.
+
+    **Real-world problem:** Logistics and operations teams need realistic inventory data that shows filling, draining, and transfers. Snapshot data doesn't capture the dynamics.
+
+    **Why it matters:** If your inventory model doesn't integrate flows over time, it can't predict when a tank will be full or empty. Level alarms depend on the rate of change, not just the current level.
+
+    **Hook:** "prev() is just a material balance. What comes in minus what goes out equals what accumulates. Tank levels from first principles."
+
+    **YouTube angle:** "Material balance in YAML: tracking tank levels from inflow and outflow rates using prev() for state integration."
+
+!!! tip "Combine with"
+    - **Pattern 23** - warehouse inventory with receipts and issues
+    - **Pattern 8** - cross-entity references for tank-to-tank transfers
+    - **Pattern 7** - incremental mode for continuous inventory tracking
 
 ---
 

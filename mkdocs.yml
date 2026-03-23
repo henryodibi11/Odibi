@@ -87,6 +87,7 @@ nav:
   # ═════════════════════════════════════════════════════════════════
   - 🔬 Simulation:
       - Overview: simulation/index.md
+      - Why Odibi Simulation: simulation/positioning.md
       - Getting Started: simulation/getting_started.md
       - Core Concepts: simulation/core_concepts.md
       - Generators Reference: simulation/generators.md
