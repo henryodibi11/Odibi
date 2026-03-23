@@ -256,6 +256,9 @@ nav:
   # ═════════════════════════════════════════════════════════════════
   - 📊 Visuals:
       - Odibi in One Picture: visuals/odibi_architecture.md
+      - Run Lifecycle: visuals/run_lifecycle.md
+      - Fact Build Flow: visuals/fact_build_flow.md
+      - SCD2 Timeline: visuals/scd2_timeline.md
       - Incremental Decision Tree: visuals/incremental_decision_tree.md
 
   # ═════════════════════════════════════════════════════════════════
