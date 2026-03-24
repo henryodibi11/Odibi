@@ -595,7 +595,7 @@ pipelines:
                   data_type: int
                   generator:
                     type: derived
-                    expression: "round(450 + occupancy * 25 + random() * 20, 0)"
+                    expression: "None if occupancy is None else round(450 + occupancy * 25 + random() * 20, 0)"
 
               # sensor_15 battery died — no data after 14:00
               # When a sensor dies, ALL readings go NULL — not just some
@@ -871,7 +871,7 @@ pipelines:
                   data_type: int
                   generator:
                     type: derived
-                    expression: "round(450 + occupancy * 25 + random() * 20, 0)"
+                    expression: "None if occupancy is None else round(450 + occupancy * 25 + random() * 20, 0)"
 
                 # Step 3: HVAC fan speed — responds to raw CO2
                 # 20% minimum (always-on), ramps to 100% at high CO2
@@ -879,14 +879,14 @@ pipelines:
                   data_type: int
                   generator:
                     type: derived
-                    expression: "min(100, max(20, round((co2_raw_ppm - 450) / 5.5, 0)))"
+                    expression: "None if co2_raw_ppm is None else min(100, max(20, round((co2_raw_ppm - 450) / 5.5, 0)))"
 
                 # Step 4: Actual CO2 after HVAC dilution
                 - name: co2_ppm
                   data_type: int
                   generator:
                     type: derived
-                    expression: "max(420, round(co2_raw_ppm - (hvac_fan_pct * 0.8) + random() * 10, 0))"
+                    expression: "None if co2_raw_ppm is None or hvac_fan_pct is None else max(420, round(co2_raw_ppm - (hvac_fan_pct * 0.8) + random() * 10, 0))"
 
               # sensor_15 battery died — ALL readings go NULL
               scheduled_events:
