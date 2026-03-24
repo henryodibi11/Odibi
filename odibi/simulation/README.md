@@ -10,7 +10,7 @@ This module provides synthetic data generation capabilities for Odibi pipelines.
 SimulationEngine (generator.py)
 ├── Scope Management (time, rows, seed)
 ├── Entity Generation (domain-agnostic)
-├── Column Generators (11 types)
+├── Column Generators (13 types)
 │   ├── Range (uniform/normal)
 │   ├── Categorical (weighted choice)
 │   ├── Boolean (probability)
@@ -21,6 +21,7 @@ SimulationEngine (generator.py)
 │   ├── Email (pattern-based)
 │   ├── IPv4 (subnet-aware)
 │   ├── Geo (bounding box)
+│   ├── Daily Profile (time-of-day curves)
 │   └── Derived (calculated with dependencies)
 ├── Dependency Resolution (topological sort)
 ├── Chaos Application (outliers, duplicates, downtime)
@@ -56,8 +57,10 @@ SimulationEngine (generator.py)
 - `ColumnGeneratorConfig` - Column specification
 - `ChaosConfig` - Chaos parameters
 
-**Generator configs (11 types):**
+**Generator configs (13 types):**
 - RangeGeneratorConfig
+- RandomWalkGeneratorConfig
+- DailyProfileGeneratorConfig
 - CategoricalGeneratorConfig
 - BooleanGeneratorConfig
 - TimestampGeneratorConfig
@@ -141,7 +144,7 @@ rows2 = engine2.generate()  # Continues from max_ts
 
 **Coverage:**
 - Configuration validation
-- All 11 generators
+- All 13 generators
 - Determinism (including cross-process)
 - Dependency resolution
 - Circular dependencies
@@ -212,7 +215,6 @@ def test_my_generator():
 **Not supported (future):**
 - Variable timestep (event-driven)
 - Cross-entity foreign keys
-- Time-series patterns (seasonality, trends)
 - Batch/streaming for >10M rows (in Pandas)
 - Realistic PII (names, addresses, phone numbers)
 

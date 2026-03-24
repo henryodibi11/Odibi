@@ -1252,6 +1252,7 @@ class GeneratorType(str, Enum):
     TIMESTAMP = "timestamp"
     SEQUENTIAL = "sequential"
     CONSTANT = "constant"
+    DAILY_PROFILE = "daily_profile"
 
 
 class DistributionType(str, Enum):
@@ -1467,6 +1468,13 @@ class GeoGeneratorConfig(BaseModel):
         return self
 
 
+class InterpolationType(str, Enum):
+    """Interpolation methods for profile generators."""
+
+    LINEAR = "linear"
+    STEP = "step"
+
+
 class DerivedGeneratorConfig(BaseModel):
     """Derived column generator (calculated from other columns).
 
@@ -1493,6 +1501,118 @@ class DerivedGeneratorConfig(BaseModel):
     expression: str = Field(
         description="Python expression using other column names. Evaluated safely."
     )
+
+
+class DailyProfileGeneratorConfig(BaseModel):
+    """Daily profile generator for time-of-day patterns.
+
+    Produces values that follow a repeating daily curve defined by anchor points.
+    The engine interpolates between anchor points, adds noise, and clamps to
+    [min, max]. Ideal for simulating occupancy, energy demand, traffic, call
+    volume, or any metric with a predictable intraday shape.
+
+    Example (building occupancy):
+    ```yaml
+    type: daily_profile
+    min: 0
+    max: 25
+    precision: 0
+    noise: 1.5
+    interpolation: linear
+    profile:
+      "00:00": 1
+      "06:00": 3
+      "08:00": 19
+      "12:00": 15
+      "13:00": 22
+      "17:00": 14
+      "22:00": 2
+    ```
+
+    Example (network traffic with weekend scaling):
+    ```yaml
+    type: daily_profile
+    min: 0.0
+    max: 1000.0
+    noise: 50.0
+    interpolation: linear
+    weekend_scale: 0.3
+    profile:
+      "00:00": 50.0
+      "06:00": 100.0
+      "09:00": 800.0
+      "12:00": 650.0
+      "13:00": 750.0
+      "17:00": 900.0
+      "20:00": 400.0
+      "23:00": 100.0
+    ```
+    """
+
+    type: Literal["daily_profile"]
+    profile: Dict[str, float] = Field(
+        description=(
+            "Anchor points mapping time-of-day (HH:MM) to target values. "
+            "The engine interpolates between these points to produce a smooth daily curve."
+        )
+    )
+    min: float = Field(description="Hard lower bound (physical limit)")
+    max: float = Field(description="Hard upper bound (physical limit)")
+    noise: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Random noise amplitude (±noise added to interpolated value).",
+    )
+    interpolation: InterpolationType = Field(
+        default=InterpolationType.LINEAR,
+        description="Interpolation method between anchor points: linear or step.",
+    )
+    precision: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=10,
+        description="Round values to N decimal places. None = no rounding. 0 = integers.",
+    )
+    volatility: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Day-to-day variation in anchor point targets. Each day, every anchor "
+            "point is independently shifted by a random amount drawn from a normal "
+            "distribution (mean = profile value, std_dev = volatility). This makes "
+            "each day's curve slightly different while preserving the overall shape. "
+            "0.0 = identical curve every day. Higher values = more day-to-day variation."
+        ),
+    )
+    weekend_scale: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Scale factor for weekends (Saturday/Sunday). "
+            "0.0 = zero on weekends, 1.0 = same as weekday. "
+            "None = no weekend adjustment."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_daily_profile(self):
+        if self.min >= self.max:
+            raise ValueError(f"Daily profile min ({self.min}) must be less than max ({self.max})")
+        if not self.profile:
+            raise ValueError("Daily profile must have at least one anchor point")
+        for time_key, value in self.profile.items():
+            # Validate HH:MM format
+            try:
+                parts = time_key.split(":")
+                if len(parts) != 2:
+                    raise ValueError()
+                h, m = int(parts[0]), int(parts[1])
+                if not (0 <= h <= 23 and 0 <= m <= 59):
+                    raise ValueError()
+            except (ValueError, IndexError):
+                raise ValueError(f"Profile key '{time_key}' must be in HH:MM format (00:00–23:59)")
+        return self
 
 
 class RandomWalkGeneratorConfig(BaseModel):
@@ -1645,6 +1765,7 @@ GeneratorConfig = Annotated[
         IPGeneratorConfig,
         GeoGeneratorConfig,
         RandomWalkGeneratorConfig,
+        DailyProfileGeneratorConfig,
         DerivedGeneratorConfig,
     ],
     Field(discriminator="type"),

@@ -12,6 +12,7 @@ from odibi.config import (
     BooleanGeneratorConfig,
     CategoricalGeneratorConfig,
     ConstantGeneratorConfig,
+    DailyProfileGeneratorConfig,
     DerivedGeneratorConfig,
     EmailGeneratorConfig,
     GeoGeneratorConfig,
@@ -257,6 +258,11 @@ class SimulationEngine:
         # Also remove ema() calls - they reference previous state, not current row
         expression_without_prev = re.sub(r"ema\s*\([^)]+\)", "", expression_without_prev)
 
+        # Remove _timestamp.attr patterns - these are context variables, not column refs
+        expression_without_prev = re.sub(
+            r"_timestamp\.[a-zA-Z_][a-zA-Z0-9_]*", "", expression_without_prev
+        )
+
         # Find all identifiers in the remaining expression
         # Match valid Python identifiers
         identifiers = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", expression_without_prev)
@@ -286,6 +292,11 @@ class SimulationEngine:
             "prev",
             "ema",
             "pid",
+            # Context variables
+            "_timestamp",
+            "_row_index",
+            "entity_id",
+            "random",
         }
 
         return {name for name in identifiers if name in all_columns and name not in python_keywords}
@@ -926,9 +937,11 @@ class SimulationEngine:
             return self._generate_ipv4(generator, rng)
         elif isinstance(generator, GeoGeneratorConfig):
             return self._generate_geo(generator, rng)
+        elif isinstance(generator, DailyProfileGeneratorConfig):
+            return self._generate_daily_profile(generator, timestamp, rng)
         elif isinstance(generator, DerivedGeneratorConfig):
             return self._generate_derived(
-                generator, current_row or {}, entity_name, entity_state or {}, row_idx
+                generator, current_row or {}, entity_name, entity_state or {}, row_idx, timestamp
             )
         else:
             raise ValueError(f"Unknown generator type: {type(generator)}")
@@ -1186,6 +1199,119 @@ class SimulationEngine:
             # For now return tuple, caller can split if needed
             return {"lat": lat, "lon": lon}
 
+    def _generate_daily_profile(
+        self,
+        config: DailyProfileGeneratorConfig,
+        timestamp: datetime,
+        rng: np.random.Generator,
+    ) -> float:
+        """Generate value from daily profile based on time of day.
+
+        Interpolates between anchor points in the profile to produce a smooth
+        daily curve, then adds noise and clamps to [min, max].
+
+        Args:
+            config: Daily profile generator configuration
+            timestamp: Current row timestamp
+            rng: Random number generator
+
+        Returns:
+            Generated value following the daily curve
+        """
+        # Convert profile keys to sorted list of (minutes_since_midnight, value)
+        anchors = []
+        for time_key, value in config.profile.items():
+            parts = time_key.split(":")
+            minutes = int(parts[0]) * 60 + int(parts[1])
+            anchors.append((minutes, value))
+        anchors.sort(key=lambda x: x[0])
+
+        # Apply day-to-day volatility: shift each anchor point independently per day
+        if config.volatility > 0:
+            # Use date as seed so same day always gets same shifts (deterministic)
+            day_seed = timestamp.year * 10000 + timestamp.month * 100 + timestamp.day
+            day_rng = np.random.default_rng(seed=day_seed)
+            anchors = [
+                (minutes, val + day_rng.normal(0, config.volatility)) for minutes, val in anchors
+            ]
+
+        # Current time in minutes since midnight
+        current_minutes = timestamp.hour * 60 + timestamp.minute
+
+        # Apply weekend scaling
+        is_weekend = timestamp.weekday() >= 5  # Saturday=5, Sunday=6
+
+        # Find surrounding anchor points
+        if len(anchors) == 1:
+            value = anchors[0][1]
+        elif current_minutes <= anchors[0][0]:
+            # Before first anchor — interpolate between last anchor (wrapped) and first
+            if config.interpolation == "step":
+                value = anchors[-1][1]
+            else:
+                prev_minutes = anchors[-1][0] - 1440  # wrap previous day
+                prev_value = anchors[-1][1]
+                next_minutes = anchors[0][0]
+                next_value = anchors[0][1]
+                span = next_minutes - prev_minutes
+                if span == 0:
+                    value = next_value
+                else:
+                    t = (current_minutes - prev_minutes) / span
+                    value = prev_value + t * (next_value - prev_value)
+        elif current_minutes >= anchors[-1][0]:
+            # After last anchor — interpolate between last anchor and first (wrapped)
+            if config.interpolation == "step":
+                value = anchors[-1][1]
+            else:
+                prev_minutes = anchors[-1][0]
+                prev_value = anchors[-1][1]
+                next_minutes = anchors[0][0] + 1440  # wrap next day
+                next_value = anchors[0][1]
+                span = next_minutes - prev_minutes
+                if span == 0:
+                    value = prev_value
+                else:
+                    t = (current_minutes - prev_minutes) / span
+                    value = prev_value + t * (next_value - prev_value)
+        else:
+            # Between two anchors
+            for i in range(len(anchors) - 1):
+                if anchors[i][0] <= current_minutes < anchors[i + 1][0]:
+                    if config.interpolation == "step":
+                        value = anchors[i][1]
+                    else:
+                        prev_minutes, prev_value = anchors[i]
+                        next_minutes, next_value = anchors[i + 1]
+                        span = next_minutes - prev_minutes
+                        if span == 0:
+                            value = prev_value
+                        else:
+                            t = (current_minutes - prev_minutes) / span
+                            value = prev_value + t * (next_value - prev_value)
+                    break
+            else:
+                value = anchors[-1][1]
+
+        # Apply weekend scaling
+        if is_weekend and config.weekend_scale is not None:
+            value = value * config.weekend_scale
+
+        # Add noise
+        if config.noise > 0:
+            value += rng.uniform(-config.noise, config.noise)
+
+        # Clamp to [min, max]
+        value = float(np.clip(value, config.min, config.max))
+
+        # Apply precision
+        if config.precision is not None:
+            value = round(value, config.precision)
+            if config.precision == 0:
+                value = int(value)
+
+        return value
+
     def _generate_derived(
         self,
         config: DerivedGeneratorConfig,
@@ -1193,6 +1319,7 @@ class SimulationEngine:
         entity_name: str,
         entity_state: Dict[str, Any],
         row_idx: int = 0,
+        timestamp: datetime = None,
     ) -> Any:
         """Generate derived value from expression.
 
@@ -1202,6 +1329,7 @@ class SimulationEngine:
             entity_name: Current entity name for state tracking
             entity_state: Entity-specific state dict for stateful functions
             row_idx: Row index (0-based) for _row_index variable
+            timestamp: Current row timestamp for _timestamp variable
 
         Returns:
             Calculated value
@@ -1391,6 +1519,7 @@ class SimulationEngine:
         namespace = {**row_data, **safe_builtins, **self.entity_proxies}
         namespace["entity_id"] = entity_name
         namespace["_row_index"] = row_idx
+        namespace["_timestamp"] = timestamp
 
         try:
             # Evaluate expression in restricted namespace

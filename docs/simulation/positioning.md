@@ -119,4 +119,4 @@ The unique angle: **I'm a chemical engineer who built this. Let me teach you bot
 - **[Getting Started](getting_started.md)** - Your first simulation in 30 minutes
 - **[Patterns & Recipes](patterns/index.md)** - 38 production-ready patterns
 - **[Process Simulation](process_simulation.md)** - ChemE and process control deep dive
-- **[Generators Reference](generators.md)** - All 12 generator types
+- **[Generators Reference](generators.md)** - All 13 generator types

@@ -597,7 +597,7 @@ Check chaos `downtime_events` — your entities might be "offline" for the entir
 
 ## What's Next
 
-- [Generators Reference](../reference/simulation_generators.md) — quick parameter lookup for all 12 generators
+- [Generators Reference](../reference/simulation_generators.md) — quick parameter lookup for all 13 generators
 - [Incremental Loading](../patterns/incremental_stateful.md) — deep dive into stateful vs rolling window modes
 - [Example YAML](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_example.yaml) — full working example
 - [Validation](../features/quality_gates.md) — add quality checks to your simulated data

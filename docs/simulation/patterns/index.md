@@ -40,7 +40,8 @@ Start here. These patterns cover the core simulation features you'll use in ever
 |---|---------|-------------|----------|
 | 1 | Build Before Sources Exist | Core simulation concept | General |
 | 2 | Manufacturing Production Line | `entity_overrides`, `scheduled_events`, `chaos` | Manufacturing |
-| 3 | IoT Sensor Network | `null_rate`, `random_walk` + `mean_reversion` | Building Mgmt |
+| 3 | IoT Sensor Network | `daily_profile`, `derived` from occupancy, `random_walk` | Building Mgmt |
+| 3b | HVAC Feedback Loop | Derived column chaining, feedback modeling | Building Mgmt |
 | 4 | Order / Transaction Data | `incremental: stateful`, `derived` expressions | E-commerce |
 | 5 | Equipment Degradation | `trend`, `mean_reversion_to`, cleaning cycles | Maintenance |
 | 6 | Stress Test at Scale | High-volume config | Data Engineering |
@@ -160,48 +161,49 @@ Patterns for testing your data platform itself — schema changes, late data, mu
 
 Which features does each pattern use? Denser rows mean more complex simulations. Use this to find patterns that teach a specific feature, or to find the most feature-rich patterns for deep learning.
 
-| # | Pattern | range | walk | cat | seq | derived | const | ts | uuid | bool | geo | ip | email | prev | ema | pid | overrides | events | chaos | trend | m.r.to | shock | incr | x-entity | valid |
-|---|---------|:-----:|:----:|:---:|:---:|:-------:|:-----:|:--:|:----:|:----:|:---:|:--:|:-----:|:----:|:---:|:---:|:---------:|:------:|:-----:|:-----:|:------:|:-----:|:----:|:--------:|:-----:|
-| 1 | Build Before Sources | **X** | | **X** | **X** | | | **X** | **X** | | | | | | | | | | | | | | | | **X** |
-| 2 | Production Line | **X** | | **X** | | | **X** | **X** | | | | | | | | | **X** | **X** | **X** | | | | | | |
-| 3 | IoT Sensors | **X** | **X** | | | | | **X** | | | | | | | | | | **X** | **X** | | | | | | |
-| 4 | Order Data | **X** | | **X** | **X** | **X** | | **X** | **X** | | | | | | | | | | | | | | **X** | | |
-| 5 | Degradation | **X** | **X** | | | **X** | **X** | **X** | | | | | | | | | | **X** | | **X** | **X** | | | | |
-| 6 | Stress Test | **X** | | **X** | | | | **X** | | | | | | | | | | | | | | | | | |
-| 7 | Dashboard Feed | | **X** | | | **X** | | **X** | | | | | | | | | | | | | | | **X** | | |
-| 8 | Multi-System | | **X** | | | **X** | **X** | **X** | | | | | | **X** | | | | | | | | | | **X** | |
-| 9 | Wastewater | **X** | **X** | | | **X** | | **X** | | | | | | | | | **X** | **X** | | | | | | **X** | |
-| 10 | Compressor | | **X** | **X** | | **X** | | **X** | | | | | | | | | | | **X** | | | **X** | | | |
-| 11 | CSTR + PID | | | | | **X** | **X** | **X** | | | | | | **X** | | **X** | | | | | | | | | |
-| 12 | Distillation | | **X** | | | **X** | | **X** | | | | | | | | | | | | | **X** | | | | |
-| 13 | Cooling Tower | | **X** | | | **X** | | **X** | | | | | | | **X** | | | | | | | | | | |
-| 14 | Batch Reactor | | | | | **X** | **X** | **X** | | | | | | **X** | | | | **X** | | | | | | | |
-| 15 | Tank Farm | | **X** | | | **X** | **X** | **X** | | | | | | **X** | | | | | | | | | | | |
-| 16 | Solar Farm | **X** | **X** | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | | | | | |
-| 17 | Wind Turbines | | **X** | | | **X** | | **X** | | | **X** | | | | | | **X** | | | | | | | | |
-| 18 | BESS | | **X** | | | **X** | **X** | **X** | | | | | | **X** | | | | | | | | | | | |
-| 19 | Smart Meters | **X** | **X** | | | **X** | | **X** | | | | **X** | | | | | | | | | | | | | |
-| 20 | EV Charging | **X** | **X** | **X** | | **X** | | **X** | **X** | | **X** | | | | | | | | | | | | | | |
-| 21 | Packaging SPC | **X** | **X** | | | **X** | | **X** | | | | | | | | | | | **X** | | | | | | **X** |
-| 22 | CNC Shop | **X** | **X** | **X** | | **X** | | **X** | | | | | | | | | | | **X** | | | | | | |
-| 23 | Warehouse | **X** | | **X** | **X** | **X** | | **X** | | | | | | **X** | | | | | | | | | | | |
-| 24 | Cold Chain | **X** | **X** | | | **X** | | **X** | | | | | **X** | | | | | | | | | | | | |
-| 25 | Assembly Line | | **X** | **X** | | **X** | | **X** | | | | | | | | | | | | | | | | **X** | |
-| 26 | Weather Stations | **X** | **X** | | | **X** | | **X** | | **X** | **X** | | | | | | | | **X** | | | | | | |
-| 27 | Air Quality | | **X** | **X** | | **X** | | **X** | | | | | | | | | | | | **X** | | | | | |
-| 28 | Greenhouse | | **X** | | | **X** | **X** | **X** | | | | | | **X** | | **X** | | | | | **X** | | | | |
-| 29 | ICU Vitals | **X** | **X** | **X** | | **X** | | **X** | | | | | | | | | | | | | | | | | |
-| 30 | Pharma Batch | **X** | **X** | **X** | **X** | **X** | **X** | **X** | | | | | | **X** | | | | **X** | | | | | | | |
-| 31 | Retail POS | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | | | | | | | |
-| 32 | Call Center | **X** | | **X** | | **X** | | **X** | | | | | | **X** | | | | | | | | | | | |
-| 33 | Server Monitor | **X** | **X** | **X** | | **X** | | **X** | | | | **X** | **X** | | | | | | | | | | | | |
-| 34 | API Perf Logs | **X** | | **X** | | **X** | | **X** | **X** | | | **X** | | | | | | | | | | | | | |
-| 35 | Supply Chain | **X** | | **X** | | **X** | | **X** | **X** | | **X** | | | | | | | | | | | | | | |
-| 36 | Late Data | | **X** | **X** | **X** | | | **X** | | | | | | | | | | | **X** | | | | | | **X** |
-| 37 | Schema Evolution | **X** | | **X** | **X** | **X** | | **X** | | **X** | | | | | | | | | | | | | | | **X** |
-| 38 | Multi-Source Merge | **X** | **X** | **X** | **X** | **X** | | **X** | **X** | | | | | | | | | | **X** | | | | | | |
+| # | Pattern | range | walk | d.prof | cat | seq | derived | const | ts | uuid | bool | geo | ip | email | prev | ema | pid | overrides | events | chaos | trend | m.r.to | shock | incr | x-entity | valid |
+|---|---------|:-----:|:----:|:------:|:---:|:---:|:-------:|:-----:|:--:|:----:|:----:|:---:|:--:|:-----:|:----:|:---:|:---:|:---------:|:------:|:-----:|:-----:|:------:|:-----:|:----:|:--------:|:-----:|
+| 1 | Build Before Sources | **X** | | | **X** | **X** | | | **X** | **X** | | | | | | | | | | | | | | | | **X** |
+| 2 | Production Line | **X** | | | **X** | | | **X** | **X** | | | | | | | | | **X** | **X** | **X** | | | | | | |
+| 3 | IoT Sensors | | **X** | **X** | | | **X** | | **X** | | | | | | | | | **X** | **X** | **X** | | | | | | |
+| 3b | HVAC Feedback | | **X** | **X** | | | **X** | | **X** | | | | | | | | | **X** | **X** | **X** | | | | | | |
+| 4 | Order Data | **X** | | | **X** | **X** | **X** | | **X** | **X** | | | | | | | | | | | | | | **X** | | |
+| 5 | Degradation | **X** | **X** | | | | **X** | **X** | **X** | | | | | | | | | | **X** | | **X** | **X** | | | | |
+| 6 | Stress Test | **X** | | | **X** | | | | **X** | | | | | | | | | | | | | | | | | |
+| 7 | Dashboard Feed | | **X** | | | | **X** | | **X** | | | | | | | | | | | | | | | **X** | | |
+| 8 | Multi-System | | **X** | | | | **X** | **X** | **X** | | | | | | **X** | | | | | | | | | | **X** | |
+| 9 | Wastewater | **X** | **X** | | | | **X** | | **X** | | | | | | | | | **X** | **X** | | | | | | **X** | |
+| 10 | Compressor | | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | **X** | | | **X** | | | |
+| 11 | CSTR + PID | | | | | | **X** | **X** | **X** | | | | | | **X** | | **X** | | | | | | | | | |
+| 12 | Distillation | | **X** | | | | **X** | | **X** | | | | | | | | | | | | | **X** | | | | |
+| 13 | Cooling Tower | | **X** | | | | **X** | | **X** | | | | | | | **X** | | | | | | | | | | |
+| 14 | Batch Reactor | | | | | | **X** | **X** | **X** | | | | | | **X** | | | | **X** | | | | | | | |
+| 15 | Tank Farm | | **X** | | | | **X** | **X** | **X** | | | | | | **X** | | | | | | | | | | | |
+| 16 | Solar Farm | **X** | **X** | | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | | | | | |
+| 17 | Wind Turbines | | **X** | | | | **X** | | **X** | | | **X** | | | | | | **X** | | | | | | | | |
+| 18 | BESS | | **X** | | | | **X** | **X** | **X** | | | | | | **X** | | | | | | | | | | | |
+| 19 | Smart Meters | **X** | **X** | | | | **X** | | **X** | | | | **X** | | | | | | | | | | | | | |
+| 20 | EV Charging | **X** | **X** | | **X** | | **X** | | **X** | **X** | | **X** | | | | | | | | | | | | | | |
+| 21 | Packaging SPC | **X** | **X** | | | | **X** | | **X** | | | | | | | | | | | **X** | | | | | | **X** |
+| 22 | CNC Shop | **X** | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | **X** | | | | | | |
+| 23 | Warehouse | **X** | | | **X** | **X** | **X** | | **X** | | | | | | **X** | | | | | | | | | | | |
+| 24 | Cold Chain | **X** | **X** | | | | **X** | | **X** | | | | | **X** | | | | | | | | | | | | |
+| 25 | Assembly Line | | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | | | | | | **X** | |
+| 26 | Weather Stations | **X** | **X** | | | | **X** | | **X** | | **X** | **X** | | | | | | | | **X** | | | | | | |
+| 27 | Air Quality | | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | | **X** | | | | | |
+| 28 | Greenhouse | | **X** | | | | **X** | **X** | **X** | | | | | | **X** | | **X** | | | | | **X** | | | | |
+| 29 | ICU Vitals | **X** | **X** | | **X** | | **X** | | **X** | | | | | | | | | | | | | | | | | |
+| 30 | Pharma Batch | **X** | **X** | | **X** | **X** | **X** | **X** | **X** | | | | | | **X** | | | | **X** | | | | | | | |
+| 31 | Retail POS | **X** | | | **X** | | **X** | | **X** | | | | | | | | | | | | | | | | | |
+| 32 | Call Center | **X** | | | **X** | | **X** | | **X** | | | | | | **X** | | | | | | | | | | | |
+| 33 | Server Monitor | **X** | **X** | | **X** | | **X** | | **X** | | | | **X** | **X** | | | | | | | | | | | | |
+| 34 | API Perf Logs | **X** | | | **X** | | **X** | | **X** | **X** | | | **X** | | | | | | | | | | | | | |
+| 35 | Supply Chain | **X** | | | **X** | | **X** | | **X** | **X** | | **X** | | | | | | | | | | | | | | |
+| 36 | Late Data | | **X** | | **X** | **X** | | | **X** | | | | | | | | | | | **X** | | | | | | **X** |
+| 37 | Schema Evolution | **X** | | | **X** | **X** | **X** | | **X** | | **X** | | | | | | | | | | | | | | | **X** |
+| 38 | Multi-Source Merge | **X** | **X** | | **X** | **X** | **X** | | **X** | **X** | | | | | | | | | | **X** | | | | | | |
 
-**Legend:** range = `range`, walk = `random_walk`, cat = `categorical`, seq = `sequential`, const = `constant`, ts = `timestamp`, m.r.to = `mean_reversion_to`, incr = `incremental: stateful`, x-entity = cross-entity references, valid = validation on simulated data
+**Legend:** range = `range`, walk = `random_walk`, d.prof = `daily_profile`, cat = `categorical`, seq = `sequential`, const = `constant`, ts = `timestamp`, m.r.to = `mean_reversion_to`, incr = `incremental: stateful`, x-entity = cross-entity references, valid = validation on simulated data
 
 ---
 

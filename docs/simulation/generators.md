@@ -1,6 +1,6 @@
 # Simulation Generators Reference
 
-Comprehensive reference for all 12 simulation generator types. Each generator produces
+Comprehensive reference for all 13 simulation generator types. Each generator produces
 a specific kind of synthetic data for realistic dataset simulation.
 
 !!! example "Why this matters"
@@ -14,6 +14,7 @@ a specific kind of synthetic data for realistic dataset simulation.
 |-----------|----------|------------|
 | [range](#range) | Metrics, measurements, scores | int, float |
 | [random_walk](#random_walk) | Process variables, stock prices, sensor drift | float |
+| [daily_profile](#daily_profile) | Occupancy, traffic, energy demand, shift patterns | int, float |
 | [categorical](#categorical) | Status codes, categories, enums | string, int |
 | [boolean](#boolean) | Flags, binary states | boolean |
 | [timestamp](#timestamp) | Event times, auto-stepped | timestamp |
@@ -272,6 +273,109 @@ columns:
 - Use `shock_rate: 0.02` with `shock_bias: 1.0` to simulate occasional exothermic runaways.
 - A warning is issued if `shock_rate > 0` without `mean_reversion` — shocks without recovery aren't realistic.
 - Works with **incremental mode** — the last value per entity is saved and restored on the next run.
+
+---
+
+## daily_profile
+
+Generate values that follow a repeating daily curve defined by anchor points. The engine interpolates between anchor points, adds noise, and clamps to [min, max]. Ideal for simulating any metric with a predictable intraday pattern.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| profile | dict | Yes | — | Anchor points mapping `HH:MM` to target values |
+| min | float | Yes | — | Hard lower bound (physical limit) |
+| max | float | Yes | — | Hard upper bound (physical limit) |
+| noise | float | No | `0.0` | Random noise amplitude (±noise added to interpolated value) |
+| volatility | float | No | `0.0` | Day-to-day variation. Each day, anchor targets shift by a random amount (std_dev = volatility). 0 = same curve every day. |
+| interpolation | string | No | `linear` | `linear` or `step` |
+| precision | int | No | `None` | Round to N decimal places. `0` = integers. None = full float. Range: 0–10. |
+| weekend_scale | float | No | `None` | Scale factor for weekends (0.0–1.0). None = no adjustment. |
+
+**Supported data types:** `int`, `float`
+
+**How it works:** At each timestamp, the engine finds the two surrounding anchor points and interpolates to get a base value. If `volatility` is set, each day's anchor targets are independently shifted by a random normal amount, making each day's curve slightly different while preserving the overall shape. Noise is added (±noise, uniform), then the result is clamped to [min, max] and rounded to the specified precision. On weekends (Saturday/Sunday), the interpolated value is multiplied by `weekend_scale` before noise is applied.
+
+### Examples
+
+**Facilities — building occupancy (integers):**
+
+```yaml
+name: occupancy
+data_type: int
+generator:
+  type: daily_profile
+  min: 0
+  max: 25
+  precision: 0
+  noise: 1.5
+  volatility: 3.0
+  profile:
+    "00:00": 1
+    "06:00": 3
+    "08:00": 19
+    "12:00": 15
+    "13:00": 22
+    "17:00": 14
+    "22:00": 2
+```
+
+**IT — network traffic (float, weekend scaling):**
+
+```yaml
+name: bandwidth_mbps
+data_type: float
+generator:
+  type: daily_profile
+  min: 0.0
+  max: 1000.0
+  noise: 50.0
+  precision: 1
+  interpolation: linear
+  weekend_scale: 0.3
+  profile:
+    "00:00": 50.0
+    "06:00": 100.0
+    "09:00": 800.0
+    "12:00": 650.0
+    "13:00": 750.0
+    "17:00": 900.0
+    "20:00": 400.0
+    "23:00": 100.0
+```
+
+**Manufacturing — shift-based power consumption (step interpolation):**
+
+```yaml
+name: power_kw
+data_type: float
+generator:
+  type: daily_profile
+  min: 0
+  max: 500
+  precision: 0
+  interpolation: step
+  profile:
+    "00:00": 50
+    "06:00": 350
+    "14:00": 400
+    "22:00": 50
+```
+
+!!! tip "Choosing between `linear` and `step`"
+    Use **linear** for metrics that transition gradually (occupancy, temperature, traffic). Use **step** for metrics that change abruptly at specific times (shift changes, scheduled equipment start/stop).
+
+!!! info "Two levels of randomness"
+    `noise` and `volatility` work at different time scales:
+    
+    - **`noise`** adds per-reading jitter. Every 5-minute reading gets a small random offset. This makes the line wiggly within a single day.
+    - **`volatility`** adds per-day variation. Each day's anchor targets are shifted independently, so Monday might peak at 21 people and Tuesday at 17. This makes the overall shape different from day to day.
+    
+    Use both together for the most realistic data: `noise` for instrument-level variation, `volatility` for real-world unpredictability.
+
+!!! info "Weekend scaling"
+    `weekend_scale` multiplies the interpolated profile value before noise is applied. A value of `0.3` means weekend values are 30% of the weekday profile. Use `0.0` for buildings that are empty on weekends, or `None` (the default) for 24/7 operations where weekends look the same as weekdays.
 
 ---
 
@@ -572,6 +676,7 @@ These variables are automatically available in every derived expression:
 |----------|------|-------------|
 | `entity_id` | string | Current entity name (e.g., `"sensor_01"`) |
 | `_row_index` | int | Current row index (0-based) |
+| `_timestamp` | datetime | Current row timestamp as a Python `datetime` object |
 
 ```yaml
 # Example: battery draining over time
@@ -579,6 +684,24 @@ expression: "max(0, 100 - (_row_index * 0.07))"
 
 # Example: entity-specific logic
 expression: "'high' if entity_id == 'reactor_01' else 'normal'"
+```
+
+`_timestamp` enables time-of-day logic in derived expressions:
+
+```yaml
+# Classify by shift
+name: shift
+generator:
+  type: derived
+  expression: "'day' if 6 <= _timestamp.hour < 18 else 'night'"
+```
+
+```yaml
+# Extract hour for grouping
+name: hour_of_day
+generator:
+  type: derived
+  expression: "_timestamp.hour"
 ```
 
 ### Stateful Functions
@@ -809,6 +932,7 @@ All generators work across all engines, incremental mode, null injection, and en
 |-----------|--------|-------|--------|-------------|-----------|-----------|
 | range | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | random_walk | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| daily_profile | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | categorical | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | boolean | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | timestamp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |

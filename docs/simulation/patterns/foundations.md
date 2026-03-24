@@ -419,21 +419,24 @@ pipelines:
 **Industry:** Building Management | **Difficulty:** Beginner
 
 !!! tip "What you'll learn"
+    - **`daily_profile`** — simulate time-of-day patterns (occupancy rises in the morning, dips at lunch, drops at night)
+    - **`derived` from another column** — make CO2 a function of occupancy instead of an independent random value
     - **`random_walk` with `mean_reversion`** — simulate controlled processes where values drift but get pulled back to a setpoint (like HVAC-controlled temperature)
     - **`entity_overrides`** — pin sensors to specific floors and permanently disable capabilities on specific sensors
     - **`null_rate`** — simulate occasional signal dropout on sensors that have the capability
     - **`scheduled_events` with no `end_time`** — create permanent failures (sensor battery dies and never recovers)
 
-Modern buildings are full of wireless sensors - temperature, humidity, CO2, occupancy - feeding a Building Management System (BMS) that controls HVAC, lighting, and ventilation. In practice, not every sensor measures every metric (some lack humidity capability), sensors fail unpredictably (battery death, connectivity loss), and the HVAC system creates a characteristic "controlled drift" pattern in temperature data.
+Modern buildings are full of wireless sensors - temperature, humidity, CO2, occupancy - feeding a Building Management System (BMS) that controls HVAC, lighting, and ventilation. In practice, occupancy follows a predictable daily rhythm (empty at night, busy during the day, lunch dip), CO2 rises and falls with occupancy, not every sensor measures every metric (some lack humidity capability), sensors fail unpredictably (battery death, connectivity loss), and the HVAC system creates a characteristic "controlled drift" pattern in temperature data.
 
-This pattern simulates 20 sensors across 4 floors of an office building over 24 hours. The key teaching points are how `entity_overrides` pins sensors to physical locations and models hardware differences, how `random_walk` with `mean_reversion` creates the look of an HVAC-controlled environment, how `null_rate` models random signal glitches, and how scheduled events with no `end_time` create permanent failures.
+This pattern simulates 20 sensors across 4 floors of an office building over 24 hours. The key teaching points are how `daily_profile` creates realistic time-of-day occupancy curves, how `derived` columns make CO2 respond to occupancy instead of being an independent random value, how `entity_overrides` pins sensors to physical locations and models hardware differences, how `random_walk` with `mean_reversion` creates the look of an HVAC-controlled environment, how `null_rate` models random signal glitches, and how scheduled events with no `end_time` create permanent failures.
 
 - **20 sensors** - pinned to 4 floors via `entity_overrides` (5 per floor). Each sensor reports temperature, humidity, CO2, and occupancy every 5 minutes.
 - **Floor** - assigned per sensor using `entity_overrides` with `constant` generators. A sensor is physically installed on one floor — it doesn't move between readings.
+- **Occupancy** - uses `daily_profile` to follow a realistic office rhythm: near-zero overnight, morning ramp-up, lunch dip, afternoon peak, evening decline. `precision: 0` ensures integer headcounts (you can't have 18.2 people in a room).
 - **Temperature** - controlled by HVAC via `random_walk` with `mean_reversion: 0.15`. The value drifts naturally but gets pulled back toward the setpoint, creating the sawtooth-like pattern you see in real building data.
 - **Humidity** - 3 sensors (sensor_04, sensor_12, sensor_18) permanently lack this capability via `entity_overrides` that set the generator to `{type: constant, value: null}`. The remaining sensors have a small `null_rate: 0.02` for occasional signal dropout.
-- **CO2** - a random walk that responds to occupancy changes. CO2 rises when rooms fill up and drops when people leave.
-- **sensor_15** - battery dies at 14:00 and never recovers. All readings go to NULL permanently (scheduled event with no `end_time`).
+- **CO2** - derived from occupancy, not independent. Each person in the room contributes approximately 25 ppm above the 450 ppm baseline (per ASHRAE steady-state figures for standard office ventilation). A small random jitter models natural variation from door openings, movement, and HVAC cycling.
+- **sensor_15** - battery dies at 14:00 and never recovers. All readings — including occupancy — go to NULL permanently (scheduled event with no `end_time`).
 
 ```mermaid
 flowchart TB
@@ -464,8 +467,9 @@ flowchart TB
 
 !!! info "Why these parameter values?"
     - **`count: 20`:** A typical 4-floor office building might have 5-10 sensors per floor. Twenty sensors is realistic without generating an overwhelming dataset.
+    - **Occupancy `daily_profile`:** The anchor points define a typical office day — 1 person overnight (security guard), ramping to 19 by 8am, dipping to 15 at lunch (people leave the floor), peaking at 22 in the afternoon, and dropping back to 2 by 10pm. `precision: 0` ensures you get whole numbers — occupancy is a headcount, not a measurement. `noise: 1.5` adds ±1-2 people of jitter so it doesn't look perfectly scripted every day. `volatility: 3.0` means each day's anchor targets shift independently by ±3 people (normal distribution), so Monday might peak at 21 and Tuesday at 17. Over a year of data, no two days look identical.
+    - **CO2 `450 + occupancy * 25`:** The 450 ppm baseline is what an empty office reads — outdoor air (~420 ppm) plus residual from HVAC recirculation. The 25 ppm per person comes from ASHRAE steady-state calculations assuming standard office ventilation (7.5 L/s/person). So 20 people → ~950 ppm, which is in the "acceptable" range. `random() * 20` adds 0-20 ppm of natural variation.
     - **Temperature `mean_reversion: 0.15`:** A moderate pull-back rate. Lower values (0.05) let temperature wander further from the setpoint; higher values (0.3+) make it almost constant. 0.15 creates a visible but controlled drift.
-    - **CO2 `mean_reversion: 0.05`:** CO2 changes more slowly than temperature because ventilation systems have longer response times. A lower mean_reversion creates more gradual swings.
     - **`entity_overrides` on humidity:** 3 sensors permanently lack humidity (older hardware). This is modeled with `{type: constant, value: null}` overrides — not `null_rate`, which would randomly drop values on every sensor. The small `null_rate: 0.02` handles occasional signal glitches on the sensors that *do* have humidity hardware.
     - **`outlier_rate: 0.005`:** Very low. Wireless sensor networks have occasional transmission errors, but modern BMS protocols include error checking, so corrupt readings are rare.
 
@@ -564,22 +568,37 @@ pipelines:
                     sensor_12: {type: constant, value: null}
                     sensor_18: {type: constant, value: null}
 
-                - name: co2_ppm
-                  data_type: float
-                  generator:
-                    type: random_walk
-                    start: 450.0
-                    min: 450.0
-                    max: 1200.0
-                    volatility: 5.0
-                    mean_reversion: 0.05
-                    precision: 0
-
+                # Occupancy — follows a realistic daily office rhythm
                 - name: occupancy
                   data_type: int
-                  generator: {type: range, min: 0, max: 25}
+                  generator:
+                    type: daily_profile
+                    min: 0
+                    max: 25
+                    precision: 0
+                    noise: 1.5
+                    volatility: 3.0
+                    profile:
+                      "00:00": 1       # Overnight — security guard only
+                      "06:00": 3       # Early arrivals
+                      "08:00": 19      # Morning ramp-up
+                      "10:00": 22      # Mid-morning peak
+                      "12:00": 15      # Lunch — people leave the floor
+                      "13:00": 22      # Afternoon return
+                      "17:00": 14      # Evening departure begins
+                      "19:00": 4       # Late workers
+                      "22:00": 2       # Cleaning crew
+
+                # CO2 — derived from occupancy (not independent)
+                # Each person adds ~25 ppm above the 450 ppm baseline (ASHRAE)
+                - name: co2_ppm
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "round(450 + occupancy * 25 + random() * 20, 0)"
 
               # sensor_15 battery died — no data after 14:00
+              # When a sensor dies, ALL readings go NULL — not just some
               scheduled_events:
                 - type: forced_value
                   entity: sensor_15
@@ -589,6 +608,11 @@ pipelines:
                 - type: forced_value
                   entity: sensor_15
                   column: humidity_pct
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: occupancy
                   value: null
                   start_time: "2026-03-10T14:00:00Z"
                 - type: forced_value
@@ -609,30 +633,33 @@ pipelines:
 ```
 
 !!! example "What the output looks like"
-    This config generates **5,760 rows** (288 timesteps x 20 sensors). Here's a snapshot showing the variety across sensors:
+    This config generates **5,760 rows** (288 timesteps x 20 sensors). Here's a snapshot showing the variety across sensors and times of day:
 
-    | sensor_id  | timestamp            | floor   | temperature_c | humidity_pct | co2_ppm | occupancy |
-    |------------|----------------------|---------|---------------|--------------|---------|-----------|
-    | sensor_01  | 2026-03-10 09:00:00  | Floor_1 | 22.4          | 43.2         | 580     | 18        |
-    | sensor_04  | 2026-03-10 09:00:00  | Floor_1 | 21.8          | NULL         | 510     | 12        |
-    | sensor_07  | 2026-03-10 09:00:00  | Floor_2 | 22.1          | 47.8         | 495     | 15        |
-    | sensor_15  | 2026-03-10 15:00:00  | Floor_3 | NULL          | NULL         | NULL    | 8         |
+    | sensor_id  | timestamp            | floor   | temperature_c | humidity_pct | occupancy | co2_ppm |
+    |------------|----------------------|---------|---------------|--------------|-----------|---------|
+    | sensor_01  | 2026-03-10 03:00:00  | Floor_1 | 21.8          | 42.1         | 1         | 474     |
+    | sensor_01  | 2026-03-10 09:00:00  | Floor_1 | 22.4          | 43.2         | 20        | 963     |
+    | sensor_01  | 2026-03-10 12:00:00  | Floor_1 | 22.1          | 44.8         | 15        | 837     |
+    | sensor_04  | 2026-03-10 09:00:00  | Floor_1 | 21.8          | NULL         | 19        | 935     |
+    | sensor_15  | 2026-03-10 15:00:00  | Floor_3 | NULL          | NULL         | NULL      | NULL    |
 
-    Notice sensor_01 always reports Floor_1 (pinned via entity_overrides). sensor_04 has NULL humidity permanently (older hardware without humidity chip). sensor_15 shows NULL for all measurements after 14:00 (battery death).
+    Notice: at 3am occupancy is 1 (security guard) and CO2 is low (474 ppm). By 9am occupancy has ramped to 20 and CO2 has risen to 963 ppm — because CO2 is derived from occupancy, they move together. At lunch (12:00), occupancy dips to 15 and CO2 drops accordingly. sensor_04 has NULL humidity permanently (older hardware). sensor_15 shows NULL for everything after 14:00 (battery death) — including occupancy and CO2.
 
 **What makes this realistic:**
 
-- **HVAC-controlled temperature looks right.** `random_walk` with `mean_reversion` creates the characteristic pattern you see in real BMS data - temperature drifts 1-2 degrees, then the system kicks in and pulls it back. A flat constant would look fake; a pure random walk would look uncontrolled.
+- **Occupancy follows a daily rhythm, not random noise.** The `daily_profile` generator creates the pattern you'd actually see in a real building — near-empty overnight, a morning ramp-up, a lunch dip, and an evening decline. A `range` generator would give you random headcounts at 3am, which doesn't happen in real buildings.
+- **CO2 tracks occupancy because it physically depends on it.** Using a `derived` expression (`450 + occupancy * 25`) means CO2 rises when people arrive and falls when they leave — exactly like a real building. An independent random walk for CO2 would produce readings that don't correlate with occupancy, which would look wrong to anyone who works in facilities management.
+- **HVAC-controlled temperature looks right.** `random_walk` with `mean_reversion` creates the characteristic pattern you see in real BMS data — temperature drifts 1-2 degrees, then the system kicks in and pulls it back. A flat constant would look fake; a pure random walk would look uncontrolled.
 - **Floors are pinned, not random.** Each sensor is physically installed on one floor via `entity_overrides`. A `categorical` generator would randomly change the floor every reading — that's not how real sensors work.
-- **Missing capabilities vs. signal glitches are modeled separately.** `entity_overrides` on humidity permanently disables 3 sensors (older hardware without humidity chips) — a structural gap. The small `null_rate: 0.02` on the base column simulates occasional signal dropout on sensors that *do* have the capability. sensor_15's battery death is a third type — a *failure* modeled via scheduled events. Your pipeline needs to handle all three.
-- **CO2 drifts realistically.** A random walk with low mean_reversion creates the gradual rise-and-fall pattern driven by occupancy - fast random noise would look like a broken sensor.
-- **Low chaos rates keep the data trustworthy.** 0.5% outliers and 0.3% duplicates are barely noticeable, which is exactly what real sensor data looks like - mostly clean with occasional glitches.
+- **Missing capabilities vs. signal glitches are modeled separately.** `entity_overrides` on humidity permanently disables 3 sensors (older hardware without humidity chips) — a structural gap. The small `null_rate: 0.02` on the base column simulates occasional signal dropout on sensors that *do* have the capability. sensor_15's battery death is a third type — a *failure* modeled via scheduled events that nulls ALL columns. Your pipeline needs to handle all three.
+- **Low chaos rates keep the data trustworthy.** 0.5% outliers and 0.3% duplicates are barely noticeable, which is exactly what real sensor data looks like — mostly clean with occasional glitches.
 
 !!! example "Try this"
     - Increase entity count to `50` and see how the data scales
+    - Add `weekend_scale: 0.15` to the occupancy profile and generate a Saturday — watch CO2 drop with it
     - Add a scheduled HVAC failure on Floor_2: force `temperature_c` to `null` for sensors 5-10 between 16:00-18:00
-    - Add a derived `co2_status` column: `"'high' if co2_ppm > 800 else 'normal'"` to practice derived expressions
-    - Add an `air_quality_index` derived column that combines CO2 and humidity into a comfort score
+    - Add a derived `co2_status` column: `"'high' if co2_ppm > 800 else 'normal'"` to practice chaining derived columns
+    - Change the occupancy profile to model a 24/7 data center (flat occupancy, no lunch dip) and see how CO2 changes
 
 !!! tip "What would you do with this data?"
     - **Sensor health monitoring** - Detect sensor_15's battery death by flagging sensors where all columns go NULL simultaneously. Build alerts for sensors that haven't reported in 30+ minutes.
@@ -642,20 +669,304 @@ pipelines:
 > 📖 **Learn more:** [Generators Reference](../generators.md) — All `random_walk` parameters including `mean_reversion` | [Advanced Features](../advanced_features.md) — Scheduled events and chaos config
 
 !!! example "Content extraction"
-    **Core insight:** Real sensor networks have three types of missing data: permanent capability gaps (entity_overrides), random signal glitches (null_rate), and equipment failures (scheduled_events). Modeling them separately teaches students to handle each correctly.
+    **Core insight:** Real building data has physical relationships — CO2 depends on occupancy, occupancy follows daily patterns, and sensor failures affect all readings at once. Modeling these relationships (not just random values) teaches students to think about data causality, not just data shape.
 
-    **Real-world problem:** IoT platform engineers need realistic test data for alerting and dashboard development. Clean, uniform data doesn't trigger the edge cases that matter.
+    **Real-world problem:** IoT platform engineers need realistic test data for alerting and dashboard development. Data where CO2 spikes at 3am with zero occupancy would immediately be flagged as fake by anyone in facilities management.
 
-    **Why it matters:** If your gap-filling logic has never seen a 2-hour sensor dropout, the first real outage will produce dashboard gaps nobody planned for.
+    **Why it matters:** If your pipeline assumes CO2 and occupancy are independent, your anomaly detection will fire on normal lunch dips and miss actual ventilation failures.
 
     **Hook:** "Real sensors drift, spike, and go offline. If your test data doesn't, your pipeline isn't tested."
 
     **YouTube angle:** Building a realistic IoT sensor network in YAML: random walks, null injection, and scheduled downtime.
 
 !!! tip "Combine with"
+    - **Pattern 3b** - Extend this pattern with HVAC feedback columns (fan speed responding to CO2)
     - **Pattern 26** - Add geographic positioning with the geo generator
     - **Pattern 7** - Add incremental mode for continuous monitoring
     - **Pattern 36** - Stress test with aggressive chaos settings
+
+---
+
+## Pattern 3b: HVAC Feedback Loop {#pattern-3b}
+
+**Industry:** Building Management | **Difficulty:** Intermediate | **Builds on:** [Pattern 3](#pattern-3)
+
+!!! tip "What you'll learn"
+    - **Derived column chaining** — build a multi-step calculation where each column feeds the next
+    - **Feedback modeling** — simulate how a control system (HVAC) responds to a measured value (CO2) that is itself driven by another variable (occupancy)
+    - **Making data tell a story** — when you look at the output, you can follow the causal chain: people arrive → CO2 rises → HVAC works harder → actual CO2 stays controlled
+
+This pattern extends Pattern 3 by adding HVAC response columns that show the building's ventilation system reacting to CO2 levels. Instead of one derived column (CO2 from occupancy), you build a **four-column causal chain**:
+
+1. **Occupancy** → how many people are on the floor (daily profile)
+2. **Raw CO2** → what CO2 would be from occupancy alone (derived)
+3. **HVAC fan speed** → how hard the ventilation system works to compensate (derived from raw CO2)
+4. **Actual CO2** → what sensors actually read after HVAC dilution (derived from raw CO2 and fan speed)
+
+This is a realistic model of demand-controlled ventilation (DCV), where the HVAC system monitors CO2 and adjusts airflow automatically. The data shows the feedback loop: more people → more CO2 → fan ramps up → CO2 gets pulled back down.
+
+```mermaid
+flowchart LR
+    OCC["occupancy\n(daily_profile)"] --> RAW["co2_raw_ppm\n(derived)"]
+    RAW --> FAN["hvac_fan_pct\n(derived)"]
+    RAW --> ACT["co2_ppm\n(derived)"]
+    FAN --> ACT
+
+    style OCC fill:#2d6a4f,stroke:#1b4332,color:#ffffff
+    style RAW fill:#e76f51,stroke:#c44536,color:#ffffff
+    style FAN fill:#264653,stroke:#1d3557,color:#ffffff
+    style ACT fill:#e9c46a,stroke:#c9a227,color:#000000
+```
+
+!!! info "The expressions explained"
+
+    **`co2_raw_ppm`** — `450 + occupancy * 25 + random() * 20`
+
+    - **450** = baseline CO2 in an empty office (outdoor air ~420 ppm + HVAC recirculation)
+    - **occupancy × 25** = each person adds ~25 ppm at steady state. This is the ASHRAE figure for standard office ventilation at 7.5 L/s/person. At 20 people, raw CO2 would be ~950 ppm.
+    - **random() × 20** = 0–20 ppm of natural variation from door openings, movement, and HVAC cycling
+
+    **`hvac_fan_pct`** — `min(100, max(20, round((co2_raw_ppm - 450) / 5.5, 0)))`
+
+    - **co2_raw_ppm - 450** = the CO2 above baseline (the part caused by people)
+    - **/ 5.5** = scaling factor that maps CO2-above-baseline to fan percentage. At 550 ppm above baseline (25 people), this gives ~100%.
+    - **max(20, ...)** = the fan never goes below 20% — HVAC always provides minimum ventilation even in an empty building
+    - **min(100, ...)** = the fan caps at 100% — it can't go beyond full speed
+
+    **`co2_ppm`** — `max(420, round(co2_raw_ppm - (hvac_fan_pct * 0.8) + random() * 10, 0))`
+
+    - Takes the raw CO2 and subtracts what the HVAC removes
+    - **hvac_fan_pct × 0.8** = each 1% of fan speed removes approximately 0.8 ppm. At 100% fan speed, the HVAC removes ~80 ppm.
+    - **random() × 10** = small noise from HVAC cycling (dampers opening/closing, fan speed fluctuations)
+    - **max(420, ...)** = CO2 can never go below outdoor air levels (~420 ppm)
+
+    The net effect: at full occupancy (25 people), raw CO2 is ~1075 ppm, but the HVAC at 100% fan pulls it down to ~995 ppm — keeping the building in the "borderline" zone, which is realistic for a fully occupied floor.
+
+!!! info "Why these parameter values?"
+    - **The 25 ppm per person** comes from ASHRAE Standard 62.1 steady-state calculations for office spaces with standard ventilation (7.5 L/s per person). This assumes the HVAC is running at its baseline rate.
+    - **The 5.5 scaling factor** is calibrated so that 25 people (550 ppm above baseline) maps to ~100% fan speed. In a real DCV system, the controller ramps the fan from minimum to maximum as CO2 rises from baseline to ~1000 ppm.
+    - **The 0.8 ppm removal per fan percent** means at 100% speed the HVAC removes ~80 ppm. This is a simplified model — real HVAC systems have more complex airflow dynamics — but it produces data that tells the right story: the fan works harder as occupancy increases, and the actual CO2 is always lower than the raw CO2.
+    - **The 20% minimum fan speed** represents the minimum outdoor air requirement. Even an empty building needs ventilation for air quality, moisture control, and pressurization.
+
+```yaml
+project: building_sensors_hvac
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: bms_hvac
+    nodes:
+      - name: sensor_readings
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                end_time: "2026-03-11T00:00:00Z"    # 24 hours
+                timestep: "5m"
+                seed: 42
+              entities:
+                count: 20
+                id_prefix: "sensor_"
+              columns:
+                - name: sensor_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Floor assignment (same as Pattern 3)
+                - name: floor
+                  data_type: string
+                  generator: {type: constant, value: "Floor_1"}
+                  entity_overrides:
+                    sensor_01: {type: constant, value: "Floor_1"}
+                    sensor_02: {type: constant, value: "Floor_1"}
+                    sensor_03: {type: constant, value: "Floor_1"}
+                    sensor_04: {type: constant, value: "Floor_1"}
+                    sensor_05: {type: constant, value: "Floor_1"}
+                    sensor_06: {type: constant, value: "Floor_2"}
+                    sensor_07: {type: constant, value: "Floor_2"}
+                    sensor_08: {type: constant, value: "Floor_2"}
+                    sensor_09: {type: constant, value: "Floor_2"}
+                    sensor_10: {type: constant, value: "Floor_2"}
+                    sensor_11: {type: constant, value: "Floor_3"}
+                    sensor_12: {type: constant, value: "Floor_3"}
+                    sensor_13: {type: constant, value: "Floor_3"}
+                    sensor_14: {type: constant, value: "Floor_3"}
+                    sensor_15: {type: constant, value: "Floor_3"}
+                    sensor_16: {type: constant, value: "Floor_4"}
+                    sensor_17: {type: constant, value: "Floor_4"}
+                    sensor_18: {type: constant, value: "Floor_4"}
+                    sensor_19: {type: constant, value: "Floor_4"}
+                    sensor_20: {type: constant, value: "Floor_4"}
+
+                # Temperature (same as Pattern 3)
+                - name: temperature_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 22.0
+                    min: 16.0
+                    max: 30.0
+                    volatility: 0.3
+                    mean_reversion: 0.15
+                    precision: 1
+
+                # Humidity (same as Pattern 3)
+                - name: humidity_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 30.0
+                    max: 70.0
+                    distribution: normal
+                    mean: 45.0
+                    std_dev: 8.0
+                  null_rate: 0.02
+                  entity_overrides:
+                    sensor_04: {type: constant, value: null}
+                    sensor_12: {type: constant, value: null}
+                    sensor_18: {type: constant, value: null}
+
+                # === THE FEEDBACK CHAIN ===
+
+                # Step 1: Occupancy follows a daily office rhythm
+                - name: occupancy
+                  data_type: int
+                  generator:
+                    type: daily_profile
+                    min: 0
+                    max: 25
+                    precision: 0
+                    noise: 1.5
+                    volatility: 3.0
+                    profile:
+                      "00:00": 1
+                      "06:00": 3
+                      "08:00": 19
+                      "10:00": 22
+                      "12:00": 15
+                      "13:00": 22
+                      "17:00": 14
+                      "19:00": 4
+                      "22:00": 2
+
+                # Step 2: Raw CO2 — what CO2 would be from people alone
+                - name: co2_raw_ppm
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "round(450 + occupancy * 25 + random() * 20, 0)"
+
+                # Step 3: HVAC fan speed — responds to raw CO2
+                # 20% minimum (always-on), ramps to 100% at high CO2
+                - name: hvac_fan_pct
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "min(100, max(20, round((co2_raw_ppm - 450) / 5.5, 0)))"
+
+                # Step 4: Actual CO2 after HVAC dilution
+                - name: co2_ppm
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "max(420, round(co2_raw_ppm - (hvac_fan_pct * 0.8) + random() * 10, 0))"
+
+              # sensor_15 battery died — ALL readings go NULL
+              scheduled_events:
+                - type: forced_value
+                  entity: sensor_15
+                  column: temperature_c
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: humidity_pct
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: occupancy
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: co2_raw_ppm
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: hvac_fan_pct
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: co2_ppm
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+
+              chaos:
+                outlier_rate: 0.005
+                outlier_factor: 2.5
+                duplicate_rate: 0.003
+        write:
+          connection: output
+          format: parquet
+          path: bronze/building_sensors_hvac.parquet
+          mode: overwrite
+```
+
+!!! example "What the output looks like"
+    The feedback chain is visible in the data — watch how the columns move together:
+
+    | sensor_id | timestamp           | occupancy | co2_raw_ppm | hvac_fan_pct | co2_ppm |
+    |-----------|---------------------|-----------|-------------|--------------|---------|
+    | sensor_01 | 2026-03-10 03:00:00 | 1         | 480         | 20           | 469     |
+    | sensor_01 | 2026-03-10 09:00:00 | 20        | 963         | 93           | 897     |
+    | sensor_01 | 2026-03-10 12:00:00 | 15        | 837         | 70           | 786     |
+    | sensor_01 | 2026-03-10 17:00:00 | 14        | 808         | 65           | 759     |
+    | sensor_01 | 2026-03-10 22:00:00 | 2         | 505         | 20           | 494     |
+
+    **Read the story in the data:** At 3am, 1 person is in the building. Raw CO2 is low (480 ppm), so the HVAC runs at minimum (20%). By 9am, 20 people have arrived — raw CO2 jumps to 963, the fan ramps to 93%, and it pulls actual CO2 down to 897. At lunch (12:00), people leave (15), CO2 drops, and the fan eases back. By 10pm, only 2 people remain and the HVAC is back to minimum.
+
+**What makes this realistic:**
+
+- **The fan responds proportionally, not on/off.** Real DCV systems ramp fan speed smoothly based on CO2 readings, not binary high/low. The expression `(co2_raw_ppm - 450) / 5.5` creates a linear ramp that matches how variable frequency drives (VFDs) control HVAC fans in modern buildings.
+- **The HVAC can't fully compensate at peak occupancy.** At 25 people, raw CO2 is ~1075 ppm and the fan at 100% only removes ~80 ppm, leaving actual CO2 around 995 ppm. This is realistic — a fully occupied floor *does* run higher CO2 than a half-occupied one, even with HVAC working at full capacity.
+- **The minimum fan speed is never zero.** A 20% floor means the building always has some ventilation, even at 3am. This matches building codes that require minimum outdoor air rates regardless of occupancy.
+- **Actual CO2 is always lower than raw CO2.** The HVAC always helps — you'll never see actual CO2 *above* raw CO2 in the data. This constraint is physically correct and immediately visible in the output.
+
+!!! example "Try this"
+    - Add a **scheduled HVAC failure**: force `hvac_fan_pct` to `0` on Floor_2 sensors between 10:00-14:00. Watch `co2_ppm` spike because the raw CO2 passes through unfiltered. This is the kind of anomaly your pipeline should detect.
+    - Add a `comfort_index` derived column: `"'good' if co2_ppm < 800 else ('fair' if co2_ppm < 1000 else 'poor')"` to practice chaining another derived column on top of the feedback chain.
+    - Compare `co2_raw_ppm` vs `co2_ppm` in a chart — the gap between them IS the HVAC's contribution. Wider gap = fan working harder.
+
+!!! tip "What would you do with this data?"
+    - **HVAC efficiency monitoring** — Track the ratio of `co2_ppm / co2_raw_ppm` over time. If it creeps toward 1.0, the HVAC is losing effectiveness (clogged filters, failing fan, leaky ducts).
+    - **Energy optimization** — `hvac_fan_pct` directly correlates with electricity consumption. Identify floors or time periods where the fan runs high and occupancy is low — that's wasted energy.
+    - **Predictive maintenance** — If `hvac_fan_pct` is at 100% but `co2_ppm` is still above 1000 ppm, the system can't keep up. Flag these events for maintenance review.
+
+!!! tip "Combine with"
+    - **Pattern 7** - Add incremental mode to generate a week of data and watch the daily pattern repeat
+    - **Pattern 5** - Add `trend` to the fan speed to simulate filter degradation over time
+
+> 📖 **Learn more:** [Generators Reference](../generators.md#daily_profile) — `daily_profile` parameters | [Generators Reference](../generators.md#derived) — Derived expression syntax and context variables
 
 ---
 

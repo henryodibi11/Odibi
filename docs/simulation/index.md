@@ -26,7 +26,7 @@ read:
 
 | Capability | What You Get |
 |---|---|
-| **12 Generator Types** | `range` · `random_walk` · `categorical` · `boolean` · `timestamp` · `sequential` · `constant` · `derived` · `uuid` · `email` · `ipv4` · `geo` |
+| **13 Generator Types** | `range` · `random_walk` · `daily_profile` · `categorical` · `boolean` · `timestamp` · `sequential` · `constant` · `derived` · `uuid` · `email` · `ipv4` · `geo` |
 | **Stateful Functions** | `prev()`, `ema()`, `pid()` — values that depend on history for dynamic process simulation |
 | **Cross-Entity References** | One entity reacts to another: downstream sensor reads upstream output |
 | **Entity Overrides** | Per-entity behavior variation — entity A runs hot, entity B runs cold |
@@ -47,7 +47,7 @@ Work through the simulation docs in order, or jump to what you need:
 | :material-star: [Why Odibi Simulation](positioning.md) | What makes this different and why it matters |
 | :material-rocket-launch: [Getting Started](getting_started.md) | Your first simulation in 5 minutes |
 | :material-book-open-variant: [Core Concepts](core_concepts.md) | Scope, entities, and columns - the three building blocks |
-| :material-format-list-bulleted-type: [Generators Reference](generators.md) | All 12 generator types with parameters and examples |
+| :material-format-list-bulleted-type: [Generators Reference](generators.md) | All 13 generator types with parameters and examples |
 | :material-function-variant: [Stateful Functions](stateful_functions.md) | `prev()`, `ema()`, `pid()` — history-dependent values |
 | :material-puzzle: [Advanced Features](advanced_features.md) | Cross-entity references, overrides, scheduled events, chaos |
 | :material-sync: [Incremental Mode](incremental.md) | Continuous data generation across pipeline runs |

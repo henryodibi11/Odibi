@@ -619,7 +619,7 @@ See [Stateful Incremental Loading](../patterns/incremental_stateful.md) for full
 
 ## Related Documentation
 
-- [Generators Reference](generators.md) — all 12 generator types with parameters and examples
+- [Generators Reference](generators.md) — all 13 generator types with parameters and examples
 - [Advanced Features](advanced_features.md) — cross-entity references, scheduled events, chaos engineering
 - [Process Simulation](process_simulation.md) — chemical engineering and process control scenarios
 - [Incremental Mode](incremental.md) — continuous data generation with HWM state persistence

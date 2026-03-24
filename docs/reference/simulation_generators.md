@@ -1,6 +1,6 @@
 # Simulation Generators Reference
 
-Quick reference for all 12 simulation generator types.
+Quick reference for all 13 simulation generator types.
 
 ## Generator Types
 
@@ -83,6 +83,57 @@ generator:
 - Shocks perturb the walk's internal state, so `mean_reversion` naturally pulls values back — producing realistic spike-and-recover patterns
 - A warning is issued if `shock_rate > 0` without `mean_reversion` — shocks without recovery aren't realistic
 - Works with incremental mode — the last value per entity is saved and restored on the next run
+
+---
+
+### daily_profile
+
+**Purpose:** Time-of-day patterns with day-to-day variation. Values follow a repeating daily curve defined by anchor points.
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| profile | dict | Yes | - | Anchor points mapping `HH:MM` to target values |
+| min | float | Yes | - | Hard lower bound |
+| max | float | Yes | - | Hard upper bound |
+| noise | float | No | `0.0` | Per-reading jitter (±noise) |
+| volatility | float | No | `0.0` | Day-to-day variation in anchor targets (std_dev) |
+| interpolation | string | No | `linear` | `linear` or `step` |
+| precision | int | No | None | Round to N decimal places. `0` = integers |
+| weekend_scale | float | No | None | Scale factor for weekends (0.0–1.0) |
+
+**Data types:** int, float
+
+**How it works:** Interpolates between anchor points to get a base value. If `volatility > 0`, each day's anchors are independently shifted by a random normal amount. Noise is added, then clamped to [min, max] and rounded.
+
+**Example:**
+```yaml
+name: occupancy
+data_type: int
+generator:
+  type: daily_profile
+  min: 0
+  max: 25
+  precision: 0
+  noise: 1.5
+  volatility: 3.0
+  profile:
+    "00:00": 1
+    "08:00": 19
+    "12:00": 15
+    "13:00": 22
+    "17:00": 14
+    "22:00": 2
+```
+
+**Tips:**
+
+- Use `precision: 0` for headcounts, counters, or anything that must be a whole number
+- Use `noise` for reading-to-reading jitter, `volatility` for day-to-day variation in the overall shape
+- Use `weekend_scale: 0.15` for office buildings that are nearly empty on weekends
+- Use `interpolation: step` for shift-based patterns that change abruptly (e.g., factory power at shift change)
+- Pairs well with `derived` columns — e.g., CO2 derived from occupancy
 
 ---
 
@@ -394,6 +445,7 @@ generator:
 |-----------|--------|-------|--------|-------------|-----------|-----------|
 | range | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | random_walk | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| daily_profile | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | categorical | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | boolean | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | timestamp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |

@@ -908,6 +908,6 @@ pipelines:
 ## See Also
 
 - **[Getting Started](getting_started.md)** — Your first simulation in 5 minutes
-- **[Generators Reference](generators.md)** — All 12 generator types with parameters and examples
+- **[Generators Reference](generators.md)** — All 13 generator types with parameters and examples
 - **[Advanced Features](advanced_features.md)** — Cross-entity references, scheduled events, entity overrides, chaos
 - **[Process Simulation](process_simulation.md)** — Chemical engineering and process control scenarios

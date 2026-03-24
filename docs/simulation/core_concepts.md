@@ -404,6 +404,6 @@ The `scope`, `entities`, and `columns` keys are required. `chaos` and `scheduled
 
 Now that you understand the three building blocks, dive deeper:
 
-- **[Generators](generators.md)** — All 12 generator types in detail (range, random_walk, categorical, derived, and more)
+- **[Generators](generators.md)** — All 13 generator types in detail (range, random_walk, daily_profile, categorical, derived, and more)
 - **[Stateful Functions](stateful_functions.md)** — Random walks, incremental mode, and state persistence across runs
 - **[Advanced Features](advanced_features.md)** — Chaos engineering, scheduled events, downtime periods, and entity overrides at scale

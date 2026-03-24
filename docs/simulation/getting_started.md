@@ -405,7 +405,7 @@ With `mode: warn`, the pipeline continues even if tests fail — you'll see warn
 You've built a simulation from scratch, scaled it to multiple entities, added realistic chaos, and wired up transforms and validation. Here's where to go deeper:
 
 - **[Core Concepts](core_concepts.md)** — understand scope, entities, and columns in depth
-- **[Generators Reference](generators.md)** — all 12 generator types with full parameter docs
+- **[Generators Reference](generators.md)** — all 13 generator types with full parameter docs
 - **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()` for dynamic, time-dependent data
 - **[Advanced Features](advanced_features.md)** — cross-entity references, scheduled events, entity overrides
 - **[Patterns & Recipes](patterns.md)** — real-world simulation scenarios (IoT fleets, process control, daily feeds)

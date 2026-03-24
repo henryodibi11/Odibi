@@ -44,8 +44,8 @@ nodes:
 
 ## Key Features
 
-### 🎲 12 Generator Types
-**Basic:** range, random_walk, categorical, boolean, timestamp, sequential, constant  
+### 🎲 13 Generator Types
+**Basic:** range, random_walk, daily_profile, categorical, boolean, timestamp, sequential, constant  
 **Advanced:** derived, uuid, email, ipv4, geo
 
 ### ⚡ Incremental Mode
