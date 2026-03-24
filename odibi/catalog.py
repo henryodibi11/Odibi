@@ -31,7 +31,8 @@ except ImportError:
         Use specific subclasses (StringType, LongType, etc.) to define column types.
         """
 
-        pass
+        def simpleString(self) -> str:
+            return self.__class__.__name__.replace("Type", "").lower()
 
     class StringType(DataType):
         """String/text data type.
