@@ -3200,7 +3200,7 @@ class NodeExecutor:
                 "format": write_cfg.format.value
                 if hasattr(write_cfg.format, "value")
                 else str(write_cfg.format),
-                "table_name": write_cfg.register_table or write_cfg.table,
+                "table_name": write_cfg.register_table or write_cfg.table or "",
                 "last_run": datetime.now(timezone.utc),
                 "row_count": row_count,
             }
@@ -3214,7 +3214,7 @@ class NodeExecutor:
                 "connection_name": output_info.get("connection"),
                 "path": output_info.get("path"),
                 "format": output_info.get("format", "delta"),
-                "table_name": output_info.get("register_table"),
+                "table_name": output_info.get("register_table") or "",
                 "last_run": datetime.now(timezone.utc),
                 "row_count": row_count,
             }

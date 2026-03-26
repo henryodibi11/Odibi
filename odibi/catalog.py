@@ -1525,9 +1525,9 @@ class CatalogManager:
                         "connection_name": output_info.get("connection"),
                         "path": output_info.get("path"),
                         "format": output_info.get("format", "delta"),
-                        "table_name": output_info.get("register_table"),
+                        "table_name": output_info.get("register_table") or "",
                         "last_run": datetime(1970, 1, 1, tzinfo=timezone.utc),
-                        "row_count": None,
+                        "row_count": 0,
                     }
                 )
 

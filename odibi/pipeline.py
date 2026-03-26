@@ -2863,6 +2863,15 @@ class PipelineManager:
             from odibi.story.lineage_utils import generate_lineage_for_pipeline
 
             return generate_lineage_for_pipeline(self.project_config, pipeline_name)
+        except ImportError:
+            self._ctx.debug("generate_lineage_for_pipeline not available, using generate_lineage")
+            try:
+                from odibi.story.lineage_utils import generate_lineage
+
+                return generate_lineage(self.project_config)
+            except Exception as e:
+                self._ctx.warning(f"Failed to build lineage piece for {pipeline_name}: {e}")
+                return None
         except Exception as e:
             self._ctx.warning(f"Failed to build lineage piece for {pipeline_name}: {e}")
             return None
