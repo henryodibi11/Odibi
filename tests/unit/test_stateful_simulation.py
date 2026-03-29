@@ -785,5 +785,169 @@ def test_stateful_functions_persistence_across_incremental_runs():
     assert df2["cumsum"].iloc[0] == 1  # Restarts (current behavior)
 
 
+def test_delay_function_basic():
+    """Test delay() returns value from N steps ago."""
+    config = SimulationConfig(
+        scope=SimulationScope(
+            start_time="2026-01-01T00:00:00Z",
+            timestep="1m",
+            row_count=8,
+            seed=42,
+        ),
+        entities=EntityConfig(count=1, id_prefix="E"),
+        columns=[
+            ColumnGeneratorConfig(
+                name="timestamp",
+                data_type=SimulationDataType.TIMESTAMP,
+                generator=TimestampGeneratorConfig(type="timestamp"),
+            ),
+            ColumnGeneratorConfig(
+                name="input_val",
+                data_type=SimulationDataType.FLOAT,
+                generator=RangeGeneratorConfig(type="range", min=1, max=100),
+            ),
+            ColumnGeneratorConfig(
+                name="delayed_val",
+                data_type=SimulationDataType.FLOAT,
+                generator=DerivedGeneratorConfig(
+                    type="derived",
+                    expression="delay('input_val', 3, 0.0)",
+                ),
+            ),
+        ],
+    )
+
+    engine = SimulationEngine(config)
+    rows = engine.generate()
+
+    assert len(rows) == 8
+
+    input_vals = [r["input_val"] for r in rows]
+    delayed_vals = [r["delayed_val"] for r in rows]
+
+    # First 3 rows should return default (0.0) because buffer not full
+    for i in range(3):
+        assert delayed_vals[i] == 0.0, f"Row {i}: expected default 0.0, got {delayed_vals[i]}"
+
+    # From row 3 onwards, delayed_val should equal input_val from 3 steps ago
+    for i in range(3, len(rows)):
+        assert abs(delayed_vals[i] - input_vals[i - 3]) < 0.01, (
+            f"Row {i}: expected {input_vals[i - 3]}, got {delayed_vals[i]}"
+        )
+
+
+def test_delay_function_multi_entity():
+    """Test delay() maintains separate buffers per entity."""
+    config = SimulationConfig(
+        scope=SimulationScope(
+            start_time="2026-01-01T00:00:00Z",
+            timestep="1m",
+            row_count=5,
+            seed=42,
+        ),
+        entities=EntityConfig(names=["sensor_A", "sensor_B"]),
+        columns=[
+            ColumnGeneratorConfig(
+                name="entity_id",
+                data_type=SimulationDataType.STRING,
+                generator=ConstantGeneratorConfig(type="constant", value="{entity_id}"),
+            ),
+            ColumnGeneratorConfig(
+                name="timestamp",
+                data_type=SimulationDataType.TIMESTAMP,
+                generator=TimestampGeneratorConfig(type="timestamp"),
+            ),
+            ColumnGeneratorConfig(
+                name="reading",
+                data_type=SimulationDataType.FLOAT,
+                generator=RangeGeneratorConfig(type="range", min=10, max=50),
+            ),
+            ColumnGeneratorConfig(
+                name="delayed_reading",
+                data_type=SimulationDataType.FLOAT,
+                generator=DerivedGeneratorConfig(
+                    type="derived",
+                    expression="delay('reading', 2, 0.0)",
+                ),
+            ),
+        ],
+    )
+
+    engine = SimulationEngine(config)
+    rows = engine.generate()
+
+    # Total rows = 5 per entity * 2 entities = 10
+    assert len(rows) == 10
+
+    # Group by entity
+    df = pd.DataFrame(rows)
+
+    for entity in df["entity_id"].unique():
+        entity_df = df[df["entity_id"] == entity].reset_index(drop=True)
+
+        readings = entity_df["reading"].tolist()
+        delayed = entity_df["delayed_reading"].tolist()
+
+        # First 2 rows should return default (0.0)
+        for i in range(2):
+            assert delayed[i] == 0.0, f"{entity} row {i}: expected 0.0, got {delayed[i]}"
+
+        # From row 2 onwards, delayed value should match reading from 2 steps ago
+        for i in range(2, len(entity_df)):
+            assert abs(delayed[i] - readings[i - 2]) < 0.01, (
+                f"{entity} row {i}: expected {readings[i - 2]}, got {delayed[i]}"
+            )
+
+
+def test_delay_function_single_step():
+    """Test delay() with steps=1 behaves like prev()."""
+    config = SimulationConfig(
+        scope=SimulationScope(
+            start_time="2026-01-01T00:00:00Z",
+            timestep="1m",
+            row_count=5,
+            seed=42,
+        ),
+        entities=EntityConfig(count=1, id_prefix="E"),
+        columns=[
+            ColumnGeneratorConfig(
+                name="timestamp",
+                data_type=SimulationDataType.TIMESTAMP,
+                generator=TimestampGeneratorConfig(type="timestamp"),
+            ),
+            ColumnGeneratorConfig(
+                name="value",
+                data_type=SimulationDataType.FLOAT,
+                generator=RangeGeneratorConfig(type="range", min=1, max=100),
+            ),
+            ColumnGeneratorConfig(
+                name="delayed_1",
+                data_type=SimulationDataType.FLOAT,
+                generator=DerivedGeneratorConfig(
+                    type="derived",
+                    expression="delay('value', 1, -1.0)",
+                ),
+            ),
+            ColumnGeneratorConfig(
+                name="prev_val",
+                data_type=SimulationDataType.FLOAT,
+                generator=DerivedGeneratorConfig(
+                    type="derived",
+                    expression="prev('value', -1.0)",
+                ),
+            ),
+        ],
+    )
+
+    engine = SimulationEngine(config)
+    rows = engine.generate()
+
+    # delay(col, 1, default) should behave like prev(col, default)
+    for i, row in enumerate(rows):
+        assert abs(row["delayed_1"] - row["prev_val"]) < 0.01, (
+            f"Row {i}: delay(1)={row['delayed_1']} != prev()={row['prev_val']}"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

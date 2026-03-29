@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-03-29
+
+### Added
+
+- **`delay()` stateful function** for transport delay simulation:
+  - Ring buffer implementation with per-entity, per-column state tracking
+  - Configurable delay steps and default value during buffer fill period
+  - Full documentation in Stateful Functions reference
+  - 3 new tests: basic delay, multi-entity isolation, single-step equivalence with `prev()`
+
+- **Manufacturing Equipment Reference** (`docs/simulation/equipment_reference.md`):
+  - Comprehensive lookup table: 25+ equipment types mapped to simulation patterns
+  - Covers valves, pumps, vessels, heat transfer, conveyors, motors, and instruments
+  - Each entry includes pattern, equation, gain, alpha, and practical notes
+  - Plain-language definitions of gain, alpha, and dt
+  - Complete worked example (globe valve → cooling water flow)
+
+- **Simulation Playbook enhancements** (`docs/simulation/simulation_playbook.md`):
+  - 4 runnable validation configs with engine-verified expected output (first-order, integrator, second-order, dead-time)
+  - Concrete filled-in examples for all 5 reusable pattern templates
+  - Mermaid dependency diagram for System 3 (temperature control loop)
+
+### Fixed
+
+- **Second-order trace table** in simulation playbook: replaced hand-calculated values with engine-verified output (rows 12, 15, 20 were incorrect)
+- **mkdocs navigation**: removed 15 duplicate page entries that caused sidebar hierarchy jumps when clicking between sections
+- **Simulation Playbook placement**: moved from bottom of Simulation nav to near top (after Getting Started)
+
 ## [3.4.0] - 2026-03-12
 
 ### Added

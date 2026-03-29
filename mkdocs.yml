@@ -92,6 +92,8 @@ nav:
       - Overview: simulation/index.md
       - Why Odibi Simulation: simulation/positioning.md
       - Getting Started: simulation/getting_started.md
+      - Simulation Playbook: simulation/simulation_playbook.md
+      - Equipment Reference: simulation/equipment_reference.md
       - Core Concepts: simulation/core_concepts.md
       - Generators Reference: simulation/generators.md
       - Stateful Functions: simulation/stateful_functions.md
@@ -171,7 +173,6 @@ nav:
           - Anti-Patterns: patterns/anti_patterns.md
       - Common Tasks:
           - Writing Transformations: guides/writing_transformations.md
-          - Synthetic Data (Simulation): simulation/getting_started.md
           - Custom Functions Reference: guides/custom_functions.md
           - Variable Substitution: guides/variable_substitution.md
           - Explanation Feature: guides/explanation_feature.md
@@ -190,7 +191,6 @@ nav:
           - Materializing: semantics/materialize.md
           - Running Views: semantics/runner.md
       - Platform & Scaling:
-          - Decision Guide: guides/decision_guide.md
           - Performance Tuning: guides/performance_tuning.md
           - Production Deployment: guides/production_deployment.md
           - Environments: guides/environments.md
@@ -199,10 +199,7 @@ nav:
           - WSL Setup: guides/wsl_setup.md
       - Chemical Engineering (ChemE × DE):
           - 📚 Seborg Textbook Mapping: guides/seborg_textbook_mapping.md
-          - Process Simulation Guide: simulation/process_simulation.md
           - ChemE Simulation Guide: guides/chemical_engineering_simulation_guide.md
-          - Thermodynamics Transformers: guides/thermodynamics.md
-          - Unit Conversion: guides/unit_conversion.md
           - Renewable Energy: guides/odibi_for_renewable_energy.md
 
   # ═════════════════════════════════════════════════════════════════
@@ -221,14 +218,12 @@ nav:
           - Loading Patterns: features/patterns.md
           - Configuration: features/configuration.md
           - State Management: features/state.md
-          - Simulation: simulation/index.md
           - Stories: features/stories.md
           - Orchestration: features/orchestration.md
           - Bulk Copy (SQL Server): features/bulk_copy.md
       - Data Engineering 101:
           - Curriculum: learning/curriculum.md
           - Data Engineering 101: learning/data_engineering_101.md
-          - Glossary: reference/glossary.md
       - ChemE × Data Engineering Course:
           - 🚀 START HERE: learning/cheme_data_course/START_HERE.md
           - 📖 Course Overview: learning/cheme_data_course/index.md
@@ -283,14 +278,6 @@ nav:
           - Schema Tracking: features/schema_tracking.md
           - Catalog: features/catalog.md
           - Catalog Sync: guides/catalog_sync.md
-      - Deployment:
-          - Production Deployment: guides/production_deployment.md
-          - Environments: guides/environments.md
-          - Secrets Management: guides/secrets.md
-          - Azure Setup: guides/setup_azure.md
-          - Performance Tuning: guides/performance_tuning.md
-          - WSL Setup: guides/wsl_setup.md
-      - Troubleshooting: troubleshooting.md
 
   # ─────────────────────────────────────────────
   # REFERENCE - Look up exact syntax
@@ -302,7 +289,6 @@ nav:
       - Configuration: reference/configuration.md
       - Supported Formats: reference/supported_formats.md
       - Engine Parity: reference/PARITY_TABLE.md
-      - Simulation Generators: simulation/generators.md
       - Glossary: reference/glossary.md
       - CLI Reference: features/cli.md
       - AI Deep Context: ODIBI_DEEP_CONTEXT.md

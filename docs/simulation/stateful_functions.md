@@ -1,9 +1,9 @@
 # Stateful Functions Reference
 
-**Complete reference for `prev()`, `ema()`, and `pid()` - the three stateful functions available in `derived` generator expressions.**
+**Complete reference for `prev()`, `ema()`, `pid()`, and `delay()` - the four stateful functions available in `derived` generator expressions.**
 
 !!! example "Why this matters"
-    Three functions turn a row-by-row data generator into a dynamic system simulator. `prev()` gives you memory (tanks fill up, inventories accumulate). `ema()` gives you smoothing (noisy sensors become clean signals). `pid()` gives you feedback control (outputs adjust to hit targets). Without these, you get snapshots. With them, you get time series that behave like real processes - and they persist state across pipeline runs.
+    Four functions turn a row-by-row data generator into a dynamic system simulator. `prev()` gives you memory (tanks fill up, inventories accumulate). `ema()` gives you smoothing (noisy sensors become clean signals). `pid()` gives you feedback control (outputs adjust to hit targets). `delay()` gives you transport lag (pipeline delays, conveyor times). Without these, you get snapshots. With them, you get time series that behave like real processes - and they persist state across pipeline runs.
 
 ---
 
@@ -467,9 +467,164 @@ columns:
 
 ---
 
+## delay(column, steps, default) — Transport Delay
+
+**Full signature:** `delay('column_name', steps, default_value)`
+
+**What it does:** Returns the value of `column_name` from `steps` rows ago for the same entity. Maintains an internal ring buffer of past values. During the first `steps` rows (before the buffer is full), returns `default_value`.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `column` | string | Yes | Column name to delay (must be quoted) |
+| `steps` | int | Yes | Number of timesteps to look back (must be ≥ 1) |
+| `default` | any | Yes | Value to return during the initial fill period |
+
+### Use Cases (General)
+
+- **Pipeline transport:** `delay('pump_flow', 10, 50.0)` — flow arrives at the other end 10 steps later
+- **Conveyor belt:** `delay('weight_at_entry', 20, 0.0)` — weight at exit = weight at entry, 20 steps ago
+- **Batch queue:** `delay('job_submitted', 5, 0)` — result available 5 steps after submission
+- **Measurement lag:** `delay('lab_sample', 30, 0.0)` — lab result arrives 30 minutes after sample taken
+
+### Use Cases (Operations / Manufacturing)
+
+- **Pipeline transport delay** — fluid takes time to travel through a pipe
+- **Conveyor belt** — material placed at one end arrives at the other end after a fixed time
+- **Sample analysis turnaround** — take a sample now, get results N minutes later
+- **Oven/kiln transit time** — product enters, exits after a fixed residence time
+- **Paint drying / curing** — apply coating, inspect after fixed drying time
+
+### Steps Guide
+
+| steps | At 1-min timestep | At 5-min timestep | Feels like |
+|-------|-------------------|-------------------|------------|
+| 1 | 1 minute | 5 minutes | Barely noticeable lag |
+| 5 | 5 minutes | 25 minutes | Short pipeline, nearby conveyor |
+| 10 | 10 minutes | 50 minutes | Medium pipeline, process queue |
+| 30 | 30 minutes | 2.5 hours | Long pipeline, lab analysis |
+| 60 | 1 hour | 5 hours | Cross-facility transport |
+
+**How to calculate steps from physical delay:**
+
+```
+steps = physical_delay_time / scope.timestep
+
+Example: 500m pipe, flow velocity 1 m/s → transit = 500s ≈ 8.3 min
+  At timestep "1m": steps = 8 (round to nearest integer)
+  At timestep "5m": steps = 2
+```
+
+!!! info "What delay() actually looks like in the output"
+
+    Imagine pump flow bouncing between 8 and 12 m³/hr. With `delay('pump_flow', 10, 10.0)` at a 1-minute timestep:
+
+    - **First 10 rows:** Delivery flow sits flat at 10.0 (the default). The pump is running, but nothing has arrived yet.
+    - **From row 11 onwards:** Delivery flow starts bouncing between 8 and 12 — but it's showing what the pump was doing 10 minutes ago. If you overlay the two signals on a chart, the delivery trace is an exact copy of the pump trace, just shifted 10 steps to the right.
+    - **If the pump stops at row 50:** Delivery flow keeps going for 10 more rows (rows 50-60), showing what was already in the pipe. Then it drops to whatever the pump was at row 50.
+
+    **Bottom line:** The output is a time-shifted photocopy of the input. No smoothing, no lag curve — just a pure shift. Combine with first-order dynamics if you want a more gradual arrival.
+
+### Example 1: Pipeline Transport Delay
+
+A pump station sends flow through a 500m pipe. At the delivery point, flow appears 10 minutes later:
+
+```yaml
+columns:
+  - name: timestamp
+    data_type: timestamp
+    generator:
+      type: timestamp
+
+  # Pump output at the source
+  - name: pump_flow_m3_hr
+    data_type: float
+    generator:
+      type: random_walk
+      start: 10.0
+      min: 5.0
+      max: 15.0
+
+  # Flow at the delivery point — delayed by 10 timesteps
+  - name: delivery_flow_m3_hr
+    data_type: float
+    generator:
+      type: derived
+      expression: "delay('pump_flow_m3_hr', 10, 10.0)"
+```
+
+**How it works:**
+
+- For the first 10 rows, `delivery_flow_m3_hr` returns the default (10.0)
+- From row 11 onwards, it returns whatever `pump_flow_m3_hr` was 10 rows ago
+- If pump flow changes at row 20, delivery flow changes at row 30
+
+**Row-by-row (simplified, 3-step delay for clarity):**
+
+With `delay('pump_flow', 3, 10.0)`:
+
+| Row | pump_flow | delay() returns | Why |
+|-----|-----------|-----------------|-----|
+| 1 | 8.5 | 10.0 | Default — only 1 value stored, need 4 |
+| 2 | 11.2 | 10.0 | Default — 2 values stored |
+| 3 | 9.8 | 10.0 | Default — 3 values stored |
+| 4 | 12.1 | **8.5** | Buffer full — returns row 1's value |
+| 5 | 7.9 | **11.2** | Returns row 2's value |
+| 6 | 10.3 | **9.8** | Returns row 3's value |
+
+After the buffer fills (row 4 onwards), every output is exactly the input from 3 steps ago.
+
+### Example 2: Dead Time + First-Order Response
+
+Real transport delays are often followed by first-order dynamics (the pipe has some mixing). Combine `delay()` with `prev()`:
+
+```yaml
+columns:
+  - name: timestamp
+    data_type: timestamp
+    generator:
+      type: timestamp
+
+  - name: input_signal
+    data_type: float
+    generator:
+      type: random_walk
+      start: 50.0
+      min: 20.0
+      max: 80.0
+
+  # Pure delay
+  - name: delayed_input
+    data_type: float
+    generator:
+      type: derived
+      expression: "delay('input_signal', 5, 50.0)"
+
+  # First-order response to the delayed signal
+  - name: output_signal
+    data_type: float
+    generator:
+      type: derived
+      expression: "prev('output_signal', 50.0) + 0.15 * (delayed_input - prev('output_signal', 50.0))"
+```
+
+**Result:** Output is flat for 5 steps (dead time), then gradually approaches the delayed input (first-order dynamics).
+
+### delay() vs prev()
+
+| Function | Looks Back | State | Best For |
+|---|---|---|---|
+| `prev()` | Exactly 1 row | Single value | Dynamic state (integrators, first-order, feedback) |
+| `delay()` | N rows | Ring buffer of N+1 values | Transport delays (fixed time shift) |
+
+`delay('col', 1, default)` produces the same result as `prev('col', default)`.
+
+---
+
 ## Combining Stateful Functions
 
-The real power emerges when you use all three together. Here's a complete example simulating a controlled process with noisy measurements:
+The real power emerges when you use all four together. Here's a complete example simulating a controlled process with noisy measurements:
 
 ```yaml
 scope:
@@ -547,6 +702,7 @@ When using `incremental.mode: stateful`, all stateful functions preserve their i
 | `prev()` | Last value per entity |
 | `ema()` | Last smoothed value per entity |
 | `pid()` | Integral sum and last error per entity |
+| `delay()` | Ring buffer of last N values per entity |
 | `random_walk` | Last walk value per entity |
 
 **What this means:** Run 2 picks up exactly where Run 1 left off — no discontinuities, no resets.
@@ -589,15 +745,17 @@ See [Stateful Incremental Loading](../patterns/incremental_stateful.md) for full
 
 ### ✅ Do
 
-- **Quote column names in `prev()`:** `prev('level', 0)` ✅
+- **Quote column names in `prev()` and `delay()`:** `prev('level', 0)` ✅ — `delay('flow', 5, 0)` ✅
 - **Define columns in dependency order:** If column B uses `prev('A', 0)`, define A before B (or use self-reference like `prev('B', 0)` within B's own expression)
 - **Match `dt` to your actual timestep:** If `scope.timestep: "5m"`, use `dt=300` (5 × 60 seconds) in `pid()`
 - **Use `anti_windup=True`** (the default) to prevent integral windup when the PID output hits min/max limits
 - **Clamp integrated values:** Use `max(0, min(100, ...))` to keep levels, percentages, etc. within physical bounds
+- **Choose a sensible default for `delay()`:** The default is returned during the first N rows while the buffer fills. Use a realistic steady-state value (e.g., `delay('flow', 10, 10.0)` if flow is normally around 10)
+- **Use `delay()` for transport, `prev()` for dynamics:** `delay()` gives a pure time shift (ring buffer). `prev()` gives single-step memory for feedback and integration. Don't use chains of `prev()` columns when `delay()` does the job in one call
 
 ### ❌ Don't
 
-- **Unquoted column names:** `prev(level, 0)` ❌ — will be interpreted as a variable, not a column name
+- **Unquoted column names:** `prev(level, 0)` ❌ or `delay(flow, 5, 0)` ❌ — will be interpreted as a variable, not a column name
 - **Circular dependencies:** Column A depends on current B, and B depends on current A. Use `prev()` to break the cycle:
   ```yaml
   # ❌ Circular

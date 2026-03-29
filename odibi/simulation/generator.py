@@ -258,6 +258,9 @@ class SimulationEngine:
         # Also remove ema() calls - they reference previous state, not current row
         expression_without_prev = re.sub(r"ema\s*\([^)]+\)", "", expression_without_prev)
 
+        # Also remove delay() calls - they reference previous state, not current row
+        expression_without_prev = re.sub(r"delay\s*\([^)]+\)", "", expression_without_prev)
+
         # Remove _timestamp.attr patterns - these are context variables, not column refs
         expression_without_prev = re.sub(
             r"_timestamp\.[a-zA-Z_][a-zA-Z0-9_]*", "", expression_without_prev
@@ -291,6 +294,7 @@ class SimulationEngine:
             # Stateful functions
             "prev",
             "ema",
+            "delay",
             "pid",
             # Context variables
             "_timestamp",
@@ -941,7 +945,12 @@ class SimulationEngine:
             return self._generate_daily_profile(generator, timestamp, rng)
         elif isinstance(generator, DerivedGeneratorConfig):
             return self._generate_derived(
-                generator, current_row or {}, entity_name, entity_state or {}, row_idx, timestamp
+                generator,
+                current_row or {},
+                entity_name,
+                entity_state if entity_state is not None else {},
+                row_idx,
+                timestamp,
             )
         else:
             raise ValueError(f"Unknown generator type: {type(generator)}")
@@ -1409,6 +1418,48 @@ class SimulationEngine:
             entity_state[ema_key] = ema_value
             return ema_value
 
+        def delay(column_name: str, steps: int, default=None):
+            """
+            Return the value of a column from N steps ago (true transport delay).
+
+            Maintains a ring buffer in entity_state to store the last N values.
+
+            Args:
+                column_name: Column to delay (must be quoted)
+                steps: Number of timesteps to delay (must be >= 1)
+                default: Value to return during the initial fill period
+
+            Returns:
+                Value from N steps ago, or default if buffer not yet full
+
+            Example:
+                # Pipeline transport delay: output follows input from 5 steps ago
+                expression: "delay('input_flow', 5, 50.0)"
+            """
+            delay_key = f"_delay_{column_name}_{steps}"
+            buffer = entity_state.get(delay_key, [])
+
+            # Get current value of the column
+            current_value = row_data.get(column_name)
+            if current_value is None:
+                current_value = entity_state.get(column_name, default)
+
+            # Append current value to buffer
+            buffer.append(current_value)
+
+            # If buffer has more than steps+1 entries, trim from front
+            if len(buffer) > steps + 1:
+                buffer = buffer[-(steps + 1) :]
+
+            # Store updated buffer
+            entity_state[delay_key] = buffer
+
+            # Return value from N steps ago if available, else default
+            if len(buffer) > steps:
+                return buffer[0]  # oldest value in the buffer
+            else:
+                return default
+
         def pid(
             pv: float,
             sp: float,
@@ -1510,6 +1561,7 @@ class SimulationEngine:
             # Stateful functions
             "prev": prev,
             "ema": ema,
+            "delay": delay,
             "pid": pid,
             # Utility functions
             "random": _random,
