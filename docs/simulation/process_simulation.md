@@ -798,6 +798,6 @@ From textbooks or plant data:
 
 ### Related Documentation
 
-- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()` reference
+- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` reference
 - **[Generators](generators.md)** — `random_walk` with mean reversion, derived expressions
 - **[Advanced Features](advanced_features.md)** — Cross-entity references, scheduled events, entity overrides

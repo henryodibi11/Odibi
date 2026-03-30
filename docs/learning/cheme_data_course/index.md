@@ -131,7 +131,7 @@ This is a **self-paced, hands-on course** that teaches you:
 
 - YAML pipeline configuration
 - Generators: `random_walk`, `derived`, `range`, `constant`
-- Stateful functions: `prev()`, `ema()`, `pid()`
+- Stateful functions: `prev()`, `ema()`, `pid()`, `delay()`
 - Validation tests and quality gates
 - Quarantine routing for bad data
 - Multi-entity simulations and joins

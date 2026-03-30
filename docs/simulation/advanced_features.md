@@ -590,4 +590,4 @@ options:
 - **[Getting Started](getting_started.md)** — build your first simulation from scratch
 - **[Core Concepts](core_concepts.md)** — scope, entities, and columns in depth
 - **[Generators Reference](generators.md)** — all 13 generator types with parameters
-- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()` for history-dependent values
+- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` for history-dependent values

@@ -34,7 +34,7 @@ This guide maps **Process Dynamics and Control** (Seborg et al., 3rd ed.) to pra
 | Measurement noise | `range` (small) on sensors | Realistic transmitter data |
 | Process nonlinearity | `derived` with conditional logic | Gain scheduling scenarios |
 | ARX/ARMAX models | `prev()` + weighted sums | Discrete-time identification |
-| Transfer functions | Combine `prev()`, `ema()`, `pid()` | Full closed-loop simulations |
+| Transfer functions | Combine `prev()`, `ema()`, `pid()`, `delay()` | Full closed-loop simulations |
 
 ---
 

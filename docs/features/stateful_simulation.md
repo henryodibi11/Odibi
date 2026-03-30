@@ -1,6 +1,6 @@
 # Stateful Simulation Functions
 
-**New in v3.3**: `prev()`, `ema()`, and `pid()` for time-dependent process simulation
+**New in v3.3**: `prev()`, `ema()`, `pid()`, and `delay()` for time-dependent process simulation
 
 ---
 

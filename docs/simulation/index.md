@@ -27,7 +27,7 @@ read:
 | Capability | What You Get |
 |---|---|
 | **13 Generator Types** | `range` · `random_walk` · `daily_profile` · `categorical` · `boolean` · `timestamp` · `sequential` · `constant` · `derived` · `uuid` · `email` · `ipv4` · `geo` |
-| **Stateful Functions** | `prev()`, `ema()`, `pid()` — values that depend on history for dynamic process simulation |
+| **Stateful Functions** | `prev()`, `ema()`, `pid()`, `delay()` — values that depend on history for dynamic process simulation |
 | **Cross-Entity References** | One entity reacts to another: downstream sensor reads upstream output |
 | **Entity Overrides** | Per-entity behavior variation — entity A runs hot, entity B runs cold |
 | **Scheduled Events** | Maintenance windows, setpoint changes, shutdowns at specific times |
@@ -48,7 +48,7 @@ Work through the simulation docs in order, or jump to what you need:
 | :material-rocket-launch: [Getting Started](getting_started.md) | Your first simulation in 5 minutes |
 | :material-book-open-variant: [Core Concepts](core_concepts.md) | Scope, entities, and columns - the three building blocks |
 | :material-format-list-bulleted-type: [Generators Reference](generators.md) | All 13 generator types with parameters and examples |
-| :material-function-variant: [Stateful Functions](stateful_functions.md) | `prev()`, `ema()`, `pid()` — history-dependent values |
+| :material-function-variant: [Stateful Functions](stateful_functions.md) | `prev()`, `ema()`, `pid()`, `delay()` — history-dependent values |
 | :material-puzzle: [Advanced Features](advanced_features.md) | Cross-entity references, overrides, scheduled events, chaos |
 | :material-sync: [Incremental Mode](incremental.md) | Continuous data generation across pipeline runs |
 | :material-chef-hat: [Patterns & Recipes](patterns.md) | Real-world scenarios: IoT fleets, batch reactors, order streams |

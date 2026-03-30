@@ -367,7 +367,7 @@ transform:
 "ema(power_kw, alpha=0.1)"
 ```
 
-**Effort:** 1-2 days to add `prev()`, `ema()`, `pid()` functions
+**Effort:** 1-2 days to add `prev()`, `ema()`, `pid()`, `delay()` functions
 
 #### 2. Cross-Entity Streams [MEDIUM-HIGH, 2-3 days]
 

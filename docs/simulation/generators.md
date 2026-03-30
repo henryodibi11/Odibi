@@ -950,6 +950,6 @@ All generators work across all engines, incremental mode, null injection, and en
 
 ## See Also
 
-- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()` in depth
+- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` in depth
 - **[Advanced Features](advanced_features.md)** — Cross-entity references, dependency DAGs
 - **[Core Concepts](core_concepts.md)** — Entities, scopes, seeds, incremental mode

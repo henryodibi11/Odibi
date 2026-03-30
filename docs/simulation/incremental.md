@@ -412,6 +412,6 @@ incremental:
 ## Related Documentation
 
 - **[Core Concepts](core_concepts.md)** — Scope, entities, and columns — the three building blocks
-- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()` — history-dependent values and their persistence
+- **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` — history-dependent values and their persistence
 - **[Patterns & Recipes](patterns.md)** — Real-world simulation scenarios
 - **[Stateful Incremental Loading](../patterns/incremental_stateful.md)** — Full documentation of Odibi's incremental loading system (shared by all read sources)
