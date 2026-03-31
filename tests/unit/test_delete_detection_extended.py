@@ -8,18 +8,12 @@ _get_connection, _get_jdbc_url, _get_jdbc_properties, and
 _get_sqlalchemy_engine.
 """
 
+import importlib.util
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-
-try:
-    import sqlalchemy
-
-    _has_sqlalchemy = True
-except ImportError:
-    _has_sqlalchemy = False
 
 from odibi.config import (
     DeleteDetectionConfig,
@@ -41,6 +35,8 @@ from odibi.transformers.delete_detection import (
     _get_target_path,
     detect_deletes,
 )
+
+_has_sqlalchemy = importlib.util.find_spec("sqlalchemy") is not None
 
 
 # ============================================================

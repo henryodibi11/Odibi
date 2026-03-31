@@ -1,5 +1,6 @@
 """Tests for #247: Delete detection should handle non-sequential Delta versions."""
 
+import importlib.util
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,12 +9,7 @@ from odibi.config import DeleteDetectionConfig, DeleteDetectionMode
 from odibi.context import EngineContext
 from odibi.enums import EngineType
 
-try:
-    import delta.tables
-
-    _has_delta = True
-except ImportError:
-    _has_delta = False
+_has_delta = importlib.util.find_spec("delta") is not None  # noqa: E402
 
 
 def _make_context(spark_mock, df_mock, table_path="dbfs:/test/table"):
