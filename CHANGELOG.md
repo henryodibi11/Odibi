@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.3] - 2026-03-31
+
+### Fixed
+
+- **Chaos outliers corrupt derived columns** — derived columns (e.g., CO2 from occupancy) are now excluded from outlier injection since their values should follow their source formula
+- **Simulation int columns with nulls become float64** — columns declared as `data_type: int` now use Pandas nullable `Int64` dtype, preserving integer type even when nulls exist
+
 ## [3.6.2] - 2026-03-31
 
 ### Fixed

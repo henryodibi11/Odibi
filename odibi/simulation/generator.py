@@ -1630,8 +1630,13 @@ class SimulationEngine:
         Returns:
             Rows with outliers applied
         """
-        # Find numeric columns
-        numeric_cols = [c.name for c in self.config.columns if c.data_type in ["int", "float"]]
+        # Find numeric columns (exclude derived — their values follow source formulas)
+        numeric_cols = [
+            c.name
+            for c in self.config.columns
+            if c.data_type in ["int", "float"]
+            and not isinstance(c.generator, DerivedGeneratorConfig)
+        ]
 
         if not numeric_cols:
             return rows

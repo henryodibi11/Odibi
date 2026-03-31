@@ -806,6 +806,11 @@ class PandasEngine(Engine):
         # Convert to DataFrame
         df = pd.DataFrame(rows)
 
+        # Cast int columns to nullable Int64 (avoids float promotion when nulls exist)
+        for col_config in sim_config.columns:
+            if col_config.data_type == "int" and col_config.name in df.columns:
+                df[col_config.name] = df[col_config.name].astype("Int64")
+
         # Store max timestamp for HWM tracking
         max_ts = engine.get_max_timestamp(rows)
         if max_ts and hasattr(df, "attrs"):
