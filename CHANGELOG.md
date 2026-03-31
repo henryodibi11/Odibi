@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.2] - 2026-03-31
+
+### Fixed
+
+- **Simulation `data_type: int` not casting** — range generator returned floats even when `data_type: int` was declared; values are now properly rounded and cast to int in both generation paths
+
 ## [3.6.1] - 2026-03-31
 
 ### Fixed

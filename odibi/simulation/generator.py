@@ -688,6 +688,10 @@ class SimulationEngine:
                     if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
                         value = None
 
+                    # Cast to declared data_type
+                    if value is not None and col_config.data_type == "int":
+                        value = int(round(value)) if isinstance(value, float) else value
+
                     row[col_name] = value
 
                 # Update entity state with current row values for next iteration
@@ -794,6 +798,10 @@ class SimulationEngine:
                 # Apply null_rate
                 if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
                     value = None
+
+                # Cast to declared data_type
+                if value is not None and col_config.data_type == "int":
+                    value = int(round(value)) if isinstance(value, float) else value
 
                 row[col_config.name] = value
 
