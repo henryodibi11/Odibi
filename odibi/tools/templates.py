@@ -624,6 +624,54 @@ def _generate_pattern_template(pattern_name: str, pattern_info: Dict[str, Any]) 
     return "\n".join(lines)
 
 
+def _format_recipe_template(name, recipe, show_optional=True, show_comments=True):
+    """Generate a YAML template for a recipe.
+
+    Args:
+        name: Recipe name
+        recipe: RecipeConfig instance
+        show_optional: Include optional variables
+        show_comments: Include description comments
+
+    Returns:
+        YAML template string
+    """
+    lines = []
+    if show_comments:
+        lines.append(f"# Recipe: {name}")
+        if recipe.description:
+            for desc_line in recipe.description.strip().split("\n"):
+                lines.append(f"# {desc_line.strip()}")
+        lines.append("#")
+        if recipe.required_vars:
+            lines.append("# Required variables:")
+            for var in recipe.required_vars:
+                lines.append(f"#   {var:<8} - (required)")
+        if recipe.optional_vars and show_optional:
+            lines.append("# Optional variables (with defaults):")
+            for var, default in recipe.optional_vars.items():
+                lines.append(f"#   {var:<8} - {default}")
+        lines.append("")
+
+    lines.append("- name: my_node                # ← rename to your node")
+    lines.append(f"  recipe: {name}")
+    if recipe.required_vars or (recipe.optional_vars and show_optional):
+        lines.append("  recipe_vars:")
+        for var in recipe.required_vars:
+            lines.append(f"    {var}: <value>  # Required")
+        if show_optional:
+            for var, default in recipe.optional_vars.items():
+                default_str = _generator._format_yaml_value(default)
+                lines.append(f"    # {var}: {default_str}  # Optional (default: {default})")
+    if show_optional and show_comments:
+        lines.append("  # Optional overrides:")
+        lines.append("  # write:")
+        lines.append("  #   connection: my_output")
+        lines.append("  #   format: parquet")
+
+    return "\n".join(lines)
+
+
 def show_template(
     template_type: str,
     show_optional: bool = True,
@@ -675,8 +723,18 @@ def show_template(
             show_comments=show_comments,
         )
 
+    from odibi.recipes import get_recipe_registry
+
+    registry = get_recipe_registry()
+    recipe = registry.get(template_type)
+    if recipe:
+        return _format_recipe_template(template_type, recipe, show_optional, show_comments)
+
     available = sorted(
-        list(connection_models.keys()) + list(pattern_info.keys()) + list(node_models.keys())
+        list(connection_models.keys())
+        + list(pattern_info.keys())
+        + list(node_models.keys())
+        + list(registry.list_recipes().keys())
     )
     raise ValueError(f"Unknown template type: '{template_type}'. Available: {', '.join(available)}")
 
@@ -831,8 +889,12 @@ def list_templates() -> Dict[str, List[str]]:
     Returns:
         Dict with categories as keys and list of template names as values
     """
+    from odibi.recipes import get_recipe_registry
+
+    registry = get_recipe_registry()
     return {
         "connections": list(_get_connection_models().keys()),
         "patterns": list(_get_pattern_info().keys()),
         "configs": list(_get_node_config_models().keys()),
+        "recipes": sorted(registry.list_recipes().keys()),
     }

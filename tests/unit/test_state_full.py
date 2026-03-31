@@ -11,6 +11,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+try:
+    import pyspark  # noqa: F401
+
+    _has_pyspark = True
+except ImportError:
+    _has_pyspark = False
+
 from odibi.state import (
     CatalogStateBackend,
     LocalJSONStateBackend,
@@ -240,6 +247,7 @@ class TestCatalogStateBackend:
             result = b._get_hwm_spark("k")
         assert result == "42"
 
+    @pytest.mark.skipif(not _has_pyspark, reason="pyspark not installed")
     @patch("odibi.state.time.sleep")
     def test_set_hwm_with_session(self, mock_sleep):
         mock_session = MagicMock()

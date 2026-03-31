@@ -1,0 +1,89 @@
+# Bronze Layer Recipes - Ingestion patterns
+
+api_bronze_load:
+  description: >
+    HTTP API to Parquet ingestion with metadata fields, retry, and rate limiting.
+    Standardizes bronze API ingestion with _fetched_at, _load_date, and _source columns.
+  required_vars:
+    - source_name
+  optional_vars:
+    rps: 1
+    max_retries: 3
+    backoff_factor: 2.0
+    timeout_s: 30
+  template:
+    read:
+      format: api
+      options:
+        response:
+          add_fields:
+            _fetched_at: "${date:now}"
+            _load_date: "${date:today}"
+            _source: "${recipe.source_name}"
+        retry:
+          max_retries: "${recipe.max_retries}"
+          backoff_factor: "${recipe.backoff_factor}"
+        rate_limit:
+          requests_per_second: "${recipe.rps}"
+        http:
+          timeout_s: "${recipe.timeout_s}"
+    write:
+      format: parquet
+      mode: append
+      options:
+        partition_by:
+          - _load_date
+
+csv_bronze_load:
+  description: >
+    CSV to Parquet ingestion with column normalization and deduplication.
+    Standardizes bronze CSV ingestion with consistent column naming.
+  required_vars:
+    - keys
+  optional_vars:
+    order_by: null
+  template:
+    read:
+      format: csv
+    transform:
+      steps:
+        - function: normalize_column_names
+    transformer: deduplicate
+    params:
+      keys: "${recipe.keys}"
+      order_by: "${recipe.order_by}"
+    write:
+      format: parquet
+      mode: overwrite
+
+database_bronze_load:
+  description: >
+    Database table to Parquet with incremental loading support.
+    Uses stateful high-water-mark for efficient delta extraction.
+  required_vars:
+    - hwm_column
+  optional_vars:
+    format: parquet
+    write_mode: append
+  template:
+    read:
+      format: sql
+      incremental:
+        mode: stateful
+        column: "${recipe.hwm_column}"
+    write:
+      format: "${recipe.format}"
+      mode: "${recipe.write_mode}"
+
+reference_snapshot:
+  description: >
+    Full-refresh reference/lookup data with load date tracking.
+    Use for slowly changing reference data like countries, currencies, product catalogs.
+  optional_vars: {}
+  required_vars: []
+  template:
+    transform:
+      steps:
+        - function: normalize_column_names
+    write:
+      mode: overwrite

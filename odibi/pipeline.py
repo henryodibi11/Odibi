@@ -2543,29 +2543,32 @@ class PipelineManager:
         overhead_timings["overhead_delta"] = total_overhead - actual_execution
 
         # Print overhead audit report
+        def _pct(value, total):
+            return 100 * value / total if total > 0 else 0.0
+
         print("\n" + "=" * 100)
         print("INTER-PIPELINE OVERHEAD AUDIT")
         print("=" * 100)
         print(f"Total wall-clock time:          {total_overhead:>8.2f}s (100.0%)")
         print(
-            f"Actual pipeline execution:      {actual_execution:>8.2f}s ({100 * actual_execution / total_overhead:>5.1f}%)"
+            f"Actual pipeline execution:      {actual_execution:>8.2f}s ({_pct(actual_execution, total_overhead):>5.1f}%)"
         )
         print(
-            f"Total overhead:                 {overhead_timings['overhead_delta']:>8.2f}s ({100 * overhead_timings['overhead_delta'] / total_overhead:>5.1f}%)"
+            f"Total overhead:                 {overhead_timings['overhead_delta']:>8.2f}s ({_pct(overhead_timings['overhead_delta'], total_overhead):>5.1f}%)"
         )
         print("-" * 100)
         print("OVERHEAD BREAKDOWN:")
         print(
-            f"  Auto-register pipelines:      {overhead_timings.get('auto_register', 0):>8.2f}s ({100 * overhead_timings.get('auto_register', 0) / total_overhead:>5.1f}%)"
+            f"  Auto-register pipelines:      {overhead_timings.get('auto_register', 0):>8.2f}s ({_pct(overhead_timings.get('auto_register', 0), total_overhead):>5.1f}%)"
         )
         print(
-            f"  Inter-pipeline gaps:          {overhead_timings.get('inter_pipeline_gaps_total', 0):>8.2f}s ({100 * overhead_timings.get('inter_pipeline_gaps_total', 0) / total_overhead:>5.1f}%)"
+            f"  Inter-pipeline gaps:          {overhead_timings.get('inter_pipeline_gaps_total', 0):>8.2f}s ({_pct(overhead_timings.get('inter_pipeline_gaps_total', 0), total_overhead):>5.1f}%)"
         )
         print(
-            f"  Lineage generation:           {overhead_timings.get('lineage_generation', 0):>8.2f}s ({100 * overhead_timings.get('lineage_generation', 0) / total_overhead:>5.1f}%)"
+            f"  Lineage generation:           {overhead_timings.get('lineage_generation', 0):>8.2f}s ({_pct(overhead_timings.get('lineage_generation', 0), total_overhead):>5.1f}%)"
         )
         print(
-            f"  Catalog sync flush:           {overhead_timings.get('catalog_sync', 0):>8.2f}s ({100 * overhead_timings.get('catalog_sync', 0) / total_overhead:>5.1f}%)"
+            f"  Catalog sync flush:           {overhead_timings.get('catalog_sync', 0):>8.2f}s ({_pct(overhead_timings.get('catalog_sync', 0), total_overhead):>5.1f}%)"
         )
         print("=" * 100 + "\n")
 

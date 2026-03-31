@@ -7,6 +7,13 @@ import pytest
 
 from odibi.connections.azure_sql import AzureSQL
 
+try:
+    import sqlalchemy  # noqa: F401
+
+    _has_sqlalchemy = True
+except ImportError:
+    _has_sqlalchemy = False
+
 
 class TestAzureSQLConnection:
     """Tests for AzureSQL connection class."""
@@ -98,6 +105,7 @@ class TestAzureSQLConnection:
             conn.validate()
 
 
+@pytest.mark.skipif(not _has_sqlalchemy, reason="sqlalchemy not installed")
 class TestAzureSQLOperations:
     """Tests for Azure SQL read/write operations."""
 
@@ -251,6 +259,7 @@ class TestAzureSQLErrorHandling:
             with pytest.raises(ConnectionError, match="Required packages"):
                 conn.get_engine()
 
+    @pytest.mark.skipif(not _has_sqlalchemy, reason="sqlalchemy not installed")
     @patch("pandas.read_sql")
     @patch("sqlalchemy.create_engine")
     def test_read_sql_handles_connection_error(self, mock_create_engine, mock_read_sql):

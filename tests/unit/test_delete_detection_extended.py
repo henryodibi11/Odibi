@@ -14,6 +14,12 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
+try:
+    import sqlalchemy
+    _has_sqlalchemy = True
+except ImportError:
+    _has_sqlalchemy = False
+
 from odibi.config import (
     DeleteDetectionConfig,
     DeleteDetectionMode,
@@ -652,6 +658,7 @@ class TestGetSqlalchemyEngine:
         conn.get_engine = MagicMock(return_value=fake_engine)
         assert _get_sqlalchemy_engine(conn) is fake_engine
 
+    @pytest.mark.skipif(not _has_sqlalchemy, reason="sqlalchemy not installed")
     @patch("odibi.transformers.delete_detection.create_engine", create=True)
     def test_connection_string(self, mock_create):
         fake_engine = MagicMock()

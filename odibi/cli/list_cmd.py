@@ -254,13 +254,57 @@ def explain_command(args) -> int:
             print("      server: myserver.database.windows.net")
             print("      database: mydb")
 
+    # Check recipes
+    from odibi.recipes import get_recipe_registry
+
+    registry = get_recipe_registry()
+    recipe = registry.get(name)
+    if recipe is not None:
+        if found:
+            print("\n" + "-" * 60 + "\n")
+        found = True
+        print(f"Recipe: {name}")
+        print("=" * 60)
+        print()
+        if recipe.description:
+            print(recipe.description.strip())
+            print()
+        if recipe.required_vars:
+            print("Required Variables:")
+            for var in recipe.required_vars:
+                print(f"  - {var}")
+            print()
+        if recipe.optional_vars:
+            print("Optional Variables (with defaults):")
+            for var, default in recipe.optional_vars.items():
+                print(f"  - {var}: {default}")
+            print()
+        print("Template:")
+        import yaml
+
+        template_yaml = yaml.dump(recipe.template, sort_keys=False, default_flow_style=False)
+        for line in template_yaml.strip().split("\n"):
+            print(f"  {line}")
+        print()
+        print("Example YAML:")
+        print("  nodes:")
+        print("    - name: my_node")
+        print(f"      recipe: {name}")
+        if recipe.required_vars:
+            print("      recipe_vars:")
+            for var in recipe.required_vars:
+                print(f"        {var}: <value>")
+
     if not found:
+        recipe_names = list(registry.list_recipes().keys())
         print(f"Unknown: '{name}'")
         print()
         print("Try one of:")
         print(f"  Transformers: {', '.join(FunctionRegistry.list_functions()[:5])}...")
         print(f"  Patterns: {', '.join(_PATTERNS.keys())}")
         print(f"  Connections: {', '.join(_CONNECTION_FACTORIES.keys())}")
+        if recipe_names:
+            print(f"  Recipes: {', '.join(recipe_names[:5])}...")
         return 1
 
     return 0
@@ -349,11 +393,51 @@ def _extract_pattern_params(pattern_cls) -> List[Dict[str, Any]]:
     return params
 
 
+def list_recipes_command(args) -> int:
+    """List all available recipes."""
+    from odibi.recipes import get_recipe_registry
+
+    registry = get_recipe_registry()
+    recipes = registry.list_recipes()
+
+    if not recipes:
+        print("No recipes available.")
+        return 0
+
+    names = sorted(recipes.keys())
+
+    if args.format == "json":
+        result = []
+        for name in names:
+            recipe = recipes[name]
+            result.append(
+                {
+                    "name": name,
+                    "description": recipe.description or "",
+                    "required_vars": recipe.required_vars,
+                    "optional_vars": recipe.optional_vars,
+                    "template_keys": list(recipe.template.keys()),
+                }
+            )
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"Available Recipes ({len(names)}):")
+        print("=" * 70)
+        for name in names:
+            recipe = recipes[name]
+            desc = (recipe.description or "No description").strip().split("\n")[0]
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+            print(f"  {name:<28} {desc}")
+
+    return 0
+
+
 def add_list_parser(subparsers):
     """Add list subcommand parsers."""
     # odibi list
     list_parser = subparsers.add_parser(
-        "list", help="List available transformers, patterns, or connections"
+        "list", help="List available transformers, patterns, connections, or recipes"
     )
     list_subparsers = list_parser.add_subparsers(dest="list_command")
 
@@ -391,6 +475,16 @@ def add_list_parser(subparsers):
         help="Output format (default: table)",
     )
 
+    # odibi list recipes
+    recipe_parser = list_subparsers.add_parser("recipes", help="List all available recipes")
+    recipe_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["table", "json"],
+        default="table",
+        help="Output format (default: table)",
+    )
+
 
 def add_explain_parser(subparsers):
     """Add explain subcommand parser."""
@@ -410,6 +504,8 @@ def list_command(args) -> int:
         return list_patterns_command(args)
     elif args.list_command == "connections":
         return list_connections_command(args)
+    elif args.list_command == "recipes":
+        return list_recipes_command(args)
     else:
-        print("Usage: odibi list <transformers|patterns|connections>")
+        print("Usage: odibi list <transformers|patterns|connections|recipes>")
         return 1

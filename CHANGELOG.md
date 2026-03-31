@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-03-30
+
+### Added
+
+- **Recipe System** — Reusable node-level templates with variable substitution:
+  - Define common pipeline patterns once, reuse across nodes with `recipe:` and `recipe_vars:`
+  - `${recipe.var_name}` syntax with full type preservation (lists, ints, etc.)
+  - Deep merge: recipe is the base, node-level config overrides (dicts merge recursively, lists replace, scalars node wins)
+  - 12 built-in recipes for medallion architecture:
+    - **Bronze**: `api_bronze_load`, `csv_bronze_load`, `database_bronze_load`, `reference_snapshot`
+    - **Silver**: `silver_clean`, `silver_dedup`, `silver_merge`, `silver_scd2`, `silver_validate_and_write`, `silver_full_conform`
+    - **Gold**: `gold_aggregate`, `gold_pivot_report`
+  - Inline recipes via `recipes:` key in project YAML (override built-ins with same name)
+  - Recipe inheritance with `extends:` — child recipes inherit parent template, required_vars, and optional_vars
+  - Multi-level inheritance support with circular reference detection
+  - `required_vars` and `optional_vars` with defaults for clear error messages
+  - Integration with `odibi validate` — catches unknown recipes and missing required variables
+  - CLI integration:
+    - `odibi list recipes` — list all available recipes
+    - `odibi explain <recipe>` — full recipe details with example YAML
+    - `odibi templates show <recipe>` — copy-pasteable YAML template
+  - Comprehensive documentation in Concepts → Recipes
+  - 69 tests covering config validation, variable substitution, deep merge, inheritance, and built-in integrity
+
+### Fixed
+
+- **Pipeline overhead audit**: Fixed division by zero when `total_overhead=0`
+- **CLI tests**: Replaced bare `python` with `sys.executable` for venv compatibility
+- **Optional dependency tests**: Added `skipif` decorators for sqlalchemy/pyspark/delta when not installed
+- **Markdown renderer tests**: Added `pytest.importorskip("markdown")` guard
+
 ## [3.5.0] - 2026-03-29
 
 ### Added

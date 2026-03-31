@@ -1,0 +1,108 @@
+# Silver Layer Recipes - Conformance and quality patterns
+
+silver_clean:
+  description: >
+    Standard silver cleaning: normalize column names, clean text, trim whitespace,
+    and fill nulls. The basic hygiene recipe for any silver-layer node.
+  optional_vars:
+    text_columns: []
+    text_case: lower
+    null_fills: {}
+  template:
+    transform:
+      steps:
+        - function: normalize_column_names
+        - function: trim_whitespace
+    write:
+      mode: overwrite
+
+silver_dedup:
+  description: >
+    Deduplicate with enforced determinism. Requires both keys and order_by
+    to ensure consistent results across runs and engines.
+  required_vars:
+    - keys
+    - order_by
+  template:
+    transformer: deduplicate
+    params:
+      keys: "${recipe.keys}"
+      order_by: "${recipe.order_by}"
+
+silver_merge:
+  description: >
+    Deduplicate source then upsert/merge into target table.
+    Combines dedup + merge in the standard silver write pattern.
+  required_vars:
+    - keys
+    - target
+  optional_vars:
+    order_by: null
+    strategy: upsert
+  template:
+    transformer: merge
+    params:
+      keys: "${recipe.keys}"
+      target: "${recipe.target}"
+      strategy: "${recipe.strategy}"
+
+silver_scd2:
+  description: >
+    SCD Type 2 with standardized column naming (valid_from, valid_to, is_current).
+    Tracks history for dimension attributes that change over time.
+  required_vars:
+    - keys
+    - track_cols
+    - effective_time_col
+    - target
+  optional_vars:
+    start_time_col: valid_from
+    end_time_col: valid_to
+    current_flag_col: is_current
+  template:
+    transformer: scd2
+    params:
+      keys: "${recipe.keys}"
+      track_cols: "${recipe.track_cols}"
+      effective_time_col: "${recipe.effective_time_col}"
+      target: "${recipe.target}"
+      start_time_col: "${recipe.start_time_col}"
+      end_time_col: "${recipe.end_time_col}"
+      current_flag_col: "${recipe.current_flag_col}"
+
+silver_validate_and_write:
+  description: >
+    Validate data quality, quarantine bad rows, and write clean data.
+    Enforces quality gates before allowing writes to silver.
+  required_vars:
+    - tests
+  optional_vars:
+    quarantine_path: null
+    gate_threshold: 0.95
+    on_fail: warn
+  template:
+    validation:
+      tests: "${recipe.tests}"
+      on_fail: "${recipe.on_fail}"
+
+silver_full_conform:
+  description: >
+    The complete silver conformance recipe: normalize columns, trim whitespace,
+    deduplicate, then merge into target. The "don't think, just use this" recipe
+    for any silver-layer table.
+  required_vars:
+    - keys
+    - target
+  optional_vars:
+    order_by: null
+    strategy: upsert
+  template:
+    transform:
+      steps:
+        - function: normalize_column_names
+        - function: trim_whitespace
+    transformer: merge
+    params:
+      keys: "${recipe.keys}"
+      target: "${recipe.target}"
+      strategy: "${recipe.strategy}"

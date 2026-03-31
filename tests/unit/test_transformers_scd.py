@@ -13,6 +13,13 @@ from odibi.context import EngineContext, PandasContext, SparkContext  # noqa: E4
 from odibi.enums import EngineType  # noqa: E402
 from odibi.transformers.scd import SCD2Params, scd2  # noqa: E402
 
+try:
+    import pyspark  # noqa: F401
+
+    _has_pyspark = True
+except ImportError:
+    _has_pyspark = False
+
 
 class TestSCD2Pandas:
     @pytest.fixture
@@ -630,6 +637,7 @@ class TestSCD2MergeOptimizationParam:
         assert params.use_delta_merge is False
 
 
+@pytest.mark.skipif(not _has_pyspark, reason="pyspark not installed")
 class TestSCD2MergeOptimization:
     """Tests for the optimized SCD2 merge path (mock-based, no real engine needed)."""
 

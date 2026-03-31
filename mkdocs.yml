@@ -218,6 +218,7 @@ nav:
           - Loading Patterns: features/patterns.md
           - Configuration: features/configuration.md
           - State Management: features/state.md
+          - Recipes: features/recipes.md
           - Stories: features/stories.md
           - Orchestration: features/orchestration.md
           - Bulk Copy (SQL Server): features/bulk_copy.md

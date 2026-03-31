@@ -1,0 +1,39 @@
+# Gold Layer Recipes - Business logic patterns
+
+gold_aggregate:
+  description: >
+    Declarative aggregation with grain and measures.
+    Standard gold-layer summarization with audit columns.
+  required_vars:
+    - grain
+    - measures
+  optional_vars:
+    having: null
+    load_timestamp: true
+  template:
+    transformer: aggregate
+    params:
+      grain: "${recipe.grain}"
+      measures: "${recipe.measures}"
+      having: "${recipe.having}"
+    write:
+      mode: overwrite
+
+gold_pivot_report:
+  description: >
+    Pivot data for reporting output. Rotates rows to columns
+    and sorts for Excel-ready or dashboard-ready output.
+  required_vars:
+    - index
+    - columns
+    - values
+  optional_vars:
+    agg_func: sum
+    sort_by: null
+  template:
+    transformer: pivot
+    params:
+      index: "${recipe.index}"
+      columns: "${recipe.columns}"
+      values: "${recipe.values}"
+      agg_func: "${recipe.agg_func}"

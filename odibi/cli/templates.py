@@ -120,7 +120,7 @@ def add_templates_parser(subparsers: argparse._SubParsersAction) -> None:
     list_parser.add_argument(
         "--category",
         "-c",
-        choices=["connections", "patterns", "configs"],
+        choices=["connections", "patterns", "configs", "recipes"],
         help="Filter by category",
     )
     list_parser.add_argument(

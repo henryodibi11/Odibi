@@ -371,6 +371,7 @@ class TestMarkdownFilter:
 
     def test_render_markdown_basic(self):
         """Should render basic markdown to HTML."""
+        pytest.importorskip("markdown")
         renderer = HTMLStoryRenderer()
         result = renderer._render_markdown("**bold** and *italic*")
         assert "<strong>bold</strong>" in result
@@ -378,6 +379,7 @@ class TestMarkdownFilter:
 
     def test_render_markdown_list(self):
         """Should render markdown lists."""
+        pytest.importorskip("markdown")
         renderer = HTMLStoryRenderer()
         result = renderer._render_markdown("1. First\n2. Second")
         assert "<ol>" in result
@@ -385,6 +387,7 @@ class TestMarkdownFilter:
 
     def test_render_markdown_table(self):
         """Should render markdown tables."""
+        pytest.importorskip("markdown")
         renderer = HTMLStoryRenderer()
         md = """
 | Column | Value |
@@ -398,6 +401,7 @@ class TestMarkdownFilter:
 
     def test_render_markdown_code_block(self):
         """Should render code blocks."""
+        pytest.importorskip("markdown")
         renderer = HTMLStoryRenderer()
         md = """
 ```sql

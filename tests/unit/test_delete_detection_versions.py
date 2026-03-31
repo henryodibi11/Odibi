@@ -2,9 +2,17 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from odibi.config import DeleteDetectionConfig, DeleteDetectionMode
 from odibi.context import EngineContext
 from odibi.enums import EngineType
+
+try:
+    import delta.tables
+    _has_delta = True
+except ImportError:
+    _has_delta = False
 
 
 def _make_context(spark_mock, df_mock, table_path="dbfs:/test/table"):
@@ -21,6 +29,7 @@ def _make_context(spark_mock, df_mock, table_path="dbfs:/test/table"):
     return ctx
 
 
+@pytest.mark.skipif(not _has_delta, reason="delta-spark not installed")
 class TestDeleteDetectionVersions:
     """Tests for non-sequential Delta version handling."""
 

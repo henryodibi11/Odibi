@@ -5488,13 +5488,20 @@ def load_config_from_file(path: str) -> ProjectConfig:
     """
     Load and validate configuration from file.
 
+    Handles the full loading pipeline:
+    1. YAML parsing with env var substitution and imports
+    2. Recipe resolution (expand recipe references in nodes)
+    3. Pydantic validation
+
     Args:
         path: Path to YAML file
 
     Returns:
         ProjectConfig
     """
+    from odibi.recipes import resolve_recipes
     from odibi.utils import load_yaml_with_env
 
     config_dict = load_yaml_with_env(path)
+    config_dict = resolve_recipes(config_dict)
     return ProjectConfig(**config_dict)

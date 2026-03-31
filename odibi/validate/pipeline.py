@@ -73,6 +73,21 @@ def validate_yaml(yaml_content: str) -> Dict[str, Any]:
             "summary": "Invalid config structure",
         }
 
+    # Attempt recipe resolution before validation
+    from odibi.recipes import resolve_recipes
+
+    try:
+        config = resolve_recipes(config)
+    except ValueError as e:
+        errors.append(
+            {
+                "code": "RECIPE_ERROR",
+                "field_path": "recipes",
+                "message": str(e),
+                "fix": "Check recipe names and required variables",
+            }
+        )
+
     is_project_config = "project" in config or "connections" in config
     is_pipeline_file = "pipelines" in config and "project" not in config
 

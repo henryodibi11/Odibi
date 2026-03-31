@@ -1,6 +1,7 @@
 """Integration tests for CLI (Phase 2.5)."""
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ class TestCLIHelp:
 
     def test_cli_help_command(self):
         """CLI --help should work."""
-        result = subprocess.run(["python", "-m", "odibi", "--help"], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, "-m", "odibi", "--help"], capture_output=True, text=True)
         assert result.returncode == 0
         output = result.stdout + result.stderr
         assert "discover" in output.lower()
@@ -20,7 +21,7 @@ class TestCLIHelp:
     def test_cli_discover_help(self):
         """CLI discover --help should work."""
         result = subprocess.run(
-            ["python", "-m", "odibi", "discover", "--help"], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "discover", "--help"], capture_output=True, text=True
         )
         assert result.returncode == 0
         output = result.stdout + result.stderr
@@ -29,7 +30,7 @@ class TestCLIHelp:
     def test_cli_validate_help(self):
         """CLI validate --help should work."""
         result = subprocess.run(
-            ["python", "-m", "odibi", "validate", "--help"], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "validate", "--help"], capture_output=True, text=True
         )
         assert result.returncode == 0
         output = result.stdout + result.stderr
@@ -42,7 +43,7 @@ class TestCLIValidateCommand:
     def test_validate_missing_file(self):
         """Validate should fail gracefully with missing file."""
         result = subprocess.run(
-            ["python", "-m", "odibi", "validate", "nonexistent.yaml"],
+            [sys.executable, "-m", "odibi", "validate", "nonexistent.yaml"],
             capture_output=True,
             text=True,
         )
@@ -56,7 +57,7 @@ class TestCLIValidateCommand:
         config_file.write_text("invalid: yaml: content: ][")
 
         result = subprocess.run(
-            ["python", "-m", "odibi", "validate", str(config_file)], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "validate", str(config_file)], capture_output=True, text=True
         )
         assert result.returncode == 1
 
@@ -89,7 +90,7 @@ pipelines:
         )
 
         result = subprocess.run(
-            ["python", "-m", "odibi", "validate", str(config_file)], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "validate", str(config_file)], capture_output=True, text=True
         )
         assert result.returncode == 0
         output = result.stdout + result.stderr
@@ -103,7 +104,7 @@ class TestCLIRunCommand:
     def test_run_missing_file(self):
         """Run should fail gracefully with missing file."""
         result = subprocess.run(
-            ["python", "-m", "odibi", "run", "nonexistent.yaml"], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "run", "nonexistent.yaml"], capture_output=True, text=True
         )
         assert result.returncode == 1
         output = result.stdout + result.stderr
@@ -136,7 +137,7 @@ pipelines:
         )
 
         result = subprocess.run(
-            ["python", "-m", "odibi", "run", str(config_file)], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "run", str(config_file)], capture_output=True, text=True
         )
         # Should fail because data file doesn't exist
         assert result.returncode == 1
@@ -150,7 +151,7 @@ class TestCLIExampleFiles:
         example_path = Path("examples/example_local.yaml")
         if example_path.exists():
             result = subprocess.run(
-                ["python", "-m", "odibi", "validate", str(example_path)],
+                [sys.executable, "-m", "odibi", "validate", str(example_path)],
                 capture_output=True,
                 text=True,
             )
@@ -168,7 +169,7 @@ class TestCLIInvalidCommands:
     @pytest.mark.skip(reason="Subprocess crashes on Windows - covered by unit tests")
     def test_cli_no_command(self):
         """CLI with no command should show help."""
-        result = subprocess.run(["python", "-m", "odibi"], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, "-m", "odibi"], capture_output=True, text=True)
         # Should exit with error and show help
         assert result.returncode == 1
         output = result.stdout + result.stderr
@@ -178,6 +179,6 @@ class TestCLIInvalidCommands:
     def test_cli_invalid_command(self):
         """CLI with invalid command should fail."""
         result = subprocess.run(
-            ["python", "-m", "odibi", "invalid-command"], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "invalid-command"], capture_output=True, text=True
         )
         assert result.returncode != 0
