@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-03-31
+
+### Fixed
+
+- **Lineage save path doubling** — `write_file_local` was prepending `base_path` to an already-resolved path, creating `data/data/stories/lineage/` instead of `data/stories/lineage/`
+- **Ruff F401 lint errors** — replaced unused `import sqlalchemy` and `import delta.tables` with `importlib.util.find_spec()` in delete detection tests
+
 ## [3.6.0] - 2026-03-30
 
 ### Added

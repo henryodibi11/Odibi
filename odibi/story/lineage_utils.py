@@ -204,14 +204,12 @@ def get_write_file(project_config: ProjectConfig) -> Optional[Callable[[str, str
     conn_type_value = conn_type.value if hasattr(conn_type, "value") else str(conn_type)
 
     if conn_type_value == "local":
-        base_path = getattr(story_conn, "base_path", "./data")
 
         def write_file_local(path: str, content: str) -> None:
             import os
 
-            full_path = os.path.join(base_path, path)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            with open(full_path, "w") as f:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as f:
                 f.write(content)
 
         return write_file_local
