@@ -10,6 +10,7 @@ from odibi.enums import EngineType
 
 try:
     import delta.tables
+
     _has_delta = True
 except ImportError:
     _has_delta = False

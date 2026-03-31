@@ -12,7 +12,9 @@ class TestCLIHelp:
 
     def test_cli_help_command(self):
         """CLI --help should work."""
-        result = subprocess.run([sys.executable, "-m", "odibi", "--help"], capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, "-m", "odibi", "--help"], capture_output=True, text=True
+        )
         assert result.returncode == 0
         output = result.stdout + result.stderr
         assert "discover" in output.lower()
@@ -57,7 +59,9 @@ class TestCLIValidateCommand:
         config_file.write_text("invalid: yaml: content: ][")
 
         result = subprocess.run(
-            [sys.executable, "-m", "odibi", "validate", str(config_file)], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "validate", str(config_file)],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
 
@@ -90,7 +94,9 @@ pipelines:
         )
 
         result = subprocess.run(
-            [sys.executable, "-m", "odibi", "validate", str(config_file)], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "validate", str(config_file)],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         output = result.stdout + result.stderr
@@ -104,7 +110,9 @@ class TestCLIRunCommand:
     def test_run_missing_file(self):
         """Run should fail gracefully with missing file."""
         result = subprocess.run(
-            [sys.executable, "-m", "odibi", "run", "nonexistent.yaml"], capture_output=True, text=True
+            [sys.executable, "-m", "odibi", "run", "nonexistent.yaml"],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
         output = result.stdout + result.stderr

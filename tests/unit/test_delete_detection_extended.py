@@ -16,6 +16,7 @@ import pytest
 
 try:
     import sqlalchemy
+
     _has_sqlalchemy = True
 except ImportError:
     _has_sqlalchemy = False
