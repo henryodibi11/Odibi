@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.3] - 2026-04-01
+
+### Changed
+
+- **Sequential IDs unique across entities by default** — sequential generator now offsets each entity's ID range so IDs are globally unique (entity 0 → 1–10, entity 1 → 11–20, etc.). Set `unique_across_entities: false` for per-entity sequences (old behavior).
+
 ## [3.6.3] - 2026-03-31
 
 ### Fixed

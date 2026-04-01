@@ -211,7 +211,7 @@ generator:
 
 ### sequential
 
-**Purpose:** Auto-incrementing integers
+**Purpose:** Auto-incrementing integers (globally unique across entities by default)
 
 **Parameters:**
 
@@ -219,6 +219,7 @@ generator:
 |-----------|------|----------|---------|-------------|
 | start | int | No | 1 | Starting value |
 | step | int | No | 1 | Increment step |
+| unique_across_entities | bool | No | true | Each entity gets a non-overlapping ID range |
 
 **Data types:** int
 

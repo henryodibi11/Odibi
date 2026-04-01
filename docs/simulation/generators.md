@@ -486,12 +486,20 @@ generator:
 
 Generate auto-incrementing integer values.
 
+By default, IDs are **globally unique across entities** — each entity gets a non-overlapping
+range. Entity 0 gets `[start, start + rows)`, entity 1 gets `[start + rows, start + 2*rows)`,
+etc. This prevents duplicate IDs when multiple entities share the same sequential column.
+
+Set `unique_across_entities: false` to revert to per-entity sequences (all entities start
+from the same `start` value).
+
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | start | int | No | `1` | Starting value |
 | step | int | No | `1` | Increment per row |
+| unique_across_entities | bool | No | `true` | Each entity gets a non-overlapping ID range |
 
 **Supported data types:** `int`
 
@@ -517,6 +525,17 @@ generator:
   type: sequential
   start: 1000
   step: 10
+```
+
+**Per-entity sequence (opt-in to old behavior):**
+
+```yaml
+name: local_seq
+data_type: int
+generator:
+  type: sequential
+  start: 1
+  unique_across_entities: false
 ```
 
 ---
