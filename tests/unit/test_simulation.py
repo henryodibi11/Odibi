@@ -1008,7 +1008,7 @@ class TestSimulationEngine:
             if gap < 0:
                 gap += 24  # handle day wrap
             assert gap >= 5, (
-                f"Cooldown violated: triggers at {trigger_times[i-1]} and {trigger_times[i]} "
+                f"Cooldown violated: triggers at {trigger_times[i - 1]} and {trigger_times[i]} "
                 f"(gap={gap}h, expected >= 5h)"
             )
 
@@ -1240,8 +1240,7 @@ class TestSimulationEngine:
 
         # During ramp window, values should increase toward 94.0
         ramp_rows = [
-            r for r in rows
-            if "2026-01-01T02:00:00Z" <= r["timestamp"] <= "2026-01-01T06:00:00Z"
+            r for r in rows if "2026-01-01T02:00:00Z" <= r["timestamp"] <= "2026-01-01T06:00:00Z"
         ]
         assert len(ramp_rows) > 0
 

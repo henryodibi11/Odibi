@@ -1966,9 +1966,7 @@ class ScheduledEvent(BaseModel):
         if self.sustain is not None and self.condition is None:
             raise ValueError("'sustain' requires 'condition'.")
         if self.transition not in ("instant", "ramp"):
-            raise ValueError(
-                f"'transition' must be 'instant' or 'ramp', got '{self.transition}'."
-            )
+            raise ValueError(f"'transition' must be 'instant' or 'ramp', got '{self.transition}'.")
         if self.transition == "ramp":
             has_time_span = self.start_time is not None and self.end_time is not None
             if self.duration is None and not has_time_span:
