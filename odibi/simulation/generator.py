@@ -1583,7 +1583,8 @@ class SimulationEngine:
 
         try:
             # Evaluate expression in restricted namespace
-            result = eval(config.expression, {"__builtins__": {}}, namespace)
+            expr = " ".join(config.expression.split())
+            result = eval(expr, {"__builtins__": {}}, namespace)
             return result
         except NameError as e:
             # Column not yet generated (dependency issue) or undefined
