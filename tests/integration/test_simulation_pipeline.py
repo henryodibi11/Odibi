@@ -146,11 +146,10 @@ class TestSimulationPipeline:
         # Verify status values
         assert set(df["status"].unique()).issubset({"active", "idle", "error"})
 
-        # Verify sequential IDs (per entity)
-        for sensor in ["sensor_01", "sensor_02", "sensor_03"]:
-            sensor_data = df[df["sensor_id"] == sensor]
-            record_ids = sensor_data["record_id"].tolist()
-            assert record_ids == list(range(1, 101))
+        # Verify sequential IDs are globally unique across entities
+        all_ids = sorted(df["record_id"].tolist())
+        assert all_ids == list(range(1, 301))
+        assert df["record_id"].nunique() == 300
 
     def test_simulation_with_transformations(self, tmp_path):
         """Test simulation followed by transformations."""
