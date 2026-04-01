@@ -88,6 +88,7 @@ pipelines:
 | **freshness_sla** | Optional[str] | No | - | Expected freshness, e.g. '6h', '1d' |
 | **freshness_anchor** | Literal['run_completion', 'table_max_timestamp', 'watermark_state'] | No | `run_completion` | What defines freshness. Only 'run_completion' implemented initially. |
 | **nodes** | List[[NodeConfig](#nodeconfig)] | Yes | - | List of nodes in this pipeline |
+| **auto_cache_threshold** | Optional[int] | No | `3` | Auto-cache nodes with N or more downstream dependencies. Prevents redundant ADLS re-reads when a node is used by multiple downstream nodes. Default: 3. Set to null to disable auto-caching. Individual nodes can override with explicit cache: true/false. |
 
 ---
 ### `NodeConfig`
@@ -131,8 +132,8 @@ This ensures you don't need separate "init" and "update" pipelines. One config h
 ### 🏷️ Orchestration Tags
 **Run What You Need.**
 Tags allow you to execute slices of your pipeline.
-*   `odibi run odibi.yaml --tag daily` -> Runs all nodes with "daily" tag.
-*   `odibi run odibi.yaml --tag critical` -> Runs high-priority nodes.
+*   `odibi run --tag daily` -> Runs all nodes with "daily" tag.
+*   `odibi run --tag critical` -> Runs high-priority nodes.
 
 ### 🤖 Choosing Your Logic: Transformer vs. Transform
 
@@ -470,7 +471,11 @@ system:
 | **cost_per_compute_hour** | Optional[float] | No | - | Estimated cost per compute hour (USD) for cost tracking |
 | **databricks_billing_enabled** | bool | No | `False` | Attempt to query Databricks billing tables for actual costs |
 | **retention_days** | Optional[[RetentionConfig](#retentionconfig)] | No | - | Retention periods for system tables |
-| **optimize_catalog** | bool | No | `True` | Run OPTIMIZE + VACUUM on all system catalog Delta tables after each pipeline run. Compacts small files created by frequent MERGE operations. Adds ~15-20s but prevents accumulation of small files that degrade read performance over time. Set to false to skip. |
+| **optimize_catalog** | bool | No | `False` | Run OPTIMIZE + VACUUM on all system catalog Delta tables after each pipeline run. Compacts small files created by frequent MERGE operations. Adds ~15-20s but prevents accumulation of small files that degrade read performance over time. Set to false to skip. |
+| **sync_timeout_seconds** | float | No | `30.0` | Maximum time (seconds) to wait for async catalog sync to complete. Reduced from 300s default to 30s for better performance. Sync is incremental, so incomplete syncs will catch up on next run. |
+| **async_derived_updates** | bool | No | `True` | Run derived table updates (meta_daily_stats, meta_pipeline_health, etc.) asynchronously in background thread. Saves ~20-30s per pipeline. Updates complete eventually - safe for reporting tables. |
+| **async_lineage** | bool | No | `True` | Build lineage incrementally as each pipeline completes, then merge at end. Saves ~40s by parallelizing lineage construction with pipeline execution. Lineage still generated, just built in background. |
+| **skip_sync_wait_in_databricks** | bool | No | `True` | Skip waiting for catalog sync to complete when running in Databricks. Databricks clusters stay alive, so background sync threads complete safely. Saves ~90s overhead. Set to false to always wait for sync completion. |
 
 ---
 ### `SyncFromConfig`

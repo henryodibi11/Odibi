@@ -271,6 +271,75 @@ class TestSimulationEngine:
         ids = [row["id"] for row in rows]
         assert ids == [100, 110, 120, 130, 140]
 
+    def test_sequential_unique_across_entities(self):
+        """Test sequential generator produces non-overlapping IDs across entities."""
+        config = SimulationConfig(
+            scope=SimulationScope(
+                start_time="2026-01-01T00:00:00Z",
+                timestep="1m",
+                row_count=3,
+            ),
+            entities=EntityConfig(names=["web", "mobile", "store"]),
+            columns=[
+                ColumnGeneratorConfig(
+                    name="entity_id",
+                    data_type=SimulationDataType.STRING,
+                    generator=ConstantGeneratorConfig(type="constant", value="{entity_id}"),
+                ),
+                ColumnGeneratorConfig(
+                    name="order_id",
+                    data_type=SimulationDataType.INT,
+                    generator=SequentialGeneratorConfig(type="sequential", start=1, step=1),
+                ),
+            ],
+        )
+
+        engine = SimulationEngine(config)
+        rows = engine.generate()
+
+        # All order_ids should be globally unique
+        order_ids = [row["order_id"] for row in rows]
+        assert len(order_ids) == len(set(order_ids)), (
+            f"Sequential IDs must be unique across entities, got duplicates: {order_ids}"
+        )
+
+        # 3 entities × 3 rows = 9 total rows, IDs 1-9
+        assert sorted(order_ids) == list(range(1, 10))
+
+    def test_sequential_non_unique_across_entities(self):
+        """Test sequential with unique_across_entities=False gives per-entity sequences."""
+        config = SimulationConfig(
+            scope=SimulationScope(
+                start_time="2026-01-01T00:00:00Z",
+                timestep="1m",
+                row_count=3,
+            ),
+            entities=EntityConfig(names=["web", "mobile"]),
+            columns=[
+                ColumnGeneratorConfig(
+                    name="entity_id",
+                    data_type=SimulationDataType.STRING,
+                    generator=ConstantGeneratorConfig(type="constant", value="{entity_id}"),
+                ),
+                ColumnGeneratorConfig(
+                    name="seq",
+                    data_type=SimulationDataType.INT,
+                    generator=SequentialGeneratorConfig(
+                        type="sequential", start=1, step=1, unique_across_entities=False
+                    ),
+                ),
+            ],
+        )
+
+        engine = SimulationEngine(config)
+        rows = engine.generate()
+
+        # Both entities should have the same per-entity sequence
+        web_seqs = [r["seq"] for r in rows if r["entity_id"] == "web"]
+        mobile_seqs = [r["seq"] for r in rows if r["entity_id"] == "mobile"]
+        assert web_seqs == [1, 2, 3]
+        assert mobile_seqs == [1, 2, 3]
+
     def test_null_rate(self):
         """Test null_rate parameter."""
         config = SimulationConfig(

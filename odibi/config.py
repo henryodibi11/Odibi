@@ -1355,17 +1355,29 @@ class TimestampGeneratorConfig(BaseModel):
 class SequentialGeneratorConfig(BaseModel):
     """Sequential number generator.
 
+    By default, generates globally unique IDs across all entities by offsetting
+    each entity's sequence range. Entity 0 gets IDs [start, start + rows),
+    entity 1 gets [start + rows, start + 2*rows), etc.
+
+    Set ``unique_across_entities: false`` for per-entity sequences (all entities
+    share the same ID range).
+
     Example:
     ```yaml
     type: sequential
     start: 1
     step: 1
+    unique_across_entities: true  # default
     ```
     """
 
     type: Literal["sequential"]
     start: int = Field(default=1, description="Starting value")
     step: int = Field(default=1, description="Increment step")
+    unique_across_entities: bool = Field(
+        default=True,
+        description="When true, each entity gets a non-overlapping ID range",
+    )
 
 
 class ConstantGeneratorConfig(BaseModel):

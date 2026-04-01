@@ -925,7 +925,10 @@ class SimulationEngine:
             # Return Zulu time format (Z suffix) for consistency
             return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
         elif isinstance(generator, SequentialGeneratorConfig):
-            return generator.start + ((row_idx + self.rows_before_hwm) * generator.step)
+            global_row = row_idx + self.rows_before_hwm
+            if generator.unique_across_entities:
+                global_row += entity_idx * self.total_rows
+            return generator.start + (global_row * generator.step)
         elif isinstance(generator, ConstantGeneratorConfig):
             # Support magic variables
             value = str(generator.value)

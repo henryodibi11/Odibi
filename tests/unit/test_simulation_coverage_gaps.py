@@ -91,16 +91,11 @@ class TestWriteModeCompatibility:
         engine = SimulationEngine(config)
         rows = engine.generate()
 
-        # Each entity should have unique sequences
-        for device in ["device_01", "device_02", "device_03"]:
-            device_rows = [r for r in rows if r["device_id"] == device]
-            sequences = [r["sequence"] for r in device_rows]
-            # Should be 1, 2, 3, ..., 10
-            assert sequences == list(range(1, 11))
-
-        # Composite key (device_id, sequence) should be unique
-        composite_keys = [(r["device_id"], r["sequence"]) for r in rows]
-        assert len(composite_keys) == len(set(composite_keys)), "Composite keys must be unique"
+        # With unique_across_entities=True (default), each entity gets a non-overlapping range
+        # 3 entities × 10 rows: entity 0 → 1-10, entity 1 → 11-20, entity 2 → 21-30
+        all_sequences = [r["sequence"] for r in rows]
+        assert sorted(all_sequences) == list(range(1, 31))
+        assert len(all_sequences) == len(set(all_sequences)), "All IDs must be globally unique"
 
 
 class TestLargeScalePerformance:
