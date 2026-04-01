@@ -129,8 +129,13 @@ class SimulationEngine:
         if hwm_timestamp:
             hwm_dt = datetime.fromisoformat(hwm_timestamp.replace("Z", "+00:00"))
             self.effective_start_time = hwm_dt + timedelta(seconds=self.timestep_seconds)
+            self.rows_before_hwm = int(
+                (self.effective_start_time - self.start_time).total_seconds()
+                / self.timestep_seconds
+            )
         else:
             self.effective_start_time = self.start_time
+            self.rows_before_hwm = 0
 
         # Calculate total rows and end time
         if config.scope.row_count:
@@ -537,17 +542,8 @@ class SimulationEngine:
             base_entity_seed = self.config.scope.seed + int(entity_hash, 16) % (2**31)
 
             # Advance RNG for incremental mode
-            if self.hwm_timestamp:
-                # Calculate how many rows were already generated (before HWM)
-                rows_before_hwm = int(
-                    (self.effective_start_time - self.start_time).total_seconds()
-                    / self.timestep_seconds
-                )
-                # Advance seed based on rows already generated
-                # This ensures new runs don't repeat the same random sequence
-                entity_seed = base_entity_seed + rows_before_hwm
-            else:
-                entity_seed = base_entity_seed
+            # This ensures new runs don't repeat the same random sequence
+            entity_seed = base_entity_seed + self.rows_before_hwm
 
             entity_rng = np.random.default_rng(entity_seed)
 
@@ -929,14 +925,14 @@ class SimulationEngine:
             # Return Zulu time format (Z suffix) for consistency
             return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
         elif isinstance(generator, SequentialGeneratorConfig):
-            return generator.start + (row_idx * generator.step)
+            return generator.start + ((row_idx + self.rows_before_hwm) * generator.step)
         elif isinstance(generator, ConstantGeneratorConfig):
             # Support magic variables
             value = str(generator.value)
             value = value.replace("{entity_id}", entity_name)
             value = value.replace("{entity_index}", str(entity_idx))
             value = value.replace("{timestamp}", timestamp.isoformat())
-            value = value.replace("{row_number}", str(row_idx))
+            value = value.replace("{row_number}", str(row_idx + self.rows_before_hwm))
             # Convert back to original type if it wasn't a template
             if value == str(generator.value):
                 return generator.value
@@ -1578,7 +1574,7 @@ class SimulationEngine:
         # Combine row data with safe builtins, entity proxies, and context variables
         namespace = {**row_data, **safe_builtins, **self.entity_proxies}
         namespace["entity_id"] = entity_name
-        namespace["_row_index"] = row_idx
+        namespace["_row_index"] = row_idx + self.rows_before_hwm
         namespace["_timestamp"] = timestamp
 
         try:
