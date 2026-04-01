@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.4] - 2026-04-01
+
+### Fixed
+
+- **`parameter_override` and `setpoint_change` scheduled events now work** — both event types were defined in config but silently ignored by the simulation engine. `parameter_override` now overrides the value AND resets the random walk internal state (critical for CIP cleaning cycles in Pattern 5). `setpoint_change` now applies the value permanently from `start_time`.
+
 ## [3.7.3] - 2026-04-01
 
 ### Changed

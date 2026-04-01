@@ -677,8 +677,17 @@ class SimulationEngine:
                     active_event = self._get_active_scheduled_event(
                         entity_name, col_name, row_timestamp
                     )
-                    if active_event and active_event.type == ScheduledEventType.FORCED_VALUE:
-                        value = active_event.value
+                    if active_event:
+                        if active_event.type in (
+                            ScheduledEventType.FORCED_VALUE,
+                            ScheduledEventType.SETPOINT_CHANGE,
+                        ):
+                            value = active_event.value
+                        elif active_event.type == ScheduledEventType.PARAMETER_OVERRIDE:
+                            value = active_event.value
+                            # Reset random walk state so it continues from this value
+                            if col_name in entity_random_walk:
+                                entity_random_walk[col_name] = float(active_event.value)
 
                     # Apply null_rate
                     if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
@@ -788,8 +797,17 @@ class SimulationEngine:
                 active_event = self._get_active_scheduled_event(
                     entity_name, col_name, row_timestamp
                 )
-                if active_event and active_event.type == ScheduledEventType.FORCED_VALUE:
-                    value = active_event.value
+                if active_event:
+                    if active_event.type in (
+                        ScheduledEventType.FORCED_VALUE,
+                        ScheduledEventType.SETPOINT_CHANGE,
+                    ):
+                        value = active_event.value
+                    elif active_event.type == ScheduledEventType.PARAMETER_OVERRIDE:
+                        value = active_event.value
+                        # Reset random walk state so it continues from this value
+                        if col_name in random_walk_current:
+                            random_walk_current[col_name] = float(active_event.value)
 
                 # Apply null_rate
                 if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:

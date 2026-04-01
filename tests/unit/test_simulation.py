@@ -8,7 +8,9 @@ from odibi.config import (
     ColumnGeneratorConfig,
     ConstantGeneratorConfig,
     EntityConfig,
+    RandomWalkGeneratorConfig,
     RangeGeneratorConfig,
+    ScheduledEvent,
     SequentialGeneratorConfig,
     SimulationConfig,
     SimulationDataType,
@@ -478,3 +480,121 @@ class TestSimulationEngine:
         if rows1 and rows2:
             first_ts2 = rows2[0]["timestamp"]
             assert first_ts2 > max_ts1
+
+    def test_parameter_override_resets_random_walk(self):
+        """Test parameter_override resets random walk value (e.g., CIP cleaning)."""
+        config = SimulationConfig(
+            scope=SimulationScope(
+                start_time="2026-01-01T00:00:00Z",
+                timestep="1h",
+                row_count=48,  # 2 days
+                seed=42,
+            ),
+            entities=EntityConfig(names=["HX_01"]),
+            columns=[
+                ColumnGeneratorConfig(
+                    name="equipment_id",
+                    data_type=SimulationDataType.STRING,
+                    generator=ConstantGeneratorConfig(type="constant", value="{entity_id}"),
+                ),
+                ColumnGeneratorConfig(
+                    name="timestamp",
+                    data_type=SimulationDataType.TIMESTAMP,
+                    generator=TimestampGeneratorConfig(type="timestamp"),
+                ),
+                ColumnGeneratorConfig(
+                    name="efficiency",
+                    data_type=SimulationDataType.FLOAT,
+                    generator=RandomWalkGeneratorConfig(
+                        type="random_walk",
+                        start=94.0,
+                        min=60.0,
+                        max=95.0,
+                        volatility=0.1,
+                        trend=-0.1,
+                        mean_reversion=0.0,
+                    ),
+                ),
+            ],
+            scheduled_events=[
+                ScheduledEvent(
+                    type="parameter_override",
+                    entity="HX_01",
+                    column="efficiency",
+                    value=94.0,
+                    start_time="2026-01-02T00:00:00Z",
+                    end_time="2026-01-02T04:00:00Z",
+                ),
+            ],
+        )
+
+        engine = SimulationEngine(config)
+        rows = engine.generate()
+
+        # During the override window (hours 24-28), efficiency should be 94.0
+        override_rows = [r for r in rows if "2026-01-02T00" <= r["timestamp"] <= "2026-01-02T04"]
+        for r in override_rows:
+            assert r["efficiency"] == 94.0, (
+                f"At {r['timestamp']}, efficiency should be 94.0 during override, got {r['efficiency']}"
+            )
+
+        # After override ends, walk should continue from 94.0 (not from pre-override value)
+        post_rows = [r for r in rows if r["timestamp"] > "2026-01-02T04:00:00Z"]
+        if post_rows:
+            # First value after override should be close to 94.0 (one step away)
+            assert post_rows[0]["efficiency"] > 90.0, (
+                "Random walk should continue from reset value, not pre-override value"
+            )
+
+    def test_setpoint_change_overrides_value(self):
+        """Test setpoint_change works like forced_value."""
+        config = SimulationConfig(
+            scope=SimulationScope(
+                start_time="2026-01-01T00:00:00Z",
+                timestep="1h",
+                row_count=10,
+                seed=42,
+            ),
+            entities=EntityConfig(names=["Reactor_01"]),
+            columns=[
+                ColumnGeneratorConfig(
+                    name="entity_id",
+                    data_type=SimulationDataType.STRING,
+                    generator=ConstantGeneratorConfig(type="constant", value="{entity_id}"),
+                ),
+                ColumnGeneratorConfig(
+                    name="timestamp",
+                    data_type=SimulationDataType.TIMESTAMP,
+                    generator=TimestampGeneratorConfig(type="timestamp"),
+                ),
+                ColumnGeneratorConfig(
+                    name="setpoint",
+                    data_type=SimulationDataType.FLOAT,
+                    generator=ConstantGeneratorConfig(type="constant", value=350.0),
+                ),
+            ],
+            scheduled_events=[
+                ScheduledEvent(
+                    type="setpoint_change",
+                    entity="Reactor_01",
+                    column="setpoint",
+                    value=370.0,
+                    start_time="2026-01-01T05:00:00Z",
+                    # No end_time = permanent
+                ),
+            ],
+        )
+
+        engine = SimulationEngine(config)
+        rows = engine.generate()
+
+        # Before setpoint change: 350.0
+        before = [r for r in rows if r["timestamp"] < "2026-01-01T05:00:00Z"]
+        for r in before:
+            assert r["setpoint"] == 350.0
+
+        # After setpoint change: 370.0 (permanent)
+        after = [r for r in rows if r["timestamp"] >= "2026-01-01T05:00:00Z"]
+        assert len(after) > 0
+        for r in after:
+            assert r["setpoint"] == 370.0
