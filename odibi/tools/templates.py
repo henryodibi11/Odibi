@@ -855,8 +855,236 @@ def generate_json_schema(
         "Generated from Pydantic models - do not edit manually."
     )
 
+    # Auto-inject all config models that aren't reachable from ProjectConfig
+    # (e.g., SimulationConfig, ApiOptionsConfig live under Dict[str, Any] options)
+    try:
+        import inspect
+        from enum import Enum
+
+        from pydantic import BaseModel as PydanticBase
+
+        from odibi import config as config_module
+
+        if "$defs" not in schema:
+            schema["$defs"] = {}
+
+        existing_defs = set(schema["$defs"].keys())
+
+        # Find all BaseModel/Enum subclasses defined in config.py
+        models_to_inject = []
+        for name, obj in inspect.getmembers(config_module):
+            if not inspect.isclass(obj) or obj.__module__ != "odibi.config":
+                continue
+            if name in existing_defs:
+                continue
+            if issubclass(obj, PydanticBase) and obj is not PydanticBase:
+                models_to_inject.append(obj)
+            elif issubclass(obj, Enum):
+                models_to_inject.append(obj)
+
+        for model_cls in models_to_inject:
+            if issubclass(model_cls, PydanticBase):
+                model_schema = model_cls.model_json_schema(by_alias=True)
+                for def_name, def_body in model_schema.pop("$defs", {}).items():
+                    if def_name not in schema["$defs"]:
+                        schema["$defs"][def_name] = def_body
+                schema["$defs"][model_cls.__name__] = model_schema
+
+        # Enrich ReadConfig.options with typed properties for known formats
+        # Uses a flat object with all known keys optional + additionalProperties
+        # so autocomplete works without oneOf/anyOf validation conflicts
+        read_config = schema.get("$defs", {}).get("ReadConfig", {})
+        if read_config:
+            read_config.get("properties", {})["options"] = {
+                "type": "object",
+                "description": (
+                    "Format-specific options. For format: simulation, use a 'simulation' "
+                    "key with SimulationConfig. For format: api, use pagination, response, "
+                    "retry, rate_limit keys."
+                ),
+                "properties": {
+                    "simulation": {"$ref": "#/$defs/SimulationConfig"},
+                    "pagination": {"$ref": "#/$defs/ApiPaginationConfig"},
+                    "response": {"$ref": "#/$defs/ApiResponseConfig"},
+                    "retry": {"$ref": "#/$defs/ApiRetryConfig"},
+                    "rate_limit": {"$ref": "#/$defs/ApiRateLimitConfig"},
+                },
+                "additionalProperties": True,
+                "title": "Options",
+            }
+
+        # Add recipe support: RecipeConfig model + top-level recipes field + node-level fields
+        # These are pre-processed before Pydantic validation so they're not in the models
+        try:
+            from odibi.recipes import RecipeConfig, get_recipe_registry
+
+            recipe_schema = RecipeConfig.model_json_schema(by_alias=True)
+            for def_name, def_body in recipe_schema.pop("$defs", {}).items():
+                if def_name not in schema["$defs"]:
+                    schema["$defs"][def_name] = def_body
+            schema["$defs"]["RecipeConfig"] = recipe_schema
+
+            # Collect built-in recipe names for autocomplete
+            builtin_recipe_names = sorted(get_recipe_registry().list_recipes().keys())
+        except ImportError:
+            builtin_recipe_names = []
+
+        # Add semantic layer models (SemanticLayerConfig lives in semantics module)
+        try:
+            from odibi.semantics.metrics import SemanticLayerConfig
+
+            sem_schema = SemanticLayerConfig.model_json_schema(by_alias=True)
+            for def_name, def_body in sem_schema.pop("$defs", {}).items():
+                if def_name not in schema["$defs"]:
+                    schema["$defs"][def_name] = def_body
+            schema["$defs"]["SemanticLayerConfig"] = sem_schema
+
+            # Replace the generic semantic field with typed reference
+            semantic_typed = {
+                "anyOf": [
+                    {"$ref": "#/$defs/SemanticLayerConfig"},
+                    {"type": "null"},
+                ],
+                "default": None,
+                "description": (
+                    "Semantic layer: metrics, dimensions, materializations, and views. "
+                    "Can be inline or loaded from external file."
+                ),
+                "title": "Semantic",
+            }
+            for target in [schema, schema.get("$defs", {}).get("ProjectConfig", {})]:
+                if target and target.get("properties", {}).get("semantic"):
+                    target["properties"]["semantic"] = semantic_typed
+        except ImportError:
+            pass
+
+        # Add imports to root + ProjectConfig (pre-processed before Pydantic sees it)
+        imports_field = {
+            "anyOf": [
+                {"type": "array", "items": {"type": "string"}},
+                {"type": "string"},
+            ],
+            "description": (
+                "Import other YAML files to merge into this config. "
+                "Paths are relative to this YAML file. "
+                "Example: imports: ['pipelines/bronze.yaml', 'pipelines/silver.yaml']"
+            ),
+            "title": "Imports",
+        }
+
+        # Add recipes to ProjectConfig (pre-processed before Pydantic sees it)
+        # Must add to both root schema and $defs/ProjectConfig since Pydantic
+        # puts ProjectConfig properties at the root level
+        recipes_field = {
+            "type": "object",
+            "additionalProperties": {"$ref": "#/$defs/RecipeConfig"},
+            "description": (
+                "Reusable node templates with variable substitution. "
+                "Define a recipe once, use it in many nodes with recipe_vars."
+            ),
+            "title": "Recipes",
+        }
+        for target in [schema, schema.get("$defs", {}).get("ProjectConfig", {})]:
+            if target:
+                props = target.get("properties", {})
+                if props:
+                    if "recipes" not in props:
+                        props["recipes"] = recipes_field
+                    if "imports" not in props:
+                        props["imports"] = imports_field
+
+        # Add recipe/recipe_vars to NodeConfig (consumed before Pydantic validation)
+        node_config = schema.get("$defs", {}).get("NodeConfig", {})
+        if node_config:
+            node_props = node_config.get("properties", {})
+            if "recipe" not in node_props:
+                # Include built-in recipe names as enum suggestions
+                recipe_field = {
+                    "description": (
+                        "Name of a recipe to apply to this node. "
+                        "Can be a built-in recipe or one defined in the recipes section."
+                    ),
+                    "title": "Recipe",
+                }
+                if builtin_recipe_names:
+                    recipe_field["anyOf"] = [
+                        {
+                            "type": "string",
+                            "enum": builtin_recipe_names,
+                            "description": f"Built-in recipes: {len(builtin_recipe_names)} available",
+                        },
+                        {"type": "string"},
+                    ]
+                else:
+                    recipe_field["type"] = "string"
+                node_props["recipe"] = recipe_field
+            if "recipe_vars" not in node_props:
+                node_props["recipe_vars"] = {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": "Variables to pass to the recipe template (replaces ${recipe.var_name} placeholders).",
+                    "title": "Recipe Vars",
+                }
+            # Add pattern shorthand (pre-processed into transformer + params)
+            if "pattern" not in node_props:
+                pattern_types = []
+                try:
+                    from odibi.patterns import _PATTERNS
+
+                    pattern_types = sorted(_PATTERNS.keys())
+                except ImportError:
+                    pass
+                node_props["pattern"] = {
+                    "type": "object",
+                    "description": (
+                        "Pattern shorthand: expands to transformer + params. "
+                        "Example: pattern: { type: dimension, params: { natural_key: id } }"
+                    ),
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            **({"enum": pattern_types} if pattern_types else {}),
+                            "description": "Pattern type (dimension, fact, scd2, merge, aggregation, date_dimension)",
+                        },
+                        "params": {
+                            "type": "object",
+                            "additionalProperties": True,
+                            "description": "Pattern parameters",
+                        },
+                    },
+                    "required": ["type"],
+                    "title": "Pattern",
+                }
+
+        # Inject pattern param models (SCD2Params, MergeParams, etc.) from patterns module
+        try:
+            from pydantic import BaseModel as _PB
+
+            from odibi.patterns import _PATTERNS
+
+            for pattern_name, pattern_cls in _PATTERNS.items():
+                params_model = getattr(pattern_cls, "params_model", None)
+                if (
+                    params_model
+                    and isinstance(params_model, type)
+                    and issubclass(params_model, _PB)
+                ):
+                    if params_model.__name__ not in schema["$defs"]:
+                        p_schema = params_model.model_json_schema(by_alias=True)
+                        for def_name, def_body in p_schema.pop("$defs", {}).items():
+                            if def_name not in schema["$defs"]:
+                                schema["$defs"][def_name] = def_body
+                        schema["$defs"][params_model.__name__] = p_schema
+        except (ImportError, AttributeError):
+            pass
+
+    except ImportError:
+        pass
+
     if include_transformers:
         try:
+            from pydantic import BaseModel as PydanticBase
+
             from odibi.registry import FunctionRegistry
             from odibi.transformers import register_standard_library
 
@@ -873,6 +1101,102 @@ def generate_json_schema(
                 "enum": sorted(transformer_names),
                 "description": f"Available transformers: {len(transformer_names)} registered",
             }
+
+            # Inject all transformer param models and build a union for
+            # NodeConfig.params and TransformStep.params
+            all_param_properties = {}
+            for tname in sorted(transformer_names):
+                info = FunctionRegistry.get_function_info(tname)
+                p = info.get("parameters", {}).get("params", {})
+                ann = p.get("annotation")
+                # Handle Union types (e.g., Union[MergeParams, Any, None])
+                if ann and hasattr(ann, "__args__"):
+                    for arg in ann.__args__:
+                        if isinstance(arg, type) and issubclass(arg, PydanticBase):
+                            ann = arg
+                            break
+                # Handle string forward references (e.g., "SCD2Params")
+                if isinstance(ann, str):
+                    import importlib
+
+                    func = FunctionRegistry.get_function(tname)
+                    if func and hasattr(func, "__module__"):
+                        try:
+                            mod = importlib.import_module(func.__module__)
+                            resolved = getattr(mod, ann, None)
+                            if resolved and isinstance(resolved, type):
+                                ann = resolved
+                        except (ImportError, AttributeError):
+                            pass
+                # Also try the registry's param model lookup
+                if not (ann and isinstance(ann, type) and issubclass(ann, PydanticBase)):
+                    try:
+                        pm = FunctionRegistry.get_param_model(tname)
+                        if pm and isinstance(pm, type) and issubclass(pm, PydanticBase):
+                            ann = pm
+                    except Exception:
+                        pass
+                if ann and isinstance(ann, type) and issubclass(ann, PydanticBase):
+                    model_schema = ann.model_json_schema(by_alias=True)
+                    for def_name, def_body in model_schema.pop("$defs", {}).items():
+                        if def_name not in schema["$defs"]:
+                            schema["$defs"][def_name] = def_body
+                    schema["$defs"][ann.__name__] = model_schema
+                    # Collect every field from every param model as optional
+                    for field_name, field_schema in model_schema.get("properties", {}).items():
+                        if field_name not in all_param_properties:
+                            all_param_properties[field_name] = field_schema
+
+            # Enrich NodeConfig.params and TransformStep.params with all known
+            # transformer param fields so autocomplete suggests them
+            params_schema = {
+                "type": "object",
+                "description": (
+                    "Parameters for transformer or operation. "
+                    "Available fields depend on the chosen transformer."
+                ),
+                "properties": all_param_properties,
+                "additionalProperties": True,
+                "title": "Params",
+            }
+            for model_name in ["NodeConfig", "TransformStep"]:
+                model_def = schema.get("$defs", {}).get(model_name, {})
+                if model_def and "params" in model_def.get("properties", {}):
+                    model_def["properties"]["params"] = params_schema
+
+            # Wire NodeConfig.transformer, TransformStep.operation/function
+            # to suggest the registered transformer names
+            transformer_enum_schema = {
+                "anyOf": [
+                    {"$ref": "#/$defs/TransformOperation"},
+                    {"type": "null"},
+                ],
+                "default": None,
+            }
+            nc_def = schema.get("$defs", {}).get("NodeConfig", {})
+            if nc_def:
+                nc_def.get("properties", {})["transformer"] = {
+                    **transformer_enum_schema,
+                    "description": (
+                        "Name of the 'App' logic to run (e.g., 'deduplicate', 'scd2'). "
+                        "See Transformer Catalog for options."
+                    ),
+                    "title": "Transformer",
+                }
+            ts_def = schema.get("$defs", {}).get("TransformStep", {})
+            if ts_def:
+                ts_props = ts_def.get("properties", {})
+                ts_props["operation"] = {
+                    **transformer_enum_schema,
+                    "description": "Built-in operation name (e.g., drop_duplicates, fill_na).",
+                    "title": "Operation",
+                }
+                ts_props["function"] = {
+                    **transformer_enum_schema,
+                    "description": "Name of a registered Python function (@transform or @register).",
+                    "title": "Function",
+                }
+
         except ImportError:
             pass
 

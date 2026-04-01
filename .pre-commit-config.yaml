@@ -82,7 +82,7 @@ repos:
         description: Scans for private keys and secrets
 
   # ============================================================================
-  # DOCS SYNC - Auto-regenerate yaml_schema.md when config models change
+  # DOCS & SCHEMA SYNC - Auto-regenerate when config models change
   # ============================================================================
   - repo: local
     hooks:
@@ -90,6 +90,14 @@ repos:
         name: Regenerate yaml_schema.md
         description: Keeps docs/reference/yaml_schema.md in sync with Pydantic models
         entry: python odibi/introspect.py
+        language: system
+        files: ^odibi/.*\.py$
+        pass_filenames: false
+
+      - id: sync-json-schema
+        name: Regenerate odibi.schema.json
+        description: Keeps VS Code JSON schema in sync with Pydantic models
+        entry: python -m odibi templates schema
         language: system
         files: ^odibi/.*\.py$
         pass_filenames: false
