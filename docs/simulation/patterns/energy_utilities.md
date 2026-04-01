@@ -675,14 +675,15 @@ pipelines:
                     mean_reversion: 0.1
                     precision: 1
 
-              # Peak shaving — force discharge during utility peak (4–8 PM)
+              # Daily peak shaving — force discharge during utility peak (4–8 PM)
               scheduled_events:
                 - type: forced_value
                   entity: null
                   column: current_a
                   value: -25
                   start_time: "2026-03-01T16:00:00Z"
-                  end_time: "2026-03-01T20:00:00Z"
+                  recurrence: "1d"
+                  duration: "4h"
 
         write:
           connection: output
@@ -692,7 +693,7 @@ pipelines:
 ```
 
 !!! example "What the output looks like"
-    This config generates **576 rows** (288 timesteps x 2 modules). Here's a snapshot showing the transition from normal operation into the peak shaving event at 4 PM - notice the current jumping to -25A:
+    This config generates **576 rows** (288 timesteps x 2 modules). Here's a snapshot showing the transition from normal operation into the peak shaving event at 4 PM (which repeats daily via `recurrence: "1d"`) - notice the current jumping to -25A:
 
     | module_id      | timestamp            | current_a | voltage_v | soc_pct | power_kw | cycle_state  | cell_temp_c |
     |----------------|----------------------|-----------|-----------|---------|----------|--------------|-------------|
@@ -703,7 +704,7 @@ pipelines:
     | BESS_Module_01 | 2026-03-01 16:05:00  | -25.0     | 405.8     | 60.3    | -10.15   | discharging  | 29.4        |
     | BESS_Module_02 | 2026-03-01 16:05:00  | -25.0     | 393.9     | 45.7    | -9.85    | discharging  | 31.9        |
 
-    At 15:50, Module_01 was charging at 8.3A while Module_02 was discharging at -5.1A - normal independent operation. At 16:00, the peak shaving event kicks in and both modules snap to -25A discharge. You can see the SOC dropping at each 5-minute step (62.4 to 60.3 for Module_01). The power output jumps to about -10 kW per module - that's 20 kW of peak shaving capacity from this two-module system.
+    At 15:50, Module_01 was charging at 8.3A while Module_02 was discharging at -5.1A - normal independent operation. At 16:00, the peak shaving event kicks in and both modules snap to -25A discharge. This event repeats daily via `recurrence: "1d"` with a `duration: "4h"` window, so every day from 4–8 PM the BESS discharges at full capacity. You can see the SOC dropping at each 5-minute step (62.4 to 60.3 for Module_01). The power output jumps to about -10 kW per module - that's 20 kW of peak shaving capacity from this two-module system.
 
 **What makes this realistic:**
 

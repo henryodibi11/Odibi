@@ -788,9 +788,15 @@ class PandasEngine(Engine):
         # Check for random walk state (passed through options for incremental mode)
         random_walk_state = options.get("_random_walk_state")
 
+        # Check for scheduled event state (passed through options for incremental mode)
+        scheduled_event_state = options.get("_scheduled_event_state")
+
         # Create simulation engine
         engine = SimulationEngine(
-            sim_config, hwm_timestamp=hwm_timestamp, random_walk_state=random_walk_state
+            sim_config,
+            hwm_timestamp=hwm_timestamp,
+            random_walk_state=random_walk_state,
+            scheduled_event_state=scheduled_event_state,
         )
 
         # Generate data
@@ -820,6 +826,11 @@ class PandasEngine(Engine):
         rw_state = engine.get_random_walk_final_state(rows)
         if rw_state and hasattr(df, "attrs"):
             df.attrs["_simulation_random_walk_state"] = rw_state
+
+        # Store scheduled event final state for incremental persistence
+        se_state = engine.get_scheduled_event_final_state()
+        if se_state and hasattr(df, "attrs"):
+            df.attrs["_simulation_scheduled_event_state"] = se_state
 
         ctx.info(
             "Simulation complete",

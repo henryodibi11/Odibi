@@ -136,6 +136,12 @@ class PolarsEngine(Engine):
             if hasattr(pdf, "attrs") and "_simulation_random_walk_state" in pdf.attrs:
                 lf._simulation_random_walk_state = pdf.attrs["_simulation_random_walk_state"]
 
+            # Preserve scheduled event state
+            if hasattr(pdf, "attrs") and "_simulation_scheduled_event_state" in pdf.attrs:
+                lf._simulation_scheduled_event_state = pdf.attrs[
+                    "_simulation_scheduled_event_state"
+                ]
+
             ctx.info(
                 "Simulation read completed (via Pandas, converted to Polars LazyFrame)",
                 row_count=len(pdf),

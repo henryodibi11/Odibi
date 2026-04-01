@@ -311,9 +311,78 @@ scheduled_events:
 | `entity` | string | No | `null` (all) | Entity to affect; `null` applies to all entities |
 | `column` | string | Yes | — | Column to modify |
 | `value` | any | Yes | — | Value to apply |
-| `start_time` | string | Yes | — | ISO8601 start time |
-| `end_time` | string | No | `null` (permanent) | ISO8601 end time; omit for permanent changes |
+| `start_time` | string | Conditional | — | ISO8601 start time. Required unless `condition` is set |
+| `end_time` | string | No | `null` (permanent) | ISO8601 end time; omit for permanent changes. Cannot combine with `duration` |
 | `priority` | int | No | `0` | For overlapping events — higher priority is applied last (wins) |
+| `recurrence` | string | No | — | Repeat interval (e.g., `"30d"`, `"7d"`, `"4h"`). Requires `start_time` |
+| `duration` | string | No | — | Duration of each occurrence (e.g., `"4h"`). Alternative to `end_time` |
+| `jitter` | string | No | — | Random offset ± applied to each recurrence start (e.g., `"2d"`). Requires `recurrence` |
+| `max_occurrences` | int | No | — | Stop repeating after N occurrences. Requires `recurrence` |
+| `condition` | string | No | — | Python expression evaluated against current row data (e.g., `"efficiency < 70"`) |
+| `cooldown` | string | No | — | Minimum gap between condition triggers (e.g., `"7d"`). Requires `condition` |
+| `sustain` | string | No | — | Condition must be true for this duration before triggering (e.g., `"24h"`). Requires `condition` |
+| `transition` | string | No | `"instant"` | How value is applied: `"instant"` (jump) or `"ramp"` (linear interpolation over duration) |
+
+### Recurring Events
+
+Instead of manually specifying start/end times for repeated events, use `recurrence` and `duration`:
+
+```yaml
+scheduled_events:
+  # CIP cleaning every 15 days, 4 hours each
+  - type: parameter_override
+    entity: HX_01
+    column: actual_efficiency_pct
+    value: 94.0
+    start_time: "2026-01-15T08:00:00Z"
+    recurrence: "15d"
+    duration: "4h"
+    max_occurrences: 12
+    jitter: "2d"          # ±2 day random scheduling variation
+```
+
+The event repeats every `recurrence` interval from `start_time`. Each occurrence lasts `duration`. Add `jitter` for realistic scheduling variation (deterministic per seed). Use `max_occurrences` to cap the number of repeats.
+
+### Condition-Based Events
+
+Trigger events based on current data values instead of fixed times:
+
+```yaml
+scheduled_events:
+  # Override when efficiency drops below 70%
+  - type: parameter_override
+    column: flow_rate_lpm
+    value: 50.0
+    condition: "actual_efficiency_pct < 70"
+    cooldown: "7d"         # Don't retrigger within 7 days
+    sustain: "24h"         # Must be true for 24h before triggering
+    duration: "4h"         # Hold override for 4 hours after triggering
+```
+
+Condition expressions use the same safe namespace as derived expressions (`abs`, `round`, `min`, `max`, etc.) and can reference any column in the current row. Compound logic works: `"a < 70 and b > 50"`.
+
+- **`sustain`**: Condition must be continuously true for this duration before the event triggers. Prevents spurious triggers from momentary spikes.
+- **`cooldown`**: Minimum gap between triggers. Prevents rapid re-triggering.
+- **`duration`**: Once triggered, the override holds for this duration even if the condition becomes false. Without `duration`, the event stays active only while the condition is true.
+
+### Ramp Transitions
+
+Gradually transition to the target value instead of jumping instantly:
+
+```yaml
+scheduled_events:
+  - type: setpoint_change
+    entity: Reactor_01
+    column: temp_setpoint_c
+    value: 370.0
+    start_time: "2026-03-11T12:00:00Z"
+    duration: "2h"
+    transition: ramp       # Linear interpolation over 2 hours
+```
+
+With `transition: ramp`, the value changes linearly from the current value to the target over the duration window. At the midpoint of a 2-hour ramp from 350 to 370, the value is 360. After the ramp completes, the target value holds.
+
+Ramp transitions work with `parameter_override` and `setpoint_change` event types. Requires `duration` or both `start_time` and `end_time` to define the ramp window.
 
 !!! tip "How priority works with overlapping events"
 

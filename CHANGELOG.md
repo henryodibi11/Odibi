@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-04-01
+
+### Added
+
+- **Recurring scheduled events** — use `recurrence` and `duration` to repeat events at regular intervals instead of manually specifying each start/end time. Add `jitter` for realistic scheduling variation and `max_occurrences` to cap repeats. Pattern 5 (heat exchanger CIP cleaning) now uses recurring events.
+- **Condition-based scheduled events** — trigger events based on current data values with `condition` expressions (e.g., `"actual_efficiency_pct < 70"`). Supports `cooldown` (minimum gap between triggers), `sustain` (condition must be true for N consecutive timesteps), and `duration` (hold override for fixed window after triggering).
+- **Ramp transitions** — set `transition: ramp` for gradual linear interpolation from current value to target over the duration window, instead of instant jumps. Works with `parameter_override` and `setpoint_change` event types.
+- **Scheduled event state persistence** — condition-based event state (sustain counters, cooldown timestamps, active durations, ramp progress) is now persisted across incremental runs, following the same pattern as random walk state. Supports all three engines (Pandas, Spark, Polars).
+
+### Changed
+
+- **Pattern 5 updated** — removed `mean_reversion` and `mean_reversion_to` from `actual_efficiency_pct` (fouling is one-way degradation, mean_reversion made efficiency unrealistically bounce back). Fixed max to 95.0 (was 96.0). Cleaning events now use `recurrence: "15d"` with `duration: "4h"`.
+
 ## [3.7.4] - 2026-04-01
 
 ### Fixed

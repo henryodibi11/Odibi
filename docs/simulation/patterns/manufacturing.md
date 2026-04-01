@@ -860,6 +860,14 @@ pipelines:
                   start_time: "2026-03-10T14:00:00Z"
                   end_time: "2026-03-10T14:30:00Z"
 
+                # Condition-based: compressor boost when temp exceeds 5°C
+                - type: parameter_override
+                  column: temperature_c
+                  value: 2.0
+                  condition: "temperature_c > 5.0"
+                  cooldown: "2h"
+                  duration: "30m"
+
               chaos:
                 outlier_rate: 0.005
                 outlier_factor: 2.0
@@ -888,7 +896,7 @@ pipelines:
 **What makes this realistic:**
 
 - **Cold chain has tight temperature bands (target 2C, excursion at 5C)** - this matches HACCP food safety requirements for chilled products. The 3-degree buffer between target and limit is what gives operators time to react before product safety is compromised.
-- **Door open events cause temperature spikes** - the loading dock stop forces `door_open: true` for 30 minutes, and the temperature naturally rises because the random walk's volatility keeps pushing it upward without the compressor being able to compensate for the open door. This is exactly what happens at every delivery stop.
+- **Door open events cause temperature spikes** - the loading dock stop forces `door_open: true` for 30 minutes, and the temperature naturally rises because the random walk's volatility keeps pushing it upward without the compressor being able to compensate for the open door. This is exactly what happens at every delivery stop. A condition-based event then models the automatic compressor response — when temperature exceeds 5°C, the system overrides temperature back toward the 2°C target for 30 minutes, with a 2-hour cooldown to prevent constant retriggering.
 - **Email generator creates realistic alert routing addresses** tied to each entity - `truck_01_0@coldfresh.example.com` is the kind of address a cold chain monitoring platform would use to route alerts to the driver or facility manager responsible for that unit.
 - **Truck vs. warehouse have different thermal profiles** - Truck_01 has 2x the volatility of the warehouse zones, wider temperature range, and is more likely to breach. This mirrors the fundamental difference between mobile and stationary refrigeration - warehouses are thermally stable, trucks are not.
 

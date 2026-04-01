@@ -1,5 +1,6 @@
 """Configuration models for ODIBI framework."""
 
+import re
 import warnings
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -1809,13 +1810,15 @@ class ScheduledEventType(str, Enum):
 
 
 class ScheduledEvent(BaseModel):
-    """Scheduled event that modifies simulation behavior at specific times.
+    """Scheduled event that modifies simulation behavior at specific times or conditions.
 
     Enables realistic process simulation with:
     - Maintenance windows (forced power=0)
     - Grid curtailment (forced output reduction)
     - Setpoint changes (scheduled process changes)
     - Cleaning cycles (efficiency restoration)
+    - Recurring events (e.g., weekly maintenance)
+    - Condition-based triggers (e.g., degrade when efficiency drops)
 
     Example (maintenance window):
     ```yaml
@@ -1849,6 +1852,44 @@ class ScheduledEvent(BaseModel):
         start_time: "2026-03-11T12:00:00Z"
         # No end_time = permanent change
     ```
+
+    Example (recurring maintenance every 30 days):
+    ```yaml
+    scheduled_events:
+      - type: forced_value
+        entity: Turbine_01
+        column: power_kw
+        value: 0.0
+        start_time: "2026-01-15T06:00:00Z"
+        recurrence: "30d"
+        duration: "4h"
+        jitter: "2d"
+        max_occurrences: 12
+    ```
+
+    Example (condition-based event):
+    ```yaml
+    scheduled_events:
+      - type: parameter_override
+        entity: Pump_05
+        column: flow_rate_lpm
+        value: 50.0
+        condition: "actual_efficiency_pct < 70"
+        cooldown: "7d"
+        sustain: "24h"
+    ```
+
+    Example (ramped setpoint change):
+    ```yaml
+    scheduled_events:
+      - type: setpoint_change
+        entity: Reactor_01
+        column: temp_setpoint_c
+        value: 370.0
+        start_time: "2026-03-11T12:00:00Z"
+        duration: "2h"
+        transition: ramp
+    ```
     """
 
     type: ScheduledEventType = Field(description="Event type")
@@ -1857,13 +1898,93 @@ class ScheduledEvent(BaseModel):
     )
     column: str = Field(description="Column name to modify")
     value: Any = Field(description="Value to apply during event")
-    start_time: str = Field(description="Event start timestamp (ISO8601)")
+    start_time: Optional[str] = Field(
+        default=None, description="Event start timestamp (ISO8601). Required for time-based events."
+    )
     end_time: Optional[str] = Field(
         default=None, description="Event end timestamp (ISO8601). None = permanent change."
     )
     priority: int = Field(
         default=0, description="Priority for overlapping events (higher = applied last)"
     )
+
+    # V1: Recurrence fields
+    recurrence: Optional[str] = Field(
+        default=None,
+        description="Repeat interval (e.g., '30d', '7d', '4h'). Event recurs at this interval from start_time.",
+    )
+    duration: Optional[str] = Field(
+        default=None,
+        description="Duration of each occurrence (e.g., '4h'). Alternative to specifying end_time.",
+    )
+    jitter: Optional[str] = Field(
+        default=None,
+        description="Random offset ± applied to each recurrence start (e.g., '2d').",
+    )
+    max_occurrences: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Stop repeating after N occurrences.",
+    )
+
+    # V2: Condition-based fields
+    condition: Optional[str] = Field(
+        default=None,
+        description="Python expression evaluated against current row data (e.g., 'actual_efficiency_pct < 70'). Triggers event when true.",
+    )
+    cooldown: Optional[str] = Field(
+        default=None,
+        description="Minimum gap between condition triggers (e.g., '7d').",
+    )
+    sustain: Optional[str] = Field(
+        default=None,
+        description="Condition must be true for this duration before triggering (e.g., '24h').",
+    )
+
+    # V3: Transition field
+    transition: str = Field(
+        default="instant",
+        description="How value is applied: 'instant' (default, jump to value) or 'ramp' (linear interpolation over duration).",
+    )
+
+    _INTERVAL_PATTERN: re.Pattern = re.compile(r"^\d+[smhd]$")
+
+    @model_validator(mode="after")
+    def validate_event_fields(self):
+        if self.start_time is None and self.condition is None:
+            raise ValueError("Must have at least one of 'start_time' or 'condition'.")
+        if self.end_time is not None and self.duration is not None:
+            raise ValueError("Cannot specify both 'end_time' and 'duration'.")
+        if self.recurrence is not None and self.start_time is None:
+            raise ValueError("'recurrence' requires 'start_time'.")
+        if self.jitter is not None and self.recurrence is None:
+            raise ValueError("'jitter' requires 'recurrence'.")
+        if self.max_occurrences is not None and self.recurrence is None:
+            raise ValueError("'max_occurrences' requires 'recurrence'.")
+        if self.cooldown is not None and self.condition is None:
+            raise ValueError("'cooldown' requires 'condition'.")
+        if self.sustain is not None and self.condition is None:
+            raise ValueError("'sustain' requires 'condition'.")
+        if self.transition not in ("instant", "ramp"):
+            raise ValueError(
+                f"'transition' must be 'instant' or 'ramp', got '{self.transition}'."
+            )
+        if self.transition == "ramp":
+            has_time_span = self.start_time is not None and self.end_time is not None
+            if self.duration is None and not has_time_span:
+                raise ValueError(
+                    "'transition=\"ramp\"' requires 'duration' or both 'start_time' and 'end_time'."
+                )
+
+        interval_fields = ("recurrence", "duration", "jitter", "cooldown", "sustain")
+        for field_name in interval_fields:
+            val = getattr(self, field_name)
+            if val is not None and not self._INTERVAL_PATTERN.match(val):
+                raise ValueError(
+                    f"'{field_name}' must match pattern '<number><s|m|h|d>' (e.g., '30d', '4h'), got '{val}'."
+                )
+
+        return self
 
 
 class ChaosConfig(BaseModel):

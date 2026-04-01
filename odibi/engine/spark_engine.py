@@ -599,6 +599,12 @@ class SparkEngine(Engine):
             if hasattr(pdf, "attrs") and "_simulation_random_walk_state" in pdf.attrs:
                 df._simulation_random_walk_state = pdf.attrs["_simulation_random_walk_state"]
 
+            # Preserve scheduled event state
+            if hasattr(pdf, "attrs") and "_simulation_scheduled_event_state" in pdf.attrs:
+                df._simulation_scheduled_event_state = pdf.attrs[
+                    "_simulation_scheduled_event_state"
+                ]
+
             ctx.info(
                 "Simulation read completed (via Pandas)",
                 elapsed_ms=round(elapsed, 2),

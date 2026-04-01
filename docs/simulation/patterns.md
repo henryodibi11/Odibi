@@ -578,17 +578,16 @@ pipelines:
                   generator: {type: constant, value: 95.0}
 
                 # Actual efficiency — random walk with negative trend (fouling)
+                # No mean_reversion: fouling is one-way degradation
                 - name: actual_efficiency_pct
                   data_type: float
                   generator:
                     type: random_walk
                     start: 94.0
                     min: 60.0
-                    max: 96.0
+                    max: 95.0
                     volatility: 0.2
                     trend: -0.01           # Gradual fouling
-                    mean_reversion: 0.02
-                    mean_reversion_to: design_efficiency_pct
                     precision: 1
 
                 # Derived: energy loss from degradation
@@ -605,20 +604,22 @@ pipelines:
                     type: derived
                     expression: "actual_efficiency_pct < 80.0"
 
-              # Cleaning cycle resets efficiency on day 15
+              # CIP cleaning cycles using recurrence
               scheduled_events:
                 - type: parameter_override
                   entity: HX_01
                   column: actual_efficiency_pct
                   value: 94.0
                   start_time: "2026-01-15T08:00:00Z"
-                  end_time: "2026-01-15T12:00:00Z"
+                  recurrence: "15d"
+                  duration: "4h"
                 - type: parameter_override
                   entity: HX_02
                   column: actual_efficiency_pct
                   value: 94.0
                   start_time: "2026-01-16T08:00:00Z"
-                  end_time: "2026-01-16T12:00:00Z"
+                  recurrence: "15d"
+                  duration: "4h"
         write:
           connection: output
           format: parquet
@@ -628,8 +629,8 @@ pipelines:
 
 **What makes this realistic:**
 
-- `trend: -0.01` causes efficiency to slowly degrade (fouling buildup)
-- `mean_reversion_to: design_efficiency_pct` creates a tug-of-war between degradation and the design spec
+- `trend: -0.01` causes efficiency to slowly degrade (fouling buildup) — no `mean_reversion` because fouling is one-way
+- `recurrence: "15d"` with `duration: "4h"` schedules recurring CIP cleaning cycles instead of manual start/end times
 - Scheduled events simulate cleaning cycles that reset efficiency back to 94%
 - `HX_03` never gets cleaned — its efficiency degrades further than the others
 - `energy_loss_kw` is derived in real-time from the gap between design and actual
@@ -897,7 +898,7 @@ pipelines:
 
 - **Use entity overrides to create "problem" entities.** Old equipment runs slower, bad sensors report wider ranges, overloaded channels drop more data. One or two problem entities make the dataset much more realistic than uniform behavior.
 
-- **Use scheduled events for operational realism.** Shifts, maintenance windows, outages, setpoint changes — these create the time-based patterns that real operations data has. A simulation without events is a simulation without a story.
+- **Use scheduled events for operational realism.** Shifts, maintenance windows, outages, setpoint changes — these create the time-based patterns that real operations data has. Use `recurrence` for repeating events, `condition` for data-driven triggers, and `transition: ramp` for gradual changes. A simulation without events is a simulation without a story.
 
 - **Use incremental mode for anything time-based.** Daily feeds, streaming data, dashboard demos — `incremental: stateful` ensures each run picks up where the last one left off with no discontinuities.
 
@@ -909,5 +910,5 @@ pipelines:
 
 - **[Getting Started](getting_started.md)** — Your first simulation in 5 minutes
 - **[Generators Reference](generators.md)** — All 13 generator types with parameters and examples
-- **[Advanced Features](advanced_features.md)** — Cross-entity references, scheduled events, entity overrides, chaos
+- **[Advanced Features](advanced_features.md)** — Cross-entity references, scheduled events (recurring, condition-based, ramp), entity overrides, chaos
 - **[Process Simulation](process_simulation.md)** — Chemical engineering and process control scenarios

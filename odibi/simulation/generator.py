@@ -1,10 +1,12 @@
 """Core simulation engine for generating synthetic data."""
 
 import hashlib
+import math
 import re
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -26,6 +28,35 @@ from odibi.config import (
     TimestampGeneratorConfig,
     UUIDGeneratorConfig,
 )
+
+
+@dataclass
+class PreparedScheduledEvent:
+    """Pre-parsed scheduled event with resolved datetime/timedelta values."""
+
+    event_id: int
+    config: ScheduledEvent
+    start_dt: Optional[datetime] = None
+    end_dt: Optional[datetime] = None
+    duration_td: Optional[timedelta] = None
+    recurrence_td: Optional[timedelta] = None
+    jitter_td: Optional[timedelta] = None
+    cooldown_td: Optional[timedelta] = None
+    sustain_steps: int = 0
+    # Pre-expanded occurrence windows for recurring events: list of (start, end)
+    occurrence_windows: List[Tuple[datetime, datetime]] = field(default_factory=list)
+
+
+@dataclass
+class ResolvedScheduledEvent:
+    """Result of resolving a scheduled event at a specific timestamp."""
+
+    config: ScheduledEvent
+    event_id: int
+    window_start: datetime
+    window_end: Optional[datetime]
+    is_ramp: bool = False
+    ramp_duration_seconds: float = 0.0
 
 
 class EntityProxy:
@@ -97,6 +128,7 @@ class SimulationEngine:
         config: SimulationConfig,
         hwm_timestamp: Optional[str] = None,
         random_walk_state: Optional[Dict[str, Dict[str, float]]] = None,
+        scheduled_event_state: Optional[Dict[str, Dict[int, Dict[str, Any]]]] = None,
     ):
         """Initialize simulation engine.
 
@@ -104,6 +136,7 @@ class SimulationEngine:
             config: Simulation configuration
             hwm_timestamp: High-water mark timestamp for incremental generation
             random_walk_state: Last random walk values per entity per column from previous run
+            scheduled_event_state: Condition-based event state per entity per event from previous run
         """
         self.config = config
         self.hwm_timestamp = hwm_timestamp
@@ -155,6 +188,39 @@ class SimulationEngine:
         # Detect cross-entity references and build entity dependency DAG
         self._detect_cross_entity_references()
         self._build_entity_dependency_dag()
+
+        # Prepare scheduled events (pre-parse times, expand recurrences)
+        self.prepared_events = self._prepare_scheduled_events()
+        # Per-entity per-event runtime state for conditions/ramp
+        # Format: {entity_name: {event_id: {key: value}}}
+        self.scheduled_event_state: Dict[str, Dict[int, Dict[str, Any]]] = (
+            self._deserialize_event_state(scheduled_event_state) if scheduled_event_state else {}
+        )
+
+    @staticmethod
+    def _deserialize_event_state(
+        raw: Dict[str, Dict[Any, Dict[str, Any]]],
+    ) -> Dict[str, Dict[int, Dict[str, Any]]]:
+        """Deserialize scheduled event state from JSON-safe format.
+
+        JSON round-trips convert int keys to strings and datetime objects to
+        ISO strings. This restores the original types.
+        """
+        _dt_keys = {"last_trigger_time", "active_until", "ramp_started_at"}
+        result: Dict[str, Dict[int, Dict[str, Any]]] = {}
+        for entity, events in raw.items():
+            result[entity] = {}
+            for eid, state in events.items():
+                deserialized = {}
+                for k, v in state.items():
+                    if k in _dt_keys and isinstance(v, str):
+                        try:
+                            v = datetime.fromisoformat(v)
+                        except ValueError:
+                            pass
+                    deserialized[k] = v
+                result[entity][int(eid)] = deserialized
+        return result
 
     def _parse_timestep(self, timestep: str) -> float:
         """Parse timestep string into seconds.
@@ -674,20 +740,24 @@ class SimulationEngine:
                     )
 
                     # Check for scheduled events that override this value
-                    active_event = self._get_active_scheduled_event(
-                        entity_name, col_name, row_timestamp
+                    event_context = {**row, col_name: value}
+                    resolved = self._resolve_scheduled_event(
+                        entity_name,
+                        col_name,
+                        row_timestamp,
+                        row_data=event_context,
+                        entity_state=entity_state,
+                        row_idx=row_idx,
                     )
-                    if active_event:
-                        if active_event.type in (
-                            ScheduledEventType.FORCED_VALUE,
-                            ScheduledEventType.SETPOINT_CHANGE,
-                        ):
-                            value = active_event.value
-                        elif active_event.type == ScheduledEventType.PARAMETER_OVERRIDE:
-                            value = active_event.value
-                            # Reset random walk state so it continues from this value
-                            if col_name in entity_random_walk:
-                                entity_random_walk[col_name] = float(active_event.value)
+                    if resolved:
+                        value = self._apply_scheduled_event(
+                            base_value=value,
+                            resolved=resolved,
+                            entity_name=entity_name,
+                            column_name=col_name,
+                            timestamp=row_timestamp,
+                            random_walk_current=entity_random_walk,
+                        )
 
                     # Apply null_rate
                     if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
@@ -794,20 +864,24 @@ class SimulationEngine:
                 )
 
                 # Check for scheduled events that override this value
-                active_event = self._get_active_scheduled_event(
-                    entity_name, col_name, row_timestamp
+                event_context = {**row, col_name: value}
+                resolved = self._resolve_scheduled_event(
+                    entity_name,
+                    col_name,
+                    row_timestamp,
+                    row_data=event_context,
+                    entity_state=entity_state,
+                    row_idx=row_idx,
                 )
-                if active_event:
-                    if active_event.type in (
-                        ScheduledEventType.FORCED_VALUE,
-                        ScheduledEventType.SETPOINT_CHANGE,
-                    ):
-                        value = active_event.value
-                    elif active_event.type == ScheduledEventType.PARAMETER_OVERRIDE:
-                        value = active_event.value
-                        # Reset random walk state so it continues from this value
-                        if col_name in random_walk_current:
-                            random_walk_current[col_name] = float(active_event.value)
+                if resolved:
+                    value = self._apply_scheduled_event(
+                        base_value=value,
+                        resolved=resolved,
+                        entity_name=entity_name,
+                        column_name=col_name,
+                        timestamp=row_timestamp,
+                        random_walk_current=random_walk_current,
+                    )
 
                 # Apply null_rate
                 if col_config.null_rate > 0 and entity_rng.random() < col_config.null_rate:
@@ -856,53 +930,311 @@ class SimulationEngine:
 
         return False
 
-    def _get_active_scheduled_event(
-        self, entity_name: str, column_name: str, timestamp: datetime
-    ) -> Optional[ScheduledEvent]:
-        """Get active scheduled event for entity/column at given timestamp.
+    @staticmethod
+    def _parse_interval(interval: str) -> timedelta:
+        """Parse interval string like '30d', '4h', '5m', '10s' into timedelta."""
+        match = re.match(r"^(\d+)([smhd])$", interval)
+        if not match:
+            raise ValueError(f"Invalid interval format: '{interval}'")
+        value, unit = int(match.group(1)), match.group(2)
+        return timedelta(seconds=value * {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit])
 
-        Args:
-            entity_name: Entity name
-            column_name: Column name
-            timestamp: Timestamp to check
-
-        Returns:
-            Active event with highest priority, or None if no events active
-        """
+    def _prepare_scheduled_events(self) -> List[PreparedScheduledEvent]:
+        """Pre-parse all scheduled events into PreparedScheduledEvent objects."""
         if not self.config.scheduled_events:
+            return []
+
+        prepared = []
+        for idx, event in enumerate(self.config.scheduled_events):
+            start_dt = (
+                datetime.fromisoformat(event.start_time.replace("Z", "+00:00"))
+                if event.start_time
+                else None
+            )
+            end_dt = (
+                datetime.fromisoformat(event.end_time.replace("Z", "+00:00"))
+                if event.end_time
+                else None
+            )
+            duration_td = self._parse_interval(event.duration) if event.duration else None
+            recurrence_td = self._parse_interval(event.recurrence) if event.recurrence else None
+            jitter_td = self._parse_interval(event.jitter) if event.jitter else None
+            cooldown_td = self._parse_interval(event.cooldown) if event.cooldown else None
+
+            # Calculate sustain in timesteps
+            sustain_steps = 0
+            if event.sustain:
+                sustain_td = self._parse_interval(event.sustain)
+                sustain_steps = max(
+                    1, math.ceil(sustain_td.total_seconds() / self.timestep_seconds)
+                )
+
+            # Compute effective end for non-recurring single events with duration
+            if duration_td and not recurrence_td and start_dt and not end_dt:
+                end_dt = start_dt + duration_td
+
+            # Pre-expand recurring events into occurrence windows
+            occurrence_windows: List[Tuple[datetime, datetime]] = []
+            if recurrence_td and start_dt:
+                # Determine per-occurrence active window length
+                if duration_td:
+                    window_len = duration_td
+                elif end_dt and not duration_td:
+                    # Use original end_time - start_time as template window
+                    window_len = end_dt - start_dt
+                else:
+                    # Recurring with no duration/end_time: instantaneous pulse (1 timestep)
+                    window_len = timedelta(seconds=self.timestep_seconds)
+
+                max_occ = event.max_occurrences or 10000  # safety cap
+                occ_idx = 0
+                while occ_idx < max_occ:
+                    occ_start = start_dt + recurrence_td * occ_idx
+                    # Apply jitter deterministically per occurrence
+                    if jitter_td:
+                        jitter_seed = self.config.scope.seed + idx * 1000 + occ_idx
+                        jitter_rng = np.random.default_rng(jitter_seed)
+                        jitter_offset = jitter_rng.uniform(
+                            -jitter_td.total_seconds(), jitter_td.total_seconds()
+                        )
+                        occ_start = occ_start + timedelta(seconds=jitter_offset)
+                    occ_end = occ_start + window_len
+                    # Stop if occurrence is entirely past simulation horizon
+                    if occ_start > self.end_time:
+                        break
+                    # Only include if occurrence overlaps simulation window
+                    if occ_end >= self.effective_start_time:
+                        occurrence_windows.append((occ_start, occ_end))
+                    occ_idx += 1
+
+            pe = PreparedScheduledEvent(
+                event_id=idx,
+                config=event,
+                start_dt=start_dt,
+                end_dt=end_dt,
+                duration_td=duration_td,
+                recurrence_td=recurrence_td,
+                jitter_td=jitter_td,
+                cooldown_td=cooldown_td,
+                sustain_steps=sustain_steps,
+                occurrence_windows=occurrence_windows,
+            )
+            prepared.append(pe)
+
+        return prepared
+
+    def _get_event_state(self, entity_name: str, event_id: int) -> Dict[str, Any]:
+        """Get or initialize runtime state for an entity/event pair."""
+        if entity_name not in self.scheduled_event_state:
+            self.scheduled_event_state[entity_name] = {}
+        if event_id not in self.scheduled_event_state[entity_name]:
+            self.scheduled_event_state[entity_name][event_id] = {
+                "consecutive_true_steps": 0,
+                "last_trigger_time": None,
+                "active_until": None,
+                "ramp_start_value": None,
+                "ramp_started_at": None,
+            }
+        return self.scheduled_event_state[entity_name][event_id]
+
+    def _eval_condition(
+        self,
+        condition_expr: str,
+        row_data: Dict[str, Any],
+        entity_name: str,
+        timestamp: datetime,
+    ) -> bool:
+        """Evaluate a condition expression against current row data."""
+        safe_builtins = {
+            "abs": abs,
+            "round": round,
+            "min": min,
+            "max": max,
+            "int": int,
+            "float": float,
+            "str": str,
+            "bool": bool,
+            "True": True,
+            "False": False,
+            "true": True,
+            "false": False,
+            "None": None,
+        }
+        namespace = {**row_data, **safe_builtins, **self.entity_proxies}
+        namespace["entity_id"] = entity_name
+        namespace["_timestamp"] = timestamp
+        try:
+            return bool(eval(condition_expr, {"__builtins__": {}}, namespace))
+        except Exception:
+            return False
+
+    def _resolve_scheduled_event(
+        self,
+        entity_name: str,
+        column_name: str,
+        timestamp: datetime,
+        row_data: Optional[Dict[str, Any]] = None,
+        entity_state: Optional[Dict[str, Any]] = None,
+        row_idx: int = 0,
+    ) -> Optional[ResolvedScheduledEvent]:
+        """Resolve the highest-priority active scheduled event for entity/column/timestamp.
+
+        Handles time-based windows, recurrence, condition-based triggers, and sustain/cooldown.
+        """
+        if not self.prepared_events:
             return None
 
-        active_events = []
+        active: List[Tuple[PreparedScheduledEvent, datetime, Optional[datetime]]] = []
 
-        for event in self.config.scheduled_events:
-            # Check if event applies to this entity
+        for pe in self.prepared_events:
+            event = pe.config
+
+            # Filter by entity
             if event.entity is not None and event.entity != entity_name:
                 continue
-
-            # Check if event applies to this column
+            # Filter by column
             if event.column != column_name:
                 continue
 
-            # Parse event times
-            start_dt = datetime.fromisoformat(event.start_time.replace("Z", "+00:00"))
+            es = self._get_event_state(entity_name, pe.event_id)
 
-            # Check end_time (None = permanent from start_time)
-            if event.end_time is not None:
-                end_dt = datetime.fromisoformat(event.end_time.replace("Z", "+00:00"))
-                if not (start_dt <= timestamp <= end_dt):
+            # --- Condition-based events ---
+            if event.condition is not None:
+                cond_result = self._eval_condition(
+                    event.condition,
+                    row_data or {},
+                    entity_name,
+                    timestamp,
+                )
+
+                # Check if currently in a held duration window
+                if es["active_until"] is not None and timestamp <= es["active_until"]:
+                    active.append((pe, es.get("trigger_time", timestamp), es["active_until"]))
                     continue
-            else:
-                # Permanent event (no end time)
-                if timestamp < start_dt:
+
+                if es["active_until"] is not None and timestamp > es["active_until"]:
+                    # Duration window expired, reset
+                    es["active_until"] = None
+                    es["ramp_start_value"] = None
+                    es["ramp_started_at"] = None
+
+                if cond_result:
+                    es["consecutive_true_steps"] += 1
+                else:
+                    es["consecutive_true_steps"] = 0
                     continue
 
-            active_events.append(event)
+                # Check sustain
+                if pe.sustain_steps > 0 and es["consecutive_true_steps"] < pe.sustain_steps:
+                    continue
 
-        if not active_events:
+                # Check cooldown
+                if pe.cooldown_td and es["last_trigger_time"] is not None:
+                    if timestamp < es["last_trigger_time"] + pe.cooldown_td:
+                        continue
+
+                # Trigger!
+                es["last_trigger_time"] = timestamp
+                es["trigger_time"] = timestamp
+                es["consecutive_true_steps"] = 0  # Reset after trigger
+
+                if pe.duration_td:
+                    es["active_until"] = timestamp + pe.duration_td
+
+                window_end = es["active_until"]
+                active.append((pe, timestamp, window_end))
+                continue
+
+            # --- Recurring time-based events ---
+            if pe.occurrence_windows:
+                for occ_start, occ_end in pe.occurrence_windows:
+                    if occ_start <= timestamp <= occ_end:
+                        active.append((pe, occ_start, occ_end))
+                        break
+                continue
+
+            # --- Simple time-based events ---
+            if pe.start_dt is not None:
+                if pe.end_dt is not None:
+                    if pe.start_dt <= timestamp <= pe.end_dt:
+                        active.append((pe, pe.start_dt, pe.end_dt))
+                else:
+                    # Permanent event (no end time)
+                    if timestamp >= pe.start_dt:
+                        active.append((pe, pe.start_dt, None))
+
+        if not active:
             return None
 
-        # Return highest priority event (if multiple overlap)
-        return max(active_events, key=lambda e: e.priority)
+        # Pick highest priority
+        best_pe, best_start, best_end = max(active, key=lambda t: t[0].config.priority)
+        event = best_pe.config
+
+        # Determine ramp info
+        is_ramp = event.transition == "ramp"
+        ramp_duration_seconds = 0.0
+        if is_ramp:
+            if best_pe.duration_td:
+                ramp_duration_seconds = best_pe.duration_td.total_seconds()
+            elif best_end and best_start:
+                ramp_duration_seconds = (best_end - best_start).total_seconds()
+
+        return ResolvedScheduledEvent(
+            config=event,
+            event_id=best_pe.event_id,
+            window_start=best_start,
+            window_end=best_end,
+            is_ramp=is_ramp,
+            ramp_duration_seconds=ramp_duration_seconds,
+        )
+
+    def _apply_scheduled_event(
+        self,
+        base_value: Any,
+        resolved: ResolvedScheduledEvent,
+        entity_name: str,
+        column_name: str,
+        timestamp: datetime,
+        random_walk_current: Dict[str, float],
+    ) -> Any:
+        """Apply a resolved scheduled event, returning the overridden value."""
+        event = resolved.config
+        target_value = event.value
+        es = self._get_event_state(entity_name, resolved.event_id)
+
+        # Handle ramp transition
+        if resolved.is_ramp and resolved.ramp_duration_seconds > 0:
+            # Capture ramp start value on first encounter
+            if es.get("ramp_start_value") is None:
+                es["ramp_start_value"] = base_value
+                es["ramp_started_at"] = resolved.window_start
+
+            ramp_start = es["ramp_start_value"]
+            if ramp_start is not None and target_value is not None:
+                elapsed = (timestamp - resolved.window_start).total_seconds()
+                progress = min(1.0, max(0.0, elapsed / resolved.ramp_duration_seconds))
+                value = float(ramp_start) + progress * (float(target_value) - float(ramp_start))
+            else:
+                value = target_value
+        else:
+            value = target_value
+
+        # Reset random walk state for parameter_override
+        if event.type == ScheduledEventType.PARAMETER_OVERRIDE:
+            if column_name in random_walk_current:
+                random_walk_current[column_name] = float(value) if value is not None else 0.0
+
+        return value
+
+    def _get_active_scheduled_event(
+        self, entity_name: str, column_name: str, timestamp: datetime
+    ) -> Optional[ScheduledEvent]:
+        """Legacy wrapper: get active scheduled event (time-based only, no conditions/ramp).
+
+        Used by call sites that haven't been updated to the new resolver.
+        """
+        resolved = self._resolve_scheduled_event(entity_name, column_name, timestamp)
+        return resolved.config if resolved else None
 
     def _generate_value(
         self,
@@ -1752,3 +2084,26 @@ class SimulationEngine:
                         state[entity][col] = row[col]
 
         return state
+
+    def get_scheduled_event_final_state(self) -> Dict[str, Dict[int, Dict[str, Any]]]:
+        """Get the final scheduled event state for persistence across incremental runs.
+
+        Serializes datetime objects to ISO strings for JSON compatibility.
+
+        Returns:
+            Dict mapping entity_name -> {event_id: {state_key: value}}
+        """
+        if not self.scheduled_event_state:
+            return {}
+
+        def _serialize(val: Any) -> Any:
+            if isinstance(val, datetime):
+                return val.isoformat()
+            return val
+
+        serialized: Dict[str, Dict[int, Dict[str, Any]]] = {}
+        for entity, events in self.scheduled_event_state.items():
+            serialized[entity] = {}
+            for event_id, state in events.items():
+                serialized[entity][event_id] = {k: _serialize(v) for k, v in state.items()}
+        return serialized

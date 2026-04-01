@@ -27,7 +27,7 @@ Whether you're modeling a single CSTR, a multi-unit flowsheet, or a full plant w
 | Mean-reverting processes | `random_walk` with `mean_reversion` |
 | Dynamic setpoint tracking | `mean_reversion_to` column reference |
 | Cross-entity streams | `Entity.column` references |
-| Scheduled operations | `scheduled_events` for maintenance, setpoint changes |
+| Scheduled operations | `scheduled_events` — time-based, recurring (`recurrence`), condition-based (`condition`), with `transition: ramp` |
 
 ---
 

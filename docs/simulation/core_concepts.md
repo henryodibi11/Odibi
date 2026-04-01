@@ -393,7 +393,7 @@ read:
       chaos:                     # Optional: inject noise
         outlier_rate: 0.01
         outlier_factor: 3.0
-      scheduled_events: []       # Optional: time-based behavior changes
+      scheduled_events: []       # Optional: time/condition-based behavior changes
 ```
 
 The `scope`, `entities`, and `columns` keys are required. `chaos` and `scheduled_events` are optional and covered in [Advanced Features](advanced_features.md).

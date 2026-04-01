@@ -1145,7 +1145,7 @@ pipelines:
 
 !!! tip "What you'll learn"
     - **`trend`** — add a slow directional drift to a random walk (e.g., efficiency degrades over time due to fouling)
-    - **`mean_reversion_to`** — make a random walk pull toward *another column's value* instead of its own start value
+    - **`recurrence` + `duration`** — schedule recurring cleaning cycles instead of manually specifying each start/end time
     - **Scheduled events as cleaning cycles** — use `parameter_override` events to reset a degraded value back to baseline
 
 Heat exchangers are everywhere in industry - refineries, chemical plants, power stations, HVAC systems, even your car radiator. Their job is simple: transfer heat from one fluid to another without the fluids mixing. A shell-and-tube heat exchanger, for example, runs hot fluid through a bundle of tubes while cool fluid flows around the outside of the tubes inside a shell. The temperature difference between the two fluids drives heat transfer.
@@ -1154,12 +1154,12 @@ The problem is **fouling**. Over time, deposits build up on the heat transfer su
 
 The solution is **cleaning cycles**. In many facilities, this is CIP (Clean-In-Place) - circulating a chemical cleaning solution through the exchanger without disassembling it. After cleaning, efficiency jumps back to near-design levels, and the fouling cycle starts again. The pattern is characteristic: a slow decline punctuated by sharp recoveries, creating a sawtooth curve over time.
 
-This pattern simulates three heat exchangers over 30 days. Two get scheduled cleaning cycles mid-month; one is neglected and degrades continuously. The simulation uses `trend` for gradual degradation and `parameter_override` scheduled events to reset efficiency during cleaning.
+This pattern simulates three heat exchangers over 30 days. Two get recurring cleaning cycles; one is neglected and degrades continuously. The simulation uses `trend` for gradual degradation and recurring `parameter_override` scheduled events to reset efficiency during cleaning.
 
-- **HX_01** - cleaned on day 15. Efficiency degrades gradually due to fouling (trend: -0.01 per hour), then jumps back to 94% during the 4-hour cleaning window. After cleaning, the fouling cycle restarts.
-- **HX_02** - cleaned on day 16. Same behavior as HX_01 but one day later, simulating a staggered maintenance schedule (you can't clean everything at once - the plant still needs to run).
+- **HX_01** - cleaned every 15 days starting day 15. Efficiency degrades gradually due to fouling (trend: -0.01 per hour), then jumps back to 94% during each 4-hour cleaning window. After cleaning, the fouling cycle restarts. Uses `recurrence: "15d"` with `duration: "4h"` instead of manual start/end times.
+- **HX_02** - cleaned every 15 days starting day 16. Same behavior as HX_01 but one day later, simulating a staggered maintenance schedule (you can't clean everything at once - the plant still needs to run).
 - **HX_03** - never cleaned. Its efficiency degrades continuously for the full 30 days, dropping well below the other two. This is the exchanger that eventually triggers an unplanned shutdown when efficiency gets too low to maintain process temperatures.
-- **design_efficiency_pct** - the constant 95% target. The `mean_reversion_to` parameter on actual_efficiency_pct creates a tug-of-war: fouling pulls efficiency down, while the design spec pulls it back. The trend wins over time, but mean_reversion slows the decline.
+- **design_efficiency_pct** - the constant 95% target. The gap between design and actual efficiency represents wasted energy.
 - **energy_loss_kw** - derived from the gap between design and actual efficiency. Every percentage point of lost efficiency costs energy (and money).
 - **needs_cleaning** - a boolean flag that triggers when efficiency drops below 80%. In a real facility, this would generate a work order in the CMMS (Computerized Maintenance Management System).
 
@@ -1176,8 +1176,9 @@ This pattern simulates three heat exchangers over 30 days. Two get scheduled cle
 
 !!! info "Why these parameter values?"
     - **`trend: -0.01`:** At hourly intervals, this produces a ~7 percentage-point efficiency drop over 30 days. That's realistic for moderate fouling in cooling water service. Aggressive services (crude oil preheat, for example) might see `trend: -0.05` or worse.
-    - **`mean_reversion: 0.02` with `mean_reversion_to: design_efficiency_pct`:** Creates the characteristic curve where efficiency drops quickly at first, then the rate of decline slows as the fouling layer reaches a quasi-equilibrium. Without mean_reversion, efficiency would decline linearly - with it, you get the realistic exponential-decay shape.
+    - **No `mean_reversion`:** Fouling is a one-way process — deposits accumulate and efficiency only goes down until you clean. Adding mean_reversion would make efficiency unrealistically bounce back on its own. The `trend` parameter alone produces the correct monotonic decline.
     - **`start: 94.0` (not 95.0):** Even a "clean" exchanger doesn't operate at 100% of design. The 1-point gap represents baseline performance losses from age, slight misalignment, and the minimum fouling that persists even after cleaning.
+    - **`recurrence: "15d"` with `duration: "4h"`:** Instead of manually specifying start/end times for each cleaning cycle, recurrence repeats the event automatically every 15 days. Add `jitter: "2d"` for realistic scheduling variation.
     - **Cleaning resets to 94.0:** CIP doesn't restore an exchanger to brand-new condition - it removes most deposits but not all. Resetting to 94% (not 95%) reflects this practical reality.
     - **`min: 60.0`:** A hard floor. In practice, an exchanger below 60% efficiency would be shut down for mechanical cleaning or replacement. This prevents the simulation from generating unrealistically low values.
     - **HX_03 never cleaned:** This is the control case. Comparing HX_03's continuous decline to HX_01/HX_02's sawtooth pattern shows the value of preventive maintenance - a common analysis in reliability engineering.
@@ -1228,17 +1229,16 @@ pipelines:
                   generator: {type: constant, value: 95.0}
 
                 # Actual efficiency — random walk with negative trend (fouling)
+                # No mean_reversion: fouling is one-way degradation, not oscillation
                 - name: actual_efficiency_pct
                   data_type: float
                   generator:
                     type: random_walk
                     start: 94.0
                     min: 60.0
-                    max: 96.0
+                    max: 95.0
                     volatility: 0.2
                     trend: -0.01           # Gradual fouling
-                    mean_reversion: 0.02
-                    mean_reversion_to: design_efficiency_pct
                     precision: 1
 
                 # Derived: energy loss from degradation
@@ -1255,20 +1255,22 @@ pipelines:
                     type: derived
                     expression: "actual_efficiency_pct < 80.0"
 
-              # Cleaning cycle resets efficiency on day 15
+              # CIP cleaning cycles using recurrence
               scheduled_events:
                 - type: parameter_override
                   entity: HX_01
                   column: actual_efficiency_pct
                   value: 94.0
                   start_time: "2026-01-15T08:00:00Z"
-                  end_time: "2026-01-15T12:00:00Z"
+                  recurrence: "15d"
+                  duration: "4h"
                 - type: parameter_override
                   entity: HX_02
                   column: actual_efficiency_pct
                   value: 94.0
                   start_time: "2026-01-16T08:00:00Z"
-                  end_time: "2026-01-16T12:00:00Z"
+                  recurrence: "15d"
+                  duration: "4h"
         write:
           connection: output
           format: parquet
@@ -1308,7 +1310,7 @@ pipelines:
 **What makes this realistic:**
 
 - **The sawtooth degradation curve is the real pattern.** If you plot actual_efficiency_pct over time, HX_01 and HX_02 show the classic fouling-then-cleaning sawtooth, while HX_03 shows a continuous decline. This is exactly what you'd see in a reliability engineer's monitoring dashboard.
-- **`trend` vs. `mean_reversion_to` creates the right physics.** In a real exchanger, fouling rate is fastest on clean surfaces (fresh deposits stick easily) and slows as the fouling layer builds up (existing deposits partially insulate the surface from new deposition). The combination of negative trend and mean_reversion toward design_efficiency_pct naturally produces this decelerating curve.
+- **`trend` without `mean_reversion` models one-way degradation.** Fouling only gets worse until you clean — there's no natural recovery. Using `trend: -0.01` alone produces the correct monotonic decline. If you added mean_reversion, efficiency would unrealistically bounce back between cleanings.
 - **Cleaning doesn't restore to 100%.** Resetting to 94% instead of 95% reflects the practical reality that CIP removes most deposits but not all. Over many cleaning cycles, the baseline slowly drops - a real phenomenon called "irreversible fouling" that eventually requires mechanical cleaning or tube replacement.
 - **Energy loss is a direct dollar figure.** The `energy_loss_kw` column translates abstract efficiency percentages into concrete energy waste. A reliability engineer can multiply this by the cost of energy ($0.08-0.15/kWh) and hours of operation to calculate the cost of deferred maintenance - often the argument that gets cleaning budgets approved.
 - **The neglected exchanger tells a story.** HX_03's continuous decline is the cost of skipping maintenance. By day 30, it's wasting 40+ kW compared to a clean exchanger - and approaching the efficiency floor where process temperatures can't be maintained.
@@ -1328,7 +1330,7 @@ pipelines:
 > 📖 **Learn more:** [Generators Reference](../generators.md) — `random_walk` parameters including `trend` and `mean_reversion_to`
 
 !!! example "Content extraction"
-    **Core insight:** The trend parameter models slow, persistent drift - fouling, wear, calibration loss. Combined with mean_reversion_to, you get a process variable that chases a degrading target.
+    **Core insight:** The trend parameter models slow, persistent drift - fouling, wear, calibration loss. Combined with recurring parameter_override events, you get realistic sawtooth degradation-and-recovery cycles.
 
     **Real-world problem:** Predictive maintenance teams need training data that shows progressive failure. Point-in-time snapshots don't capture the degradation trajectory.
 

@@ -666,7 +666,7 @@ columns:
 
 **YAML — Pipeline transport with step-change testing:**
 
-`scheduled_events` is a top-level simulation key (not per-column). Use `start_time` / `end_time`:
+`scheduled_events` is a top-level simulation key (not per-column). Use `start_time` / `end_time` (or `duration`). Events also support `recurrence`, `condition`, and `transition: ramp` — see [Advanced Features](advanced_features.md#scheduled-events):
 
 ```yaml
 scope:
@@ -1195,7 +1195,7 @@ The fastest way to verify a simulation produces realistic behavior.
 
 **Using `scheduled_events` for automated step-change testing:**
 
-`scheduled_events` is a **top-level** simulation key (sibling of `scope:`, `entities:`, `columns:`), not nested under individual columns. It uses `start_time` / `end_time` fields:
+`scheduled_events` is a **top-level** simulation key (sibling of `scope:`, `entities:`, `columns:`), not nested under individual columns. Use `start_time` with `end_time` or `duration`. For gradual changes, add `transition: ramp`:
 
 ```yaml
 scope:
@@ -1647,7 +1647,7 @@ Ten rules you can memorize and apply from memory:
 | Process dynamics | `prev()` in `derived` expressions | `columns[].generator.type: derived` | [Stateful Functions](stateful_functions.md) |
 | Input signals | `random_walk`, `constant`, `daily_profile` | `columns[].generator.type: random_walk` | [Generators](generators.md) |
 | Physical bounds | `max(0, min(100, ...))` in expressions | Inside `expression:` string | This page |
-| Step-change testing | `scheduled_events` | Top-level `scheduled_events:` (sibling of `columns:`) | [Advanced Features](advanced_features.md#scheduled-events) |
+| Step-change testing | `scheduled_events` | Top-level `scheduled_events:` (sibling of `columns:`) — supports `recurrence`, `condition`, `transition: ramp` | [Advanced Features](advanced_features.md#scheduled-events) |
 | Multi-entity simulation | `entities.names: [a, b, c]` | Top-level `entities:` block | [Core Concepts](core_concepts.md#entities-who-generates-data) |
 | Cross-entity references | `Entity.column` dot notation | Inside `expression:` string | [Advanced Features](advanced_features.md#cross-entity-references) |
 | Continuous operation | `incremental.mode: stateful` | `read.incremental` | [Incremental Mode](incremental.md) |
@@ -1657,7 +1657,7 @@ Ten rules you can memorize and apply from memory:
 | Transport delay | `delay()` stateful function | Inside `expression:` string | This page ([Dead Time](#25-dead_time-transport-delay)) |
 | Data quality chaos | `chaos:` block | Top-level `chaos:` | [Advanced Features](advanced_features.md#chaos-engineering) |
 | Per-entity variation | `entity_overrides` | `columns[].entity_overrides` | [Core Concepts](core_concepts.md#entity_overrides-per-entity-customization) |
-| Behavioral events | `scheduled_events` | Top-level `scheduled_events:` (sibling of `columns:`) | [Advanced Features](advanced_features.md#scheduled-events) |
+| Behavioral events | `scheduled_events` | Top-level `scheduled_events:` — time-based, recurring, or condition-triggered | [Advanced Features](advanced_features.md#scheduled-events) |
 
 ### Reusable Pattern Templates
 
@@ -1885,7 +1885,7 @@ This connects the simulation playbook directly to Odibi's full pipeline ecosyste
 - **[Core Concepts](core_concepts.md)** — Scope, entities, columns fundamentals
 - **[Generators Reference](generators.md)** — All 13 generator types with parameters and examples
 - **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` complete reference
-- **[Advanced Features](advanced_features.md)** — Cross-entity references, scheduled events, chaos engineering
+- **[Advanced Features](advanced_features.md)** — Cross-entity references, scheduled events (recurring, condition-based, ramp), chaos engineering
 - **[Process Control & ChemE](process_simulation.md)** — Chemical engineering scenarios, material/energy balances
 - **[Incremental Mode](incremental.md)** — Continuous data generation with state persistence
 - **[Patterns & Recipes](patterns/index.md)** — 38 ready-made simulation recipes across domains

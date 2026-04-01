@@ -43,7 +43,7 @@ Start here. These patterns cover the core simulation features you'll use in ever
 | 3 | IoT Sensor Network | `daily_profile`, `derived` from occupancy, `random_walk` | Building Mgmt |
 | 3b | HVAC Feedback Loop | Derived column chaining, feedback modeling | Building Mgmt |
 | 4 | Order / Transaction Data | `incremental: stateful`, `derived` expressions | E-commerce |
-| 5 | Equipment Degradation | `trend`, `mean_reversion_to`, cleaning cycles | Maintenance |
+| 5 | Equipment Degradation | `trend`, `recurrence`, cleaning cycles | Maintenance |
 | 6 | Stress Test at Scale | High-volume config | Data Engineering |
 | 7 | Daily Dashboard Feed | Incremental + Delta Lake append | Analytics |
 | 8 | Multi-System Integration | Cross-entity refs, `prev()` | Data Engineering |
@@ -255,7 +255,10 @@ Use this table to find which pattern teaches a specific feature.
 | Feature | Patterns |
 |---------|----------|
 | `entity_overrides` | 2, 17 |
-| `scheduled_events` | 2, 3, 5, 14 |
+| `scheduled_events` | 2, 3, 5, 12, 14, 18, 22 |
+| `recurrence` | 5, 18 |
+| `condition` | 22 |
+| `transition: ramp` | 12 |
 | `chaos` (outliers, duplicates) | 2, 3, 10, 36 |
 | `null_rate` | 3 |
 | `trend` | 5, 27 |
@@ -272,5 +275,5 @@ Use this table to find which pattern teaches a specific feature.
 
 - **[Getting Started](../getting_started.md)** - Your first simulation in 5 minutes
 - **[Generators Reference](../generators.md)** - All generator types with parameters and examples
-- **[Advanced Features](../advanced_features.md)** - Cross-entity references, scheduled events, entity overrides, chaos
+- **[Advanced Features](../advanced_features.md)** - Cross-entity references, scheduled events (recurring, condition-based, ramp), entity overrides, chaos
 - **[Process Simulation](../process_simulation.md)** - Chemical engineering and process control deep dive

@@ -539,7 +539,7 @@ If you've ever watched a YouTube video of a chemical plant and wondered what all
 
 The catch? The reaction inside this reactor is exothermic - it releases heat. Left unchecked, the temperature would climb until you hit thermal runaway, which is exactly as bad as it sounds (think Bhopal, T2 Laboratories). So you wrap the reactor in a cooling jacket, pump cold water through it, and use a PID controller to automatically adjust how much cooling you apply. The PID controller is the unsung hero of every chemical plant - it reads the current temperature, compares it to the setpoint, and calculates how much to open or close the cooling valve. Thousands of times a day, without complaint.
 
-This pattern simulates that entire control loop: feed enters the reactor, generates heat, the PID controller reads the temperature, adjusts the cooling valve, and the reactor temperature responds with realistic first-order dynamics. At hour 4, a feed disturbance (flow jumps to 5.8 m3/hr) forces more heat into the system, and you get to watch the controller fight to bring temperature back to setpoint. It's the same scenario a process engineer would test during commissioning.
+This pattern simulates that entire control loop: feed enters the reactor, generates heat, the PID controller reads the temperature, adjusts the cooling valve, and the reactor temperature responds with realistic first-order dynamics. At hour 4, a feed disturbance (flow ramps up to 5.8 m3/hr over 15 minutes via `transition: ramp`) forces more heat into the system, and you get to watch the controller fight to bring temperature back to setpoint. It's the same scenario a process engineer would test during commissioning.
 
 ### Process breakdown
 
@@ -597,7 +597,7 @@ flowchart LR
     - **Kp=2.5, Ki=0.08, Kd=0.5:** Moderate tuning for a temperature loop with a 5-minute time constant. Kp=2.5 gives reasonable proportional response without being overly aggressive. Ki=0.08 is slow enough to eliminate steady-state offset without causing integral windup. Kd=0.5 provides some anticipatory action for disturbance rejection. These are realistic first-pass tuning values from Ziegler-Nichols or similar methods.
     - **tau = 300s (5 minutes):** Typical for a medium-size jacketed reactor (roughly 1-5 m3 volume). Smaller reactors respond faster (tau < 60s), larger reactors slower (tau > 600s). The 5-minute time constant means temperature changes are gradual, not instantaneous - exactly how real reactors behave.
     - **Heat generation = feed_flow * 10 kW per m3/hr:** A simplified but physically reasonable model. At 5.0 m3/hr, that's 50 kW of heat generation - comparable to a moderately exothermic reaction like an esterification. Highly exothermic reactions (nitration, polymerization) can generate 10x more.
-    - **Feed flow 4.0-6.0 m3/hr with disturbance to 5.8:** The normal operating range is narrow (plus or minus 20% of nominal). The step disturbance to 5.8 m3/hr at hour 4 represents a sudden upstream change - maybe a feed pump switched, or an upstream tank level controller opened a valve. This 16% increase in feed flow creates a 16% increase in heat generation, which is enough to challenge the controller without being catastrophic.
+    - **Feed flow 4.0-6.0 m3/hr with disturbance to 5.8:** The normal operating range is narrow (plus or minus 20% of nominal). The ramped disturbance to 5.8 m3/hr at hour 4 (`transition: ramp`) represents a gradual upstream change - maybe a feed pump switching over or an upstream tank level controller opening a valve. Real process upsets ramp over minutes, not instantly. This 16% increase in feed flow creates a 16% increase in heat generation, which is enough to challenge the controller without being catastrophic.
     - **dt=60 in PID:** Matches the 1-minute simulation timestep. In a real plant, PID controllers typically execute every 0.1-1.0 seconds, but the dynamics here are slow enough that 1-minute sampling is adequate for demonstration.
     - **output_min=0, output_max=100:** Physical valve constraints. A valve can't be less than 0% open or more than 100% open. Without these limits, the PID math could calculate negative values (impossible) or values above 100 (also impossible). This is called anti-windup protection.
 
@@ -704,14 +704,15 @@ pipelines:
                     type: derived
                     expression: "reactor_temp_c > 95.0"
 
-              # Feed disturbance at hour 4
+              # Feed disturbance at hour 4 — ramps up over 15 minutes
               scheduled_events:
                 - type: forced_value
                   entity: CSTR_01
                   column: feed_flow_m3_hr
                   value: 5.8
                   start_time: "2026-03-10T10:00:00Z"
-                  end_time: "2026-03-10T11:00:00Z"
+                  duration: "1h"
+                  transition: ramp
         write:
           connection: output
           format: parquet
@@ -732,14 +733,14 @@ pipelines:
     | CSTR_01    | 2026-03-10 10:30:00  | 85.0            | 5.80            | 58.0                | 78.9        | 86.5           | -1.5         | false           |
     | CSTR_01    | 2026-03-10 11:30:00  | 85.0            | 5.11            | 51.1                | 50.2        | 85.1           | -0.1         | false           |
 
-    The story unfolds in the data: during normal operation (06:00-10:00), temperature hovers near 85 degrees C and the cooling valve sits around 48%. When the feed disturbance hits at 10:00, heat generation jumps from ~50 kW to 58 kW. The PID controller reacts - you can see `cooling_pct` climbing from 52% to nearly 79% as it opens the valve to reject the extra heat. Temperature overshoots to about 87 degrees C before the controller brings it back. By 11:30, everything is settled again. That overshoot-then-recovery signature is exactly what you'd see on a real DCS trend screen.
+    The story unfolds in the data: during normal operation (06:00-10:00), temperature hovers near 85 degrees C and the cooling valve sits around 48%. When the feed disturbance begins ramping at 10:00, heat generation climbs from ~50 kW toward 58 kW over 15 minutes. The PID controller reacts - you can see `cooling_pct` climbing from 52% to nearly 79% as it opens the valve to reject the extra heat. Temperature overshoots to about 87 degrees C before the controller brings it back. By 11:30, everything is settled again. That overshoot-then-recovery signature is exactly what you'd see on a real DCS trend screen.
 
 **What makes this realistic:**
 
 - **The PID controller reads previous temperature** (`prev('reactor_temp_c', 85.0)`) - just like a real controller that samples, calculates, then acts. There's always a one-scan delay between measurement and action. This is not a modeling shortcut; it's how real control systems work.
 - **Reactor temperature responds with first-order dynamics (tau=5 min)** - it doesn't jump to the new value instantly. The expression `prev() + (dt/tau) * (driving forces)` is a discrete approximation of the first-order ODE that governs heat transfer in a jacketed vessel. This is textbook chemical engineering.
 - **More feed generates more heat generates higher temperature generates more cooling** - the entire causal chain is modeled. Feed flow is the disturbance, heat generation is the effect, temperature is the process variable, and cooling is the manipulated variable. This is the classic cascade you'd draw on a whiteboard in any process control class.
-- **The feed disturbance at hour 4 forces a step change** that tests the controller's ability to reject a load disturbance. In a real plant, this could be an upstream valve opening, a feed pump switching, or a batch tank dumping its contents into the continuous process.
+- **The feed disturbance at hour 4 ramps up gradually** (`transition: ramp`) rather than jumping instantly — real process upsets rarely happen as instant step changes. An upstream valve opening or a feed pump switching produces a ramp, not a step. This tests the controller's ability to reject a realistic load disturbance.
 - **`output_min=0, output_max=100` constrains the valve to 0-100%** - a real valve can't go beyond fully open or fully closed. Without these limits, the PID integral term could "wind up" to absurd values, and when the disturbance clears, the controller would take forever to unwind. This anti-windup protection is critical in real installations.
 
 !!! warning "Why are the PID gains negative?"

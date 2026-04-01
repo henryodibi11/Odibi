@@ -30,7 +30,7 @@ read:
 | **Stateful Functions** | `prev()`, `ema()`, `pid()`, `delay()` — values that depend on history for dynamic process simulation |
 | **Cross-Entity References** | One entity reacts to another: downstream sensor reads upstream output |
 | **Entity Overrides** | Per-entity behavior variation — entity A runs hot, entity B runs cold |
-| **Scheduled Events** | Maintenance windows, setpoint changes, shutdowns at specific times |
+| **Scheduled Events** | Maintenance windows, setpoint changes, recurring events, condition-based triggers, ramp transitions |
 | **Chaos Engineering** | Outliers, duplicates, downtime gaps, null injection — realistic imperfections |
 | **Incremental Mode** | Continuous data generation with HWM state — each run picks up where the last left off |
 | **Deterministic** | Same seed = same output, every time |
@@ -49,7 +49,7 @@ Work through the simulation docs in order, or jump to what you need:
 | :material-book-open-variant: [Core Concepts](core_concepts.md) | Scope, entities, and columns - the three building blocks |
 | :material-format-list-bulleted-type: [Generators Reference](generators.md) | All 13 generator types with parameters and examples |
 | :material-function-variant: [Stateful Functions](stateful_functions.md) | `prev()`, `ema()`, `pid()`, `delay()` — history-dependent values |
-| :material-puzzle: [Advanced Features](advanced_features.md) | Cross-entity references, overrides, scheduled events, chaos |
+| :material-puzzle: [Advanced Features](advanced_features.md) | Cross-entity references, overrides, scheduled events (recurring, condition-based, ramp), chaos |
 | :material-sync: [Incremental Mode](incremental.md) | Continuous data generation across pipeline runs |
 | :material-chef-hat: [Patterns & Recipes](patterns.md) | Real-world scenarios: IoT fleets, batch reactors, order streams |
 | :material-flask: [Process Simulation](process_simulation.md) | ChemE and process control: FOPTD, PID loops, reactor dynamics |

@@ -662,6 +662,21 @@ class NodeExecutor:
                         except (json.JSONDecodeError, TypeError):
                             pass
 
+                    # Restore scheduled event state for continuity across runs
+                    se_state_key = f"{config.name}_se_state"
+                    se_state = (
+                        self.state_manager.get_hwm(se_state_key) if self.state_manager else None
+                    )
+                    if se_state:
+                        import json
+
+                        try:
+                            read_options["_scheduled_event_state"] = (
+                                json.loads(se_state) if isinstance(se_state, str) else se_state
+                            )
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
             # Execute Read
             df = self.engine.read(
                 connection=connection,
@@ -737,6 +752,19 @@ class NodeExecutor:
 
                         rw_state_key = f"{config.name}_rw_state"
                         self.state_manager.set_hwm(rw_state_key, json.dumps(rw_final))
+
+                    # Capture scheduled event final state for persistence
+                    se_final = None
+                    if hasattr(df, "attrs"):
+                        se_final = df.attrs.get("_simulation_scheduled_event_state")
+                    elif hasattr(df, "_simulation_scheduled_event_state"):
+                        se_final = df._simulation_scheduled_event_state
+
+                    if se_final and self.state_manager:
+                        import json
+
+                        se_state_key = f"{config.name}_se_state"
+                        self.state_manager.set_hwm(se_state_key, json.dumps(se_final))
                 else:
                     df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
                     if pending_hwm:
