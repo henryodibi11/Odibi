@@ -947,7 +947,7 @@
             }
           ],
           "default": null,
-          "description": "Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency.",
+          "description": "Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency.",
           "title": "Watermark Lag"
         },
         "date_format": {
@@ -3072,7 +3072,7 @@
             }
           ],
           "default": null,
-          "description": "Expected freshness, e.g. '6h', '1d'",
+          "description": "Expected data freshness SLA. Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '6h', '1d', '30m'.",
           "title": "Freshness Sla"
         },
         "freshness_anchor": {
@@ -7622,7 +7622,7 @@
           "type": "string"
         },
         "expression": {
-          "description": "Python expression using other column names. Evaluated safely.",
+          "description": "Sandboxed Python expression referencing column names. Supports context variables (_row_index, entity_id, _timestamp), safe math functions (abs, round, min, max, coalesce, safe_div), and stateful functions (prev, ema, pid, delay).",
           "title": "Expression",
           "type": "string"
         }
@@ -7659,7 +7659,7 @@
         },
         "pattern": {
           "default": "{entity}_{index}",
-          "description": "Username pattern (supports {entity}, {index}, {row})",
+          "description": "Username template. Available placeholders: {entity}, {index}, {row}. Default produces usernames like 'entity_01'.",
           "title": "Pattern",
           "type": "string"
         }
@@ -7905,7 +7905,7 @@
       "type": "object"
     },
     "SequentialGeneratorConfig": {
-      "description": "Sequential number generator.\n\nExample:\n```yaml\ntype: sequential\nstart: 1\nstep: 1\n```",
+      "description": "Sequential number generator.\n\nBy default, generates globally unique IDs across all entities by offsetting\neach entity's sequence range. Entity 0 gets IDs [start, start + rows),\nentity 1 gets [start + rows, start + 2*rows), etc.\n\nSet ``unique_across_entities: false`` for per-entity sequences (all entities\nshare the same ID range).\n\nExample:\n```yaml\ntype: sequential\nstart: 1\nstep: 1\nunique_across_entities: true  # default\n```",
       "properties": {
         "type": {
           "const": "sequential",
@@ -7923,6 +7923,12 @@
           "description": "Increment step",
           "title": "Step",
           "type": "integer"
+        },
+        "unique_across_entities": {
+          "default": true,
+          "description": "When true, each entity gets a non-overlapping ID range",
+          "title": "Unique Across Entities",
+          "type": "boolean"
         }
       },
       "required": [
@@ -7969,7 +7975,7 @@
         },
         "version": {
           "default": 4,
-          "description": "UUID version: 4=random, 5=deterministic (from entity+row)",
+          "description": "UUID version. Options: 4 (random, default) or 5 (deterministic/namespace-based). Only these values are supported.",
           "enum": [
             4,
             5
@@ -7987,7 +7993,7 @@
             }
           ],
           "default": null,
-          "description": "Namespace for UUID5 (uses UUID.NAMESPACE_DNS if not provided)",
+          "description": "Namespace seed for UUID5 generation. Arbitrary string; default 'DNS' uses the standard DNS namespace UUID.",
           "title": "Namespace"
         }
       },
@@ -8574,7 +8580,7 @@
       "type": "string"
     },
     "ScheduledEvent": {
-      "description": "Scheduled event that modifies simulation behavior at specific times.\n\nEnables realistic process simulation with:\n- Maintenance windows (forced power=0)\n- Grid curtailment (forced output reduction)\n- Setpoint changes (scheduled process changes)\n- Cleaning cycles (efficiency restoration)\n\nExample (maintenance window):\n```yaml\nscheduled_events:\n  - type: forced_value\n    entity: Turbine_01\n    column: power_kw\n    value: 0.0\n    start_time: \"2026-03-11T14:00:00Z\"\n    end_time: \"2026-03-11T18:00:00Z\"\n```\n\nExample (grid curtailment - all entities):\n```yaml\nscheduled_events:\n  - type: forced_value\n    entity: null  # Applies to all entities\n    column: max_output_pct\n    value: 80.0\n    start_time: \"2026-03-11T16:00:00Z\"\n    end_time: \"2026-03-11T19:00:00Z\"\n```\n\nExample (permanent setpoint change):\n```yaml\nscheduled_events:\n  - type: setpoint_change\n    entity: Reactor_01\n    column: temp_setpoint_c\n    value: 370.0\n    start_time: \"2026-03-11T12:00:00Z\"\n    # No end_time = permanent change\n```",
+      "description": "Scheduled event that modifies simulation behavior at specific times or conditions.\n\nEnables realistic process simulation with:\n- Maintenance windows (forced power=0)\n- Grid curtailment (forced output reduction)\n- Setpoint changes (scheduled process changes)\n- Cleaning cycles (efficiency restoration)\n- Recurring events (e.g., weekly maintenance)\n- Condition-based triggers (e.g., degrade when efficiency drops)\n\nExample (maintenance window):\n```yaml\nscheduled_events:\n  - type: forced_value\n    entity: Turbine_01\n    column: power_kw\n    value: 0.0\n    start_time: \"2026-03-11T14:00:00Z\"\n    end_time: \"2026-03-11T18:00:00Z\"\n```\n\nExample (grid curtailment - all entities):\n```yaml\nscheduled_events:\n  - type: forced_value\n    entity: null  # Applies to all entities\n    column: max_output_pct\n    value: 80.0\n    start_time: \"2026-03-11T16:00:00Z\"\n    end_time: \"2026-03-11T19:00:00Z\"\n```\n\nExample (permanent setpoint change):\n```yaml\nscheduled_events:\n  - type: setpoint_change\n    entity: Reactor_01\n    column: temp_setpoint_c\n    value: 370.0\n    start_time: \"2026-03-11T12:00:00Z\"\n    # No end_time = permanent change\n```\n\nExample (recurring maintenance every 30 days):\n```yaml\nscheduled_events:\n  - type: forced_value\n    entity: Turbine_01\n    column: power_kw\n    value: 0.0\n    start_time: \"2026-01-15T06:00:00Z\"\n    recurrence: \"30d\"\n    duration: \"4h\"\n    jitter: \"2d\"\n    max_occurrences: 12\n```\n\nExample (condition-based event):\n```yaml\nscheduled_events:\n  - type: parameter_override\n    entity: Pump_05\n    column: flow_rate_lpm\n    value: 50.0\n    condition: \"actual_efficiency_pct < 70\"\n    cooldown: \"7d\"\n    sustain: \"24h\"\n```\n\nExample (ramped setpoint change):\n```yaml\nscheduled_events:\n  - type: setpoint_change\n    entity: Reactor_01\n    column: temp_setpoint_c\n    value: 370.0\n    start_time: \"2026-03-11T12:00:00Z\"\n    duration: \"2h\"\n    transition: ramp\n```",
       "properties": {
         "type": {
           "$ref": "#/$defs/ScheduledEventType",
@@ -8590,7 +8596,7 @@
             }
           ],
           "default": null,
-          "description": "Entity affected (None = applies to all entities)",
+          "description": "Entity name (must match a name from entities.names) or None to apply to all entities",
           "title": "Entity"
         },
         "column": {
@@ -8603,9 +8609,17 @@
           "title": "Value"
         },
         "start_time": {
-          "description": "Event start timestamp (ISO8601)",
-          "title": "Start Time",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Event start timestamp in ISO8601 Zulu format (e.g., '2026-01-15T06:00:00Z'). Required for time-based events.",
+          "title": "Start Time"
         },
         "end_time": {
           "anyOf": [
@@ -8617,7 +8631,7 @@
             }
           ],
           "default": null,
-          "description": "Event end timestamp (ISO8601). None = permanent change.",
+          "description": "Event end timestamp in ISO8601 Zulu format (e.g., '2026-01-15T18:00:00Z'). None = permanent change.",
           "title": "End Time"
         },
         "priority": {
@@ -8625,13 +8639,110 @@
           "description": "Priority for overlapping events (higher = applied last)",
           "title": "Priority",
           "type": "integer"
+        },
+        "recurrence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Repeat interval. Event recurs at this interval from start_time. Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '30d', '7d', '4h'.",
+          "title": "Recurrence"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Duration of each occurrence. Alternative to specifying end_time. Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '4h', '30m', '2d'.",
+          "title": "Duration"
+        },
+        "jitter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Random offset \u00b1 applied to each recurrence start (deterministic per seed). Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '2d', '6h'.",
+          "title": "Jitter"
+        },
+        "max_occurrences": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Stop repeating after N occurrences.",
+          "title": "Max Occurrences"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sandboxed Python expression evaluated against current row columns. Supports comparison operators, compound logic (and, or, not), and safe functions (abs, round, min, max). E.g., 'actual_efficiency_pct < 70 and pressure > 50'. Triggers event when true.",
+          "title": "Condition"
+        },
+        "cooldown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum gap between condition triggers. Prevents rapid re-triggering. Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '7d', '12h'.",
+          "title": "Cooldown"
+        },
+        "sustain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Condition must be continuously true for this duration before triggering. Prevents spurious triggers from momentary spikes. Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '24h', '30m'.",
+          "title": "Sustain"
+        },
+        "transition": {
+          "default": "instant",
+          "description": "How value is applied: 'instant' (default, jump to value) or 'ramp' (linear interpolation over duration).",
+          "title": "Transition",
+          "type": "string"
         }
       },
       "required": [
         "type",
         "column",
-        "value",
-        "start_time"
+        "value"
       ],
       "title": "ScheduledEvent",
       "type": "object"
@@ -8640,12 +8751,12 @@
       "description": "Simulation scope and boundaries.\n\nExample (row count):\n```yaml\nscope:\n  start_time: \"2026-01-01T00:00:00Z\"\n  timestep: \"5m\"\n  row_count: 10000\n  seed: 42\n```\n\nExample (time range):\n```yaml\nscope:\n  start_time: \"2026-01-01T00:00:00Z\"\n  end_time: \"2026-01-02T00:00:00Z\"\n  timestep: \"10m\"\n  seed: 42\n```",
       "properties": {
         "start_time": {
-          "description": "Simulation start timestamp (ISO8601)",
+          "description": "Simulation start timestamp in ISO8601 Zulu format (e.g., '2026-01-01T00:00:00Z')",
           "title": "Start Time",
           "type": "string"
         },
         "timestep": {
-          "description": "Time between events (e.g., '5m', '1h', '30s')",
+          "description": "Time between rows. Format: number followed by unit \u2014 s (seconds), m (minutes), h (hours), or d (days). Examples: '30s', '5m', '1h', '2d'.",
           "title": "Timestep",
           "type": "string"
         },
@@ -8673,7 +8784,7 @@
             }
           ],
           "default": null,
-          "description": "Simulation end timestamp (mutually exclusive with row_count)",
+          "description": "Simulation end timestamp in ISO8601 Zulu format (e.g., '2026-01-02T00:00:00Z'). Mutually exclusive with row_count",
           "title": "End Time"
         },
         "seed": {

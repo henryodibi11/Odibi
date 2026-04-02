@@ -49,10 +49,12 @@ jobs:
       - name: Lint code (Ruff)
         run: ruff check odibi/ tests/
 
-      # Step 6: Regenerate docs (only on 3.11 where sync test runs)
-      - name: Regenerate docs
+      # Step 6: Regenerate docs and schema (only on 3.11 where sync test runs)
+      - name: Regenerate docs and JSON schema
         if: matrix.python-version == '3.11'
-        run: python odibi/introspect.py
+        run: |
+          python odibi/introspect.py
+          odibi templates schema
 
       # Step 7: Run all base tests with coverage
       # These are the 78 existing Pandas tests that MUST pass
