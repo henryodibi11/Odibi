@@ -31,10 +31,10 @@ A treatment plant is essentially a series of stages, each one removing a fractio
 
 ```mermaid
 flowchart LR
-    A["Influent\n12 MGD\nBOD: 220 mg/L\nTSS: 200 mg/L"] -->|"98% flow\n65% BOD passes"| B["Primary\nClarifier"]
-    B -->|"95% flow\n15% BOD passes"| C["Aeration\nBasin\nDO: 2.0 mg/L"]
-    C -->|"97% flow\n60% BOD passes"| D["Secondary\nClarifier"]
-    D -->|"99% flow\n85% BOD passes"| E["Effluent\n10.7 MGD\nBOD: ~11 mg/L\nTSS: ~6 mg/L"]
+    A["Influent\n12 MGD\nBOD: 220 mg/L\nTSS: 200 mg/L"] --> B["Primary\nClarifier\nremoves 35% BOD\n2% flow lost to sludge"]
+    B --> C["Aeration\nBasin\nremoves 85% BOD\nDO: 2.0 mg/L"]
+    C --> D["Secondary\nClarifier\nremoves 40% BOD\n3% flow to RAS"]
+    D --> E["Effluent\n10.7 MGD\nBOD: ~11 mg/L\nTSS: ~6 mg/L"]
 
     style A fill:#dc3545,stroke:#a71d2a,color:#ffffff
     style B fill:#4a90d9,stroke:#2c5f8a,color:#ffffff
