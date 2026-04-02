@@ -219,7 +219,7 @@ connections:
 | `driver` | string | `ODBC Driver 18 for SQL Server` | ODBC driver |
 | `port` | int | `1433` | SQL Server port |
 | `timeout` | int | `30` | Connection timeout (seconds) |
-| `auth_mode` | string | Auto | `sql`, `aad_msi`, `key_vault` |
+| `auth_mode` | string | Auto | Auto-detected from provided fields. Explicit options: `'sql'`, `'aad_msi'`, `'key_vault'` |
 
 ### Authentication Modes
 

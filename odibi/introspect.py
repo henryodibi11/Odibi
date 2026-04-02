@@ -141,6 +141,28 @@ GROUP_MAPPING = {
     "ApiRetryConfig": "Operation",
     "ApiRateLimitConfig": "Operation",
     "ApiOptionsConfig": "Operation",
+    # Simulation
+    "SimulationConfig": "Simulation",
+    "SimulationScope": "Simulation",
+    "EntityConfig": "Simulation",
+    "ColumnGeneratorConfig": "Simulation",
+    "ScheduledEvent": "Simulation",
+    "ChaosConfig": "Simulation",
+    "DowntimeEvent": "Simulation",
+    # Simulation Generators
+    "RangeGeneratorConfig": "Simulation",
+    "CategoricalGeneratorConfig": "Simulation",
+    "BooleanGeneratorConfig": "Simulation",
+    "TimestampGeneratorConfig": "Simulation",
+    "SequentialGeneratorConfig": "Simulation",
+    "ConstantGeneratorConfig": "Simulation",
+    "UUIDGeneratorConfig": "Simulation",
+    "EmailGeneratorConfig": "Simulation",
+    "IPGeneratorConfig": "Simulation",
+    "GeoGeneratorConfig": "Simulation",
+    "DerivedGeneratorConfig": "Simulation",
+    "DailyProfileGeneratorConfig": "Simulation",
+    "RandomWalkGeneratorConfig": "Simulation",
 }
 
 # Map modules to readable Categories
@@ -187,6 +209,28 @@ CUSTOM_ORDER = [
     "AzureBlobConnectionConfig",
     "SQLServerConnectionConfig",
     "HttpConnectionConfig",
+    # Simulation
+    "SimulationConfig",
+    "SimulationScope",
+    "EntityConfig",
+    "ColumnGeneratorConfig",
+    "ScheduledEvent",
+    "ChaosConfig",
+    "DowntimeEvent",
+    # Simulation Generators
+    "RangeGeneratorConfig",
+    "RandomWalkGeneratorConfig",
+    "DailyProfileGeneratorConfig",
+    "DerivedGeneratorConfig",
+    "CategoricalGeneratorConfig",
+    "SequentialGeneratorConfig",
+    "ConstantGeneratorConfig",
+    "BooleanGeneratorConfig",
+    "TimestampGeneratorConfig",
+    "UUIDGeneratorConfig",
+    "EmailGeneratorConfig",
+    "IPGeneratorConfig",
+    "GeoGeneratorConfig",
 ]
 
 # Map type aliases to their documentation section anchors
@@ -324,6 +368,52 @@ materializations:
 ```
 
 The `source: gold.fact_orders` notation resolves paths automatically from connections.
+""",
+    "Simulation": """
+### Simulation Engine
+
+Generate realistic time-series data for testing pipelines, dashboards, and analytics.
+Simulation is configured as `format: simulation` in a node's `read` section.
+
+**Core building blocks:**
+- **SimulationScope**: Time boundaries, timestep, row count
+- **EntityConfig**: Who generates data (sensors, machines, pumps)
+- **ColumnGeneratorConfig**: What data each entity produces
+- **ScheduledEvent**: Maintenance windows, setpoint changes, condition-based triggers
+- **ChaosConfig**: Outliers, duplicates, downtime for realistic imperfections
+
+**Duration/interval format** (used by `timestep`, `recurrence`, `duration`, `jitter`, `cooldown`, `sustain`):
+`<number><unit>` where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days).
+Examples: `5m`, `1h`, `30s`, `2d`.
+
+**Example:**
+```yaml
+read:
+  connection: null
+  format: simulation
+  options:
+    simulation:
+      scope:
+        start_time: "2026-01-01T00:00:00Z"
+        timestep: "5m"
+        row_count: 288
+        seed: 42
+      entities:
+        count: 3
+        id_prefix: pump_
+      columns:
+        - name: temperature
+          data_type: float
+          generator:
+            type: random_walk
+            start: 75.0
+            min: 60.0
+            max: 100.0
+            volatility: 1.0
+            mean_reversion: 0.1
+```
+
+**See Also:** [Simulation Docs](../simulation/core_concepts.md), [Generator Reference](simulation_generators.md)
 """,
     "Validation": """
 ### FK Validation
@@ -959,6 +1049,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
         "Contract": [],
         "Setting": [],
         "Transformation": [],
+        "Simulation": [],
         "Semantic": [],
         "Validation": [],
         "Pattern": [],
@@ -988,6 +1079,7 @@ def generate_docs(output_path: str = "docs/reference/yaml_schema.md"):
         ("Contract", "Contracts (Data Quality Gates)"),
         ("Setting", "Global Settings"),
         ("Transformation", "Transformation Reference"),
+        ("Simulation", "Simulation Engine"),
         ("Semantic", "Semantic Layer"),
         ("Validation", "FK Validation"),
         ("Pattern", "Data Patterns"),

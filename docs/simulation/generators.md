@@ -604,7 +604,7 @@ Generate calculated columns from other columns using sandboxed Python expression
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| expression | string | Yes | — | Python expression referencing other column names |
+| expression | string | Yes | — | Sandboxed Python expression referencing column names. Supports context variables (`_row_index`, `entity_id`, `_timestamp`), safe math functions (`abs`, `round`, `min`, `max`, `coalesce`, `safe_div`), and stateful functions (`prev`, `ema`, `pid`, `delay`) |
 
 **Supported data types:** any (depends on expression result)
 
@@ -807,8 +807,8 @@ Generate unique identifiers.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| version | int | No | `4` | 4 = random, 5 = deterministic |
-| namespace | string | No | `DNS` | Namespace for UUID5 generation |
+| version | int | No | `4` | UUID version. Options: `4` (random) or `5` (deterministic/namespace-based). Only these values are supported |
+| namespace | string | No | `DNS` | Namespace seed for UUID5 generation. Arbitrary string; default `DNS` uses the standard DNS namespace UUID |
 
 **Supported data types:** `string`
 
@@ -846,7 +846,7 @@ Generate email addresses.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | domain | string | No | `example.com` | Email domain |
-| pattern | string | No | `{entity}_{index}` | Username pattern |
+| pattern | string | No | `{entity}_{index}` | Username template. Available placeholders: `{entity}`, `{index}`, `{row}`. Default: `{entity}_{index}` |
 
 **Supported data types:** `string`
 

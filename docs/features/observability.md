@@ -69,8 +69,8 @@ pipelines:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `owner` | string | No | Pipeline owner (email or name). Shown in health/SLA dashboards |
-| `freshness_sla` | string | No | Expected freshness: `30m`, `6h`, `1d`, `1w` |
-| `freshness_anchor` | string | No | What defines freshness. Default: `run_completion` |
+| `freshness_sla` | string | No | Expected data freshness SLA. Format: `<number><unit>` where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days). Examples: `30m`, `6h`, `1d` |
+| `freshness_anchor` | string | No | What defines freshness. Options: `run_completion` (default), `table_max_timestamp`, `watermark_state` |
 
 !!! note "Freshness SLA Required for SLA Tracking"
     The `meta_sla_status` table is only updated if `freshness_sla` is configured.

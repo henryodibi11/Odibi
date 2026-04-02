@@ -137,7 +137,7 @@ lineage:
 |-------|------|----------|-------------|
 | `pipeline` | string | Yes | Pipeline name |
 | `description` | string | No | Pipeline description |
-| `layer` | string | No | Logical layer: `bronze`, `silver`, `gold` |
+| `layer` | string | No | Freeform string; conventional values: `'bronze'`, `'silver'`, `'gold'` |
 | `nodes` | list | Yes | List of nodes (unique names required) |
 
 ```yaml

@@ -279,8 +279,8 @@ generator:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| version | int | No | 4 | 4=random, 5=deterministic |
-| namespace | string | No | DNS | Namespace for UUID5 |
+| version | int | No | 4 | UUID version. Options: `4` (random) or `5` (deterministic/namespace-based). Only these values are supported |
+| namespace | string | No | DNS | Namespace seed for UUID5 generation. Arbitrary string; default `DNS` uses the standard DNS namespace UUID |
 
 **Data types:** string
 
@@ -313,7 +313,7 @@ generator:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | domain | string | No | `example.com` | Email domain |
-| pattern | string | No | `{entity}_{index}` | Username pattern |
+| pattern | string | No | `{entity}_{index}` | Username template. Available placeholders: `{entity}`, `{index}`, `{row}`. Default: `{entity}_{index}` |
 
 **Data types:** string
 
@@ -396,7 +396,7 @@ generator:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| expression | string | Yes | - | Python expression |
+| expression | string | Yes | - | Sandboxed Python expression referencing column names. Supports context variables (`_row_index`, `entity_id`, `_timestamp`), safe math functions (`abs`, `round`, `min`, `max`, `coalesce`, `safe_div`), and stateful functions (`prev`, `ema`, `pid`, `delay`) |
 
 **Data types:** any (depends on expression result)
 

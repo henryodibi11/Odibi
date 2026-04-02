@@ -212,7 +212,7 @@ read:
 | `rename_columns` | Rename columns | `mapping: {old: new}` |
 | `fill_nulls` | Replace nulls | `fills: {col: value}` |
 | `case_when` | Conditional logic | `conditions: [{when, then}]` |
-| `sort` | Order rows | `order_by: "col DESC"` |
+| `sort` | Order rows | `order_by: "<column> [ASC\|DESC]"` — multiple columns can be comma-separated |
 | `limit` | Take first N rows | `n: 100` |
 | `distinct` | Remove duplicates | `columns: [...]` (optional) |
 
@@ -221,10 +221,10 @@ read:
 | Transformer | Description | Key Params |
 | :--- | :--- | :--- |
 | `extract_date_parts` | Extract year, month, day | `column, parts: [year, month]` |
-| `date_add` | Add interval to date | `column, interval, unit` |
-| `date_trunc` | Truncate to period | `column, unit: "month"` |
+| `date_add` | Add interval to date | `column, interval, unit` (unit options: `day`, `hour`, `month`, `year`) |
+| `date_trunc` | Truncate to period | `column, unit` (unit options: `day`, `month`, `year`, `hour`, `minute`, `second`) |
 | `date_diff` | Days between dates | `start_col, end_col` |
-| `convert_timezone` | Convert timezones | `column, from_tz, to_tz` |
+| `convert_timezone` | Convert timezones | `column, from_tz, to_tz` (IANA timezone format, e.g., `America/New_York`, `UTC`) |
 
 ### Relational (Joins & Aggregations)
 
@@ -248,19 +248,19 @@ read:
 | `regex_replace` | Regex substitution | `column, pattern, replacement` |
 | `parse_json` | Extract from JSON | `column, schema` |
 | `generate_surrogate_key` | UUID keys | `columns, output_column` |
-| `sessionize` | Session detection | `timestamp_col, gap_minutes` |
+| `sessionize` | Session detection | `timestamp_col, gap_minutes` — integer, inactivity threshold in minutes after which a new session starts |
 
 ### Patterns (SCD, Merge, Delete Detection)
 
 | Transformer | Description | Key Params |
 | :--- | :--- | :--- |
-| `scd2` | SCD Type 2 history | `target, keys, track_cols` |
-| `merge` | Upsert/append/delete | `target, keys, strategy` |
+| `scd2` | SCD Type 2 history | `target, keys, track_cols, effective_time_col` (required) |
+| `merge` | Upsert/append/delete | `target, keys, strategy` — options: `upsert`, `append_only`, `delete_match` |
 | `detect_deletes` | Find deleted records | `target, keys` |
 
 ### Validation
 
 | Transformer | Description | Key Params |
 | :--- | :--- | :--- |
-| `cross_check` | Compare datasets | `inputs: [a, b], type` |
+| `cross_check` | Compare datasets | `inputs: [a, b], type` — options: `row_count_diff`, `schema_match` |
 | `validate_and_flag` | Flag bad records | `rules: [{col, condition}]` |

@@ -40,7 +40,7 @@ story:
 | `failure_sample_size` | int | No | `100` | Rows to capture per validation failure |
 | `max_failure_samples` | int | No | `500` | Total failed rows across all validations |
 | `max_sampled_validations` | int | No | `5` | After this many validations, show only counts |
-| `theme` | string | No | `default` | Theme name or path to YAML theme file |
+| `theme` | string | No | `default` | Built-in options: `'default'`, `'corporate'`, `'dark'`, `'minimal'`, or path to custom theme YAML file |
 | `include_samples` | bool | No | `true` | Whether to include data samples |
 
 ### Remote Storage

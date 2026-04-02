@@ -1407,10 +1407,12 @@ class UUIDGeneratorConfig(BaseModel):
 
     type: Literal["uuid"]
     version: Literal[4, 5] = Field(
-        default=4, description="UUID version: 4=random, 5=deterministic (from entity+row)"
+        default=4,
+        description="UUID version. Options: 4 (random, default) or 5 (deterministic/namespace-based). Only these values are supported.",
     )
     namespace: Optional[str] = Field(
-        default=None, description="Namespace for UUID5 (uses UUID.NAMESPACE_DNS if not provided)"
+        default=None,
+        description="Namespace seed for UUID5 generation. Arbitrary string; default 'DNS' uses the standard DNS namespace UUID.",
     )
 
 
@@ -1428,7 +1430,7 @@ class EmailGeneratorConfig(BaseModel):
     domain: str = Field(default="example.com", description="Email domain")
     pattern: str = Field(
         default="{entity}_{index}",
-        description="Username pattern (supports {entity}, {index}, {row})",
+        description="Username template. Available placeholders: {entity}, {index}, {row}. Default produces usernames like 'entity_01'.",
     )
 
 
@@ -1512,7 +1514,7 @@ class DerivedGeneratorConfig(BaseModel):
 
     type: Literal["derived"]
     expression: str = Field(
-        description="Python expression using other column names. Evaluated safely."
+        description="Sandboxed Python expression referencing column names. Supports context variables (_row_index, entity_id, _timestamp), safe math functions (abs, round, min, max, coalesce, safe_div), and stateful functions (prev, ema, pid, delay)."
     )
 
 
@@ -1894,15 +1896,18 @@ class ScheduledEvent(BaseModel):
 
     type: ScheduledEventType = Field(description="Event type")
     entity: Optional[str] = Field(
-        default=None, description="Entity affected (None = applies to all entities)"
+        default=None,
+        description="Entity name (must match a name from entities.names) or None to apply to all entities",
     )
     column: str = Field(description="Column name to modify")
     value: Any = Field(description="Value to apply during event")
     start_time: Optional[str] = Field(
-        default=None, description="Event start timestamp (ISO8601). Required for time-based events."
+        default=None,
+        description="Event start timestamp in ISO8601 Zulu format (e.g., '2026-01-15T06:00:00Z'). Required for time-based events.",
     )
     end_time: Optional[str] = Field(
-        default=None, description="Event end timestamp (ISO8601). None = permanent change."
+        default=None,
+        description="Event end timestamp in ISO8601 Zulu format (e.g., '2026-01-15T18:00:00Z'). None = permanent change.",
     )
     priority: int = Field(
         default=0, description="Priority for overlapping events (higher = applied last)"
@@ -1911,15 +1916,27 @@ class ScheduledEvent(BaseModel):
     # V1: Recurrence fields
     recurrence: Optional[str] = Field(
         default=None,
-        description="Repeat interval (e.g., '30d', '7d', '4h'). Event recurs at this interval from start_time.",
+        description=(
+            "Repeat interval. Event recurs at this interval from start_time. "
+            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Examples: '30d', '7d', '4h'."
+        ),
     )
     duration: Optional[str] = Field(
         default=None,
-        description="Duration of each occurrence (e.g., '4h'). Alternative to specifying end_time.",
+        description=(
+            "Duration of each occurrence. Alternative to specifying end_time. "
+            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Examples: '4h', '30m', '2d'."
+        ),
     )
     jitter: Optional[str] = Field(
         default=None,
-        description="Random offset ± applied to each recurrence start (e.g., '2d').",
+        description=(
+            "Random offset ± applied to each recurrence start (deterministic per seed). "
+            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Examples: '2d', '6h'."
+        ),
     )
     max_occurrences: Optional[int] = Field(
         default=None,
@@ -1930,15 +1947,24 @@ class ScheduledEvent(BaseModel):
     # V2: Condition-based fields
     condition: Optional[str] = Field(
         default=None,
-        description="Python expression evaluated against current row data (e.g., 'actual_efficiency_pct < 70'). Triggers event when true.",
+        description="Sandboxed Python expression evaluated against current row columns. Supports comparison operators, compound logic (and, or, not), and safe functions (abs, round, min, max). E.g., 'actual_efficiency_pct < 70 and pressure > 50'. Triggers event when true.",
     )
     cooldown: Optional[str] = Field(
         default=None,
-        description="Minimum gap between condition triggers (e.g., '7d').",
+        description=(
+            "Minimum gap between condition triggers. Prevents rapid re-triggering. "
+            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Examples: '7d', '12h'."
+        ),
     )
     sustain: Optional[str] = Field(
         default=None,
-        description="Condition must be true for this duration before triggering (e.g., '24h').",
+        description=(
+            "Condition must be continuously true for this duration before triggering. "
+            "Prevents spurious triggers from momentary spikes. "
+            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Examples: '24h', '30m'."
+        ),
     )
 
     # V3: Transition field
@@ -2100,13 +2126,22 @@ class SimulationScope(BaseModel):
     ```
     """
 
-    start_time: str = Field(description="Simulation start timestamp (ISO8601)")
-    timestep: str = Field(description="Time between events (e.g., '5m', '1h', '30s')")
+    start_time: str = Field(
+        description="Simulation start timestamp in ISO8601 Zulu format (e.g., '2026-01-01T00:00:00Z')"
+    )
+    timestep: str = Field(
+        description=(
+            "Time between rows. "
+            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Examples: '30s', '5m', '1h', '2d'."
+        )
+    )
     row_count: Optional[int] = Field(
         default=None, gt=0, description="Total rows to generate (mutually exclusive with end_time)"
     )
     end_time: Optional[str] = Field(
-        default=None, description="Simulation end timestamp (mutually exclusive with row_count)"
+        default=None,
+        description="Simulation end timestamp in ISO8601 Zulu format (e.g., '2026-01-02T00:00:00Z'). Mutually exclusive with row_count",
     )
     seed: int = Field(default=42, description="Random seed for deterministic generation")
 
@@ -4796,7 +4831,11 @@ class PipelineConfig(BaseModel):
     )
     freshness_sla: Optional[str] = Field(
         default=None,
-        description="Expected freshness, e.g. '6h', '1d'",
+        description=(
+            "Expected data freshness SLA. "
+            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Examples: '6h', '1d', '30m'."
+        ),
     )
     freshness_anchor: Literal["run_completion", "table_max_timestamp", "watermark_state"] = Field(
         default="run_completion",

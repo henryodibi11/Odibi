@@ -85,7 +85,7 @@ pipelines:
 | **description** | Optional[str] | No | - | Pipeline description |
 | **layer** | Optional[str] | No | - | Logical layer (bronze/silver/gold) |
 | **owner** | Optional[str] | No | - | Pipeline owner (email or name) |
-| **freshness_sla** | Optional[str] | No | - | Expected freshness, e.g. '6h', '1d' |
+| **freshness_sla** | Optional[str] | No | - | Expected data freshness SLA. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '6h', '1d', '30m'. |
 | **freshness_anchor** | Literal['run_completion', 'table_max_timestamp', 'watermark_state'] | No | `run_completion` | What defines freshness. Only 'run_completion' implemented initially. |
 | **nodes** | List[[NodeConfig](#nodeconfig)] | Yes | - | List of nodes in this pipeline |
 | **auto_cache_threshold** | Optional[int] | No | `3` | Auto-cache nodes with N or more downstream dependencies. Prevents redundant ADLS re-reads when a node is used by multiple downstream nodes. Default: 3. Set to null to disable auto-caching. Individual nodes can override with explicit cache: true/false. |
@@ -4531,6 +4531,704 @@ unit_convert:
 | **conversions** | Dict[str, [ConversionSpec](#conversionspec)] | Yes | - | Mapping of source column names to conversion specifications |
 | **gauge_pressure_offset** | Optional[str] | No | `14.696 psia` | Atmospheric pressure for gauge-to-absolute conversions. Default is sea level (14.696 psia). |
 | **errors** | str | No | `null` | How to handle conversion errors: 'null' (default), 'raise', or 'ignore' |
+
+---
+## Simulation Engine
+
+### Simulation Engine
+
+Generate realistic time-series data for testing pipelines, dashboards, and analytics.
+Simulation is configured as `format: simulation` in a node's `read` section.
+
+**Core building blocks:**
+- **SimulationScope**: Time boundaries, timestep, row count
+- **EntityConfig**: Who generates data (sensors, machines, pumps)
+- **ColumnGeneratorConfig**: What data each entity produces
+- **ScheduledEvent**: Maintenance windows, setpoint changes, condition-based triggers
+- **ChaosConfig**: Outliers, duplicates, downtime for realistic imperfections
+
+**Duration/interval format** (used by `timestep`, `recurrence`, `duration`, `jitter`, `cooldown`, `sustain`):
+`<number><unit>` where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days).
+Examples: `5m`, `1h`, `30s`, `2d`.
+
+**Example:**
+```yaml
+read:
+  connection: null
+  format: simulation
+  options:
+    simulation:
+      scope:
+        start_time: "2026-01-01T00:00:00Z"
+        timestep: "5m"
+        row_count: 288
+        seed: 42
+      entities:
+        count: 3
+        id_prefix: pump_
+      columns:
+        - name: temperature
+          data_type: float
+          generator:
+            type: random_walk
+            start: 75.0
+            min: 60.0
+            max: 100.0
+            volatility: 1.0
+            mean_reversion: 0.1
+```
+
+**See Also:** [Simulation Docs](../simulation/core_concepts.md), [Generator Reference](simulation_generators.md)
+
+---
+
+### `SimulationConfig`
+Complete simulation configuration.
+
+Example:
+```yaml
+read:
+  connection: null
+  format: simulation
+  options:
+    simulation:
+      scope:
+        start_time: "2026-01-01T00:00:00Z"
+        timestep: "5m"
+        row_count: 10000
+        seed: 42
+      entities:
+        count: 10
+        id_prefix: pump_
+      columns:
+        - name: entity_id
+          data_type: string
+          generator:
+            type: constant
+            value: "{entity_id}"
+        - name: timestamp
+          data_type: timestamp
+          generator:
+            type: timestamp
+        - name: temperature
+          data_type: float
+          generator:
+            type: range
+            min: 60.0
+            max: 80.0
+            distribution: normal
+          null_rate: 0.02
+      chaos:
+        outlier_rate: 0.01
+        outlier_factor: 3.0
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **scope** | [SimulationScope](#simulationscope) | Yes | - | Simulation scope and boundaries |
+| **entities** | [EntityConfig](#entityconfig) | Yes | - | Entity configuration |
+| **columns** | List[[ColumnGeneratorConfig](#columngeneratorconfig)] | Yes | - | Column definitions |
+| **chaos** | Optional[[ChaosConfig](#chaosconfig)] | No | - | Chaos parameters |
+| **scheduled_events** | List[[ScheduledEvent](#scheduledevent)] | No | `PydanticUndefined` | Scheduled events that modify simulation behavior |
+
+---
+### `SimulationScope`
+> *Used in: [SimulationConfig](#simulationconfig)*
+
+Simulation scope and boundaries.
+
+Example (row count):
+```yaml
+scope:
+  start_time: "2026-01-01T00:00:00Z"
+  timestep: "5m"
+  row_count: 10000
+  seed: 42
+```
+
+Example (time range):
+```yaml
+scope:
+  start_time: "2026-01-01T00:00:00Z"
+  end_time: "2026-01-02T00:00:00Z"
+  timestep: "10m"
+  seed: 42
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **start_time** | str | Yes | - | Simulation start timestamp in ISO8601 Zulu format (e.g., '2026-01-01T00:00:00Z') |
+| **timestep** | str | Yes | - | Time between rows. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '30s', '5m', '1h', '2d'. |
+| **row_count** | Optional[int] | No | - | Total rows to generate (mutually exclusive with end_time) |
+| **end_time** | Optional[str] | No | - | Simulation end timestamp in ISO8601 Zulu format (e.g., '2026-01-02T00:00:00Z'). Mutually exclusive with row_count |
+| **seed** | int | No | `42` | Random seed for deterministic generation |
+
+---
+### `EntityConfig`
+> *Used in: [SimulationConfig](#simulationconfig)*
+
+Entity declaration for simulation.
+
+Example (auto-generated):
+```yaml
+entities:
+  count: 10
+  id_prefix: pump_
+```
+
+Example (explicit names):
+```yaml
+entities:
+  names: [pump_01, pump_02, reactor_01]
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **count** | Optional[int] | No | - | Number of entities to generate |
+| **names** | Optional[List[str]] | No | - | Explicit entity names |
+| **id_prefix** | str | No | `entity_` | Prefix for auto-generated entity IDs |
+| **id_format** | Literal['sequential', 'uuid'] | No | `sequential` | ID format: sequential or uuid |
+
+---
+### `ColumnGeneratorConfig`
+> *Used in: [SimulationConfig](#simulationconfig)*
+
+Configuration for a simulated column.
+
+Example:
+```yaml
+- name: temperature
+  data_type: float
+  generator:
+    type: range
+    min: 60.0
+    max: 100.0
+    distribution: normal
+  null_rate: 0.02
+  entity_overrides:
+    pump_01:
+      type: range
+      min: 80.0
+      max: 120.0
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **name** | str | Yes | - | Column name |
+| **data_type** | SimulationDataType | Yes | - | Data type |
+| **generator** | [RangeGeneratorConfig](#rangegeneratorconfig) \| [CategoricalGeneratorConfig](#categoricalgeneratorconfig) \| [BooleanGeneratorConfig](#booleangeneratorconfig) \| [TimestampGeneratorConfig](#timestampgeneratorconfig) \| [SequentialGeneratorConfig](#sequentialgeneratorconfig) \| [ConstantGeneratorConfig](#constantgeneratorconfig) \| [UUIDGeneratorConfig](#uuidgeneratorconfig) \| [EmailGeneratorConfig](#emailgeneratorconfig) \| [IPGeneratorConfig](#ipgeneratorconfig) \| [GeoGeneratorConfig](#geogeneratorconfig) \| [RandomWalkGeneratorConfig](#randomwalkgeneratorconfig) \| [DailyProfileGeneratorConfig](#dailyprofilegeneratorconfig) \| [DerivedGeneratorConfig](#derivedgeneratorconfig) | Yes | - | Generator configuration |
+| **null_rate** | float | No | `0.0` | Probability of NULL values |
+| **entity_overrides** | Dict[str, [RangeGeneratorConfig](#rangegeneratorconfig) \| [CategoricalGeneratorConfig](#categoricalgeneratorconfig) \| [BooleanGeneratorConfig](#booleangeneratorconfig) \| [TimestampGeneratorConfig](#timestampgeneratorconfig) \| [SequentialGeneratorConfig](#sequentialgeneratorconfig) \| [ConstantGeneratorConfig](#constantgeneratorconfig) \| [UUIDGeneratorConfig](#uuidgeneratorconfig) \| [EmailGeneratorConfig](#emailgeneratorconfig) \| [IPGeneratorConfig](#ipgeneratorconfig) \| [GeoGeneratorConfig](#geogeneratorconfig) \| [RandomWalkGeneratorConfig](#randomwalkgeneratorconfig) \| [DailyProfileGeneratorConfig](#dailyprofilegeneratorconfig) \| [DerivedGeneratorConfig](#derivedgeneratorconfig)] | No | `PydanticUndefined` | Per-entity generator overrides |
+
+---
+### `ScheduledEvent`
+> *Used in: [SimulationConfig](#simulationconfig)*
+
+Scheduled event that modifies simulation behavior at specific times or conditions.
+
+Enables realistic process simulation with:
+- Maintenance windows (forced power=0)
+- Grid curtailment (forced output reduction)
+- Setpoint changes (scheduled process changes)
+- Cleaning cycles (efficiency restoration)
+- Recurring events (e.g., weekly maintenance)
+- Condition-based triggers (e.g., degrade when efficiency drops)
+
+Example (maintenance window):
+```yaml
+scheduled_events:
+  - type: forced_value
+    entity: Turbine_01
+    column: power_kw
+    value: 0.0
+    start_time: "2026-03-11T14:00:00Z"
+    end_time: "2026-03-11T18:00:00Z"
+```
+
+Example (grid curtailment - all entities):
+```yaml
+scheduled_events:
+  - type: forced_value
+    entity: null  # Applies to all entities
+    column: max_output_pct
+    value: 80.0
+    start_time: "2026-03-11T16:00:00Z"
+    end_time: "2026-03-11T19:00:00Z"
+```
+
+Example (permanent setpoint change):
+```yaml
+scheduled_events:
+  - type: setpoint_change
+    entity: Reactor_01
+    column: temp_setpoint_c
+    value: 370.0
+    start_time: "2026-03-11T12:00:00Z"
+    # No end_time = permanent change
+```
+
+Example (recurring maintenance every 30 days):
+```yaml
+scheduled_events:
+  - type: forced_value
+    entity: Turbine_01
+    column: power_kw
+    value: 0.0
+    start_time: "2026-01-15T06:00:00Z"
+    recurrence: "30d"
+    duration: "4h"
+    jitter: "2d"
+    max_occurrences: 12
+```
+
+Example (condition-based event):
+```yaml
+scheduled_events:
+  - type: parameter_override
+    entity: Pump_05
+    column: flow_rate_lpm
+    value: 50.0
+    condition: "actual_efficiency_pct < 70"
+    cooldown: "7d"
+    sustain: "24h"
+```
+
+Example (ramped setpoint change):
+```yaml
+scheduled_events:
+  - type: setpoint_change
+    entity: Reactor_01
+    column: temp_setpoint_c
+    value: 370.0
+    start_time: "2026-03-11T12:00:00Z"
+    duration: "2h"
+    transition: ramp
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | ScheduledEventType | Yes | - | Event type |
+| **entity** | Optional[str] | No | - | Entity name (must match a name from entities.names) or None to apply to all entities |
+| **column** | str | Yes | - | Column name to modify |
+| **value** | Any | Yes | - | Value to apply during event |
+| **start_time** | Optional[str] | No | - | Event start timestamp in ISO8601 Zulu format (e.g., '2026-01-15T06:00:00Z'). Required for time-based events. |
+| **end_time** | Optional[str] | No | - | Event end timestamp in ISO8601 Zulu format (e.g., '2026-01-15T18:00:00Z'). None = permanent change. |
+| **priority** | int | No | `0` | Priority for overlapping events (higher = applied last) |
+| **recurrence** | Optional[str] | No | - | Repeat interval. Event recurs at this interval from start_time. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '30d', '7d', '4h'. |
+| **duration** | Optional[str] | No | - | Duration of each occurrence. Alternative to specifying end_time. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '4h', '30m', '2d'. |
+| **jitter** | Optional[str] | No | - | Random offset ± applied to each recurrence start (deterministic per seed). Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '2d', '6h'. |
+| **max_occurrences** | Optional[int] | No | - | Stop repeating after N occurrences. |
+| **condition** | Optional[str] | No | - | Sandboxed Python expression evaluated against current row columns. Supports comparison operators, compound logic (and, or, not), and safe functions (abs, round, min, max). E.g., 'actual_efficiency_pct < 70 and pressure > 50'. Triggers event when true. |
+| **cooldown** | Optional[str] | No | - | Minimum gap between condition triggers. Prevents rapid re-triggering. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '7d', '12h'. |
+| **sustain** | Optional[str] | No | - | Condition must be continuously true for this duration before triggering. Prevents spurious triggers from momentary spikes. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '24h', '30m'. |
+| **transition** | str | No | `instant` | How value is applied: 'instant' (default, jump to value) or 'ramp' (linear interpolation over duration). |
+
+---
+### `ChaosConfig`
+> *Used in: [SimulationConfig](#simulationconfig)*
+
+Chaos engineering parameters for realistic data imperfections.
+
+Example:
+```yaml
+chaos:
+  outlier_rate: 0.01
+  outlier_factor: 3.0
+  duplicate_rate: 0.005
+  downtime_events:
+    - entity: pump_01
+      start_time: "2026-01-01T10:00:00Z"
+      end_time: "2026-01-01T12:00:00Z"
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **outlier_rate** | float | No | `0.0` | Probability of outlier values |
+| **outlier_factor** | float | No | `3.0` | Multiplier for outlier values |
+| **duplicate_rate** | float | No | `0.0` | Probability of duplicating rows |
+| **downtime_events** | List[[DowntimeEvent](#downtimeevent)] | No | `PydanticUndefined` | Time periods with no data generation |
+
+---
+### `DowntimeEvent`
+> *Used in: [ChaosConfig](#chaosconfig)*
+
+Downtime period where no data is generated.
+
+Example:
+```yaml
+entity: pump_05
+start_time: "2026-01-01T12:00:00Z"
+end_time: "2026-01-01T14:00:00Z"
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **entity** | Optional[str] | No | - | Entity affected (None = all) |
+| **start_time** | str | Yes | - | Downtime start timestamp (ISO8601) |
+| **end_time** | str | Yes | - | Downtime end timestamp (ISO8601) |
+
+---
+### `RangeGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Range generator for numeric values.
+
+Example:
+```yaml
+type: range
+min: 50.0
+max: 100.0
+distribution: normal
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['range'] | Yes | - | - |
+| **min** | float | Yes | - | Minimum value |
+| **max** | float | Yes | - | Maximum value |
+| **distribution** | DistributionType | No | `DistributionType.UNIFORM` | Distribution type: uniform or normal |
+| **mean** | Optional[float] | No | - | Mean for normal distribution (defaults to midpoint) |
+| **std_dev** | Optional[float] | No | - | Standard deviation for normal (defaults to range/6) |
+
+---
+### `RandomWalkGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Random walk generator for realistic time-series data.
+
+Produces values where each row depends on the previous row's value,
+creating smooth, realistic process data instead of independent random values.
+
+Uses an Ornstein-Uhlenbeck process with optional trend for realistic
+simulation of controlled process variables (temperatures, pressures, flow rates).
+
+Example (static setpoint):
+```yaml
+type: random_walk
+start: 350.0
+min: 300.0
+max: 400.0
+volatility: 0.5
+mean_reversion: 0.1
+trend: 0.001
+precision: 1
+shock_rate: 0.02
+shock_magnitude: 30.0
+shock_bias: 1.0
+```
+
+Example (dynamic setpoint - temperature tracking ambient):
+```yaml
+- name: ambient_temp_c
+  generator:
+    type: random_walk
+    start: 25.0
+    min: 15.0
+    max: 35.0
+    volatility: 0.3
+    mean_reversion: 0.05
+
+- name: battery_temp_c
+  generator:
+    type: random_walk
+    start: 28.0
+    min: 20.0
+    max: 40.0
+    volatility: 0.4
+    mean_reversion: 0.1
+    mean_reversion_to: ambient_temp_c  # Drifts toward ambient
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['random_walk'] | Yes | - | - |
+| **start** | float | Yes | - | Initial value / setpoint |
+| **min** | float | Yes | - | Hard lower bound (physical limit) |
+| **max** | float | Yes | - | Hard upper bound (physical limit) |
+| **volatility** | float | No | `1.0` | Standard deviation of step-to-step changes. Controls noise magnitude. |
+| **mean_reversion** | float | No | `0.0` | Strength of pull back toward start value or mean_reversion_to column (0 = pure random walk, 1 = snap back immediately). Simulates PID-like control. |
+| **mean_reversion_to** | Optional[str] | No | - | Column name to use as dynamic setpoint for mean reversion instead of static 'start' value. Enables realistic process simulation where the walk tracks a time-varying reference. Example: PV that drifts toward a changing SP column, or temperature following ambient. If specified, must reference a column defined earlier in dependency order. |
+| **trend** | float | No | `0.0` | Drift per timestep. Positive = gradual increase, negative = gradual decrease. Simulates fouling, degradation, or slow process drift. |
+| **precision** | Optional[int] | No | - | Round values to N decimal places. None = no rounding. |
+| **shock_rate** | float | No | `0.0` | Probability of a sudden shock at each timestep (0.0 = never, 1.0 = every step). Simulates process upsets like valve sticks, feed disruptions, or sensor glitches. The shock perturbs the walk's internal state, so mean_reversion naturally recovers over subsequent steps — just like a real PID-controlled process. |
+| **shock_magnitude** | float | No | `10.0` | Maximum absolute size of a shock event. The actual shock is drawn uniformly from [0, shock_magnitude]. Use values relative to your min/max range — e.g., if range is 300-400, a magnitude of 30 means shocks up to 30% of range. |
+| **shock_bias** | float | No | `0.0` | Directional tendency for shocks. +1.0 = shocks always go UP (e.g., exothermic runaway, pressure buildup). -1.0 = shocks always go DOWN (e.g., pump cavitation, flow drop). 0.0 = shocks go either direction with equal probability. Values between give partial bias (e.g., 0.7 = mostly upward). |
+
+---
+### `DailyProfileGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Daily profile generator for time-of-day patterns.
+
+Produces values that follow a repeating daily curve defined by anchor points.
+The engine interpolates between anchor points, adds noise, and clamps to
+[min, max]. Ideal for simulating occupancy, energy demand, traffic, call
+volume, or any metric with a predictable intraday shape.
+
+Example (building occupancy):
+```yaml
+type: daily_profile
+min: 0
+max: 25
+precision: 0
+noise: 1.5
+interpolation: linear
+profile:
+  "00:00": 1
+  "06:00": 3
+  "08:00": 19
+  "12:00": 15
+  "13:00": 22
+  "17:00": 14
+  "22:00": 2
+```
+
+Example (network traffic with weekend scaling):
+```yaml
+type: daily_profile
+min: 0.0
+max: 1000.0
+noise: 50.0
+interpolation: linear
+weekend_scale: 0.3
+profile:
+  "00:00": 50.0
+  "06:00": 100.0
+  "09:00": 800.0
+  "12:00": 650.0
+  "13:00": 750.0
+  "17:00": 900.0
+  "20:00": 400.0
+  "23:00": 100.0
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['daily_profile'] | Yes | - | - |
+| **profile** | Dict[str, float] | Yes | - | Anchor points mapping time-of-day (HH:MM) to target values. The engine interpolates between these points to produce a smooth daily curve. |
+| **min** | float | Yes | - | Hard lower bound (physical limit) |
+| **max** | float | Yes | - | Hard upper bound (physical limit) |
+| **noise** | float | No | `0.0` | Random noise amplitude (±noise added to interpolated value). |
+| **interpolation** | InterpolationType | No | `InterpolationType.LINEAR` | Interpolation method between anchor points: linear or step. |
+| **precision** | Optional[int] | No | - | Round values to N decimal places. None = no rounding. 0 = integers. |
+| **volatility** | float | No | `0.0` | Day-to-day variation in anchor point targets. Each day, every anchor point is independently shifted by a random amount drawn from a normal distribution (mean = profile value, std_dev = volatility). This makes each day's curve slightly different while preserving the overall shape. 0.0 = identical curve every day. Higher values = more day-to-day variation. |
+| **weekend_scale** | Optional[float] | No | - | Scale factor for weekends (Saturday/Sunday). 0.0 = zero on weekends, 1.0 = same as weekday. None = no weekend adjustment. |
+
+---
+### `DerivedGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Derived column generator (calculated from other columns).
+
+Example:
+```yaml
+type: derived
+expression: "temperature * 1.8 + 32"  # Celsius to Fahrenheit
+```
+
+Supported operators:
+- Arithmetic: +, -, *, /, //, %, **
+- Comparison: ==, !=, <, <=, >, >=
+- Logical: and, or, not
+- Functions: abs(), round(), min(), max()
+
+Example (conditional):
+```yaml
+type: derived
+expression: "100 if temperature > 80 else 0"
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['derived'] | Yes | - | - |
+| **expression** | str | Yes | - | Sandboxed Python expression referencing column names. Supports context variables (_row_index, entity_id, _timestamp), safe math functions (abs, round, min, max, coalesce, safe_div), and stateful functions (prev, ema, pid, delay). |
+
+---
+### `CategoricalGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Categorical generator for discrete values.
+
+Example:
+```yaml
+type: categorical
+values: [Running, Idle, Error]
+weights: [0.8, 0.15, 0.05]
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['categorical'] | Yes | - | - |
+| **values** | List[Any] | Yes | - | List of possible values |
+| **weights** | Optional[List[float]] | No | - | Probability weights (must sum to 1.0) |
+
+---
+### `SequentialGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Sequential number generator.
+
+By default, generates globally unique IDs across all entities by offsetting
+each entity's sequence range. Entity 0 gets IDs [start, start + rows),
+entity 1 gets [start + rows, start + 2*rows), etc.
+
+Set ``unique_across_entities: false`` for per-entity sequences (all entities
+share the same ID range).
+
+Example:
+```yaml
+type: sequential
+start: 1
+step: 1
+unique_across_entities: true  # default
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['sequential'] | Yes | - | - |
+| **start** | int | No | `1` | Starting value |
+| **step** | int | No | `1` | Increment step |
+| **unique_across_entities** | bool | No | `True` | When true, each entity gets a non-overlapping ID range |
+
+---
+### `ConstantGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Constant value generator.
+
+Example:
+```yaml
+type: constant
+value: "production"
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['constant'] | Yes | - | - |
+| **value** | Any | Yes | - | Constant value for all rows |
+
+---
+### `BooleanGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Boolean generator.
+
+Example:
+```yaml
+type: boolean
+true_probability: 0.95
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['boolean'] | Yes | - | - |
+| **true_probability** | float | No | `0.5` | Probability of True |
+
+---
+### `TimestampGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Timestamp generator (uses simulation scope).
+
+Example:
+```yaml
+type: timestamp
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['timestamp'] | Yes | - | - |
+
+---
+### `UUIDGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+UUID/GUID generator.
+
+Example:
+```yaml
+type: uuid
+version: 4  # UUID4 (random) or UUID5 (deterministic from namespace)
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['uuid'] | Yes | - | - |
+| **version** | Literal[4, 5] | No | `4` | UUID version. Options: 4 (random, default) or 5 (deterministic/namespace-based). Only these values are supported. |
+| **namespace** | Optional[str] | No | - | Namespace seed for UUID5 generation. Arbitrary string; default 'DNS' uses the standard DNS namespace UUID. |
+
+---
+### `EmailGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Email address generator.
+
+Example:
+```yaml
+type: email
+domain: example.com
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['email'] | Yes | - | - |
+| **domain** | str | No | `example.com` | Email domain |
+| **pattern** | str | No | `{entity}_{index}` | Username template. Available placeholders: {entity}, {index}, {row}. Default produces usernames like 'entity_01'. |
+
+---
+### `IPGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+IPv4 address generator.
+
+Example:
+```yaml
+type: ipv4
+subnet: "192.168.0.0/16"
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['ipv4'] | Yes | - | - |
+| **subnet** | Optional[str] | No | - | CIDR subnet (e.g., '192.168.0.0/16'). If None, uses full range. |
+
+---
+### `GeoGeneratorConfig`
+> *Used in: [ColumnGeneratorConfig](#columngeneratorconfig)*
+
+Geographic coordinate generator.
+
+Example:
+```yaml
+type: geo
+bbox: [-90, -180, 90, 180]  # [min_lat, min_lon, max_lat, max_lon]
+```
+
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['geo'] | Yes | - | - |
+| **bbox** | List[float] | Yes | - | Bounding box [min_lat, min_lon, max_lat, max_lon] |
+| **format** | Literal['tuple', 'lat_lon_separate'] | No | `tuple` | Output format: 'tuple' for (lat,lon) or 'lat_lon_separate' for separate columns |
 
 ---
 ## Semantic Layer

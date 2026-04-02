@@ -88,7 +88,14 @@ incremental:
   date_format: "oracle"  # Handles '20-APR-24 07:11:01.0'
 ```
 
-Supported values: `oracle`, `sql_server`, `us`, `eu`, `iso`. See [Smart Read](./smart_read.md#date-format-for-string-columns) for details.
+Supported values:
+- `oracle` — `DD-MON-YY` (e.g., `20-APR-24 07:11:01.0`)
+- `sql_server` — CONVERT with style 120 (`YYYY-MM-DD HH:MM:SS`)
+- `us` — `MM/DD/YYYY`
+- `eu` — `DD/MM/YYYY`
+- `iso` — `YYYY-MM-DDTHH:MM:SS`
+
+See [Smart Read](./smart_read.md#date-format-for-string-columns) for details.
 
 ## Comparison: Rolling Window vs. Stateful
 
