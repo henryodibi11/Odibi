@@ -8,7 +8,7 @@ Look at a real-world system → classify it → apply a pattern → done.
     Most simulation guides start with transfer functions and Laplace transforms. By the time you finish reading, you've forgotten what you wanted to build. This playbook works differently: you observe behavior, pick a pattern, paste the YAML, tune 1-2 numbers, and you're generating realistic data. Every pattern is tested, every YAML block is copy-pasteable, and every parameter has a "start here" value. If you can describe what happens when you turn a knob, you can build a simulation.
 
 !!! info "Prerequisites"
-    This playbook assumes you understand [Core Concepts](core_concepts.md) (scope, entities, columns) and have read the [Stateful Functions](stateful_functions.md) reference for `prev()`, `ema()`, `pid()`, and `delay()`. If not, start there — this page builds on them.
+    This playbook assumes you understand [Core Concepts](core_concepts.md) (scope, entities, columns) and have read the [Stateful Functions](stateful_functions.md) reference for `prev()`, `ema()`, `pid()`, and `delay()`. If not, start there — this page builds on them. For the complete list of all functions available in expressions, see the [Generators Reference — derived](../reference/simulation_generators.md#derived).
 
 ---
 

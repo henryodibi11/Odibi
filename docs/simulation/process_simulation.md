@@ -13,7 +13,7 @@
 
     The math is the same whether you're modeling a CSTR or a warehouse. Read the plain-English explanations and skip the textbook references if they don't apply to you.
 
-Odibi's simulation engine supports realistic process simulation using stateful functions (`prev`, `ema`, `pid`), first-order dynamics, material and energy balances, and PID control — all defined in YAML. No custom code required.
+Odibi's simulation engine supports realistic process simulation using stateful functions (`prev`, `ema`, `pid`, `delay`), first-order dynamics, material and energy balances, and PID control — all defined in YAML. No custom code required.
 
 Whether you're modeling a single CSTR, a multi-unit flowsheet, or a full plant with PID-controlled loops, scheduled maintenance, and sensor noise, the simulation framework provides the building blocks to generate physically plausible time-series data from configuration alone.
 
@@ -800,4 +800,5 @@ From textbooks or plant data:
 
 - **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` reference
 - **[Generators](generators.md)** — `random_walk` with mean reversion, derived expressions
+- **[Safe Functions Reference](../reference/simulation_generators.md#derived)** — Complete list of all functions available in derived expressions
 - **[Advanced Features](advanced_features.md)** — Cross-entity references, scheduled events, entity overrides

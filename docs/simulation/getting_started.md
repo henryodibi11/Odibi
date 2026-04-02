@@ -407,6 +407,7 @@ You've built a simulation from scratch, scaled it to multiple entities, added re
 - **[Core Concepts](core_concepts.md)** — understand scope, entities, and columns in depth
 - **[Generators Reference](generators.md)** — all 13 generator types with full parameter docs
 - **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` for dynamic, time-dependent data
+- **[Safe Functions Reference](../reference/simulation_generators.md#derived)** — complete list of all functions available in derived expressions
 - **[Advanced Features](advanced_features.md)** — cross-entity references, scheduled events (recurring, condition-based, ramp transitions), entity overrides
 - **[Patterns & Recipes](patterns.md)** — real-world simulation scenarios (IoT fleets, process control, daily feeds)
 

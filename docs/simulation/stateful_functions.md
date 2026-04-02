@@ -778,6 +778,7 @@ See [Stateful Incremental Loading](../patterns/incremental_stateful.md) for full
 ## Related Documentation
 
 - [Generators Reference](generators.md) — all 13 generator types with parameters and examples
+- [Complete Safe Functions Table](../reference/simulation_generators.md#derived) — all functions available in derived expressions (math, type casting, null-safe, stateful, utility)
 - [Advanced Features](advanced_features.md) — cross-entity references, scheduled events (recurring, condition-based, ramp), chaos engineering
 - [Process Simulation](process_simulation.md) — chemical engineering and process control scenarios
 - [Incremental Mode](incremental.md) — continuous data generation with HWM state persistence

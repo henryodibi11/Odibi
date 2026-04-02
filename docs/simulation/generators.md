@@ -731,9 +731,11 @@ These functions maintain state across rows within each entity, enabling time-ser
 |----------|-----------|-------------|
 | `prev()` | `prev(column_name, default=None)` | Get previous row's value for a column |
 | `ema()` | `ema(column_name, alpha, default=None)` | Exponential moving average (0 < alpha ≤ 1) |
+| `delay()` | `delay(column_name, steps, default=None)` | Value from N timesteps ago (transport delay) |
 | `pid()` | `pid(pv, sp, Kp, Ki, Kd, dt, output_min, output_max, anti_windup)` | PID controller with anti-windup |
+| `random()` | `random()` | Random float in [0, 1) for noise injection |
 
-For full documentation, see **[Stateful Functions](stateful_functions.md)**.
+For full documentation, see **[Stateful Functions](stateful_functions.md)**. For the complete list of all safe functions, see the **[Generators Reference — derived](../reference/simulation_generators.md#derived)**.
 
 ### Cross-Entity References
 

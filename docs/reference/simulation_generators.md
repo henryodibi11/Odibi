@@ -396,7 +396,7 @@ generator:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| expression | string | Yes | - | Sandboxed Python expression referencing column names. Supports context variables (`_row_index`, `entity_id`, `_timestamp`), safe math functions (`abs`, `round`, `min`, `max`, `coalesce`, `safe_div`), and stateful functions (`prev`, `ema`, `pid`, `delay`) |
+| expression | string | Yes | - | Sandboxed Python expression referencing column names. See the full function table below for all available functions |
 
 **Data types:** any (depends on expression result)
 
@@ -407,9 +407,27 @@ generator:
 - Conditionals: `value if condition else other`
 
 **Safe functions:**
-- Math: `abs()`, `round()`, `min()`, `max()`
-- Type: `int()`, `float()`, `str()`, `bool()`
-- Null-safe: `coalesce()`, `safe_div()`, `safe_mul()`
+
+| Category | Function | Signature | Description |
+|----------|----------|-----------|-------------|
+| Math | `abs()` | `abs(x)` | Absolute value |
+| Math | `round()` | `round(x, ndigits)` | Round to N decimal places |
+| Math | `min()` | `min(a, b, ...)` | Minimum value |
+| Math | `max()` | `max(a, b, ...)` | Maximum value |
+| Type | `int()` | `int(x)` | Cast to integer |
+| Type | `float()` | `float(x)` | Cast to float |
+| Type | `str()` | `str(x)` | Cast to string |
+| Type | `bool()` | `bool(x)` | Cast to boolean |
+| Null-safe | `coalesce()` | `coalesce(a, b, ...)` | First non-None value |
+| Null-safe | `safe_div()` | `safe_div(a, b, default=None)` | Division handling None and zero |
+| Null-safe | `safe_mul()` | `safe_mul(a, b, default=None)` | Multiplication handling None |
+| Stateful | `prev()` | `prev(column, default=None)` | Previous row value (see [Stateful Functions](../simulation/stateful_functions.md)) |
+| Stateful | `ema()` | `ema(column, alpha, default=None)` | Exponential moving average |
+| Stateful | `delay()` | `delay(column, steps, default=None)` | Value from N timesteps ago (transport delay) |
+| Stateful | `pid()` | `pid(pv, sp, Kp, Ki, Kd, dt, output_min, output_max, anti_windup)` | PID controller with anti-windup |
+| Utility | `random()` | `random()` | Random float in [0, 1) |
+
+**Context variables** available in expressions: `_row_index`, `entity_id`, `_timestamp`
 
 **Example:**
 ```yaml
@@ -463,6 +481,9 @@ generator:
 
 ## See Also
 
-- **[Complete Guide](../guides/simulation.md)** - Detailed documentation
-- **[State Management](../features/state.md)** - HWM persistence for incremental mode
-- **[Configuration](configuration.md)** - General config concepts
+- **[Simulation Overview](../simulation/index.md)** — Getting started with simulation
+- **[Generators Guide](../simulation/generators.md)** — All 13 generator types with examples
+- **[Stateful Functions](../simulation/stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` deep dive
+- **[Simulation Playbook](../simulation/simulation_playbook.md)** — Pattern-based guide for building process simulations
+- **[State Management](../features/state.md)** — HWM persistence for incremental mode
+- **[Configuration](configuration.md)** — General config concepts

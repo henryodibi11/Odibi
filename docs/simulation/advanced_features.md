@@ -660,3 +660,4 @@ options:
 - **[Core Concepts](core_concepts.md)** — scope, entities, and columns in depth
 - **[Generators Reference](generators.md)** — all 13 generator types with parameters
 - **[Stateful Functions](stateful_functions.md)** — `prev()`, `ema()`, `pid()`, `delay()` for history-dependent values
+- **[Safe Functions Reference](../reference/simulation_generators.md#derived)** — complete list of all functions available in derived expressions
