@@ -40,7 +40,7 @@ scope:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `start_time` | string | Yes | — | ISO8601 timestamp in Zulu format (e.g., `"2026-01-01T00:00:00Z"`) |
-| `timestep` | string | Yes | — | Time between rows. Format: `'<number><unit>'` where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days). E.g., `5s`, `10m`, `1h`, `2d` |
+| `timestep` | string | Yes | — | Time between rows. Format: number + unit where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days). E.g., `5s`, `10m`, `1h`, `2d` |
 | `row_count` | int | Either this or `end_time` | — | Exact number of rows to generate per entity |
 | `end_time` | string | Either this or `row_count` | — | ISO8601 end timestamp in Zulu format (e.g., `"2026-01-02T00:00:00Z"`); Odibi calculates row count automatically |
 | `seed` | int | No | `42` | Random seed for deterministic output |

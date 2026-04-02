@@ -7,7 +7,6 @@ from odibi.config import (
     CategoricalGeneratorConfig,
     ColumnGeneratorConfig,
     ConstantGeneratorConfig,
-    DerivedGeneratorConfig,
     EntityConfig,
     RandomWalkGeneratorConfig,
     RangeGeneratorConfig,

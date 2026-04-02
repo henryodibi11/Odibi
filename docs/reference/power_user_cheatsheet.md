@@ -510,7 +510,7 @@ Name:              ____________________
 Description:       ____________________
 Layer:             [ ] bronze    [ ] silver    [ ] gold
 Owner:             ____________________ (email)
-Freshness SLA:     ____________________ (format: '<number><unit>' where unit is s/m/h/d. e.g., 6h, 1d, or leave blank)
+Freshness SLA:     ____________________ (format: number + unit where unit is s/m/h/d. e.g., 6h, 1d, or leave blank)
 Freshness anchor:  [ ] run_completion (default)    [ ] table_max_timestamp    [ ] watermark_state
 
 How many nodes?    __________
@@ -617,7 +617,7 @@ Incremental:     [ ] No — full load every time (skip below)
 
   If stateful:
     State key:     ____________________  (custom key, default: node name)
-    Watermark lag: ____________________  (format: '<number><unit>' where unit is s/m/h/d. e.g., "5m" safety buffer)
+    Watermark lag: ____________________  (format: number + unit where unit is s/m/h/d. e.g., "5m" safety buffer)
 ```
 
 ### Time Travel (Delta only)
@@ -739,7 +739,7 @@ Post-SQL:  ____________________    (runs after write, e.g., OPTIMIZE, VACUUM)
 Contracts needed?  [ ] No (skip)    [ ] Yes (check applicable):
 
 Source quality (most common for contracts):
-[ ] freshness      column: ____________  max_age: ________ (format: '<number><unit>' where unit is s/m/h/d. e.g., 24h, 7d)
+[ ] freshness      column: ____________  max_age: ________ (format: number + unit where unit is s/m/h/d. e.g., 24h, 7d)
                    name: ____________  on_fail: [ ] fail  [ ] warn
 
 [ ] schema         strict: [ ] yes  [ ] no

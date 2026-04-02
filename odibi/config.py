@@ -1918,7 +1918,7 @@ class ScheduledEvent(BaseModel):
         default=None,
         description=(
             "Repeat interval. Event recurs at this interval from start_time. "
-            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '30d', '7d', '4h'."
         ),
     )
@@ -1926,7 +1926,7 @@ class ScheduledEvent(BaseModel):
         default=None,
         description=(
             "Duration of each occurrence. Alternative to specifying end_time. "
-            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '4h', '30m', '2d'."
         ),
     )
@@ -1934,7 +1934,7 @@ class ScheduledEvent(BaseModel):
         default=None,
         description=(
             "Random offset ± applied to each recurrence start (deterministic per seed). "
-            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '2d', '6h'."
         ),
     )
@@ -1953,7 +1953,7 @@ class ScheduledEvent(BaseModel):
         default=None,
         description=(
             "Minimum gap between condition triggers. Prevents rapid re-triggering. "
-            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '7d', '12h'."
         ),
     )
@@ -1962,7 +1962,7 @@ class ScheduledEvent(BaseModel):
         description=(
             "Condition must be continuously true for this duration before triggering. "
             "Prevents spurious triggers from momentary spikes. "
-            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '24h', '30m'."
         ),
     )
@@ -2132,7 +2132,7 @@ class SimulationScope(BaseModel):
     timestep: str = Field(
         description=(
             "Time between rows. "
-            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '30s', '5m', '1h', '2d'."
         )
     )
@@ -2393,7 +2393,7 @@ class IncrementalConfig(BaseModel):
         description=(
             "Safety buffer for late-arriving data in stateful mode. "
             "Subtracts this duration from the stored HWM when filtering. "
-            "Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). "
             "Use when source has replication lag or eventual consistency."
         ),
@@ -4833,7 +4833,7 @@ class PipelineConfig(BaseModel):
         default=None,
         description=(
             "Expected data freshness SLA. "
-            "Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). "
+            "Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). "
             "Examples: '6h', '1d', '30m'."
         ),
     )

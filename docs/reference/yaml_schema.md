@@ -85,7 +85,7 @@ pipelines:
 | **description** | Optional[str] | No | - | Pipeline description |
 | **layer** | Optional[str] | No | - | Logical layer (bronze/silver/gold) |
 | **owner** | Optional[str] | No | - | Pipeline owner (email or name) |
-| **freshness_sla** | Optional[str] | No | - | Expected data freshness SLA. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '6h', '1d', '30m'. |
+| **freshness_sla** | Optional[str] | No | - | Expected data freshness SLA. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '6h', '1d', '30m'. |
 | **freshness_anchor** | Literal['run_completion', 'table_max_timestamp', 'watermark_state'] | No | `run_completion` | What defines freshness. Only 'run_completion' implemented initially. |
 | **nodes** | List[[NodeConfig](#nodeconfig)] | Yes | - | List of nodes in this pipeline |
 | **auto_cache_threshold** | Optional[int] | No | `3` | Auto-cache nodes with N or more downstream dependencies. Prevents redundant ADLS re-reads when a node is used by multiple downstream nodes. Default: 3. Set to null to disable auto-caching. Individual nodes can override with explicit cache: true/false. |
@@ -867,7 +867,7 @@ Supported date_format values:
 | **lookback** | Optional[int] | No | - | Time units to look back (Rolling Window only) |
 | **unit** | Optional[IncrementalUnit] | No | - | Time unit for lookback (Rolling Window only). Options: 'hour', 'day', 'month', 'year' |
 | **state_key** | Optional[str] | No | - | Unique ID for state tracking. Defaults to node name if not provided. |
-| **watermark_lag** | Optional[str] | No | - | Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: '<number><unit>' where unit is 's', 'm', 'h', or 'd'. Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency. |
+| **watermark_lag** | Optional[str] | No | - | Safety buffer for late-arriving data in stateful mode. Subtracts this duration from the stored HWM when filtering. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '2h' (2 hours), '30m' (30 minutes), '1d' (1 day). Use when source has replication lag or eventual consistency. |
 | **date_format** | Optional[str] | No | - | Source date format when the column is stored as a string. Options: 'oracle' (DD-MON-YY for Oracle DB), 'oracle_sqlserver' (DD-MON-YY format in SQL Server), 'sql_server' (uses CONVERT with style 120), 'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DDTHH:MM:SS). When set, SQL pushdown will use appropriate CONVERT/TO_TIMESTAMP functions. |
 
 ---
@@ -4548,7 +4548,7 @@ Simulation is configured as `format: simulation` in a node's `read` section.
 - **ChaosConfig**: Outliers, duplicates, downtime for realistic imperfections
 
 **Duration/interval format** (used by `timestep`, `recurrence`, `duration`, `jitter`, `cooldown`, `sustain`):
-`<number><unit>` where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days).
+number + unit, where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days).
 Examples: `5m`, `1h`, `30s`, `2d`.
 
 **Example:**
@@ -4660,7 +4660,7 @@ scope:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **start_time** | str | Yes | - | Simulation start timestamp in ISO8601 Zulu format (e.g., '2026-01-01T00:00:00Z') |
-| **timestep** | str | Yes | - | Time between rows. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '30s', '5m', '1h', '2d'. |
+| **timestep** | str | Yes | - | Time between rows. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '30s', '5m', '1h', '2d'. |
 | **row_count** | Optional[int] | No | - | Total rows to generate (mutually exclusive with end_time) |
 | **end_time** | Optional[str] | No | - | Simulation end timestamp in ISO8601 Zulu format (e.g., '2026-01-02T00:00:00Z'). Mutually exclusive with row_count |
 | **seed** | int | No | `42` | Random seed for deterministic generation |
@@ -4819,13 +4819,13 @@ scheduled_events:
 | **start_time** | Optional[str] | No | - | Event start timestamp in ISO8601 Zulu format (e.g., '2026-01-15T06:00:00Z'). Required for time-based events. |
 | **end_time** | Optional[str] | No | - | Event end timestamp in ISO8601 Zulu format (e.g., '2026-01-15T18:00:00Z'). None = permanent change. |
 | **priority** | int | No | `0` | Priority for overlapping events (higher = applied last) |
-| **recurrence** | Optional[str] | No | - | Repeat interval. Event recurs at this interval from start_time. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '30d', '7d', '4h'. |
-| **duration** | Optional[str] | No | - | Duration of each occurrence. Alternative to specifying end_time. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '4h', '30m', '2d'. |
-| **jitter** | Optional[str] | No | - | Random offset ± applied to each recurrence start (deterministic per seed). Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '2d', '6h'. |
+| **recurrence** | Optional[str] | No | - | Repeat interval. Event recurs at this interval from start_time. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '30d', '7d', '4h'. |
+| **duration** | Optional[str] | No | - | Duration of each occurrence. Alternative to specifying end_time. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '4h', '30m', '2d'. |
+| **jitter** | Optional[str] | No | - | Random offset ± applied to each recurrence start (deterministic per seed). Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '2d', '6h'. |
 | **max_occurrences** | Optional[int] | No | - | Stop repeating after N occurrences. |
 | **condition** | Optional[str] | No | - | Sandboxed Python expression evaluated against current row columns. Supports comparison operators, compound logic (and, or, not), and safe functions (abs, round, min, max). E.g., 'actual_efficiency_pct < 70 and pressure > 50'. Triggers event when true. |
-| **cooldown** | Optional[str] | No | - | Minimum gap between condition triggers. Prevents rapid re-triggering. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '7d', '12h'. |
-| **sustain** | Optional[str] | No | - | Condition must be continuously true for this duration before triggering. Prevents spurious triggers from momentary spikes. Format: '<number><unit>' where unit is 's' (seconds), 'm' (minutes), 'h' (hours), or 'd' (days). Examples: '24h', '30m'. |
+| **cooldown** | Optional[str] | No | - | Minimum gap between condition triggers. Prevents rapid re-triggering. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '7d', '12h'. |
+| **sustain** | Optional[str] | No | - | Condition must be continuously true for this duration before triggering. Prevents spurious triggers from momentary spikes. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '24h', '30m'. |
 | **transition** | str | No | `instant` | How value is applied: 'instant' (default, jump to value) or 'ramp' (linear interpolation over duration). |
 
 ---

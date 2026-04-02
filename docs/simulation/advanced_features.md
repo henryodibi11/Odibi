@@ -314,13 +314,13 @@ scheduled_events:
 | `start_time` | string | Conditional | — | ISO8601 start time in Zulu format (e.g., `"2026-01-15T06:00:00Z"`). Required unless `condition` is set |
 | `end_time` | string | No | `null` (permanent) | ISO8601 end time in Zulu format (e.g., `"2026-01-15T18:00:00Z"`); omit for permanent changes. Cannot combine with `duration` |
 | `priority` | int | No | `0` | For overlapping events — higher priority is applied last (wins) |
-| `recurrence` | string | No | — | Repeat interval. Format: `<number><unit>` where unit is `s`/`m`/`h`/`d` (e.g., `"30d"`, `"7d"`, `"4h"`). Requires `start_time` |
-| `duration` | string | No | — | Duration of each occurrence. Format: `<number><unit>` where unit is `s`/`m`/`h`/`d` (e.g., `"4h"`, `"30m"`). Alternative to `end_time` |
-| `jitter` | string | No | — | Random offset ± applied to each recurrence start. Format: `<number><unit>` where unit is `s`/`m`/`h`/`d` (e.g., `"2d"`, `"6h"`). Requires `recurrence` |
+| `recurrence` | string | No | — | Repeat interval. Format: number + unit where unit is `s`/`m`/`h`/`d` (e.g., `"30d"`, `"7d"`, `"4h"`). Requires `start_time` |
+| `duration` | string | No | — | Duration of each occurrence. Format: number + unit where unit is `s`/`m`/`h`/`d` (e.g., `"4h"`, `"30m"`). Alternative to `end_time` |
+| `jitter` | string | No | — | Random offset ± applied to each recurrence start. Format: number + unit where unit is `s`/`m`/`h`/`d` (e.g., `"2d"`, `"6h"`). Requires `recurrence` |
 | `max_occurrences` | int | No | — | Stop repeating after N occurrences. Requires `recurrence` |
 | `condition` | string | No | — | Sandboxed Python expression evaluated against current row columns. Supports comparison operators, compound logic (`and`, `or`, `not`), and safe functions (`abs`, `round`, `min`, `max`). E.g., `"efficiency < 70 and pressure > 50"` |
-| `cooldown` | string | No | — | Minimum gap between condition triggers. Format: `<number><unit>` where unit is `s`/`m`/`h`/`d` (e.g., `"7d"`, `"12h"`). Requires `condition` |
-| `sustain` | string | No | — | Condition must be continuously true for this duration before triggering. Format: `<number><unit>` where unit is `s`/`m`/`h`/`d` (e.g., `"24h"`, `"30m"`). Requires `condition` |
+| `cooldown` | string | No | — | Minimum gap between condition triggers. Format: number + unit where unit is `s`/`m`/`h`/`d` (e.g., `"7d"`, `"12h"`). Requires `condition` |
+| `sustain` | string | No | — | Condition must be continuously true for this duration before triggering. Format: number + unit where unit is `s`/`m`/`h`/`d` (e.g., `"24h"`, `"30m"`). Requires `condition` |
 | `transition` | string | No | `"instant"` | How value is applied: `"instant"` (jump) or `"ramp"` (linear interpolation over duration) |
 
 ### Recurring Events

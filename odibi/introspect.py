@@ -383,7 +383,7 @@ Simulation is configured as `format: simulation` in a node's `read` section.
 - **ChaosConfig**: Outliers, duplicates, downtime for realistic imperfections
 
 **Duration/interval format** (used by `timestep`, `recurrence`, `duration`, `jitter`, `cooldown`, `sustain`):
-`<number><unit>` where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days).
+number + unit, where unit is `s` (seconds), `m` (minutes), `h` (hours), or `d` (days).
 Examples: `5m`, `1h`, `30s`, `2d`.
 
 **Example:**
