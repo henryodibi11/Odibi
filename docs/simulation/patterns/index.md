@@ -209,15 +209,55 @@ Which features does each pattern use? Denser rows mean more complex simulations.
 
 ## Find Your Pattern
 
-!!! tip "Start here based on your role"
+!!! tip "🎯 Start Here — Pick Your Path"
 
-    **Business analyst or junior DE?** Start with Pattern 1 (Build Before Sources Exist), then work through Foundations 2-8. You'll learn every core feature progressively.
+    === "Chemical / Process Engineer"
 
-    **Chemical or process engineer?** Jump to Patterns 9-15 (Process Engineering). These use PID control, material balances, and cross-entity cascades that map directly to real plant systems.
+        **Your journey:** Pattern 9 (Wastewater) → 11 (CSTR + PID) → 12 (Distillation) → 13 (Cooling Tower EMA) → 14 (Batch Reactor) → 15 (Tank Farm) → 28 (Greenhouse PID)
 
-    **Data platform engineer?** Start with Pattern 36 (Late Data), 37 (Schema Evolution), and 38 (Multi-Source Merge). These test your platform, not a domain.
+        You already think in terms of mass balances, PID loops, and process dynamics. Start with Pattern 9 to see how cross-entity cascades model stage-to-stage flow. Then Pattern 11 introduces `pid()` — pay attention to the negative gains for reverse-acting cooling. Pattern 13 shows `ema()` for noisy sensor smoothing. By Pattern 15, you'll be integrating tank levels with `prev()`.
 
-    **Looking for a specific feature?** Use the heat map above to find which patterns teach it.
+        **Key gotcha:** PID sign convention. Cooling loops need negative Kp. If your controller output is stuck at 0 or 100, check your signs first. See Pattern 11's "Why are the PID gains negative?" callout.
+
+    === "Data Engineer / Analytics Engineer"
+
+        **Your journey:** Pattern 1 (Build Before Sources) → 4 (Incremental) → 6 (Stress Test) → 36 (Late Data) → 37 (Schema Evolution) → 38 (Multi-Source Merge) → 7 (Dashboard Feed)
+
+        You care about pipeline architecture, not domain physics. Start with Pattern 1 to see the medallion architecture (bronze → silver → gold) with simulation as the bronze source. Pattern 4 adds `incremental: stateful` for continuous feeds. Pattern 36 is your crash test dummy — 5% outliers and 3% duplicates deliberately break things. Pattern 38 is the real challenge: merging ERP + MES + SCADA with different cadences.
+
+        **Key gotcha:** `prev()` column ordering. The column using `prev('column_x')` must appear AFTER `column_x` in the YAML. The simulator evaluates columns top-to-bottom. If you reference a column that hasn't been generated yet, you'll get the default value every time.
+
+    === "Business Analyst / Junior DE"
+
+        **Your journey:** Pattern 1 (Build Before Sources) → 2 (Production Line) → 3 (IoT Sensors) → 4 (Orders) → 31 (Retail POS) → 32 (Call Center)
+
+        Start simple. Pattern 1 teaches the core concept: simulate data, build your pipeline, swap to real data later. Pattern 2 adds entity_overrides and scheduled_events. Pattern 3 shows daily_profile for realistic time-of-day behavior. By Pattern 4, you're running incremental pipelines. Patterns 31-32 are business-domain patterns you can show to stakeholders.
+
+        **Key gotcha:** `seed` makes simulation reproducible. Always set a seed when debugging — run it twice, get the same data. Remove the seed (or change it) when you want variety.
+
+    === "IoT / Embedded Engineer"
+
+        **Your journey:** Pattern 3 (Building Sensors) → 5 (Equipment Degradation) → 19 (Smart Meters) → 24 (Cold Chain) → 26 (Weather Stations) → 29 (ICU Vitals)
+
+        You live in the world of sensors, telemetry, and signal noise. Pattern 3 models a 20-sensor building network with daily_profile occupancy, null_rate for sensor dropouts, and derived CO2. Pattern 5 adds trend for degradation curves. Pattern 19 shows ipv4 generator for network addresses at scale. Pattern 29 is high-frequency (30-second) clinical monitoring.
+
+        **Key gotcha:** `null_rate` vs `downtime_events` vs `forced_value: null`. They produce different data shapes: null_rate creates random NULLs, downtime_events create missing rows (no row at all), and forced_value null creates a continuous block of NULLs. Choose based on what failure mode you're modeling.
+
+    === "Energy / Renewables Engineer"
+
+        **Your journey:** Pattern 16 (Solar Farm) → 17 (Wind Turbines) → 18 (BESS) → 20 (EV Charging)
+
+        Solar irradiance, wind speed, battery state-of-charge — these patterns model the physics of renewable energy. Pattern 16 chains weather → panel temp → efficiency → power using derived expressions. Pattern 18 implements Coulomb counting for battery SOC via `prev()`. Note that Pattern 16's random walk irradiance doesn't model day/night — see the "Try this" section for how to add a `daily_profile` solar curve.
+
+        **Key gotcha:** `prev()` for energy integration requires the right units. `power_kw * 5.0 / 60.0` converts 5-minute power to hourly energy (kWh). Get the time conversion wrong and your cumulative energy will be off by 12x or 60x.
+
+    === "Manufacturing / Quality Engineer"
+
+        **Your journey:** Pattern 2 (Production Line) → 21 (Packaging SPC) → 22 (CNC Shop) → 23 (Warehouse) → 24 (Cold Chain) → 25 (Assembly Line)
+
+        OEE, SPC, control charts — these are your daily tools. Pattern 2 is a quick win: 5 machines, one shift, entity overrides for the problem machine. Pattern 21 adds validation rules that work exactly like SPC limits. Pattern 22 introduces downtime_events (missing rows, not null values). Pattern 25 models Theory of Constraints with cross-entity station flow.
+
+        **Key gotcha:** Chaos `outlier_rate` and `outlier_factor` interact. A 0.008 rate with 2.5x factor gives ~4 outliers per shift at 2.5x the normal range. Increase the factor for more dramatic spikes; increase the rate for more frequent ones.
 
 ---
 
@@ -268,6 +308,138 @@ Use this table to find which pattern teaches a specific feature.
 | Cross-entity references | 8, 9, 25 |
 | Multi-pipeline project | 23 |
 | Validation on simulated data | 1, 21, 37 |
+
+---
+
+## Troubleshooting Simulation Patterns {#troubleshooting}
+
+Common pitfalls when building simulation configs. If your simulation output doesn't look right, check here first.
+
+!!! warning "Column Ordering for `prev()` and `pid()`"
+    **Problem:** Your `prev('column_x')` always returns the default value, never the actual previous row's value.
+
+    **Cause:** The column using `prev('column_x')` is defined BEFORE `column_x` in the YAML. The simulator evaluates columns top-to-bottom within each timestep. If `column_x` hasn't been calculated yet when `prev('column_x')` runs, it sees the default value.
+
+    **Fix:** Move the column that *uses* `prev()` to appear AFTER the column it references. For example, `cooling_pct` (which reads `prev('reactor_temp_c')`) must come BEFORE `reactor_temp_c` in Pattern 11 — because cooling is computed first, then temperature responds. But the key rule is: the column being *read by prev()* must have been defined in a previous timestep.
+
+    ```yaml
+    # ✅ CORRECT — cooling reads prev temp, then temp uses current cooling
+    - name: cooling_pct
+      generator:
+        type: derived
+        expression: "pid(pv=prev('reactor_temp_c', 85.0), sp=temp_setpoint_c, ...)"
+    - name: reactor_temp_c
+      generator:
+        type: derived
+        expression: "prev('reactor_temp_c', 85.0) + ..."
+    ```
+
+!!! warning "PID Sign Convention (Direct vs. Reverse Acting)"
+    **Problem:** Your PID controller output is stuck at 0 or 100 and the process variable is running away from setpoint.
+
+    **Cause:** Wrong sign on Kp/Ki/Kd. Odibi's `pid()` calculates `error = setpoint - process_variable`.
+
+    **Fix:** Use this table:
+
+    | Controller type | When PV > SP, you need... | Kp sign |
+    |-----------------|---------------------------|---------|
+    | Cooling valve, fan, vent, drain | MORE output | **Negative** |
+    | Heater, steam valve, fill valve | LESS output | **Positive** |
+
+    If temperature is above setpoint and you need MORE cooling → Kp must be negative.
+    If level is above setpoint and you need MORE draining → Kp must be negative.
+    If temperature is below setpoint and you need MORE heating → Kp must be positive.
+
+!!! warning "Cross-Entity References Not Resolving"
+    **Problem:** `Entity.column` expression returns 0 or NaN instead of the expected upstream value.
+
+    **Cause:** The entity name in the expression doesn't exactly match the entity name in the `names` list (case-sensitive). Or the entity_overrides block is on the wrong column.
+
+    **Fix:** Entity names are case-sensitive. `Influent.flow_mgd` works if the entity is named `Influent`, but NOT if it's named `influent` or `INFLUENT`. Double-check spelling.
+
+    ```yaml
+    entities:
+      names: [Influent, Primary, Aeration]   # These exact names...
+    # ...
+    expression: "Influent.flow_mgd * 0.98"    # ...must match here
+    ```
+
+!!! warning "Random Walk Producing Unrealistic Values"
+    **Problem:** A random walk variable (like temperature or pressure) drifts to extreme values and stays there.
+
+    **Cause:** `mean_reversion` is too low or missing. Without mean reversion, a random walk is a pure Brownian motion that will eventually hit the min or max bounds and stay there.
+
+    **Fix:** Add or increase `mean_reversion`. Values of 0.05-0.2 are typical. Higher values (0.15-0.2) for tightly controlled variables like pressure; lower values (0.05-0.08) for naturally drifting variables like temperature.
+
+    ```yaml
+    generator:
+      type: random_walk
+      start: 50.0
+      min: 0.0
+      max: 100.0
+      volatility: 1.0
+      mean_reversion: 0.1    # Pull back toward start value
+    ```
+
+!!! warning "Scheduled Events Not Appearing in Output"
+    **Problem:** You defined a `scheduled_event` but the forced value doesn't show up in the output.
+
+    **Cause 1:** `start_time` is outside the simulation window. Check that your event times fall within the `start_time` + (`timestep` × `row_count`) window.
+
+    **Cause 2:** The `entity` name doesn't match. Scheduled events use exact entity name matching (case-sensitive).
+
+    **Cause 3:** Using `end_time` vs `duration` — you need one or the other, not both. `end_time` is an absolute timestamp; `duration` is relative to `start_time`.
+
+!!! warning "Derived Expression Errors"
+    **Problem:** A derived column produces unexpected values or errors.
+
+    **Common causes:**
+
+    - **Division by zero:** Use `max(denominator, 0.001)` to guard against zero division
+    - **None propagation:** If any input column has null values, the derived expression may produce None. Use `0 if column is None else expression` to handle nulls
+    - **Operator precedence:** Python `and`/`or` vs `&`/`|` — use Python-style `and`/`or` in derived expressions, not bitwise operators
+    - **String comparisons:** Use `==` not `is` for string comparison in expressions
+
+!!! warning "Incremental Mode Producing Duplicate Data"
+    **Problem:** Running the pipeline twice produces overlapping timestamps.
+
+    **Cause:** The system catalog wasn't configured, or the `incremental` block is missing from the read node.
+
+    **Fix:** Ensure you have both: (1) a `system:` connection block in the project config, and (2) an `incremental: { mode: stateful, column: timestamp }` block on the read node. The system catalog stores the last-generated timestamp so the next run picks up where it left off.
+
+!!! warning "Entity Overrides Not Working"
+    **Problem:** An entity_override is defined but the entity uses the default generator instead.
+
+    **Cause:** The entity name in `entity_overrides` doesn't match the entity's actual name. With `count: 5, id_prefix: "machine_"`, entities are named `machine_00` through `machine_04` (zero-indexed). With `names: [A, B, C]`, entities are named exactly `A`, `B`, `C`.
+
+    **Fix:** Check your entity naming. Use `names:` for explicit control, or remember that `count:`-based entities are zero-indexed with the prefix.
+
+!!! tip "Quick Debugging Checklist"
+    1. **Set `seed: 42`** — makes output reproducible for debugging
+    2. **Start with `row_count: 10`** — verify the structure before generating thousands of rows
+    3. **Check column order** — `prev()` and `pid()` depend on evaluation order
+    4. **Check entity names** — case-sensitive everywhere (entity_overrides, scheduled_events, cross-entity refs)
+    5. **Check time windows** — scheduled events must fall within the simulation's start/end range
+    6. **Read the story** — use the `story:` block to auto-generate a narrative of what happened in the simulation
+
+---
+
+## Standalone YAML Files
+
+All 38 patterns are available as standalone, copy-paste-ready YAML configs in the [`examples/simulation_patterns/`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/) directory.
+
+Two variants are provided for each pattern:
+
+- **`oneshot/`** — Single-run configs using Parquet format with overwrite mode. Run once, get data.
+- **`datalake/`** — Incremental configs using Delta format with append mode. Run daily for a growing dataset.
+
+```bash
+# Run a oneshot pattern
+odibi run examples/simulation_patterns/oneshot/01_sales_pipeline.yaml
+
+# Run an incremental datalake pattern
+odibi run examples/simulation_patterns/datalake/01_sales_pipeline.yaml
+```
 
 ---
 

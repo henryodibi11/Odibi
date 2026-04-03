@@ -1,0 +1,125 @@
+project: solar_farm
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: solar
+    nodes:
+      - name: solar_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "5m"
+                row_count: 288            # 24 hours
+                seed: 42
+              entities:
+                names: [Array_01, Array_02, Array_03, Array_04]
+              columns:
+                - name: array_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Cloud cover — 30% chance of clouds at any timestep
+                - name: is_cloudy
+                  data_type: boolean
+                  generator:
+                    type: boolean
+                    true_probability: 0.3
+
+                - name: ambient_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 22.0
+                    min: 15.0
+                    max: 38.0
+                    volatility: 0.5
+                    mean_reversion: 0.1
+                    precision: 1
+
+                # Solar irradiance — Array_03 has dirty panels (soiling)
+                - name: irradiance_w_m2
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 600.0
+                    min: 0.0
+                    max: 1100.0
+                    volatility: 30.0
+                    mean_reversion: 0.05
+                    precision: 0
+                  entity_overrides:
+                    Array_03:
+                      type: random_walk
+                      start: 450.0
+                      min: 0.0
+                      max: 850.0
+                      volatility: 30.0
+                      mean_reversion: 0.05
+                      precision: 0
+
+                # Panel temp rises with irradiance (NOCT relationship)
+                - name: panel_temp_c
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "ambient_temp_c + irradiance_w_m2 * 0.03"
+
+                # Efficiency derates above 25°C (temp coefficient ~-0.4%/°C)
+                - name: efficiency_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "max(0, 20.0 - 0.05 * max(0, panel_temp_c - 25.0))"
+
+                # Power output — 2.0 is array area factor, cloud impact
+                - name: power_kw
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      round(irradiance_w_m2 * efficiency_pct / 100.0
+                      * 2.0 * (0.3 if is_cloudy else 1.0), 2)
+
+                # Daily energy — 5-min integration via prev()
+                - name: daily_energy_kwh
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(prev('daily_energy_kwh', 0) + power_kw * 5.0 / 60.0, 2)"
+
+              # Grid curtailment — Array_01 forced to 0 kW at midday
+              scheduled_events:
+                - type: forced_value
+                  entity: Array_01
+                  column: power_kw
+                  value: 0
+                  start_time: "2026-03-01T12:00:00Z"
+                  end_time: "2026-03-01T13:00:00Z"
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/solar_farm.parquet
+          mode: append

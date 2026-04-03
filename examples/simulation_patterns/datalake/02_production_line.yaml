@@ -1,0 +1,110 @@
+project: production_line
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: production
+    nodes:
+      - name: machine_telemetry
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T06:00:00Z"
+                end_time: "2026-03-10T22:00:00Z"    # One shift: 6am–10pm
+                timestep: "5m"
+                seed: 42
+              entities:
+                count: 5
+                id_prefix: "machine_"
+              columns:
+                - name: machine_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: cycle_time_sec
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 28.0
+                    max: 35.0
+                    distribution: normal
+                    mean: 31.0
+                    std_dev: 1.5
+                  entity_overrides:
+                    machine_03:             # Older machine — slower
+                      type: range
+                      min: 34.0
+                      max: 45.0
+                      distribution: normal
+                      mean: 38.0
+                      std_dev: 3.0
+
+                - name: units_produced
+                  data_type: int
+                  generator: {type: range, min: 8, max: 15}
+                  entity_overrides:
+                    machine_03:
+                      type: range
+                      min: 5
+                      max: 10
+
+                - name: defect_count
+                  data_type: int
+                  generator: {type: range, min: 0, max: 2}
+                  entity_overrides:
+                    machine_03:             # Higher defect rate
+                      type: range
+                      min: 0
+                      max: 5
+
+                - name: status
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [Running, Idle, Changeover, Error]
+                    weights: [0.80, 0.10, 0.07, 0.03]
+
+              # machine_02 maintenance shutdown 14:00–16:00
+              scheduled_events:
+                - type: forced_value
+                  entity: machine_02
+                  column: status
+                  value: Maintenance
+                  start_time: "2026-03-10T14:00:00Z"
+                  end_time: "2026-03-10T16:00:00Z"
+                - type: forced_value
+                  entity: machine_02
+                  column: units_produced
+                  value: 0
+                  start_time: "2026-03-10T14:00:00Z"
+                  end_time: "2026-03-10T16:00:00Z"
+
+              chaos:
+                outlier_rate: 0.01
+                outlier_factor: 3.0
+                duplicate_rate: 0.005
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/production_telemetry.parquet
+          mode: append

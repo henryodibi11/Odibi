@@ -1,0 +1,132 @@
+project: compressor_station
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: compressors
+    nodes:
+      - name: compressor_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "5m"
+                row_count: 288            # 24 hours
+                seed: 42
+              entities:
+                names: [Compressor_01, Compressor_02, Compressor_03]
+              columns:
+                - name: unit_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: suction_pressure_psig
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 450.0
+                    min: 400.0
+                    max: 500.0
+                    volatility: 1.5
+                    mean_reversion: 0.1
+                    precision: 1
+
+                # Discharge pressure — occasional upward spikes (surge)
+                - name: discharge_pressure_psig
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 1200.0
+                    min: 1100.0
+                    max: 1400.0
+                    volatility: 3.0
+                    mean_reversion: 0.08
+                    precision: 1
+                    shock_rate: 0.03        # 3% chance of surge per timestep
+                    shock_magnitude: 50.0   # Up to 50 PSI spike
+                    shock_bias: 1.0         # Always upward — surge never goes down
+
+                # Compression ratio = discharge / suction
+                - name: compression_ratio
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(discharge_pressure_psig / suction_pressure_psig, 2)"
+
+                # Vibration — slow upward trend (bearing wear)
+                - name: vibration_mils
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 2.0
+                    min: 0.5
+                    max: 8.0
+                    volatility: 0.15
+                    mean_reversion: 0.05
+                    trend: 0.002           # Gradual bearing wear
+                    precision: 2
+                  entity_overrides:
+                    Compressor_03:          # Worse bearing
+                      type: random_walk
+                      start: 3.5
+                      min: 1.0
+                      max: 8.0
+                      volatility: 0.25
+                      mean_reversion: 0.03
+                      trend: 0.005         # Faster degradation
+                      precision: 2
+
+                - name: bearing_temp_f
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 180.0
+                    min: 160.0
+                    max: 250.0
+                    volatility: 1.0
+                    mean_reversion: 0.1
+                    precision: 1
+
+                - name: flow_mmscfd
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 25.0
+                    min: 15.0
+                    max: 35.0
+                    volatility: 0.5
+                    mean_reversion: 0.1
+                    precision: 2
+
+                # Vibration alarm threshold
+                - name: vibration_alarm
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "vibration_mils > 5.0"
+
+              chaos:
+                outlier_rate: 0.008
+                outlier_factor: 2.5
+        write:
+          connection: output
+          format: parquet
+          path: bronze/compressor_data.parquet
+          mode: overwrite

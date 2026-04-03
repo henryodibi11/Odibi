@@ -72,7 +72,7 @@ flowchart LR
     **Inverter clipping** - When panels produce more DC power than the inverter can convert to AC. The excess is simply wasted. Not modeled here, but a real concern for oversized arrays.
 
 !!! info "Why these parameter values?"
-    - **Irradiance 0-1,100 W/m2:** Clear-sky irradiance at mid-latitudes peaks around 1,000-1,100 W/m2 at solar noon. The random walk models diurnal variation, though a real simulation would use a sinusoidal base curve.
+    - **Irradiance 0-1,100 W/m2:** Clear-sky irradiance at mid-latitudes peaks around 1,000-1,100 W/m2 at solar noon. The random walk models cloud-driven variability but does NOT model the day/night cycle — the sun doesn't set in this simulation. For a YouTube demo, this is acceptable because the data still shows realistic cloud transients and power physics. For production use, you'd replace the random walk with a `daily_profile` that follows a sinusoidal solar curve (0 at night, peak at noon) and add cloud intermittency on top. See "Try this" below.
     - **Ambient temp 15-38 C:** A warm spring day in a desert climate - typical of the US Southwest where large solar farms are sited.
     - **Soiling factor (Array_03 max 850 vs 1100 W/m2):** A 23% reduction matches a moderately soiled array that hasn't been cleaned in several months. Desert installations get dusty fast.
     - **Cloud probability 0.3:** Roughly 30% of 5-minute intervals have cloud cover, which is typical for a partly cloudy day. In reality, clouds cluster in time rather than appearing randomly, but this gives a reasonable intermittency profile.
@@ -204,6 +204,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/16_solar_farm.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/16_solar_farm.yaml) | [`datalake/16_solar_farm.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/16_solar_farm.yaml)
+
 !!! example "What the output looks like"
     This config generates **1,152 rows** (288 timesteps x 4 arrays). Here's a snapshot comparing all four arrays at a single timestep - notice how Array_03's soiling and cloud state affect power output:
 
@@ -216,6 +219,15 @@ pipelines:
 
     Array_03 stands out immediately: it's cloudy AND soiled, so its power drops to 72 kW while the clean arrays produce 330+ kW. The daily energy total for Array_03 is roughly half the others by 10 AM. This is exactly the kind of disparity that triggers a cleaning work order in a real solar O&M system.
 
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='array_id'`
+
+    **X-axis:** timestamp | **Y-axis:** power_kw | **Color/facet:** array_id
+
+    **Expected visual shape:** Four overlapping lines with frequent sharp dips where `is_cloudy=True` drops power to 30% of clear-sky values. `Array_03` (soiled) runs consistently 20-25% lower than the clean arrays. `Array_01` shows a flat zero during 12:00-13:00 (grid curtailment). `daily_energy_kwh` shows monotonically increasing stairstep curves — each step is wider during cloudy periods (less energy added per interval). Note: this pattern does NOT model day/night — irradiance is a random walk, not a solar curve.
+
+    **Verification check:** Array_03 daily_energy_kwh should be ~75-80% of the clean arrays at end of day. Array_01 energy should flatten during curtailment. power_kw should never be negative. If all arrays look identical, entity_overrides aren't being applied.
+
 **What makes this realistic:**
 
 - **Boolean cloud cover creates real intermittency.** Power drops to 30% when `is_cloudy` is true, mimicking the sharp transients that real solar farms experience. On a partly cloudy day, power can swing from 100% to 30% and back in under a minute - this is why grid operators need fast-ramping backup generation.
@@ -225,6 +237,7 @@ pipelines:
 - **Grid curtailment forces Array_01 to zero during peak production (12:00-13:00).** This is a real and growing problem. California curtailed over 2.4 million MWh of solar in 2023 because midday supply exceeded demand. The scheduled event models exactly this constraint.
 
 !!! example "Try this"
+    - **Add a day/night cycle:** Replace the irradiance `random_walk` with a `daily_profile` generator: anchors at 0 W/m2 from 20:00-06:00, ramping to 1000 W/m2 at 12:00, back to 0 by 20:00. Layer the `is_cloudy` boolean on top for intermittency. This makes the power curve realistic end-to-end — zero at night, bell-shaped during the day, with cloud dips.
     - **Simulate an overcast day:** Change `true_probability` to `0.6` and compare daily energy totals against the 0.3 baseline. You'll see capacity factor drop from roughly 20% to under 12% - a bad day for solar revenue.
     - **Add wind cooling:** Create a `wind_speed_mps` column (random_walk, start 3, min 0, max 15) and modify `panel_temp_c` to subtract wind cooling: `"ambient_temp_c + irradiance_w_m2 * 0.03 - wind_speed_mps * 0.5"`. Wind cools panels and improves efficiency - this is why windy desert sites outperform calm ones.
     - **Extend to 48 hours:** Double to 576 rows and add a second curtailment event on day 2. Compare day-over-day energy production to see how weather and curtailment variability affects revenue forecasting.
@@ -463,6 +476,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/17_wind_turbines.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/17_wind_turbines.yaml) | [`datalake/17_wind_turbines.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/17_wind_turbines.yaml)
+
 !!! example "What the output looks like"
     This config generates **720 rows** (144 timesteps x 5 turbines). Here's a snapshot comparing all five turbines at a single timestep - notice how the southern cluster's stronger wind translates to dramatically higher power:
 
@@ -692,6 +708,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/18_bess.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/18_bess.yaml) | [`datalake/18_bess.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/18_bess.yaml)
+
 !!! example "What the output looks like"
     This config generates **576 rows** (288 timesteps x 2 modules). Here's a snapshot showing the transition from normal operation into the peak shaving event at 4 PM (which repeats daily via `recurrence: "1d"`) - notice the current jumping to -25A:
 
@@ -705,6 +724,15 @@ pipelines:
     | BESS_Module_02 | 2026-03-01 16:05:00  | -25.0     | 393.9     | 45.7    | -9.85    | discharging  | 31.9        |
 
     At 15:50, Module_01 was charging at 8.3A while Module_02 was discharging at -5.1A - normal independent operation. At 16:00, the peak shaving event kicks in and both modules snap to -25A discharge. This event repeats daily via `recurrence: "1d"` with a `duration: "4h"` window, so every day from 4–8 PM the BESS discharges at full capacity. You can see the SOC dropping at each 5-minute step (62.4 to 60.3 for Module_01). The power output jumps to about -10 kW per module - that's 20 kW of peak shaving capacity from this two-module system.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with dual y-axis — `soc_pct` on left, `current_a` on right
+
+    **X-axis:** timestamp | **Y-axis:** soc_pct (left), current_a (right) | **Color/facet:** module_id
+
+    **Expected visual shape:** SOC wanders randomly during normal operation, then drops steeply and linearly during the 16:00-20:00 peak shaving window when `current_a` snaps to -25A. After the event ends, SOC resumes its random walk from the new lower level. The 5% floor clamps SOC if it drains too far. `cycle_state` switches between "charging" (positive current) and "discharging" (negative current) — the peak shaving event forces both modules to "discharging" simultaneously.
+
+    **Verification check:** SOC should stay between 5% and 95%. During the forced discharge window, both modules should show exactly -25A. Power = current × voltage — verify `power_kw` matches `current_a * voltage_v / 1000`.
 
 **What makes this realistic:**
 
@@ -899,6 +927,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/19_smart_meters.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/19_smart_meters.yaml) | [`datalake/19_smart_meters.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/19_smart_meters.yaml)
+
 !!! example "What the output looks like"
     This config generates **4,800 rows** (96 timesteps x 50 meters). Here's a snapshot showing a few meters at one timestep - notice the variety in consumption, voltage, and signal strength across the network:
 
@@ -911,6 +942,15 @@ pipelines:
     | meter_31 | 2026-03-01 08:00:00  | 10.100.44.78  | 1.891           | 239.8     | 0.93         | -58.9               | active       |
 
     A few things to notice: meter_12 has a weak signal (-81.6 dBm) and is in "warning" status - this meter is at the edge of the RF mesh and may need a relay or collector repositioned. Consumption varies from 0.389 kWh (maybe a vacation home) to 2.105 kWh (running the dryer). Voltage varies by only a few volts across the network, which is expected on a well-regulated distribution feeder.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.box` of `consumption_kwh` grouped by meter, or `px.scatter` with `color='meter_status'`
+
+    **X-axis:** meter_id (for box) or timestamp (for scatter) | **Y-axis:** consumption_kwh | **Color/facet:** meter_status
+
+    **Expected visual shape:** Box plot shows consumption spread across 50 meters — most between 0.5-2.0 kWh with outlier whiskers from chaos injection. Scatter plot of `signal_strength_dbm` vs meter shows weak-signal meters (-80 dBm or lower) correlating with "warning" or "offline" status. All IP addresses should be on the 10.100.x.x subnet.
+
+    **Verification check:** Total rows = 50 meters × 96 timesteps = 4,800 (plus ~24 duplicates from 0.5% duplicate_rate). All voltages should be between 228-252V (ANSI C84.1 range). power_factor should never exceed 1.0.
 
 **What makes this realistic:**
 
@@ -1099,6 +1139,9 @@ pipelines:
           path: bronze/ev_charging.parquet
           mode: overwrite
 ```
+
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/20_ev_charging.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/20_ev_charging.yaml) | [`datalake/20_ev_charging.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/20_ev_charging.yaml)
 
 !!! example "What the output looks like"
     This config generates **576 rows** (144 timesteps x 4 stations). Here's a snapshot showing the contrast between fast and slow chargers, and the mix of session states:

@@ -156,6 +156,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/01_sales_pipeline.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/01_sales_pipeline.yaml) | [`datalake/01_sales_pipeline.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/01_sales_pipeline.yaml)
+
 !!! example "What the output looks like"
     This config generates **720 rows** (720 timesteps x 1 entity). Here's a sample from the bronze layer:
 
@@ -166,6 +169,15 @@ pipelines:
     | 10003    | 2026-01-01 02:00:00  | c5a8f3b2-6d1e-4c9a-7b4f-3e2d8a5c1f6b | Widget_A  | 12       | 31.88      |
 
     After silver transforms, `line_total` and `order_tier` columns appear. The gold layer aggregates by product - four rows with total revenue and order count per product.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.bar` for gold layer (revenue by product) or `px.histogram` for unit_price distribution
+
+    **X-axis:** product | **Y-axis:** sum of line_total | **Color/facet:** product
+
+    **Expected visual shape:** Bar chart with 4 bars (Widget_A, Widget_B, Gadget_X, Premium_Z). Widget_A should be tallest (~40% of orders). A histogram of `unit_price` shows a bell curve centered around $45 with a right tail — most items are modest, a few are expensive.
+
+    **Verification check:** Widget_A revenue > Widget_B > Gadget_X > Premium_Z (matching the 0.40/0.30/0.20/0.10 weights). Total row count = 720.
 
 **When real data arrives:** change the bronze node's `format: simulation` to `format: csv` (or `delta`, or `sql`), point it at your real connection, and delete the `simulation` block. Silver and gold nodes don't change at all.
 
@@ -363,6 +375,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/02_production_line.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/02_production_line.yaml) | [`datalake/02_production_line.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/02_production_line.yaml)
+
 !!! example "What the output looks like"
     This config generates **960 rows** (192 timesteps x 5 machines). Here's a snapshot at 14:30, during machine_02's maintenance window:
 
@@ -375,6 +390,15 @@ pipelines:
     | machine_05  | 2026-03-10 14:30:00  | 29.9           | 14             | 1            | Running     |
 
     Notice machine_02 shows 0 units during maintenance, and machine_03's cycle time is noticeably slower with more defects.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='machine_id'`
+
+    **X-axis:** timestamp | **Y-axis:** cycle_time_sec | **Color/facet:** machine_id
+
+    **Expected visual shape:** Four machines cluster around 31 seconds. `machine_03` runs visibly higher at ~38 seconds with more scatter (std_dev 3.0 vs 1.5). `machine_02` shows a flat gap from 14:00-16:00 where `units_produced` drops to 0 and `status` becomes "Maintenance." Occasional chaos spikes appear as sharp vertical jumps on any machine.
+
+    **Verification check:** machine_03 cycle_time mean should be ~38s (vs ~31s for others). machine_02 units_produced = 0 during 14:00-16:00. Total rows = 5 machines × 192 timesteps = 960.
 
 **What makes this realistic:**
 
@@ -632,6 +656,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/03_iot_sensors.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/03_iot_sensors.yaml) | [`datalake/03_iot_sensors.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/03_iot_sensors.yaml)
+
 !!! example "What the output looks like"
     This config generates **5,760 rows** (288 timesteps x 20 sensors). Here's a snapshot showing the variety across sensors and times of day:
 
@@ -644,6 +671,15 @@ pipelines:
     | sensor_15  | 2026-03-10 15:00:00  | Floor_3 | NULL          | NULL         | NULL      | NULL    |
 
     Notice: at 3am occupancy is 1 (security guard) and CO2 is low (474 ppm). By 9am occupancy has ramped to 20 and CO2 has risen to 963 ppm — because CO2 is derived from occupancy, they move together. At lunch (12:00), occupancy dips to 15 and CO2 drops accordingly. sensor_04 has NULL humidity permanently (older hardware). sensor_15 shows NULL for everything after 14:00 (battery death) — including occupancy and CO2.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='sensor_id'` (filter to one floor for clarity)
+
+    **X-axis:** timestamp | **Y-axis:** occupancy | **Color/facet:** sensor_id
+
+    **Expected visual shape:** A textbook office occupancy curve — flat near 1 overnight, ramps to ~19 at 8am, peaks at ~22 mid-morning, dips to ~15 at lunch, returns to ~22 in afternoon, tapers to ~4 by 7pm, drops to ~2 by 10pm. `co2_ppm` tracks the same shape with a vertical offset (450 ppm baseline + 25 per person). `sensor_15` flatlines to null after 14:00 on all channels — the "battery died" event.
+
+    **Verification check:** sensor_04, sensor_12, sensor_18 should have `humidity_pct = null` for all rows (structural nulls). sensor_15 should have nulls on ALL columns after 14:00. co2_ppm at peak occupancy ≈ 450 + 22×25 = 1000 ppm.
 
 **What makes this realistic:**
 
@@ -932,6 +968,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/03b_hvac_feedback.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/03b_hvac_feedback.yaml) | [`datalake/03b_hvac_feedback.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/03b_hvac_feedback.yaml)
+
 !!! example "What the output looks like"
     The feedback chain is visible in the data — watch how the columns move together:
 
@@ -944,6 +983,15 @@ pipelines:
     | sensor_01 | 2026-03-10 22:00:00 | 2         | 505         | 20           | 494     |
 
     **Read the story in the data:** At 3am, 1 person is in the building. Raw CO2 is low (480 ppm), so the HVAC runs at minimum (20%). By 9am, 20 people have arrived — raw CO2 jumps to 963, the fan ramps to 93%, and it pulls actual CO2 down to 897. At lunch (12:00), people leave (15), CO2 drops, and the fan eases back. By 10pm, only 2 people remain and the HVAC is back to minimum.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` overlaying `co2_raw_ppm` and `co2_ppm` on the same chart
+
+    **X-axis:** timestamp | **Y-axis:** ppm | **Color/facet:** column name (co2_raw vs co2_actual)
+
+    **Expected visual shape:** Two curves with the SAME shape but a GAP between them — `co2_raw_ppm` always above `co2_ppm`. The gap IS the HVAC's contribution. The gap widens during peak occupancy (more fan effort) and narrows overnight (fan at minimum 20%). `hvac_fan_pct` on a secondary y-axis mirrors the occupancy curve: low overnight, high during business hours.
+
+    **Verification check:** `co2_ppm` should NEVER exceed `co2_raw_ppm`. `hvac_fan_pct` should never go below 20% (the floor) or above 100%. At peak occupancy, fan should be near 90-100%.
 
 **What makes this realistic:**
 
@@ -1090,6 +1138,9 @@ pipelines:
           mode: append
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/04_order_stream.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/04_order_stream.yaml) | [`datalake/04_order_stream.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/04_order_stream.yaml)
+
 !!! example "What the output looks like"
     This config generates **2,880 rows** per run (720 timesteps x 4 channels). Here's a sample:
 
@@ -1100,6 +1151,15 @@ pipelines:
     | 100003   | store   | 2026-03-01 00:00:00  | f9e8d7c6-b5a4-3210-fedc-ba9876543210 | 312.50 | completed | debit_card     | platinum   |
 
     Run it again and the next batch starts at 2026-03-02 00:00:00 - no gaps, no overlaps.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.histogram` of `amount` or `px.pie` of `status`
+
+    **X-axis:** amount (for histogram) | **Y-axis:** count | **Color/facet:** source
+
+    **Expected visual shape:** Histogram of `amount` shows a bell curve centered at ~$65 with a right tail extending to $500 — most orders are modest, a few are large. A pie chart of `status` shows a dominant 82% "completed" wedge with small slices for pending (10%), cancelled (5%), and refunded (3%). Bar chart of `order_tier` counts shows "bronze" and "silver" dominating since most orders cluster below $150.
+
+    **Verification check:** ~82% of rows should have status="completed". Run it twice — the second run should start at the next day's timestamp with no overlap. Total rows per run = 720 × 4 channels = 2,880.
 
 **What makes this realistic:**
 
@@ -1278,6 +1338,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/05_degradation.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/05_degradation.yaml) | [`datalake/05_degradation.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/05_degradation.yaml)
+
 !!! example "What the output looks like"
     This config generates **2,160 rows** (720 timesteps x 3 exchangers). Here's a comparison at three points in time showing HX_01's cleaning cycle and HX_03's continuous decline:
 
@@ -1306,6 +1369,15 @@ pipelines:
     | HX_03        | 2026-01-30 00:00:00  | 95.0                  | 78.3                  | 41.8           | True           |
 
     The sawtooth pattern is clearly visible: HX_01 and HX_02 show a sharp recovery at cleaning, while HX_03 declines continuously. By day 30, HX_03 has triggered the `needs_cleaning` flag.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='equipment_id'`
+
+    **X-axis:** timestamp | **Y-axis:** actual_efficiency_pct | **Color/facet:** equipment_id
+
+    **Expected visual shape:** Classic **sawtooth pattern** — gradual downward slope from fouling (trend: -0.01 per timestep) interrupted by sharp vertical jumps back to ~94% at each CIP cleaning event. `HX_01` and `HX_02` show regular cleaning cycles every ~15 days. `HX_03` uses condition-based cleaning and may dip deeper before triggering. `energy_loss_kw` mirrors efficiency inversely — as efficiency drops, energy loss climbs linearly.
+
+    **Verification check:** `needs_cleaning` should flip to `true` when `actual_efficiency_pct` drops below 80%. After a CIP event, efficiency should jump back to ~94%. The `energy_loss_kw` = `(design - actual) × 2.5` — verify with a spot check.
 
 **What makes this realistic:**
 
@@ -1424,6 +1496,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/06_stress_test.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/06_stress_test.yaml) | [`datalake/06_stress_test.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/06_stress_test.yaml)
+
 !!! example "What the output looks like"
     This config generates **100,000 rows** (10 entities x 10,000 rows). Here's a sample:
 
@@ -1436,6 +1511,13 @@ pipelines:
     | device_10  | 2026-01-01 00:00:00  | 91.2   | error  |
 
     The data is intentionally boring - that's the point. You're testing infrastructure, not domain logic. What matters is: did all 100K rows land in the Parquet file? How fast? How big is the file?
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** Not primarily visual — this is a performance/scale pattern.
+
+    **Expected visual shape:** The output looks identical to smaller simulations but with many more rows. The key metric is generation time and file size, not chart shape.
+
+    **Verification check:** Row count should match `entity_count × row_count`. File size should scale linearly. Generation time may reveal performance bottlenecks at high entity counts.
 
 **Tips for scale testing:**
 
@@ -1588,6 +1670,9 @@ pipelines:
           mode: append
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/07_dashboard_feed.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/07_dashboard_feed.yaml) | [`datalake/07_dashboard_feed.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/07_dashboard_feed.yaml)
+
 !!! example "What the output looks like"
     After one run, you get **288 rows** (96 timesteps x 3 plants). After 7 daily runs, the Delta table has 2,016 rows - a week of operational data:
 
@@ -1599,6 +1684,15 @@ pipelines:
     | plant_north  | 2026-03-01 00:15:00  | 117.2           | 97.5        | 1006.2     | 0            |
 
     Notice how energy correlates with throughput (that's the derived expression), quality stays tight around 97%, and downtime is sporadic. This is exactly what a stakeholder's dashboard would show.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` of the metric column over time
+
+    **X-axis:** timestamp | **Y-axis:** metric value | **Color/facet:** entity_id
+
+    **Expected visual shape:** A continuous random walk line that grows with each pipeline run. The critical thing to check: **no gaps and no overlaps** between runs. Each run's segment should start exactly where the previous one ended. The line should be smooth across run boundaries.
+
+    **Verification check:** Sort by timestamp and verify that consecutive timestamps are exactly one `timestep` apart, even across runs. No duplicate timestamps, no missing intervals.
 
 **How to use this as a dashboard feed:**
 
@@ -1779,6 +1873,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/08_multi_system.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/08_multi_system.yaml) | [`datalake/08_multi_system.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/08_multi_system.yaml)
+
 !!! example "What the output looks like"
     This generates **432 rows** (144 timesteps x 3 entities). Here's one timestep across all three systems - notice how values cascade:
 
@@ -1789,6 +1886,15 @@ pipelines:
     | SystemC_Storage      | 2026-03-10 00:00:00  | 89              | 112.3       | 0.0             | 0.0        | 82.0           | 10.1                    |
 
     The key insight: only System B has non-zero `processed_count` (it references System A), and only System C has non-zero `records_stored` (it references System B). The `if entity_id ==` conditionals keep each metric on the right entity. Storage utilization starts at 10% and climbs throughout the day.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='system_id'` (filter to show only each system's relevant metric)
+
+    **X-axis:** timestamp | **Y-axis:** output_rate / processed_count / records_stored | **Color/facet:** system_id
+
+    **Expected visual shape:** Three traces at different levels — `output_rate` (Producer) is the highest, wandering between 40-180. `processed_count` (Processor) tracks at ~85% of output_rate. `records_stored` (Storage) tracks at ~98% of processed_count. `storage_utilization_pct` is a **monotonically increasing** curve that starts at 10% and climbs steadily, never decreasing.
+
+    **Verification check:** `processed_count` ≈ `output_rate × 0.85`. `records_stored` ≈ `processed_count × 0.98`. `storage_utilization_pct` should never decrease (it only accumulates via `prev()`). Total rows = 3 entities × 144 timesteps = 432.
 
 **What makes this realistic:**
 

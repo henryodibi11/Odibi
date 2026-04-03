@@ -1,0 +1,108 @@
+project: call_center
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: ticket_queue
+    nodes:
+      - name: queue_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T07:00:00Z"
+                timestep: "5m"
+                row_count: 192            # 16 hours
+                seed: 42
+              entities:
+                names: [Queue_Support, Queue_Billing, Queue_Technical]
+              columns:
+                - name: queue_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: calls_in
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 0
+                    max: 8
+                    distribution: normal
+                    mean: 3
+                    std_dev: 1.5
+
+                - name: calls_resolved
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 0
+                    max: 6
+                    distribution: normal
+                    mean: 3
+                    std_dev: 1.0
+
+                # Queue accumulation — clamped at zero
+                - name: queue_depth
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "max(0, int(prev('queue_depth', 5) + calls_in - calls_resolved))"
+
+                # Wait time proportional to queue depth
+                - name: avg_wait_min
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(max(0.5, queue_depth * 2.5 + random() * 3), 1)"
+
+                - name: satisfaction_score
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 1.0
+                    max: 5.0
+                    distribution: normal
+                    mean: 3.8
+                    std_dev: 0.6
+
+                - name: escalated
+                  data_type: boolean
+                  generator: {type: boolean, true_probability: 0.08}
+
+                - name: call_type
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [inquiry, complaint, change_request, cancellation]
+                    weights: [0.45, 0.25, 0.20, 0.10]
+
+              # Lunch rush — max calls into support queue
+              scheduled_events:
+                - type: forced_value
+                  entity: Queue_Support
+                  column: calls_in
+                  value: 8
+                  start_time: "2026-03-10T12:00:00Z"
+                  end_time: "2026-03-10T13:00:00Z"
+
+        write:
+          connection: output
+          format: parquet
+          path: bronze/call_center.parquet
+          mode: overwrite

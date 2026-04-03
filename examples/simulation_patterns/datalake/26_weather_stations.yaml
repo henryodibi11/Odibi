@@ -1,0 +1,121 @@
+project: weather_stations
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: weather
+    nodes:
+      - name: wx_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "15m"
+                row_count: 96             # 24 hours
+                seed: 42
+              entities:
+                count: 10
+                id_prefix: "wx_"
+              columns:
+                - name: station_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Station placement across NYC metro area
+                - name: location
+                  data_type: string
+                  generator:
+                    type: geo
+                    bbox: [40.0, -74.5, 41.0, -73.5]
+                    format: lat_lon_separate
+
+                - name: temperature_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 18.0
+                    min: 5.0
+                    max: 35.0
+                    volatility: 0.3
+                    mean_reversion: 0.08
+                    precision: 1
+
+                - name: humidity_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 30
+                    max: 95
+                    distribution: normal
+                    mean: 65
+                    std_dev: 12
+
+                - name: wind_speed_mps
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 3.0
+                    min: 0.0
+                    max: 20.0
+                    volatility: 0.5
+                    mean_reversion: 0.1
+                    precision: 1
+
+                - name: wind_direction_deg
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 0
+                    max: 360
+
+                - name: barometric_pressure_hpa
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 1013.25
+                    min: 990
+                    max: 1040
+                    volatility: 0.3
+                    mean_reversion: 0.15
+                    precision: 1
+
+                - name: is_precipitating
+                  data_type: boolean
+                  generator: {type: boolean, true_probability: 0.15}
+
+                # Simplified heat index combining temperature and humidity
+                - name: heat_index_c
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(temperature_c + 0.5 * (humidity_pct / 100.0) * temperature_c, 1)"
+
+              chaos:
+                outlier_rate: 0.005       # Sensor glitches
+                outlier_factor: 2.5
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/weather_stations.parquet
+          mode: append

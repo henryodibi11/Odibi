@@ -146,6 +146,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/31_retail_pos.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/31_retail_pos.yaml) | [`datalake/31_retail_pos.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/31_retail_pos.yaml)
+
 !!! example "What the output looks like"
     This config generates **2,160 rows** (720 timesteps x 3 stores). Here's a handful of transactions from Store_001:
 
@@ -157,6 +160,15 @@ pipelines:
     | Store_001 | 2026-03-10 00:06:00  | 100004         | SKU_MILK   | 5        | 3.79       | 1.52       | 20.47  | mobile_pay     | False          |
 
     Notice how `SKU_MILK` shows up more often than others (25% weight), and `tax_amount` is always exactly `unit_price * quantity * 0.08` rounded to 2 decimals. The `total` is `subtotal + tax` - no magic numbers, just math.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.bar` of total revenue by SKU, or `px.histogram` of unit_price
+
+    **X-axis:** sku (for bar) or unit_price (for histogram) | **Y-axis:** sum of total (for bar) or count (for histogram) | **Color/facet:** store_id
+
+    **Expected visual shape:** Bar chart of revenue by SKU shows SKU_MILK as the tallest bar (~25% of transactions), followed by SKU_BREAD (~22%) and SKU_COFFEE (~20%). A histogram of `unit_price` shows a bell curve centered at $8 with a right tail to $25. A pie chart of `payment_method` shows credit_card dominant at 40%, then debit at 25%, cash at 20%, mobile at 15%.
+
+    **Verification check:** Total rows = 3 stores × 720 timesteps = 2,160. `tax_amount` should always equal `round(unit_price × quantity × 0.08, 2)`. `total` should always equal `unit_price × quantity + tax_amount`. ~35% of rows should have `loyalty_member = True`.
 
 **What makes this realistic:**
 
@@ -364,6 +376,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/32_call_center.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/32_call_center.yaml) | [`datalake/32_call_center.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/32_call_center.yaml)
+
 !!! example "What the output looks like"
     This config generates **576 rows** (192 timesteps x 3 queues). Here's the support queue during and after the lunch rush - watch the queue build and slowly recover:
 
@@ -377,6 +392,15 @@ pipelines:
     | Queue_Support | 2026-03-10 14:00:00  | 2        | 4              | 10          | 26.5         | 3.2               | False     | change_request|
 
     The key thing to notice: queue depth peaks around 22 at 13:00, and even though the lunch rush *ends* at 13:00, it takes another hour before the queue drops back to manageable levels. That recovery lag is Little's Law in action - the system has accumulated a backlog that takes real time to drain.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='queue_id'`
+
+    **X-axis:** timestamp | **Y-axis:** queue_depth | **Color/facet:** queue_id
+
+    **Expected visual shape:** Queue depth hovers near 0-5 during normal hours (calls_in ≈ calls_resolved). During the lunch rush (12:00-13:00), `Queue_Support` spikes dramatically as `calls_in` jumps to 8 per interval — the queue builds because agents can't keep up. After the rush ends, the queue DOESN'T instantly clear — it takes ~30-60 minutes to decay back to normal as agents work through the backlog. `wait_time_min` mirrors the queue_depth shape with a scaling factor.
+
+    **Verification check:** Queue depth should never go below 0 (clamped by `max(0, ...)`). The lunch rush spike should be clearly visible. The recovery period after the rush is the realistic part — instant recovery would be wrong. `wait_time_min` ≈ `queue_depth × 2.5` (from the derived expression).
 
 **What makes this realistic:**
 
@@ -596,6 +620,9 @@ pipelines:
           path: bronze/server_monitoring.parquet
           mode: overwrite
 ```
+
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/33_server_monitor.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/33_server_monitor.yaml) | [`datalake/33_server_monitor.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/33_server_monitor.yaml)
 
 !!! example "What the output looks like"
     This config generates **11,520 rows** (1,440 timesteps x 8 servers). Here's srv_003 showing the memory leak progression over key hours:
@@ -838,6 +865,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/34_api_perf_logs.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/34_api_perf_logs.yaml) | [`datalake/34_api_perf_logs.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/34_api_perf_logs.yaml)
+
 !!! example "What the output looks like"
     This config generates **5,760 rows** (1,440 timesteps x 4 endpoints). Here's a snapshot across all four endpoints during normal operation, plus the deployment spike:
 
@@ -850,6 +880,15 @@ pipelines:
     | api_orders    | 2026-03-10 03:05:00  | 201           | **180.0**      | **575.0**      | 1.8            | 197        | 2          | 2          | 3.35           |
 
     The key thing to notice: `api_payments` has consistently higher latency (115ms p50 vs. ~45ms for others) because of the external gateway override. During the deployment spike at 03:05, `api_orders` p50 jumps to 180ms (the forced value) and p99 explodes to 575ms. The status code columns always sum to `request_count` - that mathematical consistency is what makes this data trustworthy.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='endpoint'`
+
+    **X-axis:** timestamp | **Y-axis:** latency_p50_ms | **Color/facet:** endpoint
+
+    **Expected visual shape:** Four overlapping lines at different levels. `api_payments` runs consistently higher (~120ms) than the other three endpoints (~45ms) because of the external gateway overhead (entity_overrides). At 03:00, `api_orders` shows a sharp spike to 180ms for exactly 15 minutes (the deployment event). `latency_p99_ms` runs at roughly 3× the p50 values. The `status_2xx + status_4xx + status_5xx` should always sum to `request_count`.
+
+    **Verification check:** `latency_p99_ms` should ALWAYS be ≥ `latency_p50_ms` (by definition). `api_payments` should be the slowest endpoint in EVERY timestep (structural, not a spike). The deployment spike should affect ONLY `api_orders`, not other endpoints. status codes should sum to request_count exactly.
 
 **What makes this realistic:**
 
@@ -1075,6 +1114,9 @@ pipelines:
           path: bronze/supply_chain.parquet
           mode: overwrite
 ```
+
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/35_supply_chain.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/35_supply_chain.yaml) | [`datalake/35_supply_chain.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/35_supply_chain.yaml)
 
 !!! example "What the output looks like"
     This config generates **216 rows** (72 timesteps x 3 legs). Here's a snapshot showing all three legs at the same moment, plus a temperature excursion event:

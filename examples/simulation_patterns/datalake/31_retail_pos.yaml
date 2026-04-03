@@ -1,0 +1,104 @@
+project: retail_pos
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: pos_transactions
+    nodes:
+      - name: pos_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "2m"
+                row_count: 720            # 24 hours
+                seed: 42
+              entities:
+                names: [Store_001, Store_002, Store_003]
+              columns:
+                - name: store_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: transaction_id
+                  data_type: int
+                  generator:
+                    type: sequential
+                    start: 100001
+                    step: 1
+
+                # Weighted SKU mix — milk most frequent (Pareto-like)
+                - name: sku
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [SKU_MILK, SKU_BREAD, SKU_EGGS, SKU_COFFEE, SKU_SNACK]
+                    weights: [0.25, 0.22, 0.18, 0.20, 0.15]
+
+                - name: quantity
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 1
+                    max: 10
+
+                - name: unit_price
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 1.50
+                    max: 25.00
+                    distribution: normal
+                    mean: 8.00
+                    std_dev: 4.00
+
+                # 8% sales tax
+                - name: tax_amount
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(unit_price * quantity * 0.08, 2)"
+
+                - name: total
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(unit_price * quantity + tax_amount, 2)"
+
+                - name: payment_method
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [credit_card, debit_card, cash, mobile_pay]
+                    weights: [0.40, 0.25, 0.20, 0.15]
+
+                - name: loyalty_member
+                  data_type: boolean
+                  generator: {type: boolean, true_probability: 0.35}
+
+          incremental:
+            mode: stateful
+            column: timestamp
+
+        write:
+          connection: output
+          format: delta
+          path: bronze/retail_pos.parquet
+          mode: append

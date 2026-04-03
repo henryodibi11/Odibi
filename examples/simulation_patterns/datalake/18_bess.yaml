@@ -1,0 +1,115 @@
+project: bess_storage
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: bess
+    nodes:
+      - name: bess_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "5m"
+                row_count: 288            # 24 hours
+                seed: 42
+              entities:
+                names: [BESS_Module_01, BESS_Module_02]
+              columns:
+                - name: module_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Current: positive = charge, negative = discharge
+                - name: current_a
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 0.0
+                    min: -30.0
+                    max: 30.0
+                    volatility: 2.0
+                    mean_reversion: 0.05
+                    precision: 1
+
+                - name: voltage_v
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 400.0
+                    min: 360.0
+                    max: 420.0
+                    volatility: 1.0
+                    mean_reversion: 0.1
+                    precision: 1
+
+                # SOC via Coulomb counting — 100Ah capacity, 5min interval
+                # SOC[t] = SOC[t-1] + I × (5/60) / 100 × 100%
+                # Clamped to 5–95% (battery protection)
+                - name: soc_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      round(max(5, min(95,
+                      prev('soc_pct', 50)
+                      + current_a * 5.0 / 60.0 / 100.0 * 100)), 1)
+
+                - name: power_kw
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(current_a * voltage_v / 1000.0, 2)"
+
+                - name: cycle_state
+                  data_type: string
+                  generator:
+                    type: derived
+                    expression: "'charging' if current_a > 1 else 'discharging' if current_a < -1 else 'idle'"
+
+                - name: cell_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 25.0
+                    min: 15.0
+                    max: 45.0
+                    volatility: 0.3
+                    mean_reversion: 0.1
+                    precision: 1
+
+              # Daily peak shaving — force discharge during utility peak (4–8 PM)
+              scheduled_events:
+                - type: forced_value
+                  entity: null
+                  column: current_a
+                  value: -25
+                  start_time: "2026-03-01T16:00:00Z"
+                  recurrence: "1d"
+                  duration: "4h"
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/bess_storage.parquet
+          mode: append

@@ -224,6 +224,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/29_icu_vitals.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/29_icu_vitals.yaml) | [`datalake/29_icu_vitals.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/29_icu_vitals.yaml)
+
 !!! example "What the output looks like"
     This config generates **11,520 rows** (2,880 timesteps x 4 patients). Here's a snapshot of Patient_Bed_03's deterioration - notice how heart rate climbs and SpO2 drops over the day, then the cardiac episode hits at 14:00:
 
@@ -237,6 +240,15 @@ pipelines:
     | Patient_Bed_01  | 2026-03-10 14:00:00  | 74             | 119                | 80                 | 97       | 16               | 37.0          | NORMAL         |
 
     The key thing to notice: Patient_Bed_03's heart rate climbs from 85 to 118 bpm over 10 hours, hitting WARNING. Then the scheduled cardiac episode forces it to 155 bpm at 14:00 - CRITICAL. Meanwhile, Patient_Bed_01 is sitting at 74 bpm, completely fine. This is exactly the needle-in-a-haystack problem that clinical early warning systems are designed to solve.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='bed_id'`
+
+    **X-axis:** timestamp | **Y-axis:** heart_rate_bpm | **Color/facet:** bed_id
+
+    **Expected visual shape:** Three stable patients (Beds 01, 02, 04) hover around 75 bpm with gentle random walk variation — flat, boring lines (which is good in an ICU). Patient_Bed_03 starts at 85 bpm and trends UPWARD over the day due to `trend: 0.02`, crossing into WARNING territory (~120 bpm) around hour 10. At 14:00, the forced cardiac episode spikes HR to exactly 155 bpm for 15 minutes — a sharp rectangular pulse. `spo2_pct` shows the mirror image: Bed_03 trends DOWN while others stay flat at ~97%.
+
+    **Verification check:** Patient_Bed_03's heart rate at hour 10 should be ~85 + (0.02 × 1200 timesteps) ≈ 109 bpm. The `critical_alert` column should show "CRITICAL" only during the 14:00-14:15 cardiac episode (HR > 150). Stable patients should almost never trigger WARNING or CRITICAL.
 
 **What makes this realistic:**
 
@@ -503,6 +515,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/30_pharma_batch.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/30_pharma_batch.yaml) | [`datalake/30_pharma_batch.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/30_pharma_batch.yaml)
+
 !!! example "What the output looks like"
     This config generates **192 rows** (96 timesteps x 2 batches). Here's a snapshot of one batch across the three phases - notice how cell count grows exponentially during the growth phase, and temperature drops to 4C at harvest:
 
@@ -516,6 +531,15 @@ pipelines:
     | Batch_2026_001 | 2026-03-10 07:55:00  | 96           | harvest      | 4.0            | 7.20 | 65.8             | 80            | 2.12                 | 4.2       | in_spec      |
 
     The key thing to notice: viable cells grow from 0.5M to over 2M during the 8-hour window. Temperature is rock-solid at 37C during inoculation and growth (PID control), then drops to exactly 4C at harvest (forced value). Agitation jumps from 150 to 250 RPM when growth phase starts, then drops to 80 at harvest. This is exactly what a real batch record looks like in a manufacturing execution system (MES).
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with phase transitions marked as vertical lines
+
+    **X-axis:** timestamp | **Y-axis:** viable_cells_million | **Secondary Y-axis:** reactor_temp_c
+
+    **Expected visual shape:** `viable_cells_million` shows a classic **exponential growth curve** — starting flat near 0.5M, then curving upward as the population compounds. The growth rate is ~0.8-1.2% per 5-minute interval, so the curve accelerates visibly over the 8-hour window. Step changes in `agitation_rpm` (150→250→80) and `reactor_temp_c` (37→37→4°C) mark the phase transitions: inoculation, growth, harvest. The temperature drop to 4°C at harvest is a dramatic cliff.
+
+    **Verification check:** Viable cells should be monotonically increasing (cells don't un-grow). Temperature should be exactly 4.0°C during the harvest phase (forced value). `quality_flag` should show "in_spec" for the vast majority of rows — "out_of_spec" only when pH or temp drifts beyond GMP limits.
 
 **What makes this realistic:**
 

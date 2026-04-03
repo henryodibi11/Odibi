@@ -1,0 +1,85 @@
+project: order_stream
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: orders
+    nodes:
+      - name: daily_orders
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                end_time: "2026-03-02T00:00:00Z"    # 1 day per run
+                timestep: "2m"
+                seed: 42
+              entities:
+                names: [web, mobile, store, partner]
+              columns:
+                - name: order_id
+                  data_type: int
+                  generator: {type: sequential, start: 100001}
+                - name: source
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: customer_id
+                  data_type: string
+                  generator: {type: uuid, version: 4}
+
+                - name: amount
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 5.00
+                    max: 500.00
+                    distribution: normal
+                    mean: 65.00
+                    std_dev: 45.00
+
+                - name: status
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [completed, pending, cancelled, refunded]
+                    weights: [0.82, 0.10, 0.05, 0.03]
+
+                - name: payment_method
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [credit_card, debit_card, paypal, apple_pay, bank_transfer]
+                    weights: [0.40, 0.25, 0.15, 0.12, 0.08]
+
+                # Derived tier based on amount thresholds
+                - name: order_tier
+                  data_type: string
+                  generator:
+                    type: derived
+                    expression: >
+                      'platinum' if amount > 300
+                      else 'gold' if amount > 150
+                      else 'silver' if amount > 50
+                      else 'bronze'
+
+        write:
+          connection: output
+          format: parquet
+          path: bronze/orders.parquet
+          mode: overwrite

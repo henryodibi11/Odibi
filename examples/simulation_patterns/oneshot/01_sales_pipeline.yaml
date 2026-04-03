@@ -1,0 +1,119 @@
+project: sales_pipeline
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: sales
+    nodes:
+      # ── Bronze: Simulated source ──────────────────────────
+      - name: raw_orders
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-01-01T00:00:00Z"
+                timestep: "1h"
+                row_count: 720        # 30 days of hourly data
+                seed: 42
+              entities:
+                count: 1
+                id_prefix: "source_"
+              columns:
+                - name: order_id
+                  data_type: int
+                  generator: {type: sequential, start: 10001}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: customer_id
+                  data_type: string
+                  generator: {type: uuid, version: 4}
+                - name: product
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [Widget_A, Widget_B, Gadget_X, Premium_Z]
+                    weights: [0.40, 0.30, 0.20, 0.10]
+                - name: quantity
+                  data_type: int
+                  generator: {type: range, min: 1, max: 20}
+                - name: unit_price
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 9.99
+                    max: 149.99
+                    distribution: normal
+                    mean: 45.00
+                    std_dev: 25.00
+        write:
+          connection: output
+          format: parquet
+          path: bronze/orders.parquet
+          mode: overwrite
+
+      # ── Silver: Transform (unchanged when bronze goes live) ──
+      - name: clean_orders
+        read:
+          connection: output
+          format: parquet
+          path: bronze/orders.parquet
+        transform:
+          steps:
+            - operation: derive_columns
+              params:
+                derivations:
+                  line_total: "quantity * unit_price"
+                  order_tier: >
+                    CASE
+                      WHEN quantity * unit_price > 500 THEN 'high'
+                      WHEN quantity * unit_price > 100 THEN 'medium'
+                      ELSE 'low'
+                    END
+        validation:
+          mode: warn
+          tests:
+            - type: not_null
+              columns: [order_id, timestamp, customer_id]
+            - type: range
+              column: unit_price
+              min: 0.0
+              max: 1000.0
+        write:
+          connection: output
+          format: parquet
+          path: silver/orders.parquet
+          mode: overwrite
+
+      # ── Gold: Aggregation (unchanged when bronze goes live) ──
+      - name: daily_summary
+        read:
+          connection: output
+          format: parquet
+          path: silver/orders.parquet
+        transform:
+          steps:
+            - operation: aggregate
+              params:
+                group_by: [product]
+                aggregations:
+                  line_total: "sum"
+                  order_id: "count"
+        write:
+          connection: output
+          format: parquet
+          path: gold/daily_product_summary.parquet
+          mode: overwrite

@@ -203,6 +203,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/26_weather_stations.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/26_weather_stations.yaml) | [`datalake/26_weather_stations.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/26_weather_stations.yaml)
+
 !!! example "What the output looks like"
     This config generates **960 rows** (96 timesteps x 10 stations). Here's a snapshot showing three stations at the same moment - notice how each station has different conditions because they're at different geographic positions:
 
@@ -215,6 +218,15 @@ pipelines:
     | wx_01      | 2026-03-10 12:00:00  | 40.23    | -74.12    | 19.8          | 59.2         | 4.1            | 55                 | 1014.1                  | true             | 25.7         |
 
     The key things to notice: at timestep zero, all stations share the same starting temperature (18.0 C) and pressure (1013.3 hPa) but have different lat/lon, humidity, wind direction, and heat index. As time progresses, each station's random walk diverges independently - by hour 6, wx_01 has cooled to 16.4 C while its pressure drifted slightly down. By noon, temperature has risen to 19.8 C and it's raining. The heat index tracks the temperature-humidity interaction - higher humidity at wx_02 produces a higher "feels like" than wx_03 at the same air temperature.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='station_id'` or `px.scatter_mapbox` for spatial view
+
+    **X-axis:** timestamp | **Y-axis:** temperature_c | **Color/facet:** station_id
+
+    **Expected visual shape:** Ten random walk lines that all START at the same value (18.0°C) but diverge over time as each station's walk takes its own path. By hour 12, stations may differ by 5-10°C. A scatter plot on a map (using latitude/longitude) colored by temperature shows spatial patterns — coastal stations may differ from inland ones. `barometric_pressure_hpa` should show the least variation of all variables (tightest mean reversion at 0.15).
+
+    **Verification check:** All stations start at 18.0°C at t=0. Pressure should stay within 990-1040 hPa with very little variation. ~15% of readings should have `is_precipitating=True`. Heat index should always be ≥ temperature (humidity adds to perceived heat).
 
 **What makes this realistic:**
 
@@ -461,6 +473,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/27_air_quality.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/27_air_quality.yaml) | [`datalake/27_air_quality.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/27_air_quality.yaml)
+
 !!! example "What the output looks like"
     This config generates **672 rows** (168 timesteps x 4 stations). Here's a snapshot comparing all four stations at the start and end of the week - notice how the `trend` parameter causes PM2.5 to drift upward, especially at the industrial site:
 
@@ -476,6 +491,15 @@ pipelines:
     | AQM_Highway    | 2026-03-16 23:00:00  | 17.1       | 32.5       | 27.9      | 2.87   | 29.4    | 71   | moderate             |
 
     The story is in the comparison. At the start of the week, the downtown and suburban sites are both at 12.0 ug/m3 for PM2.5 - right at the EPA annual standard. The industrial site starts at 35.0 ug/m3, already above the 24-hour standard. By the end of the week, the trend has pushed the industrial site to 48.2 ug/m3 - deep into "moderate" AQI territory and approaching "unhealthy for sensitive groups." The highway site doesn't have the worst PM2.5, but its CO levels (3.12 ppm) push its AQI to 78 via the `CO * 25` term in the AQI formula. That's the entity_override doing its job - same pollutant, different source profile, different health story.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='station_id'`
+
+    **X-axis:** timestamp | **Y-axis:** pollutant concentration (PM2.5 or AQI) | **Color/facet:** station_id
+
+    **Expected visual shape:** Random walk lines with a visible upward DRIFT over the simulation period — this is the `trend` parameter creating a slow, steady increase that represents seasonal pollution buildup. The trend is subtle per-timestep but clearly visible over the full duration. Without trend, the lines would stay centered; with trend, they gradually creep upward.
+
+    **Verification check:** Compare the mean pollutant value in the first hour vs. the last hour — the last hour should be measurably higher. The trend per timestep × total timesteps gives the approximate total drift.
 
 **What makes this realistic:**
 
@@ -754,6 +778,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/28_greenhouse.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/28_greenhouse.yaml) | [`datalake/28_greenhouse.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/28_greenhouse.yaml)
+
 !!! example "What the output looks like"
     This config generates **576 rows** (288 timesteps x 2 zones). Here's a snapshot showing the day-to-night transition - watch the PID controller respond to the setpoint change and solar load dropping to zero:
 
@@ -767,6 +794,15 @@ pipelines:
     | GH_Zone_01 | 2026-03-11 06:00:00  | 25.0            | 14.8           | 0            | 17.9          | 0.0               | 79.2         | 55.1              | 0          | 0.34    |
 
     The drama happens at 8 PM. The setpoint drops from 25 C to 18 C and solar load goes to zero. Look at what the PID controller does: vent_position jumps to 82.3% - the controller is opening the vents wide to dump heat. The greenhouse is at 23.1 C but needs to get to 18.0 C. Over the next few hours, actual temperature drops from 23.1 to 18.3 C as the thermal mass slowly releases heat. By 11 PM, the controller has backed off to 12.1% - just barely cracked open, because the greenhouse is now close to setpoint and ambient (15.2 C) is below setpoint, so the controller is actually trying to *retain* heat. VPD drops from 1.13 kPa (healthy transpiration) to 0.39 kPa (approaching condensation risk) as temperature falls and humidity rises. That VPD trajectory is exactly what real growers watch overnight to decide whether to run dehumidification.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` overlaying `actual_temp_c` and `temp_setpoint_c`
+
+    **X-axis:** timestamp | **Y-axis:** temperature (°C) | **Secondary Y-axis:** vent_position_pct
+
+    **Expected visual shape:** The setpoint line is flat at 25°C during the day, then steps down to 18°C at 20:00 (night mode), stepping back to 25°C at 06:00. The actual temperature tracks the setpoint but with thermal lag — it takes ~30-60 minutes (several time constants) to reach each new setpoint. `vent_position_pct` spikes when temperature is above setpoint (controller opens vents to cool) and drops when temperature is below (controller closes vents to retain heat). `solar_load_w` drops to 0 at 20:00 (night). `vpd_kpa` should hover in the 0.8-1.2 kPa sweet spot during the day.
+
+    **Verification check:** Temperature should approach setpoint within ~5 time constants. Vents should be MORE open when temp > setpoint (reverse-acting PID with negative gains). VPD = 0 would mean 100% humidity (bad); VPD > 1.5 means too dry. Solar load = 0 during 20:00-06:00.
 
 **What makes this realistic:**
 

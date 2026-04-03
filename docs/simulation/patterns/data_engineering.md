@@ -135,6 +135,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/36_late_data.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/36_late_data.yaml) | [`datalake/36_late_data.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/36_late_data.yaml)
+
 !!! example "What the output looks like"
     This config generates **~1,483 rows** (1,440 base rows + ~43 duplicates from the 3% duplicate rate). Here's a snapshot showing normal data, an outlier, and a duplicate side by side:
 
@@ -148,6 +151,15 @@ pipelines:
     | source_0  | 2026-03-01 00:04:00  | **5**      | 51.02        | good         | historian_01  | batch_a     |
 
     The key things to notice: record 4 has a `sensor_value` of 247.15 - that's an outlier injected by chaos (the sensor was walking around 50, then jumped to 5x normal). Record 5 appears twice - same `record_id`, same timestamp, same values - that's a duplicate from retransmission. And record 3 has a `suspect` quality code even though its value looks fine. Your pipeline needs to handle all three cases.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` of `sensor_value` over time, with outliers highlighted
+
+    **X-axis:** timestamp | **Y-axis:** sensor_value | **Color/facet:** quality_code
+
+    **Expected visual shape:** A random walk line meandering between 0-100, with dramatic vertical spikes where outliers were injected (5× normal values, so spikes to 250+). Duplicate points appear as overlapping markers at the same timestamp — zoom in to see them. Coloring by `quality_code` shows the 85% "good" (blue), 8% "suspect" (yellow), 5% "bad" (red), and 2% "missing" (gray) distribution. A histogram of quality_code shows the expected proportions.
+
+    **Verification check:** Total rows should be ~1,483 (1,440 base + ~43 duplicates at 3%). Outliers should be ~72 rows (5% of 1,440). Duplicates have identical record_id and timestamp. The random walk between outliers should look like a normal process variable (no systematic bias).
 
 **What makes this realistic:**
 
@@ -388,6 +400,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/37_schema_evolution.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/37_schema_evolution.yaml) | [`datalake/37_schema_evolution.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/37_schema_evolution.yaml)
+
 !!! example "What the output looks like"
     The bronze node generates **288 rows** with source-system column names. The silver node transforms them into business-friendly names with derived fields. Here's a side-by-side comparison:
 
@@ -408,6 +423,13 @@ pipelines:
     | source_0  | 2026-03-01 00:10:00  | 49.87          | 44.91           | 1           | type_a   | 4.96   | warn         |
 
     The key things to notice: `measurement_a` became `sensor_reading`, `measurement_b` became `reference_value`, and two new columns appeared - `delta` (the difference) and `status_label` (human-readable status). The original `status_code` and `category` pass through unchanged. This is the bronze-to-silver contract in action.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** Not primarily a visual pattern — this tests schema transformation logic.
+
+    **Expected visual shape:** The value is in comparing bronze vs. silver schemas. Bronze has `measurement_a`, `measurement_b`, `status_code`. Silver has `sensor_reading`, `reference_value`, `delta`, `status_label`. The `delta` column (measurement_a − measurement_b) creates a new signal that fluctuates around zero. Validation catches any rows where the transform produced nulls or out-of-range values.
+
+    **Verification check:** Silver should have MORE columns than bronze (derived fields added). `delta` should equal `sensor_reading - reference_value` exactly. All `not_null` validation tests should pass on the silver output. Quarantine table should be empty if no chaos was injected.
 
 **What makes this realistic:**
 
@@ -713,6 +735,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/38_multi_source_merge.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/38_multi_source_merge.yaml) | [`datalake/38_multi_source_merge.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/38_multi_source_merge.yaml)
+
 !!! example "What the output looks like"
     This pipeline generates **three separate bronze tables** with completely different schemas. Here's a snapshot from each at roughly the same moment:
 
@@ -741,6 +766,15 @@ pipelines:
     | scada_0   | 2026-03-01 00:02:00  | FT_301   | 48.77     | uncertain |
 
     The key thing to notice: these three tables share only `timestamp` as a join key. The ERP row at 00:00 corresponds to MES rows at 00:00, 00:05, and 00:10 (3 records in the same 15-minute window) and SCADA rows at 00:00 through 00:14 (15 records). Your silver-layer join has to handle this 1:3:15 fan-out without duplicating ERP data or losing SCADA resolution.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.bar` comparing row counts across the three bronze tables
+
+    **X-axis:** source system (ERP, MES, SCADA) | **Y-axis:** row count
+
+    **Expected visual shape:** Three bars at dramatically different heights — ERP with 96 rows (15-min cadence), MES with 288 rows (5-min cadence), and SCADA with 1,440 rows (1-min cadence). This 1:3:15 ratio is the core challenge of the pattern. A timeline visualization would show ERP as sparse dots, MES as moderate dots, and SCADA as dense dots — highlighting the cadence mismatch that makes temporal joins tricky.
+
+    **Verification check:** ERP rows = 96, MES rows = 288, SCADA rows = 1,440. All three share the same 24-hour time window. Different seeds (42, 43, 44) ensure no accidental correlation between sources.
 
 **What makes this realistic:**
 

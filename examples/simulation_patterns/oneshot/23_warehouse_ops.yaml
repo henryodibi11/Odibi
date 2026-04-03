@@ -1,0 +1,173 @@
+project: warehouse_ops
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  # ── Pipeline 1: Receiving Dock ──────────────────────────
+  - pipeline: receiving
+    nodes:
+      - name: receiving_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T06:00:00Z"
+                timestep: "15m"
+                row_count: 64             # 16 hours (6am–10pm)
+                seed: 42
+              entities:
+                count: 1
+                id_prefix: "dock_"
+              columns:
+                - name: dock_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: po_number
+                  data_type: int
+                  generator: {type: sequential, start: 50001}
+                - name: sku
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [SKU_A, SKU_B, SKU_C, SKU_D, SKU_E]
+                    weights: [0.30, 0.25, 0.20, 0.15, 0.10]
+                - name: quantity_received
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 10
+                    max: 500
+                    distribution: normal
+                    mean: 100
+                    std_dev: 50
+                - name: condition
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [good, damaged, partial]
+                    weights: [0.92, 0.05, 0.03]
+        write:
+          connection: output
+          format: parquet
+          path: bronze/warehouse_receiving.parquet
+          mode: overwrite
+
+  # ── Pipeline 2: Order Picking ──────────────────────────
+  - pipeline: picks
+    nodes:
+      - name: pick_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T06:00:00Z"
+                timestep: "5m"
+                row_count: 192            # 16 hours
+                seed: 43
+              entities:
+                names: [picker_A, picker_B, picker_C]
+              columns:
+                - name: picker_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: order_number
+                  data_type: int
+                  generator: {type: sequential, start: 80001}
+                - name: sku
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [SKU_A, SKU_B, SKU_C, SKU_D, SKU_E]
+                    weights: [0.30, 0.25, 0.20, 0.15, 0.10]
+                - name: quantity_picked
+                  data_type: int
+                  generator: {type: range, min: 1, max: 50}
+                - name: pick_time_sec
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 15.0
+                    max: 120.0
+                    distribution: normal
+                    mean: 45.0
+                    std_dev: 15.0
+                - name: pick_accuracy
+                  data_type: boolean
+                  generator: {type: boolean, true_probability: 0.98}
+        write:
+          connection: output
+          format: parquet
+          path: bronze/warehouse_picks.parquet
+          mode: overwrite
+
+  # ── Pipeline 3: Shipping ──────────────────────────
+  - pipeline: shipping
+    nodes:
+      - name: shipping_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T06:00:00Z"
+                timestep: "1h"
+                row_count: 16             # 16 hours
+                seed: 44
+              entities:
+                count: 1
+                id_prefix: "bay_"
+              columns:
+                - name: bay_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: shipment_id
+                  data_type: string
+                  generator: {type: uuid, version: 4}
+                - name: carrier
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [FedEx, UPS, USPS, LTL_Freight]
+                    weights: [0.35, 0.30, 0.20, 0.15]
+                - name: packages
+                  data_type: int
+                  generator: {type: range, min: 1, max: 50}
+                - name: weight_kg
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 2.0
+                    max: 200.0
+                    distribution: normal
+                    mean: 25.0
+                    std_dev: 20.0
+        write:
+          connection: output
+          format: parquet
+          path: bronze/warehouse_shipping.parquet
+          mode: overwrite

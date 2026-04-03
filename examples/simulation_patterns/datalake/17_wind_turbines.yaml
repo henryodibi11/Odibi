@@ -1,0 +1,128 @@
+project: wind_turbine_fleet
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: wind
+    nodes:
+      - name: turbine_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "10m"
+                row_count: 144            # 24 hours
+                seed: 42
+              entities:
+                names: [Turbine_N01, Turbine_N02, Turbine_S01, Turbine_S02, Turbine_S03]
+              columns:
+                - name: turbine_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Physical location — Southern California wind farm
+                - name: location
+                  data_type: string
+                  generator:
+                    type: geo
+                    bbox: [34.0, -118.5, 34.1, -118.4]
+                    format: tuple
+
+                # Wind speed — southern cluster is windier (ridge effect)
+                - name: wind_speed_mps
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 8.0
+                    min: 0.0
+                    max: 30.0
+                    volatility: 0.8
+                    mean_reversion: 0.08
+                    precision: 1
+                  entity_overrides:
+                    Turbine_S01:
+                      type: random_walk
+                      start: 12.0
+                      min: 2.0
+                      max: 35.0
+                      volatility: 1.0
+                      mean_reversion: 0.06
+                      precision: 1
+                    Turbine_S02:
+                      type: random_walk
+                      start: 12.0
+                      min: 2.0
+                      max: 35.0
+                      volatility: 1.0
+                      mean_reversion: 0.06
+                      precision: 1
+                    Turbine_S03:
+                      type: random_walk
+                      start: 12.0
+                      min: 2.0
+                      max: 35.0
+                      volatility: 1.0
+                      mean_reversion: 0.06
+                      precision: 1
+
+                - name: wind_direction_deg
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 0.0
+                    max: 360.0
+
+                # Cubic power curve: cut-in 3 m/s, rated at 12 m/s (2MW)
+                - name: power_kw
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      round(0 if wind_speed_mps < 3
+                      else (2000 if wind_speed_mps > 25
+                      else 2000 * min(1.0, (wind_speed_mps / 12.0) ** 3)), 1)
+
+                - name: rotor_rpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      round(0 if wind_speed_mps < 3
+                      else min(15.0, wind_speed_mps * 1.2), 1)
+
+                - name: nacelle_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 35.0
+                    min: 20.0
+                    max: 65.0
+                    volatility: 0.5
+                    mean_reversion: 0.1
+                    precision: 1
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/wind_turbines.parquet
+          mode: append

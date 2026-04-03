@@ -168,6 +168,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/21_packaging_spc.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/21_packaging_spc.yaml) | [`datalake/21_packaging_spc.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/21_packaging_spc.yaml)
+
 !!! example "What the output looks like"
     This config generates **480 rows** (one per minute for an 8-hour shift). Here's a snapshot showing the line running normally and then a chaos outlier at 06:03:
 
@@ -180,6 +183,15 @@ pipelines:
     | Line_01 | 2026-03-10 06:04:00  | 500.08        | 3.02              | -0.07             | 60.5             | false       |
 
     Row 4 is the interesting one. Fill weight dropped to 496.31g (below the 497g reject threshold) and the label drifted to 0.91mm (beyond the 0.8mm tolerance). The `reject_flag` fires, and the validation engine quarantines this row. In production, this is the package that gets kicked off the line by the rejection mechanism.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with horizontal reference lines for UCL/LCL
+
+    **X-axis:** timestamp | **Y-axis:** fill_weight_g
+
+    **Expected visual shape:** A classic X-bar control chart — points clustered tightly around 500g (the target), with the upper control limit at 503.6g and lower control limit at 496.4g drawn as horizontal dashed lines. Most points fall within the limits. Chaos outliers (about 4 per shift) appear as sharp spikes that punch through the control limits. Points where `reject_flag=True` can be highlighted in red — these are the packages that got kicked off the line.
+
+    **Verification check:** ~99.7% of non-outlier fill weights should fall within ±3σ (496.4-503.6g). Approximately 4 outliers per 480 rows (outlier_rate × rows). The quarantine table should contain the rows that failed range validation (496-504g range).
 
 **What makes this realistic:**
 
@@ -373,6 +385,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/22_cnc_shop.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/22_cnc_shop.yaml) | [`datalake/22_cnc_shop.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/22_cnc_shop.yaml)
+
 !!! example "What the output looks like"
     This config generates **1,440 rows** (480 per machine x 3 machines), minus the 45 missing rows from CNC_Mill_02's downtime. Here's a snapshot showing the three machines at the same timestamp, plus the gap where Mill_02 goes dark:
 
@@ -386,6 +401,15 @@ pipelines:
     | CNC_Mill_02   | 2026-03-10 10:15:00  | 3045              | 205              | 16.1          | 211        | 0.83              | false              |
 
     Notice the gap: CNC_Mill_02 simply has no rows between 09:30 and 10:14. The part_count jumps from 210 to 211 because the sequential counter doesn't know about the gap - that's the telltale sign of unplanned downtime in real MES data.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='machine_id'`
+
+    **X-axis:** timestamp | **Y-axis:** tool_wear_pct | **Color/facet:** machine_id
+
+    **Expected visual shape:** Upward-trending lines for each machine — tool wear increases with each part cut. `surface_finish_ra` correlates with wear (rougher finish as tool degrades). The critical feature: `CNC_Mill_02` has a **gap** in the timeline from 09:30 to ~10:15 — no rows exist during the downtime event. This is missing data, not null values. The x-axis will show a visible break if plotted with connected lines.
+
+    **Verification check:** CNC_Mill_02 should have ~45 fewer rows than the other machines (45 minutes of downtime ÷ 1 min/row). Tool wear should trend upward but never exceed 100%. The downtime gap should produce missing rows, not rows with null values.
 
 **What makes this realistic:**
 
@@ -650,6 +674,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/23_warehouse_ops.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/23_warehouse_ops.yaml) | [`datalake/23_warehouse_ops.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/23_warehouse_ops.yaml)
+
 !!! example "What the output looks like"
     This config generates three separate tables. Here's a snapshot from each:
 
@@ -879,6 +906,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/24_cold_chain.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/24_cold_chain.yaml) | [`datalake/24_cold_chain.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/24_cold_chain.yaml)
+
 !!! example "What the output looks like"
     This config generates **1,152 rows** (288 timesteps x 4 entities). Here's a snapshot comparing a truck and a warehouse zone at the same time, plus the loading dock event:
 
@@ -892,6 +922,15 @@ pipelines:
     | Truck_02         | 2026-03-10 14:30:00  | 5.1           | 90.4         | false     | true           | truck_02_0@coldfresh.example.com   | warning     |
 
     Notice the loading dock event: Truck_02's doors are forced open at 14:00, temperature climbs through 5C by 14:15 (triggering the excursion flag and a "warning" alert), and starts recovering once the doors close at 14:30. The email addresses are auto-generated per entity - ready for alert routing.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='unit_id'` and horizontal threshold line at 5°C
+
+    **X-axis:** timestamp | **Y-axis:** temperature_c | **Color/facet:** unit_id
+
+    **Expected visual shape:** Warehouse zones (Zone_A, Zone_B) show tight, stable traces hovering near 2°C — rarely touching the 5°C excursion line. Truck_01 (high volatility) shows a more erratic trace that frequently approaches or crosses the 5°C threshold. Truck_02 shows a clear temperature spike during the 14:00-14:30 loading dock event — doors open, temperature climbs above 5°C, then recovers after doors close. The `alert_level` column transitions from "normal" → "warning" → back to "normal" during this event.
+
+    **Verification check:** Warehouse temps should rarely exceed 5°C. Truck_01 should have MORE excursions than any other entity. Truck_02 should show exactly one predictable excursion during 14:00-14:30. The `temp_excursion` boolean should be true whenever `temperature_c > 5.0`.
 
 **What makes this realistic:**
 
@@ -1097,6 +1136,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/25_assembly_line.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/25_assembly_line.yaml) | [`datalake/25_assembly_line.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/25_assembly_line.yaml)
+
 !!! example "What the output looks like"
     This config generates **384 rows** (96 timesteps x 4 stations). Here's a snapshot at one timestep across all four stations - notice how parts decrease through the line:
 
@@ -1108,6 +1150,15 @@ pipelines:
     | Station_4_QC       | 2026-03-10 06:00:00  | 9        | 54.1           | 8         | 8                 | 0.111      |
 
     The cascade is visible in one row: 12 parts enter Weld, 11 survive to Paint, 10 to Assembly, 9 to QC, 8 exit as finished goods. That's a 33% total yield loss across four stations. By mid-shift, cumulative output tells a clearer story - Station 1 might show 500 cumulative parts while Station 4 shows only 380, and the gap is entirely explained by the paint station bottleneck and cumulative scrap.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='station_id'`
+
+    **X-axis:** timestamp | **Y-axis:** cumulative_output | **Color/facet:** station_id
+
+    **Expected visual shape:** Four ascending curves where each downstream station's curve is BELOW the upstream station's curve. Station_1 (Weld) is the highest line. Station_2 (Paint — the bottleneck) lags behind, and the gap between them GROWS over the shift (parts pile up waiting for paint). Station_3 (Assembly) tracks very close to Station_2 because it can only work on what Paint sends. Station_4 (QC) is the lowest, trailing by the QC scrap rate.
+
+    **Verification check:** The gap between Station_1 and Station_2 should widen over time (bottleneck accumulation). Station_3 cumulative should never exceed Station_2 (can't assemble parts that haven't been painted). This is the Theory of Constraints visualized.
 
 **What makes this realistic:**
 

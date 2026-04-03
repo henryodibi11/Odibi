@@ -1,0 +1,203 @@
+project: multi_source_merge
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: bronze_sources
+    nodes:
+      # ── Source 1: ERP system (orders, 15-minute cadence) ──
+      - name: source_erp
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "15m"
+                row_count: 96              # 24 hours
+                seed: 42
+              entities:
+                count: 1
+                id_prefix: "erp_"
+              columns:
+                - name: source_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: order_id
+                  data_type: int
+                  generator:
+                    type: sequential
+                    start: 5001
+                    step: 1
+
+                - name: product_code
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [PROD_A, PROD_B, PROD_C]
+                    weights: [0.5, 0.3, 0.2]
+
+                - name: quantity
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 1
+                    max: 100
+
+                - name: unit_cost
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 5.0
+                    max: 50.0
+                    distribution: normal
+                    mean: 20.0
+                    std_dev: 8.0
+
+          incremental:
+            mode: stateful
+            column: timestamp
+
+        write:
+          connection: output
+          format: delta
+          path: bronze/erp_orders.parquet
+          mode: append
+
+      # ── Source 2: MES system (production events, 5-minute cadence) ──
+      - name: source_mes
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "5m"
+                row_count: 288             # 24 hours
+                seed: 43
+              entities:
+                count: 1
+                id_prefix: "mes_"
+              columns:
+                - name: source_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: work_order
+                  data_type: int
+                  generator:
+                    type: sequential
+                    start: 9001
+                    step: 1
+
+                - name: machine_id
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [M01, M02, M03, M04]
+                    weights: [0.30, 0.25, 0.25, 0.20]
+
+                - name: cycle_time_sec
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 30
+                    max: 120
+                    distribution: normal
+                    mean: 60
+                    std_dev: 15
+
+                - name: pass_fail
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [pass, fail]
+                    weights: [0.95, 0.05]
+
+          incremental:
+            mode: stateful
+            column: timestamp
+
+        write:
+          connection: output
+          format: delta
+          path: bronze/mes_production.parquet
+          mode: append
+
+      # ── Source 3: SCADA system (process tags, 1-minute cadence) ──
+      - name: source_scada
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 1440            # 24 hours
+                seed: 44
+              entities:
+                count: 1
+                id_prefix: "scada_"
+              columns:
+                - name: source_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: tag_name
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [TT_101, PT_201, FT_301, LT_401]
+                    weights: [0.25, 0.25, 0.25, 0.25]
+
+                - name: tag_value
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 50
+                    min: 0
+                    max: 100
+                    volatility: 2.0
+                    mean_reversion: 0.1
+                    precision: 2
+
+                - name: quality
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [good, bad, uncertain]
+                    weights: [0.95, 0.03, 0.02]
+
+          incremental:
+            mode: stateful
+            column: timestamp
+
+        write:
+          connection: output
+          format: delta
+          path: bronze/scada_readings.parquet
+          mode: append

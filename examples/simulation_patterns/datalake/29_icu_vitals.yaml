@@ -1,0 +1,153 @@
+project: icu_monitoring
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: icu_vitals
+    nodes:
+      - name: vitals_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "30s"
+                row_count: 2880           # 24 hours
+                seed: 42
+              entities:
+                names: [Patient_Bed_01, Patient_Bed_02, Patient_Bed_03, Patient_Bed_04]
+              columns:
+                - name: bed_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Heart rate — normal ~75 bpm
+                - name: heart_rate_bpm
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 75
+                    min: 40
+                    max: 180
+                    volatility: 1.5
+                    mean_reversion: 0.1
+                    precision: 0
+                  entity_overrides:
+                    Patient_Bed_03:        # Deteriorating — HR trending up
+                      type: random_walk
+                      start: 85
+                      min: 40
+                      max: 180
+                      volatility: 2.0
+                      mean_reversion: 0.05
+                      trend: 0.02
+                      precision: 0
+
+                # Systolic blood pressure
+                - name: blood_pressure_sys
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 120
+                    min: 70
+                    max: 200
+                    volatility: 2.0
+                    mean_reversion: 0.1
+                    precision: 0
+
+                # Diastolic ~65% of systolic
+                - name: blood_pressure_dia
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(blood_pressure_sys * 0.65 + random() * 5, 0)"
+
+                # SpO2 — normal ~97%
+                - name: spo2_pct
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 97
+                    min: 80
+                    max: 100
+                    volatility: 0.3
+                    mean_reversion: 0.2
+                    precision: 0
+                  entity_overrides:
+                    Patient_Bed_03:        # Deteriorating — SpO2 drifting down
+                      type: random_walk
+                      start: 95
+                      min: 80
+                      max: 100
+                      volatility: 0.5
+                      mean_reversion: 0.2
+                      trend: -0.005
+                      precision: 0
+
+                # Respiratory rate — normal ~16 breaths/min
+                - name: respiratory_rate
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 12
+                    max: 24
+                    distribution: normal
+                    mean: 16
+                    std_dev: 2
+
+                # Body temperature
+                - name: temperature_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 37.0
+                    min: 35.5
+                    max: 40.0
+                    volatility: 0.05
+                    mean_reversion: 0.15
+                    precision: 1
+
+                # Clinical alert based on MEWS-style thresholds
+                - name: critical_alert
+                  data_type: string
+                  generator:
+                    type: derived
+                    expression: "'CRITICAL' if heart_rate_bpm > 150 or heart_rate_bpm < 45 or spo2_pct < 88 or blood_pressure_sys > 180 or blood_pressure_sys < 80 else 'WARNING' if heart_rate_bpm > 120 or spo2_pct < 92 or blood_pressure_sys > 160 else 'NORMAL'"
+
+              # Cardiac episode — Patient_Bed_03 HR spikes to 155 for 15 minutes
+              scheduled_events:
+                - type: forced_value
+                  entity: Patient_Bed_03
+                  column: heart_rate_bpm
+                  value: 155
+                  start_time: "2026-03-10T14:00:00Z"
+                  end_time: "2026-03-10T14:15:00Z"
+
+              chaos:
+                outlier_rate: 0.002       # Sensor artifacts
+                outlier_factor: 1.5
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/icu_vitals.parquet
+          mode: append

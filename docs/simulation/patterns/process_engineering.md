@@ -62,7 +62,7 @@ flowchart LR
     - **Primary removes ~35% BOD, ~50% TSS:** Gravity settling is good at catching heavy particles but can't remove dissolved organics - that's what biology is for.
     - **Aeration removes ~85% of remaining BOD:** The biological process is the workhorse. The 0.15 multiplier in the config means only 15% of what enters the aeration basin survives - 85% is consumed by bacteria.
     - **Flow decreases 1-5% per stage:** Each stage removes some water as sludge. The 0.98, 0.95, 0.97, 0.99 multipliers reflect that the aeration basin loses the most water (5%) because biological sludge is wasted there.
-    - **DO only in aeration (0.5-4.0 mg/L):** Dissolved oxygen is only actively managed in the aeration basin. Other stages don't have aerators, so DO is essentially zero or irrelevant.
+    - **DO highest in aeration (0.5-4.0 mg/L), residual downstream:** Dissolved oxygen is only actively managed in the aeration basin where blowers inject air. Influent and Primary have essentially zero DO (anaerobic/anoxic conditions). Secondary retains ~60% of aeration's DO since the water was just aerated. Effluent retains ~80% of Secondary's DO, giving a realistic 1-2 mg/L residual at discharge — enough to support the receiving water body.
     - **Storm event at 2 AM (18.5 MGD):** Rainstorms send stormwater into combined sewers, spiking influent flow. 2 AM is realistic - storms don't wait for business hours. The surge tests whether the plant can handle hydraulic overload without washing out the biology.
 
 ```yaml
@@ -178,7 +178,7 @@ pipelines:
                       type: derived
                       expression: "Secondary.tss_mg_l * 0.80"
 
-                # DO only matters in aeration basin
+                # DO — actively managed in aeration, residual downstream
                 - name: do_mg_l
                   data_type: float
                   generator:
@@ -193,6 +193,12 @@ pipelines:
                       volatility: 0.1
                       mean_reversion: 0.2
                       precision: 2
+                    Secondary:
+                      type: derived
+                      expression: "Aeration.do_mg_l * 0.6"
+                    Effluent:
+                      type: derived
+                      expression: "Secondary.do_mg_l * 0.8"
 
                 # pH — relatively stable through treatment
                 - name: ph
@@ -224,6 +230,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/09_wastewater.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/09_wastewater.yaml) | [`datalake/09_wastewater.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/09_wastewater.yaml)
+
 !!! example "What the output looks like"
     This config generates **3,360 rows** (672 timesteps x 5 entities). Here's a snapshot of one timestep across all five stages - notice how flow decreases and BOD drops dramatically:
 
@@ -232,22 +241,32 @@ pipelines:
     | Influent  | 2026-03-01 00:00:00  | 12.00    | 218.3    | 195.7    | 0.0     | 7.12 |
     | Primary   | 2026-03-01 00:00:00  | 11.76    | 141.9    | 97.8     | 0.0     | 7.08 |
     | Aeration  | 2026-03-01 00:00:00  | 11.17    | 21.3     | 29.4     | 2.34    | 7.15 |
-    | Secondary | 2026-03-01 00:00:00  | 10.84    | 12.8     | 7.3      | 0.0     | 7.05 |
-    | Effluent  | 2026-03-01 00:00:00  | 10.73    | 10.8     | 5.9      | 0.0     | 7.09 |
+    | Secondary | 2026-03-01 00:00:00  | 10.84    | 12.8     | 7.3      | 1.40    | 7.05 |
+    | Effluent  | 2026-03-01 00:00:00  | 10.73    | 10.8     | 5.9      | 1.12    | 7.09 |
 
-    The key thing to notice: BOD drops from 218 mg/L (raw sewage) to about 11 mg/L (clean enough to discharge). That's 95% removal. Flow drops from 12.0 to 10.7 MGD because each stage pulls out sludge. And dissolved oxygen is only non-zero in the Aeration stage - exactly where the blowers are running.
+    The key thing to notice: BOD drops from 218 mg/L (raw sewage) to about 11 mg/L (clean enough to discharge). That's 95% removal. Flow drops from 12.0 to 10.7 MGD because each stage pulls out sludge. Dissolved oxygen peaks in Aeration (where the blowers run) and carries through at diminishing levels to the effluent — an operator would see that 1.12 mg/L residual DO and know the biology upstream is doing its job.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='stage_id'`
+
+    **X-axis:** timestamp | **Y-axis:** bod_mg_l | **Color/facet:** stage_id
+
+    **Expected visual shape:** Five cascading lines at progressively lower levels — Influent wanders around ~220 mg/L, Primary around ~143, Aeration drops dramatically to ~21, Secondary to ~13, and Effluent to ~11. The lines maintain their relative spacing throughout. On Day 4, the Influent `flow_mgd` shows a flat plateau at 18.5 MGD (the storm event) that propagates as a visible bump through downstream stages. DO (`do_mg_l`) shows Aeration with an active random walk (0.5-4.0), Secondary at ~60% of Aeration, Effluent at ~80% of Secondary, while Influent and Primary sit flat at 0.
+
+    **Verification check:** Effluent BOD should stay below 30 mg/L (the permit limit). Flow should decrease from Influent to Effluent (mass balance). DO should be 0 for Influent and Primary, active in Aeration, and residual in Secondary/Effluent.
 
 **What makes this realistic:**
 
 - **The cascade is the real process.** In a real plant, water physically flows from one stage to the next. The cross-entity references (`Influent.flow_mgd * 0.98`) model exactly that - what leaves one stage enters the next, minus what's removed as sludge. This is the mass balance principle: *what goes in must come out somewhere*.
 - **BOD goes from ~220 mg/L to ~5 mg/L effluent** - that's a 97% overall removal rate, which matches a well-operated activated sludge plant. If your simulated effluent BOD is above 30 mg/L, you'd be violating your discharge permit - the same concern a real operator has.
 - **The storm event at 2 AM is hydraulic stress testing.** Real plants have a design capacity (say 12 MGD average, 20 MGD peak). When a rainstorm pushes flow to 18.5 MGD, the residence time in each tank drops - water moves through faster, giving bacteria less time to do their job. BOD removal efficiency drops. This is exactly what operators worry about during wet weather.
-- **Dissolved oxygen only matters in aeration** - the other stages are either gravity settling (no aeration needed) or just conveyance. Setting DO to 0.0 everywhere except the aeration basin isn't a shortcut; it's physically accurate.
+- **Dissolved oxygen cascades downstream from aeration.** The aeration basin is where blowers actively inject air (DO 0.5-4.0 mg/L). Influent and Primary have zero DO — raw sewage is anaerobic. Secondary retains ~60% of aeration's DO because the water was just aerated, and Effluent retains ~80% of Secondary's. This gives a realistic 1-2 mg/L residual at discharge. An operator checking the effluent DO would see this and know the biology upstream is working.
 - **pH stays in a tight band (6.8-7.5)** - municipal wastewater is naturally buffered near neutral. Wild pH swings indicate industrial discharge into the sewer system, which is a different (and much harder) problem.
 
 !!! example "Try this"
     - **Add ammonia treatment:** Add an `ammonia_mg_l` column starting at 25-40 mg/L in the influent (typical municipal). Nitrification happens in the aeration basin - multiply by 0.10 for 90% removal. Ammonia is toxic to fish, so effluent limits are strict (often < 2 mg/L).
     - **Add disinfection:** Add a `chlorine_residual` column on the Effluent stage only (use `entity_overrides` with `range` generator 0.5-2.0 mg/L). Real plants chlorinate effluent to kill pathogens before discharge.
+    - **Add diurnal flow variation:** Replace the Influent `flow_mgd` random walk with a `daily_profile` generator anchored at 8 MGD overnight and 15 MGD during morning peak (6-9 AM when people shower). Real influent flow follows a predictable daily curve — the random walk captures variability but misses the time-of-day structure.
     - **Stress the storm:** Increase the storm duration to 12 hours and watch how downstream BOD removal degrades - the biology can't keep up when water rushes through too fast. This is the kind of scenario real operators drill for.
 
 !!! tip "What would you do with this data?"
@@ -473,6 +492,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/10_compressor.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/10_compressor.yaml) | [`datalake/10_compressor.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/10_compressor.yaml)
+
 !!! example "What the output looks like"
     This config generates **864 rows** (288 timesteps x 3 entities). Here's a snapshot of one timestep across all three compressors - notice how Compressor_03's vibration is already elevated:
 
@@ -483,6 +505,15 @@ pipelines:
     | Compressor_03  | 2026-03-10 00:00:00  | 452.5                 | 1195.9                  | 2.64              | 3.54           | 183.2          | 24.52       | False           |
 
     Here's what to look for: all three units have similar pressures and flow - they're doing the same job. But Compressor_03's vibration is already 3.54 mils compared to ~2.0 mils for the healthy units. By the end of the 24-hour window, you'll see Unit 03's vibration climbing toward 5.0 mils while the others stay below 3.0 mils. And watch for the occasional surge event - a row where `discharge_pressure_psig` jumps 30-50 PSI above its neighbors. Those spikes are the `shock_rate` and `shock_bias` parameters at work.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='compressor_id'`
+
+    **X-axis:** timestamp | **Y-axis:** discharge_pressure | **Color/facet:** compressor_id
+
+    **Expected visual shape:** A random walk baseline with sudden vertical spikes superimposed — these are the shock events. Shocks appear as sharp jumps that immediately recover back to the random walk baseline. The shock_bias determines whether spikes go up (positive) or down (negative). Between shocks, the signal looks like a typical random walk with mean reversion.
+
+    **Verification check:** Shocks should be visually distinct from normal random walk noise — they're sudden, large, and short-lived. The frequency of shocks should roughly match the configured `shock_rate`.
 
 **What makes this realistic:**
 
@@ -560,7 +591,7 @@ This simulation has a single entity representing one reactor:
 flowchart LR
     A["Feed\n5.0 m³/hr"] -->|"reactant in"| B["CSTR_01\nSetpoint: 85°C\nτ = 5 min"]
     B -->|"product out"| C["Product\nStream"]
-    B -->|"temp reading"| D["PID Controller\nKp=2.5 Ki=0.08 Kd=0.5"]
+    B -->|"temp reading"| D["PID Controller\nKp=-1.5 Ki=-0.05 Kd=-0.3"]
     D -->|"cooling_pct\n0-100%"| E["Cooling\nJacket"]
     E -->|"removes heat"| B
 
@@ -594,7 +625,7 @@ flowchart LR
 
 !!! info "Why these parameter values?"
     - **Setpoint 85 degrees C:** A common operating temperature for many organic reactions (esterification, polymerization). High enough to drive the reaction at a useful rate, low enough to stay well below solvent boiling points and thermal decomposition temperatures.
-    - **Kp=2.5, Ki=0.08, Kd=0.5:** Moderate tuning for a temperature loop with a 5-minute time constant. Kp=2.5 gives reasonable proportional response without being overly aggressive. Ki=0.08 is slow enough to eliminate steady-state offset without causing integral windup. Kd=0.5 provides some anticipatory action for disturbance rejection. These are realistic first-pass tuning values from Ziegler-Nichols or similar methods.
+    - **Kp=-1.5, Ki=-0.05, Kd=-0.3 (negative for reverse-acting cooling):** These are moderate tuning values for a reverse-acting temperature loop with a 5-minute time constant. The negative signs are critical — this is a cooling controller, so when temperature rises above setpoint, we need MORE cooling output (see the "Why are the PID gains negative?" callout below). |Kp|=1.5 gives reasonable proportional response without being overly aggressive. |Ki|=0.05 is slow enough to eliminate steady-state offset without causing integral windup. |Kd|=0.3 provides some anticipatory action for disturbance rejection. These are realistic first-pass tuning values for a jacketed reactor cooling loop.
     - **tau = 300s (5 minutes):** Typical for a medium-size jacketed reactor (roughly 1-5 m3 volume). Smaller reactors respond faster (tau < 60s), larger reactors slower (tau > 600s). The 5-minute time constant means temperature changes are gradual, not instantaneous - exactly how real reactors behave.
     - **Heat generation = feed_flow * 10 kW per m3/hr:** A simplified but physically reasonable model. At 5.0 m3/hr, that's 50 kW of heat generation - comparable to a moderately exothermic reaction like an esterification. Highly exothermic reactions (nitration, polymerization) can generate 10x more.
     - **Feed flow 4.0-6.0 m3/hr with disturbance to 5.8:** The normal operating range is narrow (plus or minus 20% of nominal). The ramped disturbance to 5.8 m3/hr at hour 4 (`transition: ramp`) represents a gradual upstream change - maybe a feed pump switching over or an upstream tank level controller opening a valve. Real process upsets ramp over minutes, not instantly. This 16% increase in feed flow creates a 16% increase in heat generation, which is enough to challenge the controller without being catastrophic.
@@ -720,6 +751,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/11_cstr_pid.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/11_cstr_pid.yaml) | [`datalake/11_cstr_pid.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/11_cstr_pid.yaml)
+
 !!! example "What the output looks like"
     This config generates **480 rows** (480 timesteps x 1 entity). Here's a snapshot showing the controller in action - first at steady state, then during the feed disturbance at hour 4:
 
@@ -734,6 +768,15 @@ pipelines:
     | CSTR_01    | 2026-03-10 11:30:00  | 85.0            | 5.11            | 51.1                | 50.2        | 85.1           | -0.1         | false           |
 
     The story unfolds in the data: during normal operation (06:00-10:00), temperature hovers near 85 degrees C and the cooling valve sits around 48%. When the feed disturbance begins ramping at 10:00, heat generation climbs from ~50 kW toward 58 kW over 15 minutes. The PID controller reacts - you can see `cooling_pct` climbing from 52% to nearly 79% as it opens the valve to reject the extra heat. Temperature overshoots to about 87 degrees C before the controller brings it back. By 11:30, everything is settled again. That overshoot-then-recovery signature is exactly what you'd see on a real DCS trend screen.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` overlaying `reactor_temp_c` and `temp_setpoint_c`
+
+    **X-axis:** timestamp | **Y-axis:** temperature (°C) | **Secondary Y-axis:** cooling_pct
+
+    **Expected visual shape:** Two overlapping lines — the flat setpoint at 85°C and the reactor temperature hugging it closely. During normal operation (06:00-10:00), temperature oscillates within ±1°C of setpoint. At hour 4 (10:00), the feed disturbance ramps up and temperature **overshoots** to ~87°C before the controller brings it back — this overshoot-then-recovery is the classic PID response. `cooling_pct` on a secondary y-axis shows the inverse: it ramps from ~48% to ~79% during the disturbance, then settles back. `temp_error_c` oscillates around zero with a negative dip during the disturbance.
+
+    **Verification check:** Temperature should NEVER run away — if it keeps climbing past 90°C, your PID gains are wrong (probably positive instead of negative). The overshoot during the feed disturbance should be 2-5°C, not 10+°C. `high_temp_alarm` should be false for the entire simulation (unless you misconfigure the gains).
 
 **What makes this realistic:**
 
@@ -1066,6 +1109,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/12_distillation.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/12_distillation.yaml) | [`datalake/12_distillation.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/12_distillation.yaml)
+
 !!! example "What the output looks like"
     This config generates **288 rows** (288 timesteps x 1 entity). Here's a snapshot showing normal operation, then the feed composition upset hitting at hour 12:
 
@@ -1078,6 +1124,15 @@ pipelines:
     | Column_01  | 2026-03-10 15:00:00  | 74.5        | 4962            | 0.447            | 2.47         | 791              | 77.3           | 64.9            | 104.7          | 0.950           | 772               | 11.9          | false         |
 
     Watch what happens at noon: feed composition jumps from 0.443 to 0.550 (the scheduled upset forces it to the max). Overhead purity drops from 0.951 to 0.940 - the column can't separate as cleanly when it suddenly gets 22% more light component. The reboiler and condenser duties stay roughly the same because the operator hasn't adjusted them yet. By 15:00, when the upset clears, purity recovers. That purity dip during the composition upset is exactly what a column board operator would see on the DCS and start calling people about.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` overlaying `tray_10_temp_c` and `feed_temp_c`
+
+    **X-axis:** timestamp | **Y-axis:** temperature (°C) | **Color/facet:** column (tray_10 vs feed)
+
+    **Expected visual shape:** `tray_10_temp_c` tracks `feed_temp_c` via `mean_reversion_to` — like a dog on a leash. The feed temperature drifts slowly (random walk), and the tray temperature follows with a lag. `overhead_purity_frac` hovers near 0.95 with occasional dips correlated with feed composition changes. `column_dp_kpa` stays in the 8-14 kPa range; if it spikes above 16 kPa, `flooding_risk` goes true.
+
+    **Verification check:** `tray_10_temp_c` should always be between `overhead_temp_c` (~65°C) and `bottoms_temp_c` (~105°C). `condenser_duty_kw` should roughly track `reboiler_duty_kw × 0.85`. If `flooding_risk` is always true, your `column_dp_kpa` range is too high.
 
 **What makes this realistic:**
 
@@ -1349,6 +1404,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/13_cooling_tower.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/13_cooling_tower.yaml) | [`datalake/13_cooling_tower.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/13_cooling_tower.yaml)
+
 !!! example "What the output looks like"
     This config generates **2,880 rows** (1,440 timesteps x 2 entities). Here's a snapshot of both towers at the same moment - notice how CT_02's heavier load shows up across multiple columns:
 
@@ -1358,6 +1416,15 @@ pipelines:
     | CT_02    | 2026-03-10 06:00:00  | 27.3           | 29.4          | 42.8          | 2.1            | 2.8               | 13.4    | 72            | 13.90            | 3.8                    | 4.96         | 86.5           |
 
     The key things to notice: both towers share the same ambient temperature (they're at the same plant), but CT_02 has a hotter return (42.8 vs. 37.5 degrees C) because it serves a heavier process load. That higher thermal duty cascades through everything - CT_02 has a bigger range (13.4 vs. 8.7 degrees C), runs its fan harder (72% vs. 58%), and consumes more makeup water (13.9 vs. 10.2 gpm). The smooth_approach_c values differ from raw_approach_c because the EMA filter is lagging behind the instantaneous readings. This is exactly what you'd see on a real DCS screen - a jumpy raw signal and a smooth trending pen side by side.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` overlaying raw `outlet_temp_c` and `ema(outlet_temp_c)` smoothed version
+
+    **X-axis:** timestamp | **Y-axis:** temperature (°C) | **Color/facet:** raw vs smoothed
+
+    **Expected visual shape:** Two curves with the same general shape but different noise levels. The raw signal is jagged (high-frequency noise from sensor readings). The EMA-smoothed version is visibly smoother, following the trend but lagging behind sharp moves. The gap between them during a fast temperature change shows the EMA's time lag — this is the tradeoff between noise filtering and responsiveness.
+
+    **Verification check:** The EMA curve should NEVER lead the raw signal — it always lags. The smoothed curve should stay within the raw signal's envelope. If the EMA looks identical to the raw, alpha is too high (not enough smoothing).
 
 **What makes this realistic:**
 
@@ -1604,6 +1671,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/14_batch_reactor.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/14_batch_reactor.yaml) | [`datalake/14_batch_reactor.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/14_batch_reactor.yaml)
+
 !!! example "What the output looks like"
     This config generates **480 rows** (480 timesteps x 1 entity). Here's a snapshot showing key moments - the steady charging phase, the start of the reaction ramp, mid-reaction at full temperature, and the beginning of cooldown:
 
@@ -1618,6 +1688,15 @@ pipelines:
     | Reactor_01  | 2026-03-10 13:00:00  | 30.0            | 80           | cooldown    | 42.1           | 1.00         | 37.1          |
 
     Watch the temperature lag in action. At 08:05 (five minutes into the reaction phase), the setpoint is already 85.0 degrees C but the reactor has only climbed from 25.0 to about 30.8. That's the first-order dynamics at work - with dt/tau = 0.1, only 10% of the gap closes each minute. By 08:30, the reactor has reached about 56 degrees C (halfway there), and by 09:00 it's at 76 degrees C (getting close). It doesn't truly settle near 85 degrees C until around 08:40-08:50, roughly 30 minutes after the setpoint change - exactly 3 x tau. Notice how pressure stays at 1.0 bar until the reactor crosses 60 degrees C, then starts climbing. And the jacket temperature is always 5 degrees C above the reactor during heat-up (driving heat in) and 5 degrees C below during cooldown (pulling heat out).
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with vertical lines at phase transitions
+
+    **X-axis:** timestamp | **Y-axis:** reactor_temp_c | **Color/facet:** entity_id
+
+    **Expected visual shape:** A series of flat plateaus at different temperatures — each recipe phase has a different setpoint, and the reactor holds at each one. Transitions between phases show a ramp (temperature climbing or dropping) that takes several timesteps to complete (first-order dynamics). The `prev()` function creates smooth transitions rather than instant jumps. Each phase change in `scheduled_events` corresponds to a visible step in the temperature trace.
+
+    **Verification check:** Temperature should settle at each phase's setpoint within ~5 time constants (tau). If temperature oscillates wildly between phases, PID tuning is too aggressive.
 
 **What makes this realistic:**
 
@@ -1863,6 +1942,9 @@ pipelines:
           mode: overwrite
 ```
 
+!!! example "▶️ Run it"
+    Standalone YAML: [`oneshot/15_tank_farm.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/oneshot/15_tank_farm.yaml) | [`datalake/15_tank_farm.yaml`](https://github.com/henryodibi11/Odibi/blob/main/examples/simulation_patterns/datalake/15_tank_farm.yaml)
+
 !!! example "What the output looks like"
     This config generates **2,688 rows** (672 timesteps x 4 entities). Here's a snapshot of all four tanks at the same moment during normal operations:
 
@@ -1884,6 +1966,15 @@ pipelines:
     | Tank_A  | 2026-03-03 17:45:00  | 10000.0      | 50.7          | 0.0            | 8104.5    | 81.0      | False            | False           | 74.9          |
 
     See how `outflow_bbl_hr` is locked at 0.0 for the entire maintenance window? The level rises from ~5,490 bbl to ~8,100 bbl over 12 hours - roughly 600 bbl of accumulated product with nowhere to go. At 81%, it's approaching the 85% high-level alarm threshold. If the maintenance ran a few hours longer, that alarm would fire. This is exactly the scenario that API 2350 overfill protection standards are designed to prevent.
+
+!!! info "📊 What does the chart look like?"
+    **Recommended chart:** `px.line` with `color='tank_id'`
+
+    **X-axis:** timestamp | **Y-axis:** tank_level_pct | **Color/facet:** tank_id
+
+    **Expected visual shape:** Independent random-walk-like curves for each tank, but integrated via `prev()` — the level at time t equals the previous level plus inflow minus outflow. Lines should wander within the 10-90% bounds (operational limits). You'll see each tank taking its own path — some filling, some draining, occasionally hitting the min/max limits and bouncing back.
+
+    **Verification check:** Tank levels should NEVER go below 0% or above 100% (the `min`/`max` clamps). The level at any point should equal the sum of all previous inflow-outflow deltas plus the starting level. Multiple tanks should show independent trajectories.
 
 **What makes this realistic:**
 
