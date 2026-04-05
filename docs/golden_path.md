@@ -2,6 +2,8 @@
 
 Get a working Odibi pipeline in under 10 minutes. One path. No choices.
 
+> **Want to skip setup entirely?** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1jwbVARyoJTEfMDZFWUESeEqIdEAD7_HH) — run 3 cells, see your first simulation.
+
 ---
 
 ## Step 1: Install

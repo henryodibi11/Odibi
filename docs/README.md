@@ -4,7 +4,15 @@
 
 ---
 
-## ⚡ Quick Start
+## 🎯 Try Odibi in 5 Minutes (No Install Needed)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1jwbVARyoJTEfMDZFWUESeEqIdEAD7_HH)
+
+Click the badge → run 3 cells → see your first simulation. No Python install, no cloning, no setup.
+
+---
+
+## ⚡ Quick Start (Local)
 
 ```bash
 pip install odibi

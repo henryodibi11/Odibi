@@ -18,7 +18,7 @@ Odibi is a framework for building data pipelines. You describe *what* you want i
 
 ## 🎯 Try Odibi in 5 Minutes (No Install Needed)
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1y00pX3ScH95QSxq6RoKRVxyXB6QPnHLM)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1jwbVARyoJTEfMDZFWUESeEqIdEAD7_HH)
 
 Click the badge above → run 3 cells → see your first simulation. No Python install, no cloning, no setup.
 
