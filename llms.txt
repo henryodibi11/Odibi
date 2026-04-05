@@ -9,6 +9,10 @@
 For comprehensive AI context, read this file first:
 - docs/ODIBI_DEEP_CONTEXT.md (2,200+ lines covering all features)
 
+## Try It Now
+
+- **Google Colab (no install):** https://colab.research.google.com/drive/1jwbVARyoJTEfMDZFWUESeEqIdEAD7_HH
+
 ## Quick Reference
 
 - AGENTS.md - Agent-specific instructions and commands
