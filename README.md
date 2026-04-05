@@ -16,13 +16,90 @@ Odibi is a framework for building data pipelines. You describe *what* you want i
 
 ---
 
-## ⚡ Quick Start
+## 🎯 Try Odibi in 5 Minutes (No Install Needed)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1y00pX3ScH95QSxq6RoKRVxyXB6QPnHLM)
+
+Click the badge above → run 3 cells → see your first simulation. No Python install, no cloning, no setup.
+
+The notebook walks you through:
+1. `pip install odibi` (runs in the cloud)
+2. Define a simulation in YAML (sensors, sales data, or industrial equipment)
+3. Run the pipeline → see the output → chart it with Altair
+
+**When you're ready for more:** 38 simulation configs covering buildings, compressors, reactors, cooling towers, wastewater, production lines, and sales pipelines.
+
+---
+
+## ⚡ Quick Start (Local)
 
 ```bash
 pip install odibi
 ```
 
-**Option 1: Start from a template**
+**Option 1: Simulate data from YAML**
+
+Create `sim.yaml`:
+```yaml
+project: my_first_sim
+engine: pandas
+connections:
+  output:
+    type: local
+    base_path: ./data
+story:
+  connection: output
+  path: stories/
+system:
+  connection: output
+pipelines:
+  - pipeline: demo
+    nodes:
+      - name: sensors
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-01-01T00:00:00Z"
+                timestep: "5m"
+                row_count: 100
+                seed: 42
+              entities:
+                count: 3
+                id_prefix: "sensor_"
+              columns:
+                - name: sensor_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: temperature
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 22.0
+                    min: 16.0
+                    max: 30.0
+                    volatility: 0.3
+                    mean_reversion: 0.15
+        write:
+          connection: output
+          format: parquet
+          path: bronze/sensors.parquet
+          mode: overwrite
+```
+
+Run it:
+```bash
+python -c "from odibi.pipeline import PipelineManager; PipelineManager.from_yaml('sim.yaml').run()"
+```
+
+Output: `data/bronze/sensors.parquet` — 300 rows of realistic sensor data with memory, drift, and mean reversion. No database needed.
+
+**Option 2: Build a star schema from CSV**
 ```bash
 odibi init my_project --template star-schema
 cd my_project
@@ -30,7 +107,7 @@ odibi run odibi.yaml
 odibi story last          # View the audit report
 ```
 
-**Option 2: Clone the reference example**
+**Option 3: Clone the reference example**
 ```bash
 git clone https://github.com/henryodibi11/Odibi.git
 cd Odibi/docs/examples/canonical/runnable
