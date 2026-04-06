@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.8.2] - 2026-04-05
+
+### Fixed
+
+- **Simulation int columns corrupted by chaos outliers** — `_apply_outliers` multiplied int column values by a float factor (e.g., `2.5`), producing non-integer floats (e.g., `17.5`) after the data_type cast had already run. This caused `TypeError: cannot safely cast non-equivalent object to int64` when pandas built the DataFrame. Outlier-mutated int values are now re-cast to `int` immediately. Affected all simulation YAMLs with `chaos.outlier_rate > 0` and `data_type: int` columns (e.g., Pattern 3 `occupancy`).
+- **Defensive Int64 casting in pandas engine** — simulation int columns now cast through `Float64 → round → Int64` instead of direct `object → Int64`, preventing any stray float values from causing cast failures.
+
 ## [3.8.0] - 2026-04-01
 
 ### Added

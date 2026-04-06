@@ -1987,6 +1987,11 @@ class SimulationEngine:
             if c.data_type in ["int", "float"]
             and not isinstance(c.generator, DerivedGeneratorConfig)
         ]
+        int_cols = {
+            c.name
+            for c in self.config.columns
+            if c.data_type == "int" and not isinstance(c.generator, DerivedGeneratorConfig)
+        }
 
         if not numeric_cols:
             return rows
@@ -1995,6 +2000,8 @@ class SimulationEngine:
             for col in numeric_cols:
                 if row[col] is not None and self.rng.random() < outlier_rate:
                     row[col] *= outlier_factor
+                    if col in int_cols:
+                        row[col] = int(round(row[col]))
 
         return rows
 
