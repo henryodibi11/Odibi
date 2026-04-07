@@ -197,6 +197,7 @@ nav:
           - Environments: guides/environments.md
           - Secrets Management: guides/secrets.md
           - Azure Setup: guides/setup_azure.md
+          - Unity Catalog (Databricks): guides/unity_catalog.md
           - WSL Setup: guides/wsl_setup.md
       - Chemical Engineering (ChemE × DE):
           - 📚 Seborg Textbook Mapping: guides/seborg_textbook_mapping.md
