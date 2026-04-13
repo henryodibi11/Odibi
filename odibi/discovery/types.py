@@ -4,7 +4,7 @@ All discovery methods return Pydantic models for consistency, validation,
 and easy serialization (JSON, YAML, dict).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
@@ -47,7 +47,7 @@ class Schema(BaseModel):
     dataset: DatasetRef
     columns: List[Column]
     primary_key: Optional[List[str]] = Field(default=None, description="Primary key columns")
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class TableProfile(BaseModel):
@@ -136,7 +136,7 @@ class CatalogSummary(BaseModel):
 
     connection_name: str
     connection_type: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # SQL connections
     schemas: Optional[List[str]] = Field(default=None, description="Database schemas")

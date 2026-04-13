@@ -431,7 +431,8 @@ class PandasEngine(Engine):
             results = executor.map(lambda p: read_func(p, **kwargs), paths)
             dfs = list(results)
 
-        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+        non_empty = [df for df in dfs if not df.empty]
+        return pd.concat(non_empty, ignore_index=True) if non_empty else pd.DataFrame()
 
     def _read_excel_with_patterns(
         self,
@@ -641,7 +642,8 @@ class PandasEngine(Engine):
             finally:
                 fe_logger.setLevel(original_level)
 
-            return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+            non_empty = [df for df in dfs if not df.empty]
+            return pd.concat(non_empty, ignore_index=True) if non_empty else pd.DataFrame()
 
         def _read_excel_pandas(source, file_name: str, excel_kwargs: dict) -> pd.DataFrame:
             """Read Excel using pandas/openpyxl (slower fallback)."""
@@ -689,7 +691,8 @@ class PandasEngine(Engine):
                     df["_source_sheet"] = sheet
                 dfs.append(df)
 
-            return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+            non_empty = [df for df in dfs if not df.empty]
+            return pd.concat(non_empty, ignore_index=True) if non_empty else pd.DataFrame()
 
         # Expand glob patterns if needed
         file_list: List[str] = []
@@ -2233,7 +2236,8 @@ class PandasEngine(Engine):
                 if isinstance(dataset_obj, Iterator):
                     # Warning: Materializing iterator for SQL execution
                     # Note: DuckDB doesn't support streaming from iterator yet
-                    dataset_obj = pd.concat(dataset_obj, ignore_index=True)
+                    chunks = [chunk for chunk in dataset_obj if not chunk.empty]
+                    dataset_obj = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
 
                 conn.register(name, dataset_obj)
 
@@ -2257,7 +2261,8 @@ class PandasEngine(Engine):
                     from collections.abc import Iterator
 
                     if isinstance(df, Iterator):
-                        df = pd.concat(df, ignore_index=True)
+                        chunks = [chunk for chunk in df if not chunk.empty]
+                        df = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
 
                     locals_dict[name] = df
 
@@ -2293,7 +2298,8 @@ class PandasEngine(Engine):
 
         if isinstance(df, Iterator):
             # Warning: Materializing iterator for operation execution
-            df = pd.concat(df, ignore_index=True)
+            chunks = [chunk for chunk in df if not chunk.empty]
+            df = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
 
         if operation == "pivot":
             return self._pivot(df, params)

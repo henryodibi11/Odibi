@@ -4,7 +4,7 @@ import os
 import posixpath
 import threading
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from odibi.discovery.types import (
@@ -1059,7 +1059,9 @@ class AzureADLS(BaseConnection):
                 if isinstance(last_modified, str):
                     last_modified = datetime.fromisoformat(last_modified.replace("Z", "+00:00"))
 
-                age_hours = (datetime.utcnow() - last_modified).total_seconds() / 3600
+                if last_modified.tzinfo is None:
+                    last_modified = last_modified.replace(tzinfo=timezone.utc)
+                age_hours = (datetime.now(timezone.utc) - last_modified).total_seconds() / 3600
 
                 result = FreshnessResult(
                     dataset=DatasetRef(name=dataset, kind="file"),

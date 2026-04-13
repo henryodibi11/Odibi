@@ -1,7 +1,7 @@
 """Local filesystem connection."""
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -613,8 +613,8 @@ class LocalConnection(BaseConnection):
 
             if full_path.exists():
                 stat = full_path.stat()
-                last_modified = datetime.fromtimestamp(stat.st_mtime)
-                age_hours = (datetime.utcnow() - last_modified).total_seconds() / 3600
+                last_modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+                age_hours = (datetime.now(timezone.utc) - last_modified).total_seconds() / 3600
 
                 result = FreshnessResult(
                     dataset=DatasetRef(name=dataset, kind="file"),

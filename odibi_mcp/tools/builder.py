@@ -16,7 +16,7 @@ Design:
 
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import threading
 import uuid
 
@@ -49,17 +49,17 @@ class PipelineBuilderSession:
     pipeline_name: str
     layer: str = "gold"
     nodes: List[Dict[str, Any]] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    last_touched: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_touched: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def touch(self):
         """Update last accessed timestamp."""
-        self.last_touched = datetime.utcnow()
+        self.last_touched = datetime.now(timezone.utc)
 
     def is_expired(self) -> bool:
         """Check if session has exceeded TTL."""
-        age = datetime.utcnow() - self.last_touched
+        age = datetime.now(timezone.utc) - self.last_touched
         return age > timedelta(minutes=_SESSION_TTL_MINUTES)
 
     def get_node(self, node_name: str) -> Optional[Dict[str, Any]]:
@@ -543,11 +543,11 @@ def get_pipeline_state(session_id: str) -> Dict[str, Any]:
                 }
                 for n in session.nodes
             ],
-            "age_minutes": int((datetime.utcnow() - session.created_at).total_seconds() / 60),
+            "age_minutes": int((datetime.now(timezone.utc) - session.created_at).total_seconds() / 60),
             "expires_in_minutes": max(
                 0,
                 _SESSION_TTL_MINUTES
-                - int((datetime.utcnow() - session.last_touched).total_seconds() / 60),
+                - int((datetime.now(timezone.utc) - session.last_touched).total_seconds() / 60),
             ),
         }
 
@@ -644,11 +644,11 @@ def list_sessions() -> Dict[str, Any]:
 
         sessions = []
         for sid, sess in _sessions.items():
-            age_minutes = int((datetime.utcnow() - sess.created_at).total_seconds() / 60)
+            age_minutes = int((datetime.now(timezone.utc) - sess.created_at).total_seconds() / 60)
             expires_in = max(
                 0,
                 _SESSION_TTL_MINUTES
-                - int((datetime.utcnow() - sess.last_touched).total_seconds() / 60),
+                - int((datetime.now(timezone.utc) - sess.last_touched).total_seconds() / 60),
             )
 
             sessions.append(
