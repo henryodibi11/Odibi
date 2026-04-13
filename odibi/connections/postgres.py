@@ -975,7 +975,10 @@ class PostgreSQLConnection(BaseConnection):
 
                 if not df.empty and df["max_ts"].iloc[0] is not None:
                     last_updated = pd.to_datetime(df["max_ts"].iloc[0])
-                    age_hours = (datetime.now(timezone.utc) - last_updated.to_pydatetime().replace(tzinfo=timezone.utc)).total_seconds() / 3600
+                    age_hours = (
+                        datetime.now(timezone.utc)
+                        - last_updated.to_pydatetime().replace(tzinfo=timezone.utc)
+                    ).total_seconds() / 3600
 
                     result = FreshnessResult(
                         dataset=dataset_ref,
@@ -1010,7 +1013,10 @@ class PostgreSQLConnection(BaseConnection):
             if not df.empty and df["modify_date"].iloc[0] is not None:
                 last_updated = pd.to_datetime(df["modify_date"].iloc[0])
                 if last_updated.year > 1970:
-                    age_hours = (datetime.now(timezone.utc) - last_updated.to_pydatetime().replace(tzinfo=timezone.utc)).total_seconds() / 3600
+                    age_hours = (
+                        datetime.now(timezone.utc)
+                        - last_updated.to_pydatetime().replace(tzinfo=timezone.utc)
+                    ).total_seconds() / 3600
 
                     result = FreshnessResult(
                         dataset=dataset_ref,
