@@ -1,4 +1,3 @@
-import builtins
 import os
 
 import pytest
@@ -624,30 +623,18 @@ class TestPolarsLakeOperations:
 
     @pytest.fixture
     def mock_deltalake_import_error(self):
-        """Context manager to mock deltalake import failure."""
+        """Context manager to simulate deltalake being unavailable."""
         import sys
 
         original_deltalake = sys.modules.get("deltalake")
-        original_import = builtins.__import__
-
-        # Remove deltalake from modules to simulate ImportError
-        if "deltalake" in sys.modules:
-            del sys.modules["deltalake"]
-
-        # Mock builtins.__import__ to raise ImportError for deltalake
-        def mock_import(name, *args, **kwargs):
-            if name == "deltalake":
-                raise ImportError("No module named 'deltalake'")
-            return original_import(name, *args, **kwargs)
-
-        builtins.__import__ = mock_import
+        sys.modules["deltalake"] = None  # causes ImportError on `import deltalake`
 
         yield
 
-        # Restore original import and deltalake module
-        builtins.__import__ = original_import
-        if original_deltalake:
+        if original_deltalake is not None:
             sys.modules["deltalake"] = original_deltalake
+        else:
+            sys.modules.pop("deltalake", None)
 
     def test_vacuum_lake_import_error_handling(self, polars_engine, mock_deltalake_import_error):
         """Test vacuum raises proper error when deltalake not available."""
@@ -924,38 +911,31 @@ class TestAddWriteMetadata:
 
 class TestRestoreLakeVersion:
     def test_import_error_raised(self, polars_engine):
-        import builtins
+        import sys
 
-        real_import = builtins.__import__
-
-        def mock_import(name, *args, **kwargs):
-            if name == "deltalake":
-                raise ImportError("no deltalake")
-            return real_import(name, *args, **kwargs)
-
-        builtins.__import__ = mock_import
+        original = sys.modules.get("deltalake")
+        sys.modules["deltalake"] = None
         try:
             with pytest.raises(ImportError, match="Delta Lake support requires"):
                 polars_engine.restore_delta(MockConnection(), "/table", 1)
         finally:
-            builtins.__import__ = real_import
+            if original is not None:
+                sys.modules["deltalake"] = original
+            else:
+                sys.modules.pop("deltalake", None)
 
-    def test_restore_calls_dt_restore(self, polars_engine, monkeypatch):
+    def test_restore_calls_dt_restore(self, polars_engine):
+        import sys
+        import types
         from unittest.mock import MagicMock, patch
 
         mock_dt_instance = MagicMock()
         mock_dt_class = MagicMock(return_value=mock_dt_instance)
-        real_import = builtins.__import__
 
-        with patch("odibi.engine.polars_engine.DeltaTable", mock_dt_class, create=True):
-            monkeypatch.setattr(
-                "builtins.__import__",
-                lambda name, *a, **kw: (
-                    type("mod", (), {"DeltaTable": mock_dt_class})()
-                    if name == "deltalake"
-                    else real_import(name, *a, **kw)
-                ),
-            )
+        mock_deltalake = types.ModuleType("deltalake")
+        mock_deltalake.DeltaTable = mock_dt_class
+
+        with patch.dict(sys.modules, {"deltalake": mock_deltalake}):
             polars_engine.restore_delta(MockConnection(), "/table", 3)
 
         mock_dt_instance.restore.assert_called_once_with(3)
@@ -2119,21 +2099,21 @@ class TestPolarsTableMaintenance:
 
     def test_import_error_returns_silently(self, polars_engine):
         """Missing deltalake library logs warning and returns."""
-        real_import = builtins.__import__
+        import sys
 
-        def mock_import(name, *args, **kwargs):
-            if name == "deltalake":
-                raise ImportError("no deltalake")
-            return real_import(name, *args, **kwargs)
+        original = sys.modules.get("deltalake")
+        sys.modules["deltalake"] = None
 
         class Cfg:
             enabled = True
 
-        builtins.__import__ = mock_import
         try:
             polars_engine.maintain_table(MockConnection(), format="delta", path="/p", config=Cfg())
         finally:
-            builtins.__import__ = real_import
+            if original is not None:
+                sys.modules["deltalake"] = original
+            else:
+                sys.modules.pop("deltalake", None)
 
     def test_exception_handled(self, tmp_path, polars_engine):
         """Exception during maintenance logged as warning."""
@@ -2245,49 +2225,46 @@ class TestPolarsLakeOps:
         assert restored.column("id").to_pylist() == [1, 2]
 
     def test_restore_import_error(self, polars_engine):
-        real_import = builtins.__import__
+        import sys
 
-        def mock_import(name, *args, **kwargs):
-            if name == "deltalake":
-                raise ImportError("no deltalake")
-            return real_import(name, *args, **kwargs)
-
-        builtins.__import__ = mock_import
+        original = sys.modules.get("deltalake")
+        sys.modules["deltalake"] = None
         try:
             with pytest.raises(ImportError, match="Delta Lake support requires"):
                 polars_engine.restore_delta(MockConnection(), "/tbl", 1)
         finally:
-            builtins.__import__ = real_import
+            if original is not None:
+                sys.modules["deltalake"] = original
+            else:
+                sys.modules.pop("deltalake", None)
 
     def test_vacuum_import_error(self, polars_engine):
-        real_import = builtins.__import__
+        import sys
 
-        def mock_import(name, *args, **kwargs):
-            if name == "deltalake":
-                raise ImportError("no deltalake")
-            return real_import(name, *args, **kwargs)
-
-        builtins.__import__ = mock_import
+        original = sys.modules.get("deltalake")
+        sys.modules["deltalake"] = None
         try:
             with pytest.raises(ImportError, match="Delta Lake support requires"):
                 polars_engine.vacuum_delta(MockConnection(), path="/tbl")
         finally:
-            builtins.__import__ = real_import
+            if original is not None:
+                sys.modules["deltalake"] = original
+            else:
+                sys.modules.pop("deltalake", None)
 
     def test_history_import_error(self, polars_engine):
-        real_import = builtins.__import__
+        import sys
 
-        def mock_import(name, *args, **kwargs):
-            if name == "deltalake":
-                raise ImportError("no deltalake")
-            return real_import(name, *args, **kwargs)
-
-        builtins.__import__ = mock_import
+        original = sys.modules.get("deltalake")
+        sys.modules["deltalake"] = None
         try:
             with pytest.raises(ImportError, match="Delta Lake support requires"):
                 polars_engine.get_delta_history(MockConnection(), path="/tbl")
         finally:
-            builtins.__import__ = real_import
+            if original is not None:
+                sys.modules["deltalake"] = original
+            else:
+                sys.modules.pop("deltalake", None)
 
     def test_history_no_connection(self, tmp_path, polars_engine):
         tbl_path = tmp_path / "tbl"

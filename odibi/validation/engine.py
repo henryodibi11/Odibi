@@ -53,7 +53,7 @@ class Validator:
             if isinstance(df, pyspark.sql.DataFrame):
                 is_spark = True
                 engine_type = "spark"
-        except ImportError:
+        except (ImportError, AttributeError):
             pass
 
         if not is_spark:

@@ -57,7 +57,7 @@ def evaluate_gate(
 
         if hasattr(engine, "spark") or isinstance(df, pyspark.sql.DataFrame):
             is_spark = True
-    except ImportError:
+    except (ImportError, AttributeError):
         pass
 
     if is_spark:

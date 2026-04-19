@@ -28,36 +28,20 @@ if sys.platform == "win32":
         pass
 
 
-def pytest_collection_modifyitems(config, items):
-    if sys.platform == "win32":
-        items[:] = [
-            item
-            for item in items
-            if not (
-                ("spark" in item.nodeid.lower() or "delta" in item.nodeid.lower())
-                or ("spark" in str(item.fspath).lower() or "delta" in str(item.fspath).lower())
-            )
-        ]
-
-
-def pytest_runtest_setup(item):
-    # Additional hook to skip tests during setup if they involve Spark/Delta functionality
-    if sys.platform == "win32":
-        test_id = item.nodeid.lower()
-        if "spark" in test_id or "delta" in test_id:
-            pytest.skip("Skipping Spark/Delta tests on Windows due to missing winutils")
+def _is_spark_or_delta_name(name: str) -> bool:
+    """Check if a filename (not full path) contains spark or delta keywords."""
+    name = name.lower()
+    return "spark" in name or "delta" in name
 
 
 def pytest_ignore_collect(collection_path, config):
-    # Ignore collection of any test file that appears to be Spark or Delta related on Windows
-    if sys.platform == "win32" and (
-        "spark" in str(collection_path).lower() or "delta" in str(collection_path).lower()
-    ):
+    # Ignore collection of test FILES whose name contains spark/delta on Windows.
+    # Only checks the filename, not the full path, to avoid false positives
+    # (e.g., a parent directory named "delta" or test content mentioning delta).
+    if sys.platform == "win32" and _is_spark_or_delta_name(collection_path.name):
         return True
 
 
-def pytest_runtest_call(item):
+def pytest_collection_modifyitems(config, items):
     if sys.platform == "win32":
-        test_id = item.nodeid.lower()
-        if "spark" in test_id or "delta" in test_id:
-            pytest.skip("Skipping Spark/Delta tests on Windows due to missing winutils")
+        items[:] = [item for item in items if not _is_spark_or_delta_name(item.fspath.basename)]

@@ -371,14 +371,9 @@ def test_read_sample_bytes_remote_path_no_fsspec(monkeypatch):
     """
     Test _read_sample_bytes with remote path when fsspec is not available.
     """
+    import sys
 
-    # Mock ImportError for fsspec
-    def mock_import(name, *args, **kwargs):
-        if name == "fsspec":
-            raise ImportError("No module named 'fsspec'")
-        return __builtins__.__import__(name, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.__import__", mock_import)
+    monkeypatch.setitem(sys.modules, "fsspec", None)
 
     conn = DummyConnection()
     # Remote path (has :// but not file://)

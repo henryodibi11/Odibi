@@ -248,7 +248,7 @@ def split_valid_invalid(
 
         if hasattr(engine, "spark") or isinstance(df, pyspark.sql.DataFrame):
             is_spark = True
-    except ImportError:
+    except (ImportError, AttributeError):
         pass
 
     if not is_spark:
@@ -399,7 +399,7 @@ def add_quarantine_metadata(
 
         if hasattr(engine, "spark") or isinstance(invalid_df, pyspark.sql.DataFrame):
             is_spark = True
-    except ImportError:
+    except (ImportError, AttributeError):
         pass
 
     if not is_spark:
@@ -570,7 +570,7 @@ def write_quarantine(
 
         if hasattr(engine, "spark") or isinstance(invalid_df, pyspark.sql.DataFrame):
             is_spark = True
-    except ImportError:
+    except (ImportError, AttributeError):
         pass
 
     if not is_spark:

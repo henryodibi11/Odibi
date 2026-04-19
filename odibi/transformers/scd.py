@@ -969,11 +969,18 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
 
         # Identify rows to update:
         # 1. Match found (__new_end is not null)
-        # 2. Is currently active
-        mask = (final_target["__new_end"].notna()) & (final_target[flag_col] == True)  # noqa: E712
+        # 2. Is currently active (if flag_col exists; otherwise all matched rows are current)
+        has_end = final_target["__new_end"].notna()
+        if flag_col in final_target.columns:
+            mask = has_end & (final_target[flag_col] == True)  # noqa: E712
+        else:
+            mask = has_end
 
         # Apply updates
         final_target.loc[mask, end_col] = final_target.loc[mask, "__new_end"]
+        if flag_col not in final_target.columns:
+            final_target[flag_col] = True
+        final_target[flag_col] = final_target[flag_col].astype(bool)
         final_target.loc[mask, flag_col] = False
 
         # Cleanup
