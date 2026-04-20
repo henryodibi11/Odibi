@@ -1,8 +1,9 @@
 """Tests for odibi.validation.engine.Validator — Pandas and Polars paths."""
 
 import pandas as pd
-import polars as pl
 import pytest
+
+pl = pytest.importorskip("polars")
 from datetime import datetime, timedelta, timezone
 
 from odibi.validation.engine import Validator

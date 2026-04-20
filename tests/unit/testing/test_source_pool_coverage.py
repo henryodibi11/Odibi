@@ -1,5 +1,7 @@
 """Comprehensive tests for odibi.testing.source_pool models and enums."""
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 import pytest

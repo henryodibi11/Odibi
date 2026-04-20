@@ -461,11 +461,13 @@ class TestRecordLineage:
         """No engine → no-op."""
         bare_catalog.record_lineage("a", "b", "p", "n", "r")
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """Write failure logs warning."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.record_lineage("a", "b", "p", "n", "r")
-        assert any("Failed to record lineage" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.record_lineage("a", "b", "p", "n", "r")
+        mock_logger.warning.assert_called_once()
+        assert "Failed to record lineage" in mock_logger.warning.call_args[0][0]
 
     def test_default_relationship_is_feeds(self, catalog_manager):
         """Default relationship is 'feeds'."""
@@ -551,21 +553,23 @@ class TestRecordLineageBatch:
         df = _read_table(catalog_manager, "meta_lineage")
         assert df.iloc[0]["relationship"] == "feeds"
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """Write failure logs warning."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.record_lineage_batch(
-                [
-                    {
-                        "source_table": "a",
-                        "target_table": "b",
-                        "target_pipeline": "p",
-                        "target_node": "n",
-                        "run_id": "r",
-                    }
-                ]
-            )
-        assert any("Failed to batch record lineage" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.record_lineage_batch(
+                    [
+                        {
+                            "source_table": "a",
+                            "target_table": "b",
+                            "target_pipeline": "p",
+                            "target_node": "n",
+                            "run_id": "r",
+                        }
+                    ]
+                )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch record lineage" in mock_logger.warning.call_args[0][0]
 
     def test_optional_fields_default_none(self, catalog_manager):
         """Optional source_pipeline and source_node default to None."""
@@ -649,21 +653,23 @@ class TestRegisterAssetsBatch:
         df = _read_table(catalog_manager, "meta_tables")
         assert df.iloc[0]["schema_hash"] == ""
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """Write failure logs warning."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.register_assets_batch(
-                [
-                    {
-                        "project": "p",
-                        "table_name": "t",
-                        "path": "/x",
-                        "format": "parquet",
-                        "pattern_type": "dim",
-                    }
-                ]
-            )
-        assert any("Failed to batch register assets" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.register_assets_batch(
+                    [
+                        {
+                            "project": "p",
+                            "table_name": "t",
+                            "path": "/x",
+                            "format": "parquet",
+                            "pattern_type": "dim",
+                        }
+                    ]
+                )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch register assets" in mock_logger.warning.call_args[0][0]
 
     def test_project_name_key_alias(self, catalog_manager):
         """Accepts 'project_name' as alias for 'project'."""

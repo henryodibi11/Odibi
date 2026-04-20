@@ -1,8 +1,9 @@
 """Tests for remaining non-Spark coverage gaps in odibi.validation.quarantine."""
 
 import pandas as pd
-import polars as pl
 import pytest
+
+pl = pytest.importorskip("polars")
 from unittest.mock import MagicMock
 
 from odibi.config import (

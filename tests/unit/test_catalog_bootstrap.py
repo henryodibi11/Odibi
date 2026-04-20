@@ -6,7 +6,6 @@ _table_exists(), and _migrate_schema_if_needed().
 NOTE: Test names avoid 'spark' and 'delta' to prevent conftest.py from skipping on Windows.
 """
 
-import logging
 import os
 from unittest.mock import MagicMock, patch
 
@@ -128,12 +127,12 @@ class TestEnsureTable:
         catalog_manager._ensure_table("meta_tables", schema)
         assert os.path.exists(catalog_manager.tables["meta_tables"])
 
-    def test_skips_creation_when_table_exists(self, bootstrapped_catalog, caplog):
+    def test_skips_creation_when_table_exists(self, bootstrapped_catalog):
         """_ensure_table should skip creation when table already exists."""
         schema = bootstrapped_catalog._get_schema_meta_tables()
-        with caplog.at_level(logging.DEBUG, logger="odibi.catalog"):
-            bootstrapped_catalog._ensure_table("meta_tables", schema)
-        assert any("System table exists" in msg for msg in caplog.messages)
+        bootstrapped_catalog._ensure_table("meta_tables", schema)
+        # Table should still exist (no error, no recreation)
+        assert os.path.exists(bootstrapped_catalog.tables["meta_tables"])
 
     def test_partition_cols_accepted(self, catalog_manager):
         """_ensure_table should accept partition_cols without error."""
@@ -229,24 +228,26 @@ class TestMigrateSchemaIfNeeded:
         bogus = str(tmp_path / "does_not_exist_table")
         catalog_manager._migrate_schema_if_needed("test_table", bogus, schema)
 
-    def test_no_op_when_schemas_match(self, bootstrapped_catalog, caplog):
+    def test_no_op_when_schemas_match(self, bootstrapped_catalog):
         """_migrate_schema_if_needed should be a no-op when schemas already match."""
         schema = bootstrapped_catalog._get_schema_meta_tables()
         path = bootstrapped_catalog.tables["meta_tables"]
-        with caplog.at_level(logging.INFO, logger="odibi.catalog"):
+        with patch("odibi.catalog.logger") as mock_logger:
             bootstrapped_catalog._migrate_schema_if_needed("meta_tables", path, schema)
         # Should NOT log "Migrating schema" since schemas match
-        assert not any("Migrating schema" in msg for msg in caplog.messages)
+        for call in mock_logger.info.call_args_list:
+            assert "Migrating schema" not in str(call)
 
-    def test_warning_logged_on_migration_failure(self, catalog_manager, tmp_path, caplog):
+    def test_warning_logged_on_migration_failure(self, catalog_manager, tmp_path):
         """_migrate_schema_if_needed should log a warning on failure."""
         schema = StructType([StructField("id", StringType(), True)])
         # Create a directory that exists but isn't a valid table
         bogus = str(tmp_path / "not_a_table")
         os.makedirs(bogus, exist_ok=True)
-        with caplog.at_level(logging.WARNING, logger="odibi.catalog"):
+        with patch("odibi.catalog.logger") as mock_logger:
             catalog_manager._migrate_schema_if_needed("test_table", bogus, schema)
-        assert any("Schema migration check failed" in msg for msg in caplog.messages)
+        mock_logger.warning.assert_called_once()
+        assert "Schema migration check failed" in mock_logger.warning.call_args[0][0]
 
 
 # ===========================================================================

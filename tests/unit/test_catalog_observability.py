@@ -151,11 +151,13 @@ class TestLogRun:
         """log_run with no engine is a silent no-op."""
         bare_catalog.log_run("r1", "pipe", "node", "SUCCESS")  # Should not raise
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """If the write fails, a warning is logged (not raised)."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("disk full")):
-            catalog_manager.log_run("r1", "pipe", "node", "SUCCESS")
-        assert any("Failed to log run" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("disk full")):
+                catalog_manager.log_run("r1", "pipe", "node", "SUCCESS")
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log run" in mock_logger.warning.call_args[0][0]
 
     def test_sql_server_mode_delegates(self, sql_server_catalog):
         """log_run in SQL Server mode calls _log_run_sql_server."""
@@ -215,13 +217,15 @@ class TestLogRunSqlServer:
         assert params["run_id"] == "r1"
         assert params["rows"] == 100
 
-    def test_failure_logs_warning(self, sql_server_catalog, caplog):
+    def test_failure_logs_warning(self, sql_server_catalog):
         """SQL Server log_run failure logs warning."""
         sql_server_catalog.connection.execute.side_effect = Exception("conn error")
-        sql_server_catalog._log_run_sql_server(
-            "r1", "proj", "pipe", "node", "SUCCESS", 0, 0, "{}", None
-        )
-        assert any("Failed to log run to SQL Server" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            sql_server_catalog._log_run_sql_server(
+                "r1", "proj", "pipe", "node", "SUCCESS", 0, 0, "{}", None
+            )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log run to SQL Server" in mock_logger.warning.call_args[0][0]
 
     def test_defaults_none_params(self, sql_server_catalog):
         """SQL Server log_run handles None for optional params."""
@@ -300,13 +304,15 @@ class TestLogRunsBatch:
             sql_server_catalog.log_runs_batch(records)
         assert mock_sql.call_count == 2
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """Batch log failure logs warning."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.log_runs_batch(
-                [{"run_id": "r1", "pipeline_name": "p", "node_name": "n", "status": "S"}]
-            )
-        assert any("Failed to batch log runs" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.log_runs_batch(
+                    [{"run_id": "r1", "pipeline_name": "p", "node_name": "n", "status": "S"}]
+                )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch log runs" in mock_logger.warning.call_args[0][0]
 
     def test_defaults_for_missing_keys(self, catalog_manager):
         """Batch log uses defaults for optional keys not present in records."""
@@ -349,11 +355,13 @@ class TestLogPipelineRun:
             sql_server_catalog.log_pipeline_run(_make_pipeline_run())
         mock_sql.assert_called_once()
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """Pipeline run write failure logs warning."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.log_pipeline_run(_make_pipeline_run())
-        assert any("Failed to log pipeline run" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.log_pipeline_run(_make_pipeline_run())
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log pipeline run" in mock_logger.warning.call_args[0][0]
 
     def test_optional_fields_are_none(self, catalog_manager):
         """log_pipeline_run handles optional fields being None."""
@@ -412,12 +420,14 @@ class TestLogPipelineRunSqlServer:
         sql_text = sql_server_catalog.connection.execute.call_args[0][0]
         assert "MERGE INTO" in sql_text
 
-    def test_execute_failure_logs_warning(self, sql_server_catalog, caplog):
+    def test_execute_failure_logs_warning(self, sql_server_catalog):
         """Execution failure logs a warning."""
         sql_server_catalog.connection.execute.side_effect = Exception("timeout")
-        with patch.object(sql_server_catalog, "_sql_server_table_exists", return_value=True):
-            sql_server_catalog._log_pipeline_run_sql_server(_make_pipeline_run())
-        assert any("Failed to log pipeline run to SQL Server" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(sql_server_catalog, "_sql_server_table_exists", return_value=True):
+                sql_server_catalog._log_pipeline_run_sql_server(_make_pipeline_run())
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log pipeline run to SQL Server" in mock_logger.warning.call_args[0][0]
 
     def test_normal_rows_processed_preserved(self, sql_server_catalog):
         """Normal int rows_processed is passed through unchanged."""
@@ -504,11 +514,13 @@ class TestLogNodeRunsBatch:
             sql_server_catalog.log_node_runs_batch([_make_node_result()])
         mock_sql.assert_called_once()
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """Write failure logs warning."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.log_node_runs_batch([_make_node_result()])
-        assert any("Failed to batch log node runs" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.log_node_runs_batch([_make_node_result()])
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch log node runs" in mock_logger.warning.call_args[0][0]
 
     def test_optional_fields_default(self, catalog_manager):
         """Missing optional fields use None defaults."""
@@ -558,12 +570,14 @@ class TestLogNodeRunsBatchSqlServer:
         sql_text = sql_server_catalog.connection.execute.call_args[0][0]
         assert "MERGE INTO" in sql_text
 
-    def test_execute_failure_logs_warning(self, sql_server_catalog, caplog):
+    def test_execute_failure_logs_warning(self, sql_server_catalog):
         """Execution failure logs a warning."""
         sql_server_catalog.connection.execute.side_effect = Exception("err")
-        with patch.object(sql_server_catalog, "_sql_server_table_exists", return_value=True):
-            sql_server_catalog._log_node_runs_batch_sql_server([_make_node_result()])
-        assert any("Failed to batch log node runs" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(sql_server_catalog, "_sql_server_table_exists", return_value=True):
+                sql_server_catalog._log_node_runs_batch_sql_server([_make_node_result()])
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch log node runs" in mock_logger.warning.call_args[0][0]
 
     def test_normal_rows_processed_preserved(self, sql_server_catalog):
         """Normal int rows_processed passes through unchanged."""
@@ -631,11 +645,13 @@ class TestLogFailure:
             sql_server_catalog.log_failure("f1", "r1", "p", "n", "E", "msg", "trace")
         mock_sql.assert_called_once()
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
+    def test_retry_failure_logs_warning(self, catalog_manager):
         """Write failure logs warning."""
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.log_failure("f1", "r1", "p", "n", "E", "msg")
-        assert any("Failed to log failure" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.log_failure("f1", "r1", "p", "n", "E", "msg")
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log failure" in mock_logger.warning.call_args[0][0]
 
     def test_error_code_is_none(self, catalog_manager):
         """error_code field is always None (future taxonomy)."""
@@ -677,12 +693,16 @@ class TestLogFailureSqlServer:
         sql_text = sql_server_catalog.connection.execute.call_args[0][0]
         assert "INSERT INTO" in sql_text
 
-    def test_execute_failure_logs_warning(self, sql_server_catalog, caplog):
+    def test_execute_failure_logs_warning(self, sql_server_catalog):
         """Execution failure logs warning."""
         sql_server_catalog.connection.execute.side_effect = Exception("err")
-        with patch.object(sql_server_catalog, "_sql_server_table_exists", return_value=True):
-            sql_server_catalog._log_failure_sql_server("f1", "r1", "pipe", "node", "E", "msg", None)
-        assert any("Failed to log failure to SQL Server" in r.message for r in caplog.records)
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(sql_server_catalog, "_sql_server_table_exists", return_value=True):
+                sql_server_catalog._log_failure_sql_server(
+                    "f1", "r1", "pipe", "node", "E", "msg", None
+                )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log failure to SQL Server" in mock_logger.warning.call_args[0][0]
 
     def test_truncation_in_sql_server(self, sql_server_catalog):
         """SQL Server log_failure truncates long messages."""

@@ -3,8 +3,9 @@
 import logging
 from datetime import datetime, timedelta
 
-import polars as pl
 import pytest
+
+pl = pytest.importorskip("polars")
 
 from odibi.context import EngineContext, PolarsContext
 from odibi.enums import EngineType

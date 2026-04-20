@@ -7,7 +7,6 @@ NOTE: Test names avoid 'spark' and 'delta' to prevent conftest.py from skipping 
 """
 
 import json
-import logging
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -250,7 +249,7 @@ class TestBootstrappedGuard:
         cm.bootstrap()
         assert cm._bootstrapped is True
 
-    def test_second_bootstrap_is_noop(self, tmp_path, caplog):
+    def test_second_bootstrap_is_noop(self, tmp_path):
         """Second bootstrap() call skips table checks (logged as debug)."""
         config = SystemConfig(connection="local", path="_odibi_system")
         base_path = str(tmp_path / "_odibi_system")
@@ -258,10 +257,11 @@ class TestBootstrappedGuard:
         cm = CatalogManager(spark=None, config=config, base_path=base_path, engine=engine)
         cm.bootstrap()
 
-        with caplog.at_level(logging.DEBUG, logger="odibi.catalog"):
+        with patch("odibi.catalog.logger") as mock_logger:
             cm.bootstrap()
 
-        assert any("Bootstrap skipped" in msg for msg in caplog.messages)
+        mock_logger.debug.assert_called()
+        assert any("Bootstrap skipped" in str(call) for call in mock_logger.debug.call_args_list)
 
     def test_ensure_table_not_called_on_second_bootstrap(self, tmp_path):
         """_ensure_table should not be called during a second bootstrap() call."""

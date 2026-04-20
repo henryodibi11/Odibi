@@ -4,8 +4,9 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import polars as pl
 import pytest
+
+pl = pytest.importorskip("polars")
 
 from odibi.engine.polars_engine import PolarsEngine
 

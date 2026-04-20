@@ -6,6 +6,8 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
+pytest.importorskip("CoolProp")
+
 from odibi.context import EngineContext, PandasContext
 from odibi.enums import EngineType
 from odibi.transformers.thermodynamics import (

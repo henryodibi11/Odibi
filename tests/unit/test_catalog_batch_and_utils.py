@@ -237,21 +237,23 @@ class TestRegisterPipelinesBatch:
         catalog_manager.register_pipelines_batch(records)
         assert catalog_manager._pipelines_cache is None
 
-    def test_failure_logs_warning(self, catalog_manager, caplog):
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.register_pipelines_batch(
-                [
-                    {
-                        "pipeline_name": "p",
-                        "version_hash": "h",
-                        "description": "d",
-                        "layer": "bronze",
-                        "schedule": "daily",
-                        "tags_json": "{}",
-                    }
-                ]
-            )
-        assert any("Failed to batch register pipelines" in r.message for r in caplog.records)
+    def test_failure_logs_warning(self, catalog_manager):
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.register_pipelines_batch(
+                    [
+                        {
+                            "pipeline_name": "p",
+                            "version_hash": "h",
+                            "description": "d",
+                            "layer": "bronze",
+                            "schedule": "daily",
+                            "tags_json": "{}",
+                        }
+                    ]
+                )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch register pipelines" in mock_logger.warning.call_args[0][0]
 
 
 # ===========================================================================
@@ -331,20 +333,22 @@ class TestRegisterNodesBatch:
         catalog_manager.register_nodes_batch(records)
         assert catalog_manager._nodes_cache is None
 
-    def test_failure_logs_warning(self, catalog_manager, caplog):
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.register_nodes_batch(
-                [
-                    {
-                        "pipeline_name": "p",
-                        "node_name": "n",
-                        "version_hash": "h",
-                        "type": "transform",
-                        "config_json": "{}",
-                    }
-                ]
-            )
-        assert any("Failed to batch register nodes" in r.message for r in caplog.records)
+    def test_failure_logs_warning(self, catalog_manager):
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.register_nodes_batch(
+                    [
+                        {
+                            "pipeline_name": "p",
+                            "node_name": "n",
+                            "version_hash": "h",
+                            "type": "transform",
+                            "config_json": "{}",
+                        }
+                    ]
+                )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch register nodes" in mock_logger.warning.call_args[0][0]
 
 
 # ===========================================================================
@@ -425,19 +429,21 @@ class TestRegisterOutputsBatch:
         catalog_manager.register_outputs_batch(records)
         assert catalog_manager._outputs_cache is None
 
-    def test_failure_logs_warning(self, catalog_manager, caplog):
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.register_outputs_batch(
-                [
-                    {
-                        "pipeline_name": "p",
-                        "node_name": "n",
-                        "output_type": "managed_table",
-                        "last_run": datetime.now(timezone.utc),
-                    }
-                ]
-            )
-        assert any("Failed to batch register outputs" in r.message for r in caplog.records)
+    def test_failure_logs_warning(self, catalog_manager):
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.register_outputs_batch(
+                    [
+                        {
+                            "pipeline_name": "p",
+                            "node_name": "n",
+                            "output_type": "managed_table",
+                            "last_run": datetime.now(timezone.utc),
+                        }
+                    ]
+                )
+        mock_logger.warning.assert_called_once()
+        assert "Failed to batch register outputs" in mock_logger.warning.call_args[0][0]
 
 
 # ===========================================================================
@@ -459,10 +465,12 @@ class TestLogPattern:
     def test_no_engine_no_op(self, bare_catalog):
         bare_catalog.log_pattern("t", "dim", "{}", 1.0)
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.log_pattern("t", "dim", "{}", 1.0)
-        assert any("Failed to log pattern" in r.message for r in caplog.records)
+    def test_retry_failure_logs_warning(self, catalog_manager):
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.log_pattern("t", "dim", "{}", 1.0)
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log pattern" in mock_logger.warning.call_args[0][0]
 
     def test_multiple_patterns_append(self, catalog_manager):
         catalog_manager.log_pattern("a", "fact", "{}", 0.9)
@@ -498,10 +506,12 @@ class TestRegisterAsset:
     def test_no_engine_no_op(self, bare_catalog):
         bare_catalog.register_asset("proj", "t", "/path", "parquet", "dim")
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.register_asset("proj", "t", "/path", "parquet", "dim")
-        assert any("Failed to register asset" in r.message for r in caplog.records)
+    def test_retry_failure_logs_warning(self, catalog_manager):
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.register_asset("proj", "t", "/path", "parquet", "dim")
+        mock_logger.warning.assert_called_once()
+        assert "Failed to register asset" in mock_logger.warning.call_args[0][0]
 
     def test_default_schema_hash(self, catalog_manager):
         catalog_manager.register_asset("proj", "t", "/path", "parquet", "dim")
@@ -733,10 +743,12 @@ class TestLogMetrics:
     def test_no_engine_no_op(self, bare_catalog):
         bare_catalog.log_metrics("m", "SQL", ["d"], "t")
 
-    def test_retry_failure_logs_warning(self, catalog_manager, caplog):
-        with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
-            catalog_manager.log_metrics("m", "SQL", ["d"], "t")
-        assert any("Failed to log metric" in r.message for r in caplog.records)
+    def test_retry_failure_logs_warning(self, catalog_manager):
+        with patch("odibi.catalog.logger") as mock_logger:
+            with patch.object(catalog_manager.engine, "write", side_effect=IOError("fail")):
+                catalog_manager.log_metrics("m", "SQL", ["d"], "t")
+        mock_logger.warning.assert_called_once()
+        assert "Failed to log metric" in mock_logger.warning.call_args[0][0]
 
     def test_multiple_metrics_append(self, catalog_manager):
         catalog_manager.log_metrics("m1", "SQL1", ["d1"], "t1")

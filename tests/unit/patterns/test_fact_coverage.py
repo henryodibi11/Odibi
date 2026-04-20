@@ -1,5 +1,7 @@
 """Tests for odibi.patterns.fact — Pandas paths only."""
 
+from __future__ import annotations
+
 import os
 from unittest.mock import MagicMock
 

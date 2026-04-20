@@ -4,8 +4,9 @@ import hashlib
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import polars as pl
 import pytest
+
+pl = pytest.importorskip("polars")
 
 from odibi.writers.sql_server_writer import (
     MergeResult,
