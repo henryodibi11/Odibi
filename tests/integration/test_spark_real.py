@@ -9,6 +9,9 @@ def test_spark_real_session():
     except ImportError:
         pytest.skip("pyspark not installed")
 
+    if "MagicMock" in type(SparkSession).__name__ or not hasattr(SparkSession, "builder"):
+        pytest.skip("SparkSession.builder not available (mock or Databricks Connect)")
+
     try:
         # Use local[1] to run with a single thread, which is easier for CI
         spark = (
