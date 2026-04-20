@@ -39,6 +39,9 @@ class _MockColumn:
     def __invert__(self):
         return _MockColumn()
 
+    def cast(self, dataType):
+        return _MockColumn()
+
     def desc(self):
         return _MockColumn()
 
