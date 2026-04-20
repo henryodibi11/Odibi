@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-04-20
+
+### Added
+
+- **2,000+ new unit tests** across 60+ test files — coverage from 66% to 80% (34,363 stmts, 6,854 missed)
+- **Full CLI test coverage** — all commands (main, catalog, system, list, story, schema, lineage, secrets, init, test, graph, export, deploy, run, validate, ui, templates) tested via mock-based assertions
+- **Full validation engine coverage** — all 11 test types (NOT_NULL, UNIQUE, ACCEPTED_VALUES, ROW_COUNT, RANGE, REGEX_MATCH, CUSTOM_SQL, SCHEMA, FRESHNESS, etc.) tested for both Pandas and Polars engines
+- **Quarantine and gate coverage** — mask evaluation, split_valid_invalid, sampling, metadata, pass rates, thresholds, on_fail actions
+- **Pattern coverage** — Aggregation (63%), Fact (74%), Dimension (70%), Date Dimension (57%) with full Pandas/DuckDB paths
+- **Transformer coverage** — SCD2, merge, delete detection, relational (join/union/pivot), sql_core (16 transformers), manufacturing, thermodynamics, units, advanced (sessionize, split_events)
+- **Connection coverage** — Local (98%), Azure ADLS (89%), Azure SQL (93%), PostgreSQL (96%), API Fetcher (94%), Factory (81%)
+- **Story module coverage** — generator (83%), doc_generator (90%), lineage (98%), lineage_utils (100%)
+- **State module coverage** (80%) — LocalJSON, CatalogState, SqlServerSystem backends, StateManager, sync operations
+- **Writer coverage** — sql_server_writer (67%/208 tests) with all non-Spark paths
+- **Utility coverage** — progress (100%), setup_helpers (94%), introspect (88%)
+- **Pipeline coverage** — PipelineResults, utility methods, PipelineManager._build_connections/register_outputs (69 tests)
+- **Node coverage** — utilities + execution paths including error handling, incremental SQL, simulation state (89 tests)
+- **Coverage batch script** (`scripts/run_coverage.ps1`) for safe test execution without hangs
+- **Comprehensive AGENTS.md** — test execution batching, known hangs, mock patterns, gotchas, coverage roadmap
+
+### Fixed
+
+- **PySpark isinstance check crashing without JVM** — `isinstance(df, pyspark.sql.DataFrame)` in validation engine, quarantine, and gate now uses try/except to handle missing JVM gracefully
+- **SCD2 Pandas KeyError on missing flag_col** — `_scd2_pandas` now checks if `flag_col` exists in target before accessing it; creates it as `True` if missing
+- **SCD2 TimestampNTZType import failure** — `_get_timestamp_type` now uses try/except ImportError for `TimestampNTZType` to support older PySpark versions
+- **_MockColumn missing `cast()` method** — added `cast()` to `_MockColumn` in test_catalog_mock_engine_reads.py, fixing SCD2 merge optimization tests on Python 3.11/3.12
+- **OpenLineage 1.46.0 API compatibility** — updated `SourceCodeJobFacet` to use `sourceCode` (camelCase) and removed deprecated `api_key` from `OpenLineageClient`
+- **SparkEngine.__init__ mock failure** — wrapped `SparkSession.builder` logic to skip when a session is already provided
+- **Doc generator PermissionError** — replaced hardcoded `/fake` paths with `tempfile.mkdtemp()` in tests
+- **Catalog sync mock configuration** — fixed `target.uri` → `target.get_path` in delta sync tests
+- **Polars engine deltalake schema incompatibility** — added error handling for `ValueError`/`TypeError` in schema iteration
+- **Unsafe `builtins.__import__` mocking** — replaced with `sys.modules` manipulation in test_polars_engine.py and test_utils_encoding.py
+- **Deprecated `datetime.utcnow()`** — replaced with `datetime.now(timezone.utc)` to suppress Python 3.12 warnings
+- **`pd.concat` FutureWarning** — fixed future-incompatible concat calls
+
+### Changed
+
+- **Simplified conftest.py** — spark/delta filter now checks filename only, not full path; removed 3 redundant pytest hooks
+- **Ruff lint clean** — fixed all E712, E741, F841, F811, E402 errors across test suite
+
 ## [3.8.2] - 2026-04-05
 
 ### Fixed
