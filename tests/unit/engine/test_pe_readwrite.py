@@ -526,6 +526,10 @@ class TestWriteToTargetExcel:
 
 
 class TestWriteToTargetAvro:
+    @pytest.fixture(autouse=True)
+    def _require_fastavro(self):
+        pytest.importorskip("fastavro")
+
     def test_avro_overwrite_local(self, tmp_path):
         engine = PandasEngine(config={})
         avro_path = str(tmp_path / "data.avro")

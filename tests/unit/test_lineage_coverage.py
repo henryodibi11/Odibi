@@ -722,7 +722,7 @@ class TestOpenLineageAdapterInitWithUrl:
             cfg = SimpleNamespace(url="http://localhost:5000", namespace="ns", api_key="key123")
             adapter = OpenLineageAdapter(config=cfg)
             assert adapter.enabled is True
-            mod.OpenLineageClient.assert_called_with(url="http://localhost:5000", api_key="key123")
+            mod.OpenLineageClient.assert_called_with(url="http://localhost:5000")
         finally:
             mod.HAS_OPENLINEAGE = False
 
@@ -748,7 +748,7 @@ class TestOpenLineageAdapterInitWithUrl:
             with patch.dict("os.environ", {"OPENLINEAGE_URL": "http://env:5000"}):
                 adapter = OpenLineageAdapter(config=cfg)
             assert adapter.enabled is True
-            mod.OpenLineageClient.assert_called_with(url="http://env:5000", api_key=None)
+            mod.OpenLineageClient.assert_called_with(url="http://env:5000")
         finally:
             mod.HAS_OPENLINEAGE = False
 
@@ -761,6 +761,6 @@ class TestOpenLineageAdapterInitWithUrl:
             with patch.dict("os.environ", {"OPENLINEAGE_API_KEY": "envkey"}):
                 adapter = OpenLineageAdapter(config=cfg)
             assert adapter.enabled is True
-            mod.OpenLineageClient.assert_called_with(url="http://localhost:5000", api_key="envkey")
+            mod.OpenLineageClient.assert_called_with(url="http://localhost:5000")
         finally:
             mod.HAS_OPENLINEAGE = False

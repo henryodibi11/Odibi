@@ -105,44 +105,51 @@ class SparkEngine(Engine):
 
         start_time = time.time()
 
-        # Configure Delta Lake support
-        try:
-            from delta import configure_spark_with_delta_pip
+        if spark_session:
+            self.spark = spark_session
+        else:
+            # Configure Delta Lake support
+            try:
+                from delta import configure_spark_with_delta_pip
 
-            builder = SparkSession.builder.appName("odibi").config(
-                "spark.sql.sources.partitionOverwriteMode", "dynamic"
-            )
+                builder = SparkSession.builder.appName("odibi").config(
+                    "spark.sql.sources.partitionOverwriteMode", "dynamic"
+                )
 
-            # Performance Optimizations
-            builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
-            builder = builder.config("spark.sql.adaptive.enabled", "true")
+                # Performance Optimizations
+                builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
+                builder = builder.config("spark.sql.adaptive.enabled", "true")
 
-            # Reduce Verbosity
-            builder = builder.config("spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR")
-            builder = builder.config(
-                "spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
-            )
+                # Reduce Verbosity
+                builder = builder.config(
+                    "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
+                )
+                builder = builder.config(
+                    "spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
+                )
 
-            self.spark = spark_session or configure_spark_with_delta_pip(builder).getOrCreate()
-            self.spark.sparkContext.setLogLevel("ERROR")
+                self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
+                self.spark.sparkContext.setLogLevel("ERROR")
 
-            ctx.debug("Delta Lake support enabled")
+                ctx.debug("Delta Lake support enabled")
 
-        except ImportError:
-            ctx.debug("Delta Lake not available, using standard Spark")
-            builder = SparkSession.builder.appName("odibi").config(
-                "spark.sql.sources.partitionOverwriteMode", "dynamic"
-            )
+            except ImportError:
+                ctx.debug("Delta Lake not available, using standard Spark")
+                builder = SparkSession.builder.appName("odibi").config(
+                    "spark.sql.sources.partitionOverwriteMode", "dynamic"
+                )
 
-            # Performance Optimizations
-            builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
-            builder = builder.config("spark.sql.adaptive.enabled", "true")
+                # Performance Optimizations
+                builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
+                builder = builder.config("spark.sql.adaptive.enabled", "true")
 
-            # Reduce Verbosity
-            builder = builder.config("spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR")
+                # Reduce Verbosity
+                builder = builder.config(
+                    "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
+                )
 
-            self.spark = spark_session or builder.getOrCreate()
-            self.spark.sparkContext.setLogLevel("ERROR")
+                self.spark = builder.getOrCreate()
+                self.spark.sparkContext.setLogLevel("ERROR")
 
         self.config = config or {}
         self.connections = connections or {}

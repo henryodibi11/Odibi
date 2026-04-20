@@ -802,6 +802,7 @@ class TestSCD2EntryPoint:
 
     def test_unsupported_engine_raises(self):
         """Line 202-208: unsupported engine type raises ValueError."""
+        pytest.importorskip("polars")
         from odibi.context import PolarsContext
         import polars as pl
 

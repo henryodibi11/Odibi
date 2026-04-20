@@ -52,14 +52,13 @@ class OpenLineageAdapter:
             return
 
         url = config.url or os.getenv("OPENLINEAGE_URL")
-        api_key = config.api_key or os.getenv("OPENLINEAGE_API_KEY")
 
         if not url:
             self.enabled = False
             return
 
         try:
-            self.client = OpenLineageClient(url=url, api_key=api_key)
+            self.client = OpenLineageClient(url=url)
             self.namespace = config.namespace
             self.pipeline_run_id = None
             self.pipeline_name = None
@@ -195,7 +194,7 @@ class OpenLineageAdapter:
             job_facets = {
                 "sourceCode": SourceCodeJobFacet(
                     language="python",
-                    source_code=(
+                    sourceCode=(
                         str(config.model_dump_json())
                         if hasattr(config, "model_dump_json")
                         else str(config.model_dump())

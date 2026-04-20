@@ -321,7 +321,7 @@ class TestSyncToDelta:
 
     def test_engine_based_write(self):
         s = _make_syncer(target_type_val="azure_adls")
-        s.target.uri = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
+        s.target.get_path = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
         df = pd.DataFrame({"x": [1]})
         s._read_source_table = MagicMock(return_value=df)
         result = s._sync_to_delta("meta_runs")
@@ -331,7 +331,7 @@ class TestSyncToDelta:
 
     def test_engine_empty_df(self):
         s = _make_syncer(target_type_val="azure_adls")
-        s.target.uri = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
+        s.target.get_path = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
         s._read_source_table = MagicMock(return_value=pd.DataFrame())
         result = s._sync_to_delta("meta_runs")
         assert result["success"] is True
@@ -343,7 +343,7 @@ class TestSyncToDelta:
         mock_df.count.return_value = 5
         mock_spark.read.format.return_value.load.return_value = mock_df
         s = _make_syncer(target_type_val="azure_adls", spark=mock_spark)
-        s.target.uri = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
+        s.target.get_path = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
         result = s._sync_to_delta("meta_runs")
         assert result["success"] is True
         assert result["rows"] == 5
@@ -354,13 +354,13 @@ class TestSyncToDelta:
         mock_df.count.return_value = 0
         mock_spark.read.format.return_value.load.return_value = mock_df
         s = _make_syncer(target_type_val="azure_adls", spark=mock_spark)
-        s.target.uri = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
+        s.target.get_path = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
         result = s._sync_to_delta("meta_runs")
         assert result["rows"] == 0
 
     def test_exception(self):
         s = _make_syncer(target_type_val="azure_adls")
-        s.target.uri = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
+        s.target.get_path = MagicMock(return_value="abfss://cont@acct.dfs.core.windows.net/sys")
         s._read_source_table = MagicMock(side_effect=Exception("fail"))
         result = s._sync_to_delta("meta_runs")
         assert result["success"] is False

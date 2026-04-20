@@ -99,6 +99,7 @@ class TestCleanSparkTraceback:
             "    result = run()\n"
             "  at org.apache.spark.sql.SparkSession.sql(SparkSession.scala:100)\n"
             "  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)\n"
+            '  File "my_module.py", line 50, in run\n'
             "RuntimeError: Spark failed\n"
         )
         cleaned = ex._clean_spark_traceback(raw)
@@ -467,9 +468,6 @@ class TestGetDeltaTableState:
         write_cfg.connection = "local"
         write_cfg.path = "table1"
         cfg = _make_config(write=write_cfg)
-        with patch("odibi.node.DeltaTable", side_effect=Exception("not a Delta table")):
-            pass
-        # The function will try DeltaTable import — mock it
         with patch.dict("sys.modules", {"deltalake": MagicMock()}):
             # DeltaTable raises "not a Delta table"
             import sys

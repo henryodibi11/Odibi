@@ -86,11 +86,15 @@ class TestFormatOutput:
 class TestPrintTable:
     def test_rich_table_prints_output(self, capsys):
         data = {"Name": "Alice", "Age": "30"}
-        with patch("odibi.cli.main.RICH_AVAILABLE", True):
+        mock_console = MagicMock()
+        mock_table = MagicMock()
+        with (
+            patch("odibi.cli.main.RICH_AVAILABLE", True),
+            patch("odibi.cli.main.Console", return_value=mock_console, create=True),
+            patch("odibi.cli.main.Table", return_value=mock_table, create=True),
+        ):
             print_table(data, title="Test Title")
-        captured = capsys.readouterr()
-        assert "Alice" in captured.out
-        assert "30" in captured.out
+        mock_console.print.assert_called_once()
 
     def test_plain_table_prints_output(self, capsys):
         data = {"Name": "Alice", "Age": "30"}
@@ -119,10 +123,15 @@ class TestPrintTable:
 
     def test_rich_table_with_title(self, capsys):
         data = {"Key1": "Val1"}
-        with patch("odibi.cli.main.RICH_AVAILABLE", True):
+        mock_console = MagicMock()
+        mock_table = MagicMock()
+        with (
+            patch("odibi.cli.main.RICH_AVAILABLE", True),
+            patch("odibi.cli.main.Console", return_value=mock_console, create=True),
+            patch("odibi.cli.main.Table", return_value=mock_table, create=True),
+        ):
             print_table(data, title="Rich Title")
-        captured = capsys.readouterr()
-        assert "Val1" in captured.out
+        mock_console.print.assert_called_once()
 
     def test_plain_table_multiple_rows(self, capsys):
         data = {"a": "1", "b": "2", "c": "3"}

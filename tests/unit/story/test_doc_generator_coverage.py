@@ -1,6 +1,7 @@
 """Coverage tests for odibi/story/doc_generator.py — rendering helpers & edge cases."""
 
 import json
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,12 +67,12 @@ def _meta(
     )
 
 
-def _gen(enabled=True, output="docs/gen/"):
+def _gen(enabled=True, output="docs/gen/", workspace_root=None):
     cap = _Cap()
     gen = DocGenerator(
         config=_cfg(enabled, output),
         pipeline_name="test_pipe",
-        workspace_root="/fake",
+        workspace_root=workspace_root or tempfile.mkdtemp(),
         write_file=cap,
     )
     return gen, cap
@@ -593,7 +594,7 @@ class TestRunMemo:
     def _memo(self, md=None, existing=None):
         gen, cap = _gen()
         md = md or _meta()
-        history_path = "/fake/docs/gen/RUN_HISTORY.md"
+        history_path = str(Path(gen.output_path_str) / "RUN_HISTORY.md")
         if existing:
             with patch.object(gen, "_read_file", return_value=existing):
                 gen._generate_run_memo(md, history_path, "story.html")
