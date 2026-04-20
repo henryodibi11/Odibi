@@ -9,7 +9,8 @@ def test_spark_real_session():
     except ImportError:
         pytest.skip("pyspark not installed")
 
-    if "MagicMock" in type(SparkSession).__name__ or not hasattr(SparkSession, "builder"):
+    # Guard against mock contamination from other tests in the session
+    if not hasattr(SparkSession, "builder"):
         pytest.skip("SparkSession.builder not available (mock or Databricks Connect)")
 
     try:
@@ -37,6 +38,11 @@ def test_spark_real_session():
             pytest.skip(f"Spark failed to start (likely missing Java): {e}")
         else:
             pytest.fail(f"Failed to start or use real Spark session: {e}")
+    except AttributeError as e:
+        if "MagicMock" in str(e) or "builder" in str(e):
+            pytest.skip(f"SparkSession corrupted by mock in test session: {e}")
+        else:
+            pytest.fail(f"Failed to start or use real Spark session: {e}")
     except Exception as e:
         # Skip on Windows if Hadoop home is missing (common dev environment issue)
         import sys
@@ -46,8 +52,6 @@ def test_spark_real_session():
             pytest.skip(f"Spark failed to start (likely missing Java): {e}")
 
         if sys.platform == "win32":
-            # Windows failures are almost always due to winutils/hadoop missing
-            # Check for common symptoms or just skip if it looks like environment issue
             if (
                 "HADOOP_HOME" in err_msg
                 or "Job aborted" in err_msg

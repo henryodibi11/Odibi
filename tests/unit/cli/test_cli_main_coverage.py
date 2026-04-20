@@ -1,6 +1,7 @@
 """Tests for odibi.cli.main — core CLI functions."""
 
 import json
+import sys
 
 import pytest
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,10 @@ from odibi.cli.main import (
     main,
 )
 from odibi import __version__
+
+# odibi.cli.__init__ does "from .main import main", which shadows the module.
+# Access the actual module object via sys.modules for patch.object().
+_cli_main_mod = sys.modules["odibi.cli.main"]
 
 
 # ---------------------------------------------------------------------------
@@ -89,16 +94,16 @@ class TestPrintTable:
         mock_console = MagicMock()
         mock_table = MagicMock()
         with (
-            patch("odibi.cli.main.RICH_AVAILABLE", True),
-            patch("odibi.cli.main.Console", return_value=mock_console, create=True),
-            patch("odibi.cli.main.Table", return_value=mock_table, create=True),
+            patch.object(_cli_main_mod, "RICH_AVAILABLE", True),
+            patch.object(_cli_main_mod, "Console", return_value=mock_console, create=True),
+            patch.object(_cli_main_mod, "Table", return_value=mock_table, create=True),
         ):
             print_table(data, title="Test Title")
         mock_console.print.assert_called_once()
 
     def test_plain_table_prints_output(self, capsys):
         data = {"Name": "Alice", "Age": "30"}
-        with patch("odibi.cli.main.RICH_AVAILABLE", False):
+        with patch.object(_cli_main_mod, "RICH_AVAILABLE", False):
             print_table(data, title="People")
         captured = capsys.readouterr()
         assert "People" in captured.out
@@ -107,7 +112,7 @@ class TestPrintTable:
 
     def test_plain_table_with_title(self, capsys):
         data = {"k": "v"}
-        with patch("odibi.cli.main.RICH_AVAILABLE", False):
+        with patch.object(_cli_main_mod, "RICH_AVAILABLE", False):
             print_table(data, title="My Title")
         captured = capsys.readouterr()
         assert "My Title" in captured.out
@@ -115,7 +120,7 @@ class TestPrintTable:
 
     def test_plain_table_without_title(self, capsys):
         data = {"k": "v"}
-        with patch("odibi.cli.main.RICH_AVAILABLE", False):
+        with patch.object(_cli_main_mod, "RICH_AVAILABLE", False):
             print_table(data, title="")
         captured = capsys.readouterr()
         assert "=" not in captured.out
@@ -126,16 +131,16 @@ class TestPrintTable:
         mock_console = MagicMock()
         mock_table = MagicMock()
         with (
-            patch("odibi.cli.main.RICH_AVAILABLE", True),
-            patch("odibi.cli.main.Console", return_value=mock_console, create=True),
-            patch("odibi.cli.main.Table", return_value=mock_table, create=True),
+            patch.object(_cli_main_mod, "RICH_AVAILABLE", True),
+            patch.object(_cli_main_mod, "Console", return_value=mock_console, create=True),
+            patch.object(_cli_main_mod, "Table", return_value=mock_table, create=True),
         ):
             print_table(data, title="Rich Title")
         mock_console.print.assert_called_once()
 
     def test_plain_table_multiple_rows(self, capsys):
         data = {"a": "1", "b": "2", "c": "3"}
-        with patch("odibi.cli.main.RICH_AVAILABLE", False):
+        with patch.object(_cli_main_mod, "RICH_AVAILABLE", False):
             print_table(data)
         captured = capsys.readouterr()
         assert "a" in captured.out

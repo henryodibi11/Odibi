@@ -288,12 +288,17 @@ def _get_timestamp_type(df, reference_cols: List[str]) -> str:
     """
     if df is None:
         return "timestamp"
-    from pyspark.sql.types import TimestampNTZType, TimestampType
+    from pyspark.sql.types import TimestampType
+
+    try:
+        from pyspark.sql.types import TimestampNTZType
+    except ImportError:
+        TimestampNTZType = None
 
     for col_name in reference_cols:
         if col_name in df.columns:
             col_type = df.schema[col_name].dataType
-            if isinstance(col_type, TimestampNTZType):
+            if TimestampNTZType is not None and isinstance(col_type, TimestampNTZType):
                 return "timestamp_ntz"
             if isinstance(col_type, TimestampType):
                 return "timestamp"

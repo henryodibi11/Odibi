@@ -149,7 +149,7 @@ class TestRead:
             pytest.skip("deltalake write incompatibility")
         try:
             result = PolarsEngine().read(conn, "delta", path="dtable")
-        except TypeError:
+        except (TypeError, ValueError):
             pytest.skip("deltalake schema API incompatibility")
         assert isinstance(result, pl.LazyFrame)
 

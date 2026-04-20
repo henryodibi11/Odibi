@@ -473,60 +473,63 @@ class TestGetImpactAnalysis:
 # ---------------------------------------------------------------------------
 
 
-def _install_mock_openlineage_types():
-    """Inject mock OpenLineage classes into odibi.lineage module."""
-    import odibi.lineage as mod
+_OL_ATTRS = [
+    "Run",
+    "Job",
+    "RunEvent",
+    "RunState",
+    "NominalTimeRunFacet",
+    "ProcessingEngineRunFacet",
+    "DocumentationJobFacet",
+    "ErrorMessageRunFacet",
+    "ParentRunFacet",
+    "SourceCodeJobFacet",
+    "SchemaDatasetFacet",
+    "SchemaField",
+    "InputDataset",
+    "OutputDataset",
+    "OpenLineageClient",
+]
 
-    # Only install if not already present (HAS_OPENLINEAGE is False)
-    if not mod.HAS_OPENLINEAGE:
-        mod.Run = MagicMock()
-        mod.Job = MagicMock()
-        mod.RunEvent = MagicMock()
-        mod.RunState = SimpleNamespace(START="START", COMPLETE="COMPLETE", FAIL="FAIL")
-        mod.NominalTimeRunFacet = MagicMock()
-        mod.ProcessingEngineRunFacet = MagicMock()
-        mod.DocumentationJobFacet = MagicMock()
-        mod.ErrorMessageRunFacet = MagicMock()
-        mod.ParentRunFacet = MagicMock()
-        mod.SourceCodeJobFacet = MagicMock()
-        mod.SchemaDatasetFacet = MagicMock()
-        mod.SchemaField = MagicMock()
-        mod.InputDataset = MagicMock()
-        mod.OutputDataset = MagicMock()
-        mod.OpenLineageClient = MagicMock()
-
-
-def _uninstall_mock_openlineage_types():
-    """Remove mock OpenLineage classes from odibi.lineage module."""
-    import odibi.lineage as mod
-
-    for attr in [
-        "Run",
-        "Job",
-        "RunEvent",
-        "RunState",
-        "NominalTimeRunFacet",
-        "ProcessingEngineRunFacet",
-        "DocumentationJobFacet",
-        "ErrorMessageRunFacet",
-        "ParentRunFacet",
-        "SourceCodeJobFacet",
-        "SchemaDatasetFacet",
-        "SchemaField",
-        "InputDataset",
-        "OutputDataset",
-        "OpenLineageClient",
-    ]:
-        if hasattr(mod, attr) and isinstance(getattr(mod, attr), (MagicMock, SimpleNamespace)):
-            delattr(mod, attr)
+_SENTINEL = object()
 
 
 @pytest.fixture(autouse=False)
 def mock_openlineage_types():
-    """Fixture to install and remove mock OpenLineage types."""
-    _install_mock_openlineage_types()
+    """Fixture to install mock OpenLineage types and restore originals after."""
+    import odibi.lineage as mod
+
+    # Save originals
+    saved = {attr: getattr(mod, attr, _SENTINEL) for attr in _OL_ATTRS}
+
+    # Install mocks — even when OpenLineage is installed, the real
+    # types may have breaking API changes across versions.
+    mod.Run = MagicMock()
+    mod.Job = MagicMock()
+    mod.RunEvent = MagicMock()
+    mod.RunState = SimpleNamespace(START="START", COMPLETE="COMPLETE", FAIL="FAIL")
+    mod.NominalTimeRunFacet = MagicMock()
+    mod.ProcessingEngineRunFacet = MagicMock()
+    mod.DocumentationJobFacet = MagicMock()
+    mod.ErrorMessageRunFacet = MagicMock()
+    mod.ParentRunFacet = MagicMock()
+    mod.SourceCodeJobFacet = MagicMock()
+    mod.SchemaDatasetFacet = MagicMock()
+    mod.SchemaField = MagicMock()
+    mod.InputDataset = MagicMock()
+    mod.OutputDataset = MagicMock()
+    mod.OpenLineageClient = MagicMock()
+
     yield
-    _uninstall_mock_openlineage_types()
+
+    # Restore originals
+    for attr in _OL_ATTRS:
+        orig = saved[attr]
+        if orig is _SENTINEL:
+            if hasattr(mod, attr):
+                delattr(mod, attr)
+        else:
+            setattr(mod, attr, orig)
 
 
 class TestOpenLineageAdapterEnabled:

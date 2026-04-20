@@ -1,8 +1,12 @@
 """Tests for odibi.cli.main — command dispatch branches (lines 412-498)."""
 
+import sys
 from unittest.mock import patch
 
 from odibi.cli.main import main
+
+# odibi.cli.__init__ re-exports "main", shadowing the module name.
+_cli_main_mod = sys.modules["odibi.cli.main"]
 
 
 class TestMainDispatchScaffoldBranch:
@@ -17,7 +21,7 @@ class TestMainDispatchScaffoldBranch:
         ]
         with (
             patch("sys.argv", args),
-            patch("odibi.cli.main.cmd_scaffold_project", return_value=0) as mock_fn,
+            patch.object(_cli_main_mod, "cmd_scaffold_project", return_value=0) as mock_fn,
         ):
             result = main()
         assert result == 0
@@ -38,7 +42,7 @@ class TestMainDispatchScaffoldBranch:
         ]
         with (
             patch("sys.argv", args),
-            patch("odibi.cli.main.cmd_scaffold_sql_pipeline", return_value=0) as mock_fn,
+            patch.object(_cli_main_mod, "cmd_scaffold_sql_pipeline", return_value=0) as mock_fn,
         ):
             result = main()
         assert result == 0
