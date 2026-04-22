@@ -106,13 +106,12 @@ class TestStructuredLogger:
         assert data["key"] == "val"
         assert "timestamp" in data
 
-    def test_non_structured_mode_human_readable(self, caplog):
+    def test_non_structured_mode_human_readable(self):
         logger = StructuredLogger(structured=False, level="DEBUG")
-        import logging
-
-        with caplog.at_level(logging.DEBUG, logger="odibi"):
+        with patch.object(logger, "logger") as mock_py_logger:
             logger.info("test msg", extra_key="extra_val")
-        assert any("test msg" in r.message for r in caplog.records)
+            mock_py_logger.info.assert_called_once()
+            assert "test msg" in mock_py_logger.info.call_args[0][0]
 
     def test_level_filtering_debug_not_logged_at_info(self, capsys):
         logger = StructuredLogger(structured=True, level="INFO")

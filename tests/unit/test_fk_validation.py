@@ -508,7 +508,7 @@ class TestValidateFKOnLoad:
                 on_failure="error",
             )
 
-    def test_validate_on_load_warn_mode(self, sample_relationships, caplog):
+    def test_validate_on_load_warn_mode(self, sample_relationships):
         """Test warn mode logs warning but returns data."""
         dim_customer = pd.DataFrame({"customer_sk": [1, 2]})
         fact_orders = pd.DataFrame(

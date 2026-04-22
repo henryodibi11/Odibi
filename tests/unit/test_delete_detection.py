@@ -443,12 +443,11 @@ class TestDetectDeletesTransformerPandas:
                     on_threshold_breach="error",
                 )
 
+    @patch("odibi.transformers.delete_detection.logger")
     @patch("odibi.transformers.delete_detection._get_sqlalchemy_engine")
     @patch("odibi.transformers.delete_detection._get_connection")
-    def test_threshold_breach_warn(self, mock_get_conn, mock_get_engine, pandas_context, caplog):
+    def test_threshold_breach_warn(self, mock_get_conn, mock_get_engine, mock_logger, pandas_context):
         """Threshold breach with on_threshold_breach=warn should log warning."""
-        import logging
-
         silver_df = pd.DataFrame({"id": list(range(100))})
         source_keys_df = pd.DataFrame({"id": list(range(10))})
 
@@ -458,19 +457,18 @@ class TestDetectDeletesTransformerPandas:
         with patch("pandas.read_sql", return_value=source_keys_df):
             ctx = self._make_engine_context(silver_df, pandas_context)
 
-            with caplog.at_level(logging.WARNING):
-                result = detect_deletes(
-                    ctx,
-                    mode="sql_compare",
-                    keys=["id"],
-                    source_connection="conn",
-                    source_table="tbl",
-                    max_delete_percent=50.0,
-                    on_threshold_breach="warn",
-                )
+            result = detect_deletes(
+                ctx,
+                mode="sql_compare",
+                keys=["id"],
+                source_connection="conn",
+                source_table="tbl",
+                max_delete_percent=50.0,
+                on_threshold_breach="warn",
+            )
 
             assert result.df is not None
-            assert "threshold" in caplog.text.lower() or len(result.df) > 0
+            assert mock_logger.warning.called or len(result.df) > 0
 
     @patch("odibi.transformers.delete_detection._get_sqlalchemy_engine")
     @patch("odibi.transformers.delete_detection._get_connection")

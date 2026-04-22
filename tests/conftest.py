@@ -28,6 +28,22 @@ if sys.platform == "win32":
         pass
 
 
+@pytest.fixture(autouse=True)
+def _reset_logging_context():
+    """Reset the global LoggingContext singleton between tests.
+
+    Prevents state pollution when tests run in batch — the singleton
+    accumulates pipeline/node context and Rich handler state that can
+    cause TypeError or AttributeError in later tests.
+    """
+    import odibi.utils.logging_context as lc
+
+    original = lc._global_context
+    lc._global_context = None
+    yield
+    lc._global_context = original
+
+
 def _is_spark_or_delta_name(name: str) -> bool:
     """Check if a filename (not full path) contains spark or delta keywords."""
     name = name.lower()
