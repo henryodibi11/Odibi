@@ -446,7 +446,9 @@ class TestDetectDeletesTransformerPandas:
     @patch("odibi.transformers.delete_detection.logger")
     @patch("odibi.transformers.delete_detection._get_sqlalchemy_engine")
     @patch("odibi.transformers.delete_detection._get_connection")
-    def test_threshold_breach_warn(self, mock_get_conn, mock_get_engine, mock_logger, pandas_context):
+    def test_threshold_breach_warn(
+        self, mock_get_conn, mock_get_engine, mock_logger, pandas_context
+    ):
         """Threshold breach with on_threshold_breach=warn should log warning."""
         silver_df = pd.DataFrame({"id": list(range(100))})
         source_keys_df = pd.DataFrame({"id": list(range(10))})
