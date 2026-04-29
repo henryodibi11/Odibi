@@ -1,6 +1,7 @@
 """Tests for odibi.cli.catalog — catalog CLI subcommands."""
 
 import json
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
@@ -223,7 +224,7 @@ class TestCommandsWithData:
                 "status": ["SUCCESS"],
                 "rows_processed": [100],
                 "duration_ms": [500],
-                "timestamp": [pd.Timestamp("2026-04-17", tz="UTC")],
+                "timestamp": [pd.Timestamp(datetime.now(timezone.utc) - timedelta(hours=1))],
             }
         )
         args = _make_args()
@@ -384,9 +385,11 @@ class TestStatsCommand:
                 "status": ["SUCCESS", "FAILED", "SUCCESS"],
                 "rows_processed": [100, 200, 300],
                 "duration_ms": [1000, 2000, 3000],
-                "timestamp": pd.to_datetime(["2026-04-17", "2026-04-16", "2026-04-15"]).tz_localize(
-                    "UTC"
-                ),
+                "timestamp": pd.to_datetime([
+                    datetime.now(timezone.utc) - timedelta(hours=1),
+                    datetime.now(timezone.utc) - timedelta(hours=2),
+                    datetime.now(timezone.utc) - timedelta(hours=3),
+                ]).tz_localize(None).tz_localize("UTC"),
             }
         )
         args = _make_args()
@@ -442,7 +445,7 @@ class TestCommandsJsonOutput:
                 "run_id": ["r1"],
                 "pipeline_name": ["pipe1"],
                 "status": ["SUCCESS"],
-                "timestamp": [pd.Timestamp("2026-04-17", tz="UTC")],
+                "timestamp": [pd.Timestamp(datetime.now(timezone.utc) - timedelta(hours=1))],
             }
         )
         args = _make_args(format="json")
