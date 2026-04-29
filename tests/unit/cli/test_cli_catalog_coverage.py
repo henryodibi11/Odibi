@@ -385,11 +385,15 @@ class TestStatsCommand:
                 "status": ["SUCCESS", "FAILED", "SUCCESS"],
                 "rows_processed": [100, 200, 300],
                 "duration_ms": [1000, 2000, 3000],
-                "timestamp": pd.to_datetime([
-                    datetime.now(timezone.utc) - timedelta(hours=1),
-                    datetime.now(timezone.utc) - timedelta(hours=2),
-                    datetime.now(timezone.utc) - timedelta(hours=3),
-                ]).tz_localize(None).tz_localize("UTC"),
+                "timestamp": pd.to_datetime(
+                    [
+                        datetime.now(timezone.utc) - timedelta(hours=1),
+                        datetime.now(timezone.utc) - timedelta(hours=2),
+                        datetime.now(timezone.utc) - timedelta(hours=3),
+                    ]
+                )
+                .tz_localize(None)
+                .tz_localize("UTC"),
             }
         )
         args = _make_args()
