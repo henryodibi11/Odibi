@@ -1429,7 +1429,8 @@ Task: Fix the pre-existing test failures that have been documented but deferred.
 
 Known failures:
 1. ~25 caplog failures in catalog test files — logger.warning goes to stderr, caplog doesn't capture
-2. ~94 failures in test_pandas_engine_core.py when run in batch — logging context pollution
+2. ~94 failures in test_pandas_engine_core.py + test_pandas_engine_full_coverage.py when run in batch — logging context pollution
+3. ~70-93 failures in test_adf_profiler_coverage.py — Excel report generation and caching issues (environment-specific)
 
 Strategy for caplog failures:
 - Replace caplog assertions with return-value assertions
@@ -1451,6 +1452,95 @@ Success criteria:
 - [ ] Batch test failure count reduced
 - [ ] No new test patterns that break in batch
 - [ ] run_coverage.ps1 shows fewer failures
+```
+
+---
+
+### Task 26a: P-009 — DimensionPattern SCD2 + FactPattern Bug Fixes
+
+**Branch:** `fix/hodibi/p009-dimension-fact-bugs`
+
+> **⚠️ Background:** All three bugs were surfaced by Task 21 and are documented in detail
+> as P-009 in `docs/LESSONS_LEARNED.md`. The integration test
+> `examples/star_schema_e2e/star_schema_e2e.py` already encodes the expected behavior;
+> after these fixes, the test should pass without its three workarounds.
+
+**Prompt for Agent:**
+```
+Read CUSTOM_INSTRUCTIONS.md, docs/LESSONS_LEARNED.md (P-009 entry),
+examples/star_schema_e2e/README.md (Bug Notes section),
+examples/star_schema_e2e/star_schema_e2e.py (the workarounds at lines ~38-46,
+build_dim_product, _inject_unknown_member_scd2, build_fact_orders).
+
+Task: Fix three independent bugs in odibi patterns surfaced by Task 21.
+
+Bug 1: DimensionPattern._ensure_unknown_member fails on Spark Connect
+- Location: odibi/patterns/dimension.py line 602
+- Symptom: spark.createDataFrame([row_values], cols) raises
+  [CANNOT_DETERMINE_TYPE] when valid_to is None and no schema is supplied.
+- Fix: Build the unknown-member row using spark.range(1).select(F.lit(...).cast(dtype)
+  .alias(name)) so every column has an explicit type. Reuse the field types
+  from the input df.schema. Idempotent (return df unchanged if SK=0 already
+  present).
+- Test: tests/unit/patterns/test_dimension_unknown_member.py — verify the
+  unknown member row is added on Spark for SCD0/1/2 dimensions, with all
+  expected columns (including all-None valid_to).
+
+Bug 2: DimensionPattern SCD2 + scd2 transformer + surrogate keys mismatch
+- Location: odibi/patterns/dimension.py _execute_scd2 (lines 455-538) +
+  odibi/transformers/scd.py _scd2_spark + _scd2_spark_delta_merge.
+- Symptom: with use_delta_merge=True (default), scd2 writes history via MERGE
+  and returns only new/changed rows. DimensionPattern adds SK to that partial
+  result; caller overwrites target → destroys MERGE history. With
+  use_delta_merge=False, legacy path's unionByName fails because
+  rows_to_insert lacks SK column.
+- Fix approach (pick one — design choice required):
+  (a) Push surrogate-key generation INTO the scd2 transformer so the
+      transformer writes target with SK already assigned, OR
+  (b) Make DimensionPattern read the target back after scd2 runs, assign SKs
+      to any rows missing one (sequential after max), and overwrite — see
+      examples/star_schema_e2e/star_schema_e2e.py build_dim_product for the
+      working pattern.
+- Test: tests/unit/patterns/test_dimension_scd2_sk.py — verify (1) first run
+  writes 50 rows with SKs 1-50 + unknown SK=0, (2) second run with 10 changed
+  prices produces 10 history rows with new SKs (51-60), (3) is_current
+  invariant holds.
+
+Bug 3: FactPattern AMBIGUOUS_REFERENCE when dim_key == surrogate_key
+- Location: odibi/patterns/fact.py _join_dimension_spark lines 470-474.
+- Symptom: F.col(dim_key).alias(f"_dim_{dim_key}") +
+  F.col(sk_col).alias(f"_dim_{sk_col}") creates two columns with the same
+  name when dim_key == sk_col (e.g., date_sk → date_sk).
+- Fix: when dim_key == sk_col, project the column once and reuse it as the
+  SK alias; only create two aliases when they differ.
+- Test: tests/unit/patterns/test_fact_dim_alias.py — verify a fact join
+  against a date dimension where source_column=date_sk, dimension_key=date_sk,
+  surrogate_key=date_sk succeeds and no AMBIGUOUS_REFERENCE is raised.
+
+Verify all three fixes with the existing integration test:
+1. Remove the workarounds from examples/star_schema_e2e/star_schema_e2e.py:
+   - Replace build_dim_product with the simpler DimensionPattern call
+     (scd_type=2, unknown_member=true).
+   - Re-add the dim_date FK to FactPattern.dimensions list.
+   - Drop the _inject_unknown_member_scd2 helper.
+2. Re-run examples\star_schema_e2e\star_schema_e2e.py — all 12 verifications
+   must still pass without the workarounds.
+3. Update P-009 in docs/LESSONS_LEARNED.md with resolution notes.
+
+Rules:
+- Fix must work on Spark (Databricks Connect 17.3 + cluster), not just mocks.
+- Maintain Pandas + Polars parity (dimension/fact pandas paths must keep working).
+- ≤350 LOC total across all three fixes (excluding tests).
+- Add unit tests for each fix that pin the previously-broken behavior.
+
+Success criteria:
+- [ ] Bug 1 fixed: SCD2 with unknown_member=true succeeds on Spark Connect first run.
+- [ ] Bug 2 fixed: SCD2 v1 + v2 with surrogate keys produces correct history.
+- [ ] Bug 3 fixed: FactPattern accepts dim_key == surrogate_key without errors.
+- [ ] examples/star_schema_e2e/star_schema_e2e.py passes after workarounds removed.
+- [ ] Per-bug unit tests added and green.
+- [ ] Pandas + Polars dimension/fact behavior unchanged.
+- [ ] P-009 marked RESOLVED in docs/LESSONS_LEARNED.md.
 ```
 
 ---
@@ -1960,6 +2050,7 @@ Phase 6: Bug Fixes
 - [ ] Task 24: SCD2 float/NaN (#248)
 - [ ] Task 25: YAML validation hardening
 - [ ] Task 26: Pre-existing test failures
+- [ ] Task 26a: P-009 — DimensionPattern SCD2 + FactPattern bug fixes
 
 Phase 7: New Features
 - [ ] Task 27: row_number transformer
