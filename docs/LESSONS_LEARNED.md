@@ -206,16 +206,15 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Fix:** Added `_safe_partition_count(df)` helper that returns -1 on failure. Wrapped all `sparkContext` access in try/except. All 6 unprotected locations now safe.  
 **Modules:** `odibi/engine/spark_engine.py`
 
----
-
 ### T-018: normalize_column_names Uses Wrong Quote Character on Spark
+**Date:** 2026-04-30  
+**Symptom:** On Spark, `normalize_column_names` returns the literal string `"First Name"` as data instead of the actual column value. Column names are renamed correctly but all data values become the old column name string.  
+**Root Cause:** SQL generation hardcoded double-quote identifiers (`"First Name"`) for all engines. Spark SQL treats `"..."` as a string literal; column identifiers require backticks. DuckDB/Pandas unaffected (ANSI SQL: double quotes = identifiers).  
+**Fix:** Added engine-aware quoting: `` q = '`' if SPARK else '"' `` — consistent with `rename_columns` and `replace_values` which already used this pattern.  
+**Rule:** Always use engine-aware quoting for column identifiers in generated SQL.  
+**Modules:** `odibi/transformers/sql_core.py` — `normalize_column_names()`
 
-- **Date:** 2026-04-30
-- **Module:** `odibi/transformers/sql_core.py` -> `normalize_column_names()`
-- **Symptom:** On Spark, returns literal string "First Name" instead of column value. Column names renamed correctly but data values become old column name as string.
-- **Root cause:** SQL hardcoded double-quote identifiers for all engines. Spark SQL treats double quotes as string literals; needs backticks for column identifiers. DuckDB/Pandas unaffected (ANSI SQL double quotes = identifiers).
-- **Fix:** Added engine-aware quoting: backtick for Spark, double-quote for DuckDB. Consistent with rename_columns and replace_values.
-- **Rule:** Always use engine-aware quoting for column identifiers in SQL generation.
+---
 
 ## Patterns (Working Recipes)
 
