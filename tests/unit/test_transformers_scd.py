@@ -724,6 +724,7 @@ class TestSCD2MergeOptimization:
         mock_dt_class.isDeltaTable.return_value = False
 
         # Target exists (as non-Delta table) so spark.table succeeds
+        context.spark.catalog.tableExists.return_value = True
         context.spark.table.return_value = MagicMock()
 
         # Mock delta.tables at sys.modules level since it can't import on Windows
@@ -750,6 +751,7 @@ class TestSCD2MergeOptimization:
         mock_dt_class.isDeltaTable.return_value = False
 
         # Target doesn't exist at all
+        context.spark.catalog.tableExists.return_value = False
         context.spark.table.side_effect = Exception("not found")
         context.spark.read.format.return_value.load.side_effect = Exception("not found")
 
