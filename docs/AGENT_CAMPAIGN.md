@@ -1863,7 +1863,7 @@ Phase 3: Polars Parity ✅
 - [x] Task 14: Polars delete detection — 24/24 PASS, +185 LOC production
 
 Phase 4: Validation E2E
-- [ ] Task 15: Validation tutorial (#224)
+- [x] Task 15: Validation tutorial (#224) — 8/8 tests PASS, 12 valid, 8 quarantined
 - [x] Task 16: Delete detection tutorial (#223) — 9/9 PASS, 6 files
 - [x] Task 17: Quarantine tutorial (#222) — 10/10 PASS, 6 files
 - [ ] Task 18: Delta troubleshooting (#225)
