@@ -139,6 +139,27 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Fix:** Isolate Polars anonymize tests in separate batch  
 **Modules:** `engine/polars_engine.py` anonymize method
 
+### T-011: Spark Connect Temp View Lifecycle — Views Dropped Before Lazy Eval
+**Date:** 2026-04  
+**Symptom:** Spark Connect queries fail with `INVALID_HANDLE.Format: OPERATION_HANDLE` or return empty results  
+**Root Cause:** `EngineContext.sql()` used a `finally` block to unregister temp views after SQL execution. On classic Spark this works because DataFrames eagerly resolve. On Spark Connect, plan resolution is deferred — the view is dropped before the lazy DataFrame materializes.  
+**Fix:** Only unregister temp views on error (`except` block). Successful results keep views alive. Unique view names (`_odibi_view_{uuid}`) prevent conflicts; session cleanup handles the rest.  
+**Modules:** `odibi/context.py`
+
+### T-012: `bool(LazyFrame)` TypeError in Row Counting
+**Date:** 2026-04  
+**Symptom:** `TypeError: the truth value of a LazyFrame is ambiguous` when running transformers with Polars  
+**Root Cause:** Row-counting logic used `if rows_before and rows_after:` which calls `bool()` on the result of `.count()`. Polars `.count()` returns a LazyFrame (not an int), and `bool(LazyFrame)` raises TypeError.  
+**Fix:** Replace `if rows_before and rows_after:` with `if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float)):` — explicit type checks instead of truthiness.  
+**Modules:** `odibi/transformers/sql_core.py`, `odibi/transformers/advanced.py`, `odibi/transformers/relational.py`
+
+### T-013: Polars SQL Dialect Gaps — EXCEPT vs EXCLUDE, No Subqueries
+**Date:** 2026-04  
+**Symptom:** `polars.exceptions.SQLInterfaceError` on deduplicate: "EXCEPT syntax not supported" and "subqueries not supported"  
+**Root Cause:** Polars SQL uses `EXCLUDE` for column exclusion (like DuckDB/Pandas), not `EXCEPT` (Spark/SQL Server). Polars SQL also does not support subqueries like `ORDER BY (SELECT NULL)`.  
+**Fix:** Added Polars to the EXCLUDE dialect alongside Pandas/DuckDB. Use `ORDER BY 1` for Polars when no explicit `order_by` is specified.  
+**Modules:** `odibi/transformers/advanced.py` (deduplicate)
+
 ---
 
 ## Patterns (Working Recipes)
@@ -272,6 +293,16 @@ from lib.setup import *
 **Finding:** `state/__init__.py` imports `create_connection` from `odibi.connections.factory`, but only typed functions like `create_sql_server_connection` exist.  
 **Implication:** To test SQL Server state backend factory paths, inject mock directly: `m.create_connection = MagicMock()`
 
+### V-005: Module Caching on Shared Databricks Clusters
+**Verified:** 2026-04  
+**Finding:** On shared Databricks clusters, Python caches imported modules across cell executions. If you modify odibi source files and re-import, you get the stale cached version. Clearing just `odibi.*` from `sys.modules` is insufficient if your project has its own `lib/` package — both must be cleared.  
+**Implication:** Every campaign/test notebook must clear both `lib.*` and `odibi.*` from `sys.modules` before importing. Pattern: `for m in [k for k in sys.modules if k.startswith('lib') or k.startswith('odibi')]: del sys.modules[m]`
+
+### V-006: Spark Connect `.collect()` Returns List of Rows, Not DataFrame
+**Verified:** 2026-04  
+**Finding:** `hasattr(df, 'collect')` is True for both Polars LazyFrames AND Spark DataFrames. But Spark's `.collect()` returns `list[Row]`, while Polars' `.collect()` returns a `pl.DataFrame`. Using `hasattr` to detect "needs .collect()" will mis-route Spark DataFrames.  
+**Implication:** Always use `isinstance(df, pl.LazyFrame)` to detect Polars lazy frames. Never use `hasattr(df, 'collect')` as a Polars check.
+
 ---
 
 ## Session Log Template
@@ -299,3 +330,27 @@ Copy-paste this at the end of your session:
 ### No New Entries Needed
 - [ ] Confirmed: no new gotchas discovered this session
 ```
+
+## Session: 2026-04-30 — Odibi Hardening Campaign (Spark Connect + Polars Parity)
+
+### Work Done
+- Fixed `context.py` temp view lifecycle for Spark Connect lazy eval
+- Fixed row-counting `bool(LazyFrame)` TypeError across 4 transformer files
+- Fixed Polars deduplicate SQL dialect (EXCLUDE + ORDER BY 1)
+- Updated `test_context.py` to match new view lifecycle behavior
+- Built campaign test harness (01_smoke_test, 02_engine_matrix)
+- Validated: 7,440 unit tests pass, 0 regressions in changed modules
+
+### Verification Report
+- Tests written: 0 new (1 updated: test_sql_keeps_view_registered_after_successful_execution)
+- Tests passing: 7,440/7,440 (excluding 49 pre-existing failures from missing deltalake + /tmp env issues)
+- Engine parity: 11/11 parity tests pass
+- Campaign: 9/9 engine matrix tests pass (3 transformers × 3 engines)
+- Command: `pytest tests/unit/ -q --no-header`
+
+### New Entries Added
+- [x] Trap: T-011 — Spark Connect Temp View Lifecycle
+- [x] Trap: T-012 — bool(LazyFrame) TypeError in Row Counting
+- [x] Trap: T-013 — Polars SQL Dialect Gaps
+- [x] Discovery: V-005 — Module Caching on Shared Clusters
+- [x] Discovery: V-006 — Spark Connect .collect() Returns List of Rows

@@ -412,13 +412,13 @@ class TestEngineContextSql:
         assert "pdf_col" in captured_query["q"]
         assert "some_identifier" in captured_query["q"]
 
-    def test_sql_unregisters_view_after_execution(self):
+    def test_sql_keeps_view_registered_after_successful_execution(self):
         ctx = PandasContext()
         df_in = pd.DataFrame({"a": [1]})
         executor = MagicMock(return_value=pd.DataFrame())
         ec = EngineContext(ctx, df_in, EngineType.PANDAS, sql_executor=executor)
         ec.sql("SELECT * FROM df")
-        assert len(ctx._data) == 0
+        assert len(ctx._data) == 1  # View stays registered on success (Spark Connect lazy eval)
 
     def test_sql_unregisters_view_on_error(self):
         ctx = PandasContext()

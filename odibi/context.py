@@ -118,9 +118,12 @@ class EngineContext:
                 safe_query = re.sub(r'(?<!["\'\[])(\bdf\b)(?!["\'\]])', view_name, query)
                 res = self.sql_executor(safe_query, self.context)
                 return self.with_df(res)
-            finally:
-                # Cleanup temp view to avoid memory leaks
+            except Exception:
+                # Only cleanup on error — successful results may still reference the view
+                # for lazy evaluation (e.g., Spark Connect deferred plan resolution).
+                # Unique view names prevent conflicts; session cleanup handles the rest.
                 self.context.unregister(view_name)
+                raise
 
         raise NotImplementedError("EngineContext.sql requires sql_executor to be set.")
 
