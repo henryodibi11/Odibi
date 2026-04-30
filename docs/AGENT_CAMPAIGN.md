@@ -1210,6 +1210,26 @@ Success criteria:
 - [ ] Tables cleaned up
 ```
 
+**Status: ✅ COMPLETE (2026-04-30)**
+
+**Branch:** `test/hodibi/star-schema-e2e`
+
+**Deliverables:**
+- `examples/star_schema_e2e/config.yaml` — declarative pipeline (4 nodes: dim_date, dim_customer SCD1, dim_product SCD2, fact_orders) validating against `ProjectConfig`.
+- `examples/star_schema_e2e/star_schema_e2e.py` — executable integration test (415 LOC) driving the patterns against `eaai_dev.hardening_scratch` Unity Catalog.
+- `examples/star_schema_e2e/README.md` — usage + bug notes.
+
+**Verifications on DBR 17.3 / Spark 4.0.0 (Databricks Connect):**
+- dim_date=367, dim_customer=101, fact_orders=10025, dim_product=61 (50 base + 1 unknown + 10 history rows for SCD2 v2 mutations) — all row counts match.
+- Surrogate keys unique and contain `0` (unknown member) on all three dimensions.
+- FK integrity: `LEFT JOIN ... WHERE dim.sk IS NULL` returns 0 for `customer_sk`, `product_sk`, `order_date_sk`.
+- 25 fact rows mapped to unknown-member SK=0 via `FactPattern.orphan_handling=unknown`.
+- 10 products have SCD2 history rows; exactly one `is_current=true` per product_id.
+- Calculated measure `extended_amount = quantity * unit_price` consistent on all 10,025 rows.
+- Audit columns (`load_timestamp`, `source_system`) populated on every fact row.
+- All 7 sandbox tables dropped after run; pipeline elapsed ≈ 37s.
+- Surfaced three real framework bugs in DimensionPattern SCD2 + FactPattern dim_key/surrogate_key collision; documented as P-009 in LESSONS_LEARNED.md with workarounds.
+
 ---
 
 ### Task 22: Connection Discovery API — Real ADLS
@@ -1932,7 +1952,7 @@ Phase 4: Validation E2E
 Phase 5: Pattern Stress
 - [x] Task 19: Aggregation stress test
 - [x] Task 20: Date dimension full test
-- [ ] Task 21: Star schema E2E
+- [x] Task 21: Star schema E2E
 - [ ] Task 22: Connection discovery
 - [ ] Task 23: State management
 

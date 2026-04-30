@@ -862,3 +862,42 @@ ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, eng
 **Verified:** 2026-04-30 against DBR 17.3 LTS (Spark 4.0.0) via Databricks Connect
 **Finding:** `DateDimensionPattern.execute()` produces row-for-row identical values for all 18 non-`full_date` columns on Pandas and Spark for a 91-day window. The `full_date` column is `datetime.date` on Pandas and a Spark date-typed column on Spark; both serialize to the same ISO string, so `astype(str)` comparison is sufficient. Day-of-week numbering matches between engines because the Spark generator explicitly remaps `dayofweek` (Sunday=1 default) to ISO Monday=1/Sunday=7 to align with Pandas's `dayofweek + 1` convention.
 **Implication:** No engine-parity bug in date_dimension.py. The script in `examples/date_dimension_test/full_test.py` doubles as a regression detector if either engine path drifts.
+
+## Session: 2026-04-30 — Star Schema End-to-End Build (Task 21, #225)
+
+### Work Done
+- Created `examples/star_schema_e2e/config.yaml` (173 LOC) — declarative ProjectConfig-validated star schema (dim_date, dim_customer SCD1, dim_product SCD2, fact_orders) with validation gates, FK lookups, and audit columns.
+- Created `examples/star_schema_e2e/star_schema_e2e.py` (415 LOC) — executable integration test driving DateDimensionPattern, DimensionPattern, scd2 transformer, and FactPattern against real Unity Catalog tables in `eaai_dev.hardening_scratch`.
+- Created `examples/star_schema_e2e/README.md` (~110 LOC) — usage + bug notes.
+- Verified end-to-end against `1121-215743-ak1cop0m` (DBR 17.3 LTS, Spark 4.0.0) via Databricks Connect 17.3.7.
+- Surfaced three real framework bugs (P-009).
+
+### Verification Report
+- All 12 assertions pass: row counts (367/101/61/10025), unique SKs containing 0 on every dim, FK integrity 0 orphans on all three FKs (customer_sk, product_sk, order_date_sk), 25 unknown-member usages, 10 SCD2 history rows for changed products, exactly one is_current per product_id, calculated `extended_amount` consistent on all 10,025 rows, audit columns populated.
+- All 7 created tables dropped after run; managed-table count = 0.
+- Pipeline elapsed ≈ 37s.
+- YAML config validates against `ProjectConfig`.
+
+### New Entries Added
+- [x] Pattern: P-009 — DimensionPattern SCD2 + Surrogate Keys Has Three Distinct Failures On Spark Connect (Workarounds Documented)
+- [x] Verified: V-013 — FactPattern + Dimension SCD2 + Unknown Member Compose Cleanly When Workarounds Applied
+
+### P-009: DimensionPattern SCD2 + Surrogate Keys Has Three Distinct Failures On Spark Connect
+**Pattern:** Three independent bugs in `odibi/patterns/dimension.py` and `odibi/patterns/fact.py` make the documented "SCD2 dim with unknown member + surrogate key" path unusable on Spark Connect:
+
+1. **`_ensure_unknown_member` line 602** calls `spark.createDataFrame([row_values], cols)` where `valid_to` is `None`. Spark Connect raises `[CANNOT_DETERMINE_TYPE] Some of types cannot be determined after inferring`. Fix: build the unknown-member row using `spark.range(1).select(F.lit(...).cast(dtype).alias(name) ...)` so every column has an explicit type.
+
+2. **`_execute_scd2` + `scd2(use_delta_merge=True)` mismatch:** the optimized MERGE path inside the `scd2` transformer writes history directly to the target and returns only the new/changed rows. `DimensionPattern` adds `surrogate_key` to that partial DataFrame; the caller then overwrites the target with this partial result, **destroying the merged history**. Setting `use_delta_merge=False` triggers the legacy path, which then fails in `unionByName(rows_to_insert)` because `rows_to_insert` follows the source schema (no `surrogate_key`) while `final_target` has it (`Cannot resolve column name "<sk>" among (<source cols>)`).
+
+3. **`FactPattern._join_dimension_spark` lines 471-474** aliases both the dim_key and the surrogate_key columns as `_dim_<col>`. When `dim_key == surrogate_key` (e.g., date_sk → date_sk), this creates two columns with the same name and triggers `[AMBIGUOUS_REFERENCE] Reference '_dim_date_sk' is ambiguous`. Fix: when dim_key == surrogate_key, only project the column once and reuse it as the SK alias.
+
+**Workarounds applied in `examples/star_schema_e2e/star_schema_e2e.py`:**
+- For dim_product SCD2: bypass DimensionPattern entirely. Call the `scd2` transformer directly (default Delta MERGE, history written to target by MERGE), re-read the target, assign sequential `product_sk` to any rows missing it, inject the unknown member with explicit casts, then overwrite.
+- For fact_orders dim_date FK: omit dim_date from `dimensions:`. Source already carries `order_date_sk`; verify the FK directly with `LEFT JOIN dim_date ON f.order_date_sk = d.date_sk`.
+
+**Modules:** `odibi/patterns/dimension.py` (lines 467-538, 546-641), `odibi/patterns/fact.py` (lines 454-485). Three separate fixes needed — none are addressed in this task (test-only by user direction).
+
+### V-013: FactPattern + Dimension SCD2 + Unknown Member Compose Cleanly When Workarounds Applied
+**Verified:** 2026-04-30 against DBR 17.3 LTS (Spark 4.0.0) via Databricks Connect
+**Finding:** With the P-009 workarounds in place, the full star-schema flow (date dim + SCD1 dim + SCD2 dim with history + fact with FK lookups, deduplication, grain validation, calculated measures, orphan→unknown-member) executes end-to-end against real Unity Catalog tables in 37s for 100 customers, 50 products, 10,025 orders + 25 orphans. SCD2 MERGE correctly produces 10 history rows when prices change on 10 of 50 products. All FK joins yield zero orphans. The unknown-member SK=0 row is used by 25 fact rows whose customer/product source IDs were absent from the dimensions.
+**Implication:** The pattern stack is functionally complete once the three P-009 bugs are fixed. The integration test `examples/star_schema_e2e/star_schema_e2e.py` doubles as a regression detector — if a future change re-introduces any of the three bugs, the script's existing assertions will catch it.
