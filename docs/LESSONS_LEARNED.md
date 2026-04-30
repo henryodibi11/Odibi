@@ -208,6 +208,15 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 
 ---
 
+### T-018: normalize_column_names Uses Wrong Quote Character on Spark
+
+- **Date:** 2026-04-30
+- **Module:** `odibi/transformers/sql_core.py` -> `normalize_column_names()`
+- **Symptom:** On Spark, returns literal string "First Name" instead of column value. Column names renamed correctly but data values become old column name as string.
+- **Root cause:** SQL hardcoded double-quote identifiers for all engines. Spark SQL treats double quotes as string literals; needs backticks for column identifiers. DuckDB/Pandas unaffected (ANSI SQL double quotes = identifiers).
+- **Fix:** Added engine-aware quoting: backtick for Spark, double-quote for DuckDB. Consistent with rename_columns and replace_values.
+- **Rule:** Always use engine-aware quoting for column identifiers in SQL generation.
+
 ## Patterns (Working Recipes)
 
 > Copy-paste these. They're battle-tested.
@@ -447,3 +456,20 @@ Copy-paste this at the end of your session:
 ### New Entries Added
 - [x] Trap: T-017 — Spark Connect Blocks .rdd and .sparkContext
 - [x] Decision: D-008 — _safe_partition_count for Spark Connect Compatibility
+
+## Session: 2026-04-30 - sql_core Transformers Spark Validation + normalize_column_names Fix
+
+**Goal:** Test all 26 sql_core transformers with real Spark SQL on Databricks shared cluster.
+
+**What happened:**
+- Created campaign/04_spark_transformers_sql_core notebook with 27 tests
+- 26/27 passed on first run; normalize_column_names failed (T-018)
+- Fixed T-018: added engine-aware quoting (+4 lines net)
+- Re-ran: 27/27 pass
+- 5 existing unit tests: 0 regressions
+- Ruff: check clean, format applied
+
+**Artifacts:**
+- [x] Campaign notebook: campaign/04_spark_transformers_sql_core
+- [x] Bug fix: odibi/transformers/sql_core.py (normalize_column_names)
+- [x] Trap: T-018
