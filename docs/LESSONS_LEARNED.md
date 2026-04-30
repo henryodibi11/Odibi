@@ -227,12 +227,19 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Modules:** `odibi/transformers/relational.py` — `JoinParams`, `join()`
 
 ### T-020: Spark Connect Lazy Evaluation — `spark.table()` and `DeltaTable.forName()` Don't Throw for Missing Tables
-**Date:** 2026-04-30  
-**Symptom:** SCD2 and Merge tests fail with `TABLE_OR_VIEW_NOT_FOUND` / `DELTA_MISSING_DELTA_TABLE` on first run. Table-existence checks pass (no exception), but operations on the returned object throw later.  
-**Root Cause:** On Spark Connect (shared clusters / `USER_ISOLATION`), `spark.table(name)` and `DeltaTable.forName(spark, name)` are **lazy** — they return client-side objects without validating table existence on the server. Errors surface only when an action is triggered (`.columns`, `.count()`, `.execute()`). This made `try: spark.table(t); exists=True` always succeed, bypassing initial-write paths.  
-**Fix:** Replace lazy checks with `spark.catalog.tableExists(target)` as a gate. For Merge, also verify Delta format: gate on `tableExists()`, then `DeltaTable.forName()` inside a try/except (handles non-Delta tables on Hive metastore). File paths still use `DeltaTable.isDeltaTable()` / `spark.read.format("delta").load()` which are eager.  
-**Rule:** Never use `try: spark.table(name)` or `try: DeltaTable.forName(spark, name)` as existence checks on Spark Connect. Use `spark.catalog.tableExists()` — it's the only reliable, eager check across classic and Connect runtimes.  
+**Date:** 2026-04-30
+**Symptom:** SCD2 and Merge tests fail with `TABLE_OR_VIEW_NOT_FOUND` / `DELTA_MISSING_DELTA_TABLE` on first run. Table-existence checks pass (no exception), but operations on the returned object throw later.
+**Root Cause:** On Spark Connect (shared clusters / `USER_ISOLATION`), `spark.table(name)` and `DeltaTable.forName(spark, name)` are **lazy** — they return client-side objects without validating table existence on the server. Errors surface only when an action is triggered (`.columns`, `.count()`, `.execute()`). This made `try: spark.table(t); exists=True` always succeed, bypassing initial-write paths.
+**Fix:** Replace lazy checks with `spark.catalog.tableExists(target)` as a gate. For Merge, also verify Delta format: gate on `tableExists()`, then `DeltaTable.forName()` inside a try/except (handles non-Delta tables on Hive metastore). File paths still use `DeltaTable.isDeltaTable()` / `spark.read.format("delta").load()` which are eager.
+**Rule:** Never use `try: spark.table(name)` or `try: DeltaTable.forName(spark, name)` as existence checks on Spark Connect. Use `spark.catalog.tableExists()` — it's the only reliable, eager check across classic and Connect runtimes.
+**CI Impact:** When replacing `spark.table()` with `spark.catalog.tableExists()`, existing mock tests that set `spark.table.side_effect = Exception(...)` must also set `spark.catalog.tableExists.return_value = False`. MagicMock auto-returns truthy values, so without explicit `return_value`, the mock thinks the table exists.
 **Modules:** `odibi/transformers/scd.py` — `_scd2_spark_delta_merge()`, `_scd2_spark()`; `odibi/transformers/merge_transformer.py` — `merge_batch()`; `odibi/patterns/base.py` — `_load_existing_spark()` (used by DimensionPattern and FactPattern)
+
+### T-021: Run Existing Unit Tests Before Pushing Spark Fix Branches
+**Date:** 2026-04-30
+**Symptom:** Task 8 (T-020 fix) broke CI — `test_merge_optimization_first_run_writes_directly` failed with `assert None is not None`.
+**Root Cause:** Changing `spark.table()` to `spark.catalog.tableExists()` in production code invalidated mock setups in existing tests. Genie only ran Databricks integration tests, not the existing CI unit tests.
+**Rule:** Before pushing any branch that modifies production code, run `pytest tests/unit/ -q --tb=short` (or at minimum the relevant test files) to catch mock regressions. Databricks integration tests validate real behavior; CI unit tests validate mock contracts. Both must pass.
 
 ---
 
