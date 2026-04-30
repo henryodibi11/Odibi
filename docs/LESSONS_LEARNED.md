@@ -135,10 +135,12 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Fix:** Use `sys.modules` manipulation: set `sys.modules["pkg"] = None`, restore in finally  
 **Modules:** Any tests simulating missing optional dependencies
 
-### T-009: SCD2 Float/NaN Comparison Unreliable
-**Symptom:** SCD2 change detection false-positives on float columns  
-**Root Cause:** NaN != NaN in Python. float comparison precision issues.  
-**Status:** Open issue #248. Not yet fixed.  
+### T-009: SCD2 Float/NaN Comparison — Resolved on Spark
+**Date:** 2026-04-30 (resolved)  
+**Symptom:** SCD2 change detection false-positives on float columns containing NaN.  
+**Root Cause:** NaN != NaN in Python/Pandas. float comparison precision issues.  
+**Resolution:** On Spark, `eqNullSafe()` (used in Delta MERGE conditions) treats NaN == NaN correctly — no false positives. Confirmed in campaign 06 test `scd2_float_nan`. Pandas/Polars paths may still be affected.  
+**Status:** Resolved for Spark engine. #248 remains open for Pandas/Polars.  
 **Modules:** `transformers/scd.py`
 
 ### T-010: Polars `repeat_by` + `list.join` Hangs
@@ -223,6 +225,14 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Fix:** Made `on` optional (`None` default), added `model_post_init` to enforce `on` for non-cross joins, branched SQL generation to skip `ON` for cross joins, added Pandas `merge(how="cross")` path without `on` parameter.  
 **Rule:** Cross joins must never have an ON clause. Validate join parameters holistically — field-level validators can't enforce cross-field constraints.  
 **Modules:** `odibi/transformers/relational.py` — `JoinParams`, `join()`
+
+### T-020: Spark Connect Lazy Evaluation — `spark.table()` and `DeltaTable.forName()` Don't Throw for Missing Tables
+**Date:** 2026-04-30  
+**Symptom:** SCD2 and Merge tests fail with `TABLE_OR_VIEW_NOT_FOUND` / `DELTA_MISSING_DELTA_TABLE` on first run. Table-existence checks pass (no exception), but operations on the returned object throw later.  
+**Root Cause:** On Spark Connect (shared clusters / `USER_ISOLATION`), `spark.table(name)` and `DeltaTable.forName(spark, name)` are **lazy** — they return client-side objects without validating table existence on the server. Errors surface only when an action is triggered (`.columns`, `.count()`, `.execute()`). This made `try: spark.table(t); exists=True` always succeed, bypassing initial-write paths.  
+**Fix:** Replace lazy checks with `spark.catalog.tableExists(target)` as a gate. For Merge, also verify Delta format: gate on `tableExists()`, then `DeltaTable.forName()` inside a try/except (handles non-Delta tables on Hive metastore). File paths still use `DeltaTable.isDeltaTable()` / `spark.read.format("delta").load()` which are eager.  
+**Rule:** Never use `try: spark.table(name)` or `try: DeltaTable.forName(spark, name)` as existence checks on Spark Connect. Use `spark.catalog.tableExists()` — it's the only reliable, eager check across classic and Connect runtimes.  
+**Modules:** `odibi/transformers/scd.py` — `_scd2_spark_delta_merge()`, `_scd2_spark()`; `odibi/transformers/merge_transformer.py` — `merge_batch()`
 
 ---
 
@@ -497,3 +507,33 @@ Copy-paste this at the end of your session:
 - **Fix:** Made `on` optional with `model_post_init` validation, branched SQL/Pandas paths for cross joins. 4 locations changed, +12 net lines.
 
 **Other issue:** `split_events_by_period` day-split test hit `decimal.Decimal - float` type error. Fixed by casting to float before comparison.
+
+### Session: 2026-04-30 — SCD2 & Merge Patterns Campaign (06)
+
+**Notebook:** `campaign/06_spark_patterns_scd2_merge`
+
+**Scope:** Full lifecycle testing of SCD2 and Merge patterns against real Delta tables in Unity Catalog (`eaai_dev.hardening_scratch`). SCD2: initial load → no-change idempotency → changed records → new records → mixed batch → float/NaN (#248). Merge: initial load → upsert → update-only → append-only → audit columns.
+
+**Results:** 11/11 tests PASS.
+
+**Critical bug found & fixed — T-020: Spark Connect Lazy Evaluation:**
+- **Symptom:** All SCD2 and Merge tests failed on first run. `spark.table()` and `DeltaTable.forName()` returned without error for non-existent tables, bypassing initial-write paths.
+- **Root cause:** On Spark Connect (shared clusters), both APIs are lazy — they return client-side objects without validating table existence on the server. Errors only surface when an action triggers server-side resolution.
+- **Fix (3 locations):**
+  - `scd.py _scd2_spark_delta_merge` (lines 588–605): Replaced `try: spark.table(target)` with `spark.catalog.tableExists(target)`.
+  - `scd.py _scd2_spark` (lines 349–373): Same pattern — gate on `tableExists()` before `spark.table()`.
+  - `merge_transformer.py merge_batch` (lines 450–475): Gate on `tableExists()`, then verify Delta format with `DeltaTable.forName()` inside try/except (handles non-Delta Hive tables).
+
+**T-009 resolved (Spark engine):** Spark's `eqNullSafe()` handles NaN == NaN correctly — no false positives in SCD2 change detection. #248 remains open for Pandas/Polars paths.
+
+**Follow-up fix — non-Delta table safety:**
+- Original merge fix assumed any existing table is Delta (`tableExists → is_delta = True`). Tightened to two-step: `tableExists()` gate + `DeltaTable.forName()` verification, so non-Delta Hive tables on non-UC environments fall through correctly.
+
+**Files modified:**
+- `odibi/transformers/scd.py` — 2 locations fixed (~15 net lines)
+- `odibi/transformers/merge_transformer.py` — 1 location fixed (~10 net lines)
+- `campaign/06_spark_patterns_scd2_merge` — new notebook (9 cells, 11 tests)
+
+**New entries added:**
+- T-020: Spark Connect Lazy Evaluation (LESSONS_LEARNED.md)
+- T-009: Updated with Spark resolution

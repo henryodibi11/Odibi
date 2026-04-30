@@ -430,12 +430,14 @@ Rules:
 - If #248 (float/NaN) fails, document exact behavior and update the issue
 
 Success criteria:
-- [ ] SCD2 full lifecycle works with real Spark + Delta
-- [ ] Merge pattern works with real Spark + Delta
-- [ ] Float/NaN comparison behavior documented
-- [ ] Temporal integrity verified
-- [ ] All test tables cleaned up
-- [ ] Bugs filed for any issues
+- [x] SCD2 full lifecycle works with real Spark + Delta (6/6 tests PASS)
+- [x] Merge pattern works with real Spark + Delta (5/5 tests PASS)
+- [x] Float/NaN comparison behavior documented (T-009 resolved for Spark — eqNullSafe handles NaN correctly)
+- [x] Temporal integrity verified (all expired rows: valid_from < valid_to; all current: valid_to IS NULL; one is_current per key)
+- [x] All test tables cleaned up (4 tables dropped)
+- [x] Bugs filed for any issues (T-020: Spark Connect lazy eval — 3 locations fixed)
+
+**Completed:** 2026-04-30. Notebook: `campaign/06_spark_patterns_scd2_merge` (9 cells, 11 tests). Files fixed: `scd.py` (2 locations), `merge_transformer.py` (1 location).
 ```
 
 ---
@@ -1779,7 +1781,7 @@ Phase 2: Spark Reality
 - [ ] Task 5: Spark read/write
 - [ ] Task 6: Spark SQL core transformers
 - [ ] Task 7: Spark relational/advanced transformers
-- [ ] Task 8: Spark SCD2/merge patterns
+- [x] Task 8: Spark SCD2/merge patterns (11/11 PASS, T-020 fixed)
 - [ ] Task 9: Spark dimension/fact patterns
 - [ ] Task 10: Spark validation (all 11 types)
 

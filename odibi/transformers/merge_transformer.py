@@ -449,20 +449,23 @@ def _merge_spark(
 
     def merge_batch(batch_df: Any, batch_id: Optional[int] = None) -> None:
         # Check if table exists
+        # NOTE: DeltaTable.forName() and spark.table() are lazy on Spark Connect
+        # and do NOT throw for non-existent tables. Use spark.catalog.tableExists()
+        # as a gate, then verify it's actually Delta with DeltaTable.forName().
         is_delta = False
         try:
             if "/" in target or "\\" in target or ":" in target or target.startswith("."):
                 is_delta = DeltaTable.isDeltaTable(spark, target)
             else:
-                # For table name, try to access it
-                try:
-                    DeltaTable.forName(spark, target)
-                    is_delta = True
-                except Exception as e:
-                    logger = get_logging_context()
-                    logger.debug(
-                        f"Target '{target}' not found as Delta table by name: {type(e).__name__}: {e}"
-                    )
+                # Gate: check existence first (Spark Connect safe), then verify Delta
+                if spark.catalog.tableExists(target):
+                    try:
+                        DeltaTable.forName(spark, target)
+                        is_delta = True
+                    except Exception:
+                        # Table exists but is NOT Delta (e.g., Parquet/CSV Hive table)
+                        is_delta = False
+                else:
                     is_delta = False
         except Exception as e:
             logger = get_logging_context()
