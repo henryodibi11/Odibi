@@ -115,6 +115,8 @@ df.pivot(on="column", ...)  # Not columns="column"
 
 ### Delta Lake Issues
 
+> 📘 **For a comprehensive Delta Lake troubleshooting guide** covering schema evolution, concurrent write conflicts, VACUUM, RESTORE, time travel, Z-ORDER, pyarrow/deltalake version conflicts, and Databricks-vs-local differences, see [Delta Lake Troubleshooting Guide](./tutorials/delta_troubleshooting.md).
+
 #### Schema Mismatch Errors
 
 ```
