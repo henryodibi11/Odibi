@@ -998,6 +998,30 @@ Success criteria:
 - [ ] Linked from main troubleshooting.md
 ```
 
+**Status: ✅ COMPLETE (2026-04-30)**
+
+**Branch:** `docs/hodibi/delta-troubleshooting`
+
+**Deliverables:**
+- `docs/tutorials/delta_troubleshooting.md` (409 LOC, under 500 LOC budget)
+- All 10 issues covered with Symptom / Root Cause / Fix / Prevention structure:
+  1. Schema evolution errors
+  2. Concurrent write conflicts (MERGE + MERGE)
+  3. "Table already exists" errors
+  4. Null type columns (T-004)
+  5. VACUUM and file retention
+  6. Restore to previous version
+  7. Time travel queries
+  8. Z-ORDER optimization
+  9. pyarrow / deltalake version conflicts (V-010)
+  10. Databricks vs local Delta differences
+- Linked from `docs/troubleshooting.md` "Delta Lake Issues" section
+
+**Verifications on DBR 17.3 / Spark 4.0.0 (Databricks Connect):**
+- T-020 lazy vs eager: `spark.table('eaai_dev.hardening_scratch.<missing>')` returns a DataFrame without error; `spark.catalog.tableExists()` correctly returns `False`. Confirms doc's recommendation to never use `try: spark.table()` as an existence check.
+- `OPTIMIZE ... ZORDER BY (col)` SQL parses cleanly.
+- `VACUUM ... RETAIN N HOURS` SQL parses cleanly.
+
 ---
 
 ## Phase 5: Pattern Stress Testing (Tasks 19-23)
@@ -1866,7 +1890,7 @@ Phase 4: Validation E2E
 - [x] Task 15: Validation tutorial (#224) — 8/8 tests PASS, 12 valid, 8 quarantined
 - [x] Task 16: Delete detection tutorial (#223) — 9/9 PASS, 6 files
 - [x] Task 17: Quarantine tutorial (#222) — 10/10 PASS, 6 files
-- [ ] Task 18: Delta troubleshooting (#225)
+- [x] Task 18: Delta troubleshooting (#225) — 409 LOC tutorial, 10/10 issues covered, key claims verified on DBR 17.3
 
 Phase 5: Pattern Stress
 - [ ] Task 19: Aggregation stress test
