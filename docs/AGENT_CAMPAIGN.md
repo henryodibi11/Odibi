@@ -496,12 +496,18 @@ Rules:
 - Verify orphan FK handling works correctly
 
 Success criteria:
-- [ ] Dimension SCD 0/1/2 all work with real Spark
-- [ ] Fact pattern with dimension lookups works
-- [ ] Surrogate key generation correct
-- [ ] Unknown member handling correct
-- [ ] Grain validation catches duplicates
-- [ ] Orphan FK rows handled correctly
+- [x] Dimension SCD 0/1/2 all work with real Spark (6/6 PASS: SCD0 initial+rerun, SCD1 initial+update, SCD2 initial, unknown+audit)
+- [x] Fact pattern with dimension lookups works (FK→SK resolved, orphan→SK=0)
+- [x] Surrogate key generation correct (sequential from MAX+1)
+- [x] Unknown member handling correct (SK=0, natural_key="-1")
+- [x] Grain validation catches duplicates (ValueError raised)
+- [x] Orphan FK rows handled correctly (unknown/reject/quarantine all tested)
+- [x] Measures work (passthrough, rename, calculated)
+- [x] Star schema integration (10 products + 105 sales with orphans)
+- [x] All test tables cleaned up (7 tables dropped)
+- [x] T-020 fix extended to base.py _load_existing_spark (4th location)
+
+**Completed:** 2026-04-30. Notebook: `campaign/07_spark_patterns_dim_fact` (10 cells, 12 tests). Files fixed: `base.py` (1 location — T-020 extension).
 ```
 
 ---
@@ -1782,7 +1788,7 @@ Phase 2: Spark Reality
 - [ ] Task 6: Spark SQL core transformers
 - [ ] Task 7: Spark relational/advanced transformers
 - [x] Task 8: Spark SCD2/merge patterns (11/11 PASS, T-020 fixed)
-- [ ] Task 9: Spark dimension/fact patterns
+- [x] Task 9: Spark dimension/fact patterns (12/12 PASS, T-020 in base.py fixed)
 - [ ] Task 10: Spark validation (all 11 types)
 
 Phase 3: Polars Parity

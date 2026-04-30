@@ -136,13 +136,23 @@ class Pattern(ABC):
         pattern_name = self.__class__.__name__
         spark = context.spark
 
-        # Try catalog table first
-        try:
-            return spark.table(target)
-        except Exception:
-            pass
+        # Determine if target is a path or a table name
+        is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
 
-        # Check file extension for format detection
+        if not is_path:
+            # NOTE: spark.table() is lazy on Spark Connect and does NOT throw
+            # for non-existent tables (T-020). Use spark.catalog.tableExists().
+            if spark.catalog.tableExists(target):
+                return spark.table(target)
+            else:
+                ctx.debug(
+                    f"Target table '{target}' does not exist - treating as initial load.",
+                    pattern=pattern_name,
+                    target=target,
+                )
+                return None
+
+        # Path-based target: check file extension for format detection
         target_lower = target.lower()
 
         try:
