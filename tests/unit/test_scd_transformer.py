@@ -92,7 +92,7 @@ class TestSCD2EntryPoint:
         ctx = EngineContext(
             context=PandasContext(),
             df=pd.DataFrame({"id": [1]}),
-            engine_type=EngineType.POLARS,
+            engine_type="unknown",
         )
         with pytest.raises(ValueError, match="does not support engine type"):
             scd2(ctx, _base_params())

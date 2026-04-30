@@ -241,6 +241,12 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Root Cause:** Changing `spark.table()` to `spark.catalog.tableExists()` in production code invalidated mock setups in existing tests. Genie only ran Databricks integration tests, not the existing CI unit tests.
 **Rule:** Before pushing any branch that modifies production code, run `pytest tests/unit/ -q --tb=short` (or at minimum the relevant test files) to catch mock regressions. Databricks integration tests validate real behavior; CI unit tests validate mock contracts. Both must pass.
 
+### T-022: "Unsupported Engine" Tests Break When Genie Adds Engine Support
+**Date:** 2026-04-30
+**Symptom:** 5 CI failures after Task 13 (Polars SCD2/Merge). Tests like `test_unsupported_engine_raises` used `EngineType.POLARS` to trigger the else branch, but Genie added `_scd2_polars`/`_merge_polars` so POLARS is now dispatched. Pandas DataFrames hit Polars code paths → `AttributeError: 'DataFrame' has no attribute 'schema'`.
+**Root Cause:** Tests assumed a specific engine/context was "unsupported" instead of using a truly fake value. When parity work adds support for that engine, the tests break.
+**Rule:** Never use a real `EngineType` member or real context class (e.g., `PolarsContext`) as the "unsupported" test case. Use `engine_type="unknown"` or `type("UnknownContext", (), {})()` — these can never become supported. Also update regex patterns to match the actual error message (e.g., `"does not support context type"` not `"Unsupported context"`).
+
 ---
 
 ## Patterns (Working Recipes)

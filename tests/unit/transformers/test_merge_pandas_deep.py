@@ -505,13 +505,12 @@ class TestMergeEntryPoint:
         """Lines 361-362: unsupported context type raises ValueError."""
         path = str(tmp_path / "target.parquet")
         source = pd.DataFrame({"id": [1], "val": [10]})
-        # Use PolarsContext which is neither PandasContext nor SparkContext
-        from odibi.context import PolarsContext
-
-        polars_ctx = PolarsContext()
-        ctx = EngineContext(polars_ctx, source, EngineType.POLARS)
+        # Use a truly unsupported context type
+        mock_context_cls = type("UnknownContext", (), {})
+        unknown_ctx = mock_context_cls()
+        ctx = EngineContext(unknown_ctx, source, EngineType.PANDAS)
         params = MergeParams(target=path, keys=["id"])
-        with pytest.raises(ValueError, match="Unsupported context"):
+        with pytest.raises(ValueError, match="does not support context type"):
             merge(ctx, params)
 
 

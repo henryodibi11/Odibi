@@ -138,8 +138,8 @@ class TestScd2Dispatch:
     def test_unsupported_engine_raises(self):
         df = pd.DataFrame({"id": [1], "name": ["A"], "txn_date": pd.to_datetime(["2024-01-01"])})
         ctx = _make_ctx(df)
-        # Override engine_type to something unsupported
-        ctx.engine_type = EngineType.POLARS
+        # Override engine_type to something truly unsupported
+        ctx.engine_type = "unknown"
         params = SCD2Params(
             target="dummy",
             keys=["id"],
@@ -801,14 +801,10 @@ class TestSCD2EntryPoint:
     """Test the scd2() entry point function covering uncovered lines."""
 
     def test_unsupported_engine_raises(self):
-        """Line 202-208: unsupported engine type raises ValueError."""
-        pytest.importorskip("polars")
-        from odibi.context import PolarsContext
-        import polars as pl
-
-        source = pl.DataFrame({"id": [1], "name": ["A"], "txn_date": ["2024-01-01"]})
-        polars_ctx = PolarsContext()
-        ctx = EngineContext(polars_ctx, source, EngineType.POLARS)
+        """Line 204-210: unsupported engine type raises ValueError."""
+        source = pd.DataFrame({"id": [1], "name": ["A"], "txn_date": pd.to_datetime(["2024-01-01"])})
+        ctx = _make_ctx(source)
+        ctx.engine_type = "unknown"
         params = SCD2Params(
             target="dummy.parquet",
             keys=["id"],

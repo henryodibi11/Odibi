@@ -451,7 +451,7 @@ class TestMergeFunction:
         unknown = mock_context_cls()
         ctx = EngineContext(unknown, source_df, EngineType.PANDAS)
         params = MergeParams(target=str(tmp_path / "out.pq"), keys=["id"])
-        with pytest.raises(ValueError, match="Unsupported context"):
+        with pytest.raises(ValueError, match="does not support context type"):
             merge(ctx, params=params)
 
     def test_connection_not_found_raises(self, source_df):

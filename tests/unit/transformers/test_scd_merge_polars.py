@@ -13,18 +13,19 @@ import shutil
 import tempfile
 from datetime import datetime
 
-import polars as pl
 import pytest
 
-from odibi.context import EngineContext, PandasContext, PolarsContext
-from odibi.engine.pandas_engine import PandasEngine
-from odibi.engine.polars_engine import PolarsEngine
-from odibi.enums import EngineType
-from odibi.transformers.merge_transformer import (
+pl = pytest.importorskip("polars")
+
+from odibi.context import EngineContext, PandasContext, PolarsContext  # noqa: E402
+from odibi.engine.pandas_engine import PandasEngine  # noqa: E402
+from odibi.engine.polars_engine import PolarsEngine  # noqa: E402
+from odibi.enums import EngineType  # noqa: E402
+from odibi.transformers.merge_transformer import (  # noqa: E402
     MergeParams,
     merge,
 )
-from odibi.transformers.scd import SCD2Params, scd2
+from odibi.transformers.scd import SCD2Params, scd2  # noqa: E402
 
 
 # --- Helpers ---
