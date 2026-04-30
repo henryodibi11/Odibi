@@ -1,0 +1,26 @@
+customer_id,name,email,status,city
+1,Alice Johnson,alice.johnson@example.com,active,Chicago
+2,Bob Smith,bob.smith@example.com,active,Houston
+3,Carol Williams,carol.williams@example.com,active,Phoenix
+4,David Brown,david.brown@example.com,active,Dallas
+5,Eve Jones,eve.jones@example.com,active,Denver
+6,Frank Garcia,frank.garcia@example.com,active,Seattle
+7,Grace Miller,grace.miller@example.com,active,Miami
+8,Hank Davis,hank.davis@example.com,inactive,Boston
+9,Iris Lopez,iris.lopez@example.com,active,Atlanta
+10,Jack Wilson,jack.wilson@example.com,inactive,Portland
+11,Karen Anderson,karen.anderson@example.com,active,Chicago
+12,Leo Thomas,leo.thomas@example.com,active,Houston
+13,Mia Taylor,mia.taylor@example.com,active,Phoenix
+14,Nate Moore,nate.moore@example.com,active,Dallas
+15,Olivia Martin,olivia.martin@example.com,active,Denver
+16,Paul Lee,paul.lee@example.com,active,Seattle
+17,Quinn White,quinn.white@example.com,inactive,Miami
+18,Rosa Harris,rosa.harris@example.com,inactive,Boston
+19,Sam Clark,sam.clark@example.com,active,Atlanta
+20,Tina Lewis,tina.lewis@example.com,inactive,Portland
+21,Uma Rivera,uma.rivera@example.com,active,Chicago
+22,Victor Scott,victor.scott@example.com,active,Houston
+23,Wendy Turner,wendy.turner@example.com,active,Phoenix
+24,Xavier Young,xavier.young@example.com,active,Dallas
+25,Yolanda Adams,yolanda.adams@example.com,active,Denver

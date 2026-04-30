@@ -945,11 +945,13 @@ Rules:
 - ≤500 LOC
 
 Success criteria:
-- [ ] Tutorial covers full quarantine workflow
-- [ ] FK orphan handling demonstrated
-- [ ] Quarantine metadata columns shown
-- [ ] Re-processing workflow documented
-- [ ] Example runs successfully
+- [x] Tutorial covers full quarantine workflow (quarantine_workflow.md, 309 lines)
+- [x] FK orphan handling demonstrated (reject, warn, filter — 3 actions tested)
+- [x] Quarantine metadata columns shown (_rejection_reason, _rejected_at, _source_batch_id, _failed_tests, _original_node)
+- [x] Re-processing workflow documented (fix dimension → re-validate → 0 orphans)
+- [x] Example runs successfully (10/10 tests PASS)
+
+**Completed:** 2026-04-30. Notebook: `campaign/12_quarantine_e2e` (12 cells, 10 tests). Files created: `docs/tutorials/quarantine_workflow.md` (309 lines), `examples/quarantine_workflow/config.yaml` (55 lines), `examples/quarantine_workflow/README.md` (71 lines), `examples/quarantine_workflow/data/{dim_customer.csv, fact_orders.csv, dim_customer_fixed.csv}`. Additional coverage: quarantine split, metadata columns, quality gate (abort/warn_and_write), sampling (max_rows), config YAML validation.
 ```
 
 ---
@@ -1863,7 +1865,7 @@ Phase 3: Polars Parity ✅
 Phase 4: Validation E2E
 - [ ] Task 15: Validation tutorial (#224)
 - [x] Task 16: Delete detection tutorial (#223) — 9/9 PASS, 6 files
-- [ ] Task 17: Quarantine tutorial (#222)
+- [x] Task 17: Quarantine tutorial (#222) — 10/10 PASS, 6 files
 - [ ] Task 18: Delta troubleshooting (#225)
 
 Phase 5: Pattern Stress

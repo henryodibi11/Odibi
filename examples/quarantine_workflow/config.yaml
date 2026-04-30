@@ -1,0 +1,66 @@
+project: quarantine_demo
+engine: pandas
+
+connections:
+  raw:
+    type: local
+    base_path: ./data
+  silver:
+    type: local
+    base_path: ./output/silver
+  quarantine_store:
+    type: local
+    base_path: ./output/quarantine
+
+story:
+  connection: silver
+  path: stories
+
+system:
+  connection: silver
+  path: _odibi_system
+
+pipelines:
+  - pipeline: order_quality
+    layer: silver
+    nodes:
+      - name: validate_orders
+        read:
+          connection: raw
+          path: fact_orders.csv
+          format: csv
+        transform:
+          steps:
+            - function: clean_text
+              params:
+                columns: [status]
+                operations: [trim, lower]
+        validation:
+          tests:
+            - type: not_null
+              columns: [amount]
+              on_fail: quarantine
+            - type: range
+              column: amount
+              min: 0
+              on_fail: quarantine
+            - type: accepted_values
+              column: status
+              values: [completed, pending, shipped]
+              on_fail: quarantine
+          quarantine:
+            connection: quarantine_store
+            path: orders_quarantine
+            add_columns:
+              _rejection_reason: true
+              _rejected_at: true
+              _source_batch_id: true
+              _failed_tests: true
+          gate:
+            require_pass_rate: 0.90
+            on_fail: warn_and_write
+        write:
+          connection: silver
+          path: orders
+          format: parquet
+          mode: overwrite

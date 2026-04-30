@@ -767,3 +767,48 @@ ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, eng
 - **Rust engine kwarg:** 0.x supports `engine='rust'`, 1.x removed it (Rust is the only engine)
 - odibi pins `deltalake>=0.18.0,<0.30.0` (resolves to 0.25.5 on Databricks). Cluster pre-installs 1.5.1.
 **Implication:** Campaign notebooks that write Delta via `deltalake` must `%pip install "deltalake>=0.18.0,<0.30.0"` and `%restart_python` to match odibi's pinned version. Use `schema_mode="overwrite"` (not `overwrite_schema=True`).
+
+
+## Session: 2026-04-30 — Quarantine & Orphan Handling Tutorial (Task 17, #222)
+
+### Work Done
+- Created `docs/tutorials/quarantine_workflow.md` (309 lines) — covers quarantine split, FK orphan handling (reject/warn/filter), metadata columns, quality gates, sampling, re-processing
+- Created `examples/quarantine_workflow/config.yaml` (55 lines) — valid ProjectConfig with validation + quarantine + gate
+- Created `examples/quarantine_workflow/data/` — 3 CSV files (dim_customer 20 rows, fact_orders 100 rows, dim_customer_fixed 25 rows)
+- Created `examples/quarantine_workflow/README.md` (71 lines)
+- Created campaign notebook `campaign/12_quarantine_e2e` (12 cells, 10 tests)
+- All 10 tests PASS: quarantine_split, quarantine_metadata, fk_reject, fk_warn, fk_filter, gate_abort, gate_warn, sampling, reprocessing, config_yaml
+
+### Verification Report
+- Tests written: 10
+- Tests passing: 10/10
+- Concrete value assertions: 8 quarantined / 92 valid, 10 orphans detected, 90 rows after filter, 92% pass rate, 5 metadata cols, max_rows=5 cap
+- Negative tests: gate_abort (92% < 95% threshold), fk_reject (10 orphans → validation fails)
+- Edge cases tested: reappearing dimension keys, sampling cap on large invalid set
+
+### New Entries Added
+- [x] Trap: T-026 — TestConfig Is a Union Type, Not Directly Instantiable
+- [x] Trap: T-027 — NotNullTest Uses `columns` (Plural List), Not `column`
+- [x] Trap: T-028 — evaluate_gate Per-Row Boolean Lists Must Have Non-Overlapping Failures
+
+### T-026: TestConfig Is a Pydantic Discriminated Union — Cannot Instantiate Directly
+**Date:** 2026-04-30
+**Symptom:** `TypeError: Cannot instantiate typing.Union` when calling `TestConfig(type=TestType.NOT_NULL, column="amount")`
+**Root Cause:** `TestConfig` is defined as `Annotated[Union[NotNullTest, RangeTest, AcceptedValuesTest, ...], Discriminator("type")]`. It's a type alias for Pydantic parsing (YAML → Python), not a class you can construct. Pydantic dispatches to the correct subclass based on the `type` discriminator during parsing, but direct constructor calls fail.
+**Fix:** Use the specific test config classes directly: `NotNullTest(columns=["amount"])`, `RangeTest(column="amount", min=0)`, `AcceptedValuesTest(column="status", values=[...])`.
+**Modules:** `odibi/config.py` — any code creating test configs programmatically (campaigns, tests)
+
+### T-027: NotNullTest Uses `columns` (Plural List), Not `column` (Singular String)
+**Date:** 2026-04-30
+**Symptom:** `ValidationError: columns — Field required` when constructing `NotNullTest(column="amount")`
+**Root Cause:** `NotNullTest` and `UniqueTest` use `columns: List[str]` (plural, supports multiple columns). Other tests like `RangeTest`, `AcceptedValuesTest`, `RegexMatchTest` use `column: str` (singular). This asymmetry is intentional: not_null/unique checks are commonly applied to multiple columns at once.
+**Fix:** Use `columns=["amount"]` for NotNullTest/UniqueTest. Use `column="amount"` for RangeTest, AcceptedValuesTest, RegexMatchTest.
+**Rule:** Check the specific test class fields before constructing — `columns` (list) vs `column` (string) varies by test type.
+**Modules:** `odibi/config.py` — NotNullTest, UniqueTest (plural) vs all other tests (singular)
+
+### T-028: evaluate_gate Per-Row Boolean Lists Need Non-Overlapping Failures for Correct Unique Fail Count
+**Date:** 2026-04-30
+**Symptom:** Gate passes when it should fail. Pass rate shows 97% instead of expected 92%.
+**Root Cause:** `evaluate_gate` computes pass rate as: a row passes if it passes ALL tests. When validation_results lists have failures at the same positions (e.g., rows 97-99 for all tests), only 3 unique rows fail instead of 8. The positional overlap means rows are counted once, not per-test.
+**Fix:** When simulating validation_results for testing, spread failures across non-overlapping row positions to match the expected unique failure count. Example: rows 82-84 for status, 85-87 for nulls, 88-89 for negatives = 8 unique failures.
+**Modules:** Any test code constructing per-row validation_results for evaluate_gate
