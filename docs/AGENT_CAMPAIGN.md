@@ -249,7 +249,7 @@ For each test:
 
 Use a dedicated UC schema for test output:
 ```python
-TEST_SCHEMA = f"{UC_CATALOG}.odibi_campaign_test"
+TEST_SCHEMA = f"{UC_CATALOG}.hardening_scratch"
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {TEST_SCHEMA}")
 ```
 
@@ -401,7 +401,7 @@ For each test:
 
 Setup:
 ```python
-TEST_SCHEMA = f"{UC_CATALOG}.odibi_campaign_test"
+TEST_SCHEMA = f"{UC_CATALOG}.hardening_scratch"
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {TEST_SCHEMA}")
 
 # Seed initial data
