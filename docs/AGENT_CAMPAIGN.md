@@ -550,12 +550,16 @@ Rules:
 - Include timing for the 10k row test
 
 Success criteria:
-- [ ] All 11 validation test types pass with real Spark
-- [ ] Quarantine split works on Spark
-- [ ] Quality gate works on Spark
-- [ ] Spark vs Pandas results match
-- [ ] 10k row validation completes in <30 seconds
-- [ ] Bugs filed for any Spark-specific failures
+- [x] All 11 validation test types pass with real Spark (NOT_NULL, UNIQUE, ACCEPTED_VALUES, ROW_COUNT, RANGE, REGEX_MATCH, CUSTOM_SQL, SCHEMA, FRESHNESS, FK, GATE — all 11 PASS)
+- [x] Quarantine split works on Spark (validate→quarantine→gate chain: 2 valid, 3 quarantined)
+- [x] Quality gate works on Spark (95% threshold rejects 80% data, 70% threshold accepts)
+- [x] Spark vs Pandas results match (6 test types compared, all produce identical error counts)
+- [x] 10k row validation completes in <30 seconds (1.53s for 10k rows × 6 tests)
+- [x] No Spark-specific bugs found — all 17 tests passed on first run
+- [x] Special tests: fail_fast, severity=warn, empty DataFrame all correct
+- [x] No source file modifications needed
+
+**Completed:** 2026-04-30. Notebook: `campaign/08_spark_validation` (11 cells, 17 tests). No source files modified.
 ```
 
 ---
@@ -1789,7 +1793,7 @@ Phase 2: Spark Reality
 - [ ] Task 7: Spark relational/advanced transformers
 - [x] Task 8: Spark SCD2/merge patterns (11/11 PASS, T-020 fixed)
 - [x] Task 9: Spark dimension/fact patterns (12/12 PASS, T-020 in base.py fixed)
-- [ ] Task 10: Spark validation (all 11 types)
+- [x] Task 10: Spark validation (17/17 PASS, all 11 types + chain + special + Spark vs Pandas)
 
 Phase 3: Polars Parity
 - [ ] Task 11: Polars audit (#212)
