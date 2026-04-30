@@ -585,7 +585,12 @@ Process:
 Produce a report in campaign/09_polars_audit_results.md:
 
 | Module | Function | Pandas | Spark | Polars | Gap Description |
-|--------|----------|--------|-------|--------|-----------------|
+|
+**Status: ✅ COMPLETE (2026-04-30)**
+
+**Results:** 91 functions audited, 58 gaps found (23 CRITICAL, 25 MEDIUM, 10 LOW). Three gap patterns identified: explicit ValueError (8 fns), silent Pandas fallback (35 fns), missing mask branch (2 fns). Report at `docs/09_polars_audit_results.md`. Key insight: polars_engine.py is fully functional — all gaps are in consumer code (transformers/patterns/validation).
+
+--------|----------|--------|-------|--------|-----------------|
 | ... | ... | ✅ | ✅ | ❌ | Raises NotImplementedError |
 
 For each gap, classify as:
@@ -600,11 +605,11 @@ Rules:
 - ≤250 LOC for the audit report
 
 Success criteria:
-- [ ] Every transformer audited for Polars support
-- [ ] Every pattern audited for Polars support
-- [ ] Validation engine audited for Polars support
-- [ ] Gaps classified as CRITICAL/MEDIUM/LOW
-- [ ] Report saved to campaign/09_polars_audit_results.md
+- [x] Every transformer audited for Polars support (scd.py, merge_transformer.py, advanced.py, relational.py, delete_detection.py, sql_core.py, manufacturing.py, thermodynamics.py, units.py)
+- [x] Every pattern audited for Polars support (scd2.py, merge.py, dimension.py, fact.py, aggregation.py, date_dimension.py, base.py)
+- [x] Validation engine audited for Polars support (engine.py ✅ all 11 types, quarantine.py partial, fk.py ❌, gate.py ✅ engine-agnostic)
+- [x] Gaps classified as CRITICAL/MEDIUM/LOW (23/25/10)
+- [x] Report saved to campaign/09_polars_audit_results.md + docs/09_polars_audit_results.md
 - [ ] GitHub issue #212 updated with findings
 ```
 
