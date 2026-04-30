@@ -566,3 +566,26 @@ Copy-paste this at the end of your session:
 **Files modified:**
 - `odibi/patterns/base.py` — `_load_existing_spark()` fixed (~15 net lines)
 - `campaign/07_spark_patterns_dim_fact` — new notebook (10 cells, 12 tests)
+
+### Session: 2026-04-30 — Spark Validation Campaign (08)
+
+**Notebook:** `campaign/08_spark_validation`
+
+**Scope:** Full validation engine testing with real Spark DataFrames on Databricks. All 11 test types (NOT_NULL, UNIQUE, ACCEPTED_VALUES, ROW_COUNT, RANGE, REGEX_MATCH, CUSTOM_SQL, SCHEMA, FRESHNESS, FK, GATE) plus quarantine chain, quality gate, special tests (fail_fast, severity=warn, empty DataFrame, 10k performance), and Spark vs Pandas cross-engine comparison.
+
+**Results:** 17/17 tests PASS on first run. No source file modifications needed.
+
+**Key findings:**
+- All 11 validation test types work correctly on Spark Connect (USER_ISOLATION cluster).
+- Quarantine split (validate→quarantine→gate chain) works end-to-end on Spark.
+- Quality gate correctly rejects/accepts based on pass rate thresholds.
+- Spark and Pandas produce identical error counts for all 6 compared test types (NOT_NULL, UNIQUE, ACCEPTED_VALUES, ROW_COUNT, RANGE, CUSTOM_SQL).
+- 10k-row performance: 1.53s for 6 simultaneous validation tests — well under 30s target.
+- fail_fast correctly stops after first error; severity=warn correctly suppresses errors.
+- Empty DataFrame: NOT_NULL/UNIQUE pass (0 violations), ROW_COUNT min=1 correctly fails.
+- No Spark-specific bugs found — validation engine is fully functional on real Spark.
+
+**Files modified:**
+- `campaign/08_spark_validation` — new notebook (11 cells, 17 tests)
+
+**No source file changes.** Validation engine Spark path works correctly as-is.
