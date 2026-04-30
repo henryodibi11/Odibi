@@ -216,6 +216,16 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 
 ---
 
+### T-019: Cross Join Generates ON Clause — Spark Returns Inner Join Results
+**Date:** 2026-04-30  
+**Symptom:** Cross join returns 2 rows instead of 12 (4×3 cartesian product). Spark interprets `CROSS JOIN ... ON condition` as an inner join, silently filtering to only matching rows.  
+**Root Cause:** `JoinParams.on` was a required field (no way to omit for cross joins), and `join()` always appended `ON {join_condition}` to SQL regardless of `how`. Additionally, the Pandas path passed `on=` to `merge()` even for cross joins.  
+**Fix:** Made `on` optional (`None` default), added `model_post_init` to enforce `on` for non-cross joins, branched SQL generation to skip `ON` for cross joins, added Pandas `merge(how="cross")` path without `on` parameter.  
+**Rule:** Cross joins must never have an ON clause. Validate join parameters holistically — field-level validators can't enforce cross-field constraints.  
+**Modules:** `odibi/transformers/relational.py` — `JoinParams`, `join()`
+
+---
+
 ## Patterns (Working Recipes)
 
 > Copy-paste these. They're battle-tested.
@@ -472,3 +482,18 @@ Copy-paste this at the end of your session:
 - [x] Campaign notebook: campaign/04_spark_transformers_sql_core
 - [x] Bug fix: odibi/transformers/sql_core.py (normalize_column_names)
 - [x] Trap: T-018
+
+### Session: 2026-04-30 — Relational & Advanced Transformers Campaign (05)
+
+**Notebook:** `campaign/05_spark_transformers_relational`
+
+**Scope:** All relational (join, union, pivot, unpivot, aggregate) and advanced (deduplicate, sessionize, split_events_by_period) transformers tested with real Spark SQL + Pandas parity comparison.
+
+**Results:** 20/20 tests PASS (after cross join fix).
+
+**Bug found & fixed:**
+- **T-019:** `join()` generated `CROSS JOIN ... ON condition` — Spark interpreted this as INNER JOIN, returning only matching rows instead of a full cartesian product.
+- **Root cause:** `JoinParams.on` was a required field (no way to omit for cross joins), and the SQL template always appended `ON {condition}`.
+- **Fix:** Made `on` optional with `model_post_init` validation, branched SQL/Pandas paths for cross joins. 4 locations changed, +12 net lines.
+
+**Other issue:** `split_events_by_period` day-split test hit `decimal.Decimal - float` type error. Fixed by casting to float before comparison.

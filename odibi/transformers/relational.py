@@ -36,7 +36,9 @@ class JoinParams(BaseModel):
     """
 
     right_dataset: str = Field(..., description="Name of the node/dataset to join with")
-    on: Union[str, List[str]] = Field(..., description="Column(s) to join on")
+    on: Optional[Union[str, List[str]]] = Field(
+        None, description="Column(s) to join on. Not required for cross joins."
+    )
     how: Literal["inner", "left", "right", "full", "cross", "anti", "semi"] = Field(
         "left", description="Join type"
     )
@@ -47,6 +49,8 @@ class JoinParams(BaseModel):
     @field_validator("on")
     @classmethod
     def coerce_on_to_list(cls, v):
+        if v is None:
+            return v
         if isinstance(v, str):
             return [v]
         if not v:
@@ -55,6 +59,13 @@ class JoinParams(BaseModel):
                 f"Got: {v!r}. Provide column name(s) that exist in both datasets."
             )
         return v
+
+    def model_post_init(self, __context):
+        if self.how != "cross" and not self.on:
+            raise ValueError(
+                f"Join 'on' parameter is required for '{self.how}' joins. "
+                f"Only cross joins can omit 'on'."
+            )
 
 
 def join(context: EngineContext, params: JoinParams) -> EngineContext:
@@ -117,8 +128,7 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
     context.register_temp_view(right_view_name, right_df)
 
     # Construct Join Condition
-    # params.on is guaranteed to be List[str] by validator
-    join_cols = params.on
+    join_cols = params.on or []
 
     join_condition = " AND ".join([f"df.{col} = {right_view_name}.{col}" for col in join_cols])
 
@@ -138,8 +148,11 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         # Map 'full' to 'outer' for Pandas compatibility
         pandas_how = "outer" if params.how == "full" else params.how
 
-        # Handle anti and semi joins for pandas
-        if params.how == "anti":
+        # Handle special join types for pandas
+        if params.how == "cross":
+            # Cross join: no join key needed
+            res = context.df.merge(right_df, how="cross", suffixes=("", suffix))
+        elif params.how == "anti":
             # Anti join: rows in left that don't match right
             merged = context.df.merge(right_df[params.on], on=params.on, how="left", indicator=True)
             res = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
@@ -199,12 +212,19 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
     elif params.how == "semi":
         join_type_sql = "LEFT SEMI"
 
-    sql_query = f"""
-        SELECT {select_clause}
-        FROM df
-        {join_type_sql} JOIN {right_view_name}
-        ON {join_condition}
-    """
+    if params.how == "cross":
+        sql_query = f"""
+            SELECT {select_clause}
+            FROM df
+            CROSS JOIN {right_view_name}
+        """
+    else:
+        sql_query = f"""
+            SELECT {select_clause}
+            FROM df
+            {join_type_sql} JOIN {right_view_name}
+            ON {join_condition}
+        """
     result = context.sql(sql_query)
 
     # Log completion
