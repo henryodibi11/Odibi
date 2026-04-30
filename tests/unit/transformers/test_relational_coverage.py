@@ -335,14 +335,20 @@ class TestPivotAggFunctions:
 # ===========================================================================
 
 
-class TestPivotUnsupportedEngine:
-    def test_raises_for_polars_engine(self):
-        df = pd.DataFrame({"g": [1], "p": ["x"], "v": [10]})
-        pandas_ctx = PandasContext()
-        pandas_ctx.register("df", df)
-        ctx = EngineContext(context=pandas_ctx, df=df, engine_type=EngineType.POLARS)
-        with pytest.raises(ValueError, match="does not support engine type"):
-            pivot(ctx, PivotParams(group_by=["g"], pivot_col="p", agg_col="v"))
+class TestPivotPolarsEngineSupported:
+    def test_polars_engine_no_longer_raises(self):
+        """Polars is now supported for pivot — verify it works."""
+        pytest.importorskip("polars")
+        import polars as pl
+
+        from odibi.context import PolarsContext
+
+        df = pl.DataFrame({"g": [1], "p": ["x"], "v": [10]})
+        polars_ctx = PolarsContext()
+        polars_ctx.register("df", df)
+        ctx = EngineContext(context=polars_ctx, df=df, engine_type=EngineType.POLARS)
+        result = pivot(ctx, PivotParams(group_by=["g"], pivot_col="p", agg_col="v"))
+        assert result is not None
 
 
 # ===========================================================================
@@ -350,14 +356,20 @@ class TestPivotUnsupportedEngine:
 # ===========================================================================
 
 
-class TestUnpivotUnsupportedEngine:
-    def test_raises_for_polars_engine(self):
-        df = pd.DataFrame({"id": [1], "a": [10], "b": [20]})
-        pandas_ctx = PandasContext()
-        pandas_ctx.register("df", df)
-        ctx = EngineContext(context=pandas_ctx, df=df, engine_type=EngineType.POLARS)
-        with pytest.raises(ValueError, match="does not support engine type"):
-            unpivot(ctx, UnpivotParams(id_cols=["id"], value_vars=["a", "b"]))
+class TestUnpivotPolarsEngineSupported:
+    def test_polars_engine_no_longer_raises(self):
+        """Polars is now supported for unpivot — verify it works."""
+        pytest.importorskip("polars")
+        import polars as pl
+
+        from odibi.context import PolarsContext
+
+        df = pl.DataFrame({"id": [1], "a": [10], "b": [20]})
+        polars_ctx = PolarsContext()
+        polars_ctx.register("df", df)
+        ctx = EngineContext(context=polars_ctx, df=df, engine_type=EngineType.POLARS)
+        result = unpivot(ctx, UnpivotParams(id_cols=["id"], value_vars=["a", "b"]))
+        assert result is not None
 
 
 # ===========================================================================

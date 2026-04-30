@@ -7,14 +7,15 @@ GitHub issue #212 — Polars parity gap fill.
 """
 
 import pandas as pd
-import polars as pl
 import pytest
 
-from odibi.context import EngineContext, PandasContext, PolarsContext
-from odibi.engine.pandas_engine import PandasEngine
-from odibi.engine.polars_engine import PolarsEngine
-from odibi.enums import EngineType
-from odibi.transformers.relational import (
+pl = pytest.importorskip("polars")
+
+from odibi.context import EngineContext, PandasContext, PolarsContext  # noqa: E402
+from odibi.engine.pandas_engine import PandasEngine  # noqa: E402
+from odibi.engine.polars_engine import PolarsEngine  # noqa: E402
+from odibi.enums import EngineType  # noqa: E402
+from odibi.transformers.relational import (  # noqa: E402
     AggFunc,
     AggregateParams,
     JoinParams,

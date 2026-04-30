@@ -263,18 +263,20 @@ class TestPivotPandas:
             (str(c[0]), str(c[1])) for c in result.df.columns if isinstance(c, tuple)
         ]
 
-    def test_unsupported_engine_raises(self):
-        df = pd.DataFrame({"a": [1], "b": ["x"], "c": [10]})
-        pandas_ctx = PandasContext()
-        pandas_ctx.register("df", df)
-        ctx = EngineContext(
-            context=pandas_ctx,
-            df=df,
-            engine_type=EngineType.POLARS,
-        )
+    def test_polars_engine_supported(self):
+        """Polars is now a supported engine for pivot — no longer raises."""
+        pytest.importorskip("polars")
+        import polars as pl
+
+        from odibi.context import PolarsContext
+
+        df = pl.DataFrame({"a": [1], "b": ["x"], "c": [10]})
+        polars_ctx = PolarsContext()
+        polars_ctx.register("df", df)
+        ctx = EngineContext(context=polars_ctx, df=df, engine_type=EngineType.POLARS)
         params = PivotParams(group_by=["a"], pivot_col="b", agg_col="c")
-        with pytest.raises(ValueError, match="does not support engine type"):
-            pivot(ctx, params)
+        result = pivot(ctx, params)
+        assert result is not None
 
 
 # ===========================================================================

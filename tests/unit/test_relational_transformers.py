@@ -219,13 +219,20 @@ class TestPivotPandas:
             res.columns = [c[1] if isinstance(c, tuple) else c for c in res.columns]
         assert len(res) == 2
 
-    def test_pivot_unsupported_engine(self):
-        df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
-        ctx = _make_context(df)
-        ctx.engine_type = EngineType.POLARS
+    def test_pivot_polars_engine_supported(self):
+        """Polars is now a supported engine — no longer raises ValueError."""
+        pytest.importorskip("polars")
+        import polars as pl
+
+        df = pl.DataFrame({"a": [1], "b": [2], "c": [3]})
+        from odibi.context import PolarsContext
+
+        polars_ctx = PolarsContext()
+        polars_ctx.register("df", df)
+        ctx = EngineContext(context=polars_ctx, df=df, engine_type=EngineType.POLARS)
         params = PivotParams(group_by=["a"], pivot_col="b", agg_col="c")
-        with pytest.raises(ValueError, match="does not support engine type"):
-            pivot(ctx, params)
+        result = pivot(ctx, params)
+        assert result is not None
 
 
 # =========================================================================
@@ -267,13 +274,20 @@ class TestUnpivotPandas:
         assert "sales" in res.columns
         assert set(res["month"]) == {"jan_sales", "feb_sales"}
 
-    def test_unpivot_unsupported_engine(self):
-        df = pd.DataFrame({"id": [1], "a": [2], "b": [3]})
-        ctx = _make_context(df)
-        ctx.engine_type = EngineType.POLARS
+    def test_unpivot_polars_engine_supported(self):
+        """Polars is now a supported engine — no longer raises ValueError."""
+        pytest.importorskip("polars")
+        import polars as pl
+
+        df = pl.DataFrame({"id": [1], "a": [2], "b": [3]})
+        from odibi.context import PolarsContext
+
+        polars_ctx = PolarsContext()
+        polars_ctx.register("df", df)
+        ctx = EngineContext(context=polars_ctx, df=df, engine_type=EngineType.POLARS)
         params = UnpivotParams(id_cols=["id"], value_vars=["a", "b"])
-        with pytest.raises(ValueError, match="does not support engine type"):
-            unpivot(ctx, params)
+        result = unpivot(ctx, params)
+        assert result is not None
 
 
 # =========================================================================
