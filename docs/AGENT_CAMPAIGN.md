@@ -770,9 +770,19 @@ Success criteria:
 
 **Branch:** `docs/hodibi/validation-tutorial`
 
+> **⚠️ YAML Authoring Context (Required Reading for Genie):**
+> Before generating any YAML configs, read these files for correct field names and structure:
+> - `docs/skills/05_pipeline_yaml_authoring.md` — canonical YAML field rules
+> - `docs/skills/08_validation_workflow.md` — validation/quarantine/gate YAML structure
+> - `odibi/config.py` — Pydantic source of truth for all config models
+>
+> **Key YAML rules:** Use `read:`/`write:`/`transform:`/`query:` (NEVER `source:`/`sink:`/`sql:`).
+> Node names must be alphanumeric + underscore only. Write mode `upsert`/`append_once` require `options: {keys: [...]}`.
+
 **Prompt for Agent:**
 ```
 Read CUSTOM_INSTRUCTIONS.md, docs/LESSONS_LEARNED.md, docs/skills/08_validation_workflow.md.
+Also read docs/skills/05_pipeline_yaml_authoring.md and odibi/config.py (GateConfig, ValidationConfig, QuarantineConfig sections) for correct YAML field names.
 
 Task: Create a complete validation tutorial. GitHub issue #224.
 
@@ -834,9 +844,18 @@ Success criteria:
 
 **Branch:** `docs/hodibi/delete-detection-tutorial`
 
+> **⚠️ YAML Authoring Context (Required Reading for Genie):**
+> Before generating any YAML configs, read these files for correct field names and structure:
+> - `docs/skills/05_pipeline_yaml_authoring.md` — canonical YAML field rules
+> - `odibi/config.py` — Pydantic source of truth (DeleteDetectionConfig, NodeConfig)
+>
+> **Key YAML rules:** Use `read:`/`write:`/`transform:`/`query:` (NEVER `source:`/`sink:`/`sql:`).
+> Node names must be alphanumeric + underscore only. Write mode `upsert`/`append_once` require `options: {keys: [...]}`.
+
 **Prompt for Agent:**
 ```
 Read CUSTOM_INSTRUCTIONS.md, docs/LESSONS_LEARNED.md, docs/skills/02_odibi_first_lookup.md.
+Also read docs/skills/05_pipeline_yaml_authoring.md and odibi/config.py (DeleteDetectionConfig section) for correct YAML field names.
 
 Task: Create a delete detection tutorial. GitHub issue #223.
 
@@ -881,9 +900,19 @@ Success criteria:
 
 **Branch:** `docs/hodibi/quarantine-tutorial`
 
+> **⚠️ YAML Authoring Context (Required Reading for Genie):**
+> Before generating any YAML configs, read these files for correct field names and structure:
+> - `docs/skills/05_pipeline_yaml_authoring.md` — canonical YAML field rules
+> - `docs/skills/08_validation_workflow.md` — validation/quarantine/gate YAML structure
+> - `odibi/config.py` — Pydantic source of truth (QuarantineConfig, FactPatternConfig for FK orphans)
+>
+> **Key YAML rules:** Use `read:`/`write:`/`transform:`/`query:` (NEVER `source:`/`sink:`/`sql:`).
+> Node names must be alphanumeric + underscore only. Write mode `upsert`/`append_once` require `options: {keys: [...]}`.
+
 **Prompt for Agent:**
 ```
 Read CUSTOM_INSTRUCTIONS.md, docs/LESSONS_LEARNED.md, docs/skills/08_validation_workflow.md.
+Also read docs/skills/05_pipeline_yaml_authoring.md and odibi/config.py (QuarantineConfig, QuarantineColumnsConfig sections) for correct YAML field names.
 
 Task: Create a quarantine and orphan handling tutorial. GitHub issue #222.
 
@@ -1060,6 +1089,15 @@ Success criteria:
 ### Task 21: End-to-End Star Schema Build
 
 **Branch:** `test/hodibi/star-schema-e2e`
+
+> **⚠️ YAML Authoring Context (Required Reading for Genie):**
+> Before generating any YAML configs, read these files for correct field names and structure:
+> - `docs/skills/05_pipeline_yaml_authoring.md` — canonical YAML field rules
+> - `docs/skills/08_validation_workflow.md` — validation/quarantine/gate YAML structure
+> - `odibi/config.py` — Pydantic source of truth for all config models
+>
+> **Key YAML rules:** Use `read:`/`write:`/`transform:`/`query:` (NEVER `source:`/`sink:`/`sql:`).
+> Node names must be alphanumeric + underscore only. Write mode `upsert`/`append_once` require `options: {keys: [...]}`.
 
 **Prompt for Agent:**
 ```
@@ -1553,6 +1591,15 @@ Success criteria:
 
 **Branch:** `docs/hodibi/pattern-examples`
 
+> **⚠️ YAML Authoring Context (Required Reading for Genie):**
+> Before generating any YAML configs, read these files for correct field names and structure:
+> - `docs/skills/05_pipeline_yaml_authoring.md` — canonical YAML field rules
+> - `docs/skills/08_validation_workflow.md` — validation/quarantine/gate YAML structure
+> - `odibi/config.py` — Pydantic source of truth for all config models
+>
+> **Key YAML rules:** Use `read:`/`write:`/`transform:`/`query:` (NEVER `source:`/`sink:`/`sql:`).
+> Node names must be alphanumeric + underscore only. Write mode `upsert`/`append_once` require `options: {keys: [...]}`.
+
 **Prompt for Agent:**
 ```
 Read CUSTOM_INSTRUCTIONS.md, docs/LESSONS_LEARNED.md, docs/skills/05_pipeline_yaml_authoring.md.
@@ -1791,25 +1838,25 @@ Success criteria:
 Use this to track progress:
 
 ```
-Phase 1: Foundation
-- [ ] Task 1: Update ROADMAP.md
-- [ ] Task 2: Databricks workspace setup
-- [ ] Task 3: CHANGELOG catch-up
-- [ ] Task 4: Engine parity table
+Phase 1: Foundation ✅
+- [x] Task 1: Update ROADMAP.md
+- [x] Task 2: Databricks workspace setup
+- [x] Task 3: CHANGELOG catch-up
+- [x] Task 4: Engine parity table
 
-Phase 2: Spark Reality
-- [ ] Task 5: Spark read/write
-- [ ] Task 6: Spark SQL core transformers
-- [ ] Task 7: Spark relational/advanced transformers
+Phase 2: Spark Reality ✅
+- [x] Task 5: Spark read/write
+- [x] Task 6: Spark SQL core transformers
+- [x] Task 7: Spark relational/advanced transformers
 - [x] Task 8: Spark SCD2/merge patterns (11/11 PASS, T-020 fixed)
 - [x] Task 9: Spark dimension/fact patterns (12/12 PASS, T-020 in base.py fixed)
 - [x] Task 10: Spark validation (17/17 PASS, all 11 types + chain + special + Spark vs Pandas)
 
-Phase 3: Polars Parity
+Phase 3: Polars Parity ✅
 - [x] Task 11: Polars audit (#212) — 91 fns audited, 58 gaps found
 - [x] Task 12: Polars relational transformers — 14/14 PASS, +56 LOC
 - [x] Task 13: Polars SCD2/merge — 10/10 PASS, +265 LOC production
-- [ ] Task 14: Polars delete detection/manufacturing
+- [x] Task 14: Polars delete detection — 24/24 PASS, +185 LOC production
 
 Phase 4: Validation E2E
 - [ ] Task 15: Validation tutorial (#224)

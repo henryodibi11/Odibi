@@ -18,6 +18,7 @@ from odibi.config import (
 from odibi.validation.gate import (
     _check_row_count,
     _get_previous_row_count,
+    _is_summary_format,
     evaluate_gate,
 )
 
@@ -438,3 +439,93 @@ class TestGetPreviousRowCountMetricsWithoutKey:
         catalog.query.return_value = [{"rows_processed": 999}]
 
         assert _get_previous_row_count(catalog, "n") == 999
+
+
+# ---------------------------------------------------------------------------
+# _is_summary_format
+# ---------------------------------------------------------------------------
+
+
+class TestIsSummaryFormat:
+    def test_empty_dict_is_not_summary(self):
+        assert _is_summary_format({}) is False
+
+    def test_per_row_booleans_is_not_summary(self):
+        assert _is_summary_format({"not_null": [True, False, True]}) is False
+
+    def test_summary_dict_is_summary(self):
+        assert _is_summary_format({"not_null": {"pass_count": 8, "fail_count": 2}}) is True
+
+    def test_dict_without_pass_count_is_not_summary(self):
+        assert _is_summary_format({"not_null": {"other_key": 5}}) is False
+
+
+# ---------------------------------------------------------------------------
+# evaluate_gate with summary format (quarantine test_results)
+# ---------------------------------------------------------------------------
+
+
+class TestEvaluateGateSummaryFormatAllPass:
+    """Gate works with quarantine's Dict[str, Dict[str, int]] format."""
+
+    def test_all_pass_summary(self, df_10, engine):
+        results = {"not_null": {"pass_count": 10, "fail_count": 0}}
+        gate = GateConfig(require_pass_rate=0.95)
+
+        out = evaluate_gate(df_10, results, gate, engine)
+
+        assert out.passed is True
+        assert out.pass_rate == 1.0
+        assert out.passed_rows == 10
+
+
+class TestEvaluateGateSummaryFormatFailing:
+    """Gate fails correctly with summary format."""
+
+    def test_below_threshold_summary(self, df_10, engine):
+        results = {
+            "not_null": {"pass_count": 8, "fail_count": 2},
+            "range": {"pass_count": 6, "fail_count": 4},
+        }
+        gate = GateConfig(require_pass_rate=0.95)
+
+        out = evaluate_gate(df_10, results, gate, engine)
+
+        assert out.passed is False
+        assert any("Overall pass rate" in r for r in out.failure_reasons)
+
+
+class TestEvaluateGateSummaryPerTestThreshold:
+    """Per-test thresholds work with summary format."""
+
+    def test_per_test_threshold_with_summary(self, df_10, engine):
+        results = {
+            "not_null": {"pass_count": 10, "fail_count": 0},
+            "range_check": {"pass_count": 7, "fail_count": 3},
+        }
+        gate = GateConfig(
+            require_pass_rate=0.5,
+            thresholds=[GateThreshold(test="range_check", min_pass_rate=0.9)],
+        )
+
+        out = evaluate_gate(df_10, results, gate, engine)
+
+        assert out.passed is False
+        assert any("range_check" in r for r in out.failure_reasons)
+        assert out.details["per_test_rates"]["range_check"] == 0.7
+
+
+class TestEvaluateGateSummaryWithRowCount:
+    """Summary format + row_count gate work together (the original crash scenario)."""
+
+    def test_summary_with_row_count_no_crash(self, df_10, engine):
+        results = {"not_null": {"pass_count": 10, "fail_count": 0}}
+        gate = GateConfig(
+            require_pass_rate=0.95,
+            row_count=RowCountGate(min=1, max=1000000),
+        )
+
+        out = evaluate_gate(df_10, results, gate, engine)
+
+        assert out.passed is True
+        assert out.details["row_count_check"]["passed"] is True

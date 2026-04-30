@@ -79,17 +79,28 @@ def evaluate_gate(
         )
 
     passed_rows = total_rows
-    if validation_results:
-        all_pass_mask = None
-        for test_name, results in validation_results.items():
-            if len(results) == total_rows:
-                if all_pass_mask is None:
-                    all_pass_mask = results.copy()
-                else:
-                    all_pass_mask = [a and b for a, b in zip(all_pass_mask, results)]
+    is_summary_format = _is_summary_format(validation_results)
 
-        if all_pass_mask:
-            passed_rows = sum(all_pass_mask)
+    if validation_results:
+        if is_summary_format:
+            total_pass = 0
+            total_tests = 0
+            for test_name, summary in validation_results.items():
+                total_pass += summary.get("pass_count", 0)
+                total_tests += summary.get("pass_count", 0) + summary.get("fail_count", 0)
+            if total_tests > 0:
+                passed_rows = round(total_pass / total_tests * total_rows)
+        else:
+            all_pass_mask = None
+            for test_name, results in validation_results.items():
+                if len(results) == total_rows:
+                    if all_pass_mask is None:
+                        all_pass_mask = results.copy()
+                    else:
+                        all_pass_mask = [a and b for a, b in zip(all_pass_mask, results)]
+
+            if all_pass_mask:
+                passed_rows = sum(all_pass_mask)
 
     pass_rate = round(passed_rows / total_rows, 10) if total_rows > 0 else 1.0
     failed_rows = total_rows - passed_rows
@@ -112,8 +123,12 @@ def evaluate_gate(
     for threshold in gate_config.thresholds:
         test_results = validation_results.get(threshold.test)
         if test_results:
-            test_total = len(test_results)
-            test_passed = sum(test_results)
+            if isinstance(test_results, dict) and "pass_count" in test_results:
+                test_passed = test_results["pass_count"]
+                test_total = test_passed + test_results.get("fail_count", 0)
+            else:
+                test_total = len(test_results)
+                test_passed = sum(test_results)
             test_pass_rate = test_passed / test_total if test_total > 0 else 1.0
             details["per_test_rates"][threshold.test] = test_pass_rate
 
@@ -154,6 +169,15 @@ def evaluate_gate(
         action=gate_config.on_fail,
         failure_reasons=failure_reasons,
     )
+
+
+def _is_summary_format(validation_results: Dict[str, Any]) -> bool:
+    """Check if validation_results uses summary format (Dict[str, Dict[str, int]])
+    from quarantine, vs per-row format (Dict[str, List[bool]])."""
+    if not validation_results:
+        return False
+    first_value = next(iter(validation_results.values()))
+    return isinstance(first_value, dict) and "pass_count" in first_value
 
 
 def _check_row_count(

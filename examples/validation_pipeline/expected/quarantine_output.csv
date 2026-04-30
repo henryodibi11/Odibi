@@ -1,0 +1,9 @@
+customer_id,name,email,status,age,created_at,updated_at,_failure_reason
+,Carol Davis,carol.d@example.com,inactive,28,2026-04-03 10:00:00,2026-04-28 12:00:00,not_null: customer_id is NULL
+1,Alice Johnson,alice@example.com,active,30,2026-04-01 08:00:00,2026-04-29 10:00:00,unique: customer_id is not unique
+6,Frank Brown,,active,41,2026-04-06 13:00:00,2026-04-29 09:00:00,not_null: email is NULL
+1,Hank Taylor,hank.t@example.com,active,23,2026-04-08 15:00:00,2026-04-29 15:00:00,unique: customer_id is not unique
+10,Jack White,jack.w@example.com,deleted,55,2026-04-10 17:00:00,2026-04-29 17:00:00,accepted_values: status not in [active|inactive|pending]
+12,Leo Adams,leo.a@example.com,inactive,-5,2026-04-12 09:00:00,2026-04-28 09:00:00,range: age out of [0..150]
+15,Olivia King,olivia.k@example.com,active,200,2026-04-15 12:00:00,2026-04-29 12:00:00,range: age out of [0..150]
+17,Quinn Hall,not-an-email,inactive,58,2026-04-17 14:00:00,2026-04-28 14:00:00,regex_match: email does not match pattern
