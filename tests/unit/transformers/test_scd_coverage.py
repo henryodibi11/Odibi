@@ -802,7 +802,9 @@ class TestSCD2EntryPoint:
 
     def test_unsupported_engine_raises(self):
         """Line 204-210: unsupported engine type raises ValueError."""
-        source = pd.DataFrame({"id": [1], "name": ["A"], "txn_date": pd.to_datetime(["2024-01-01"])})
+        source = pd.DataFrame(
+            {"id": [1], "name": ["A"], "txn_date": pd.to_datetime(["2024-01-01"])}
+        )
         ctx = _make_ctx(source)
         ctx.engine_type = "unknown"
         params = SCD2Params(
