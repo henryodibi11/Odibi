@@ -390,6 +390,13 @@ from lib.setup import *
 **Implication:** If you overwrite a file via `editAsset`, you cannot recover it with `git checkout -- file`. The only recovery options are: (1) conversation cache from a prior `readAssetById` call, (2) a separate backup copy, or (3) manual reconstruction. Always read and cache large files before editing them.
 
 
+
+### V-008: Polars Engine Consumer Code Has 58 Dispatch Gaps
+**Verified:** 2026-04-30  
+**Finding:** Full audit of 91 engine-dispatched functions found 58 missing Polars branches. polars_engine.py itself is complete (read/write/SQL/anonymize/harmonize/validate all work). The gaps are in *consumer code*: transformers, patterns, and validation modules that dispatch on `engine_type` but only branch for Spark and Pandas. Three gap patterns: (1) 8 functions crash with ValueError, (2) 35 functions silently fall through to Pandas path, (3) 2 quarantine masks return `pl.lit(True)` for UNIQUE/CUSTOM_SQL. 24 SQL-first transformers work implicitly via `context.sql()`.  
+**Implication:** Any Polars pipeline using SCD2, Merge, Dimension, Fact, Delete Detection, or FK validation will fail. Fix priority: stop crashes (8 fns) → fix silent fallbacks (35 fns) → quarantine masks (2 fns).  
+**Reference:** `docs/09_polars_audit_results.md`, `campaign/09_polars_audit_results.md`
+
 ---
 
 ## Session Log Template
@@ -589,3 +596,23 @@ Copy-paste this at the end of your session:
 - `campaign/08_spark_validation` — new notebook (11 cells, 17 tests)
 
 **No source file changes.** Validation engine Spark path works correctly as-is.
+
+## Session: 2026-04-30 — Polars Engine Parity Audit (#212)
+
+### Work Done
+- Deep-scanned all 91 engine-dispatched functions across odibi/
+- Found 58 missing Polars branches (23 CRITICAL, 25 MEDIUM, 10 LOW)
+- Identified 3 gap patterns: explicit ValueError (8), silent Pandas fallback (35), missing mask branch (2)
+- Confirmed 33 functions already work with Polars (9 explicit + 24 implicit via SQL)
+- Produced audit report: docs/09_polars_audit_results.md + campaign/09_polars_audit_results.md
+
+### Verification Report
+- Tests written: 0 (audit-only, no source changes)
+- Files scanned: 17 with dispatch gaps, 6 with full parity
+- Concrete findings: 58 gaps classified by severity with exact function names and line numbers
+- Edge cases: Checked for both explicit NotImplementedError AND silent fallback patterns
+- Command: Automated Python scan of all .py files in odibi/
+
+### New Entries Added
+- [x] Discovery: V-008 — Polars Engine Consumer Code Has 58 Dispatch Gaps
+- [ ] AGENTS.md coverage updated (no test changes)
