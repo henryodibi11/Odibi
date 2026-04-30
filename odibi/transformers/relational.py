@@ -496,6 +496,36 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
 
         return context.with_df(res)
 
+    elif context.engine_type == EngineType.POLARS:
+        import polars as pl
+
+        df = context.df
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        # Map agg function names to Polars equivalents
+        polars_agg_map = {"avg": "mean", "count": "len"}
+        agg_func = polars_agg_map.get(params.agg_func, params.agg_func)
+
+        res = df.pivot(
+            on=params.pivot_col,
+            index=params.group_by,
+            values=params.agg_col,
+            aggregate_function=agg_func,
+        )
+
+        rows_after = res.shape[0]
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Pivot completed",
+            rows_before=rows_before,
+            rows_after=rows_after,
+            columns_after=len(res.columns),
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+
+        return context.with_df(res)
+
     else:
         ctx.error(
             "Pivot failed: unsupported engine",
@@ -503,7 +533,7 @@ def pivot(context: EngineContext, params: PivotParams) -> EngineContext:
         )
         raise ValueError(
             f"Pivot transformer does not support engine type '{context.engine_type}'. "
-            f"Supported engines: SPARK, PANDAS. "
+            f"Supported engines: SPARK, PANDAS, POLARS. "
             f"Check your engine configuration."
         )
 
@@ -608,6 +638,32 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
 
         return context.with_df(res)
 
+    elif context.engine_type == EngineType.POLARS:
+        import polars as pl
+
+        df = context.df
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        res = df.unpivot(
+            on=params.value_vars,
+            index=params.id_cols,
+            variable_name=params.var_name,
+            value_name=params.value_name,
+        )
+
+        rows_after = res.shape[0]
+        elapsed_ms = (time.time() - start_time) * 1000
+        ctx.debug(
+            "Unpivot completed",
+            rows_before=rows_before,
+            rows_after=rows_after,
+            value_vars_count=len(params.value_vars),
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+
+        return context.with_df(res)
+
     else:
         ctx.error(
             "Unpivot failed: unsupported engine",
@@ -615,7 +671,7 @@ def unpivot(context: EngineContext, params: UnpivotParams) -> EngineContext:
         )
         raise ValueError(
             f"Unpivot transformer does not support engine type '{context.engine_type}'. "
-            f"Supported engines: SPARK, PANDAS. "
+            f"Supported engines: SPARK, PANDAS, POLARS. "
             f"Check your engine configuration."
         )
 

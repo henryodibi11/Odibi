@@ -616,3 +616,28 @@ Copy-paste this at the end of your session:
 ### New Entries Added
 - [x] Discovery: V-008 — Polars Engine Consumer Code Has 58 Dispatch Gaps
 - [ ] AGENTS.md coverage updated (no test changes)
+
+### V-009: Polars Pivot/Unpivot API and Agg Function Mapping
+**Verified:** 2026-04-30  
+**Finding:** Polars `pivot()` uses `aggregate_function` parameter with function names `"mean"` (not `"avg"`) and `"len"` (not `"count"`). The `unpivot()` method uses `variable_name`/`value_name` parameters. Both require eager DataFrames — LazyFrames must be `.collect()`ed first. `pivot()` signature: `df.pivot(on, index, values, aggregate_function)`. `unpivot()` signature: `df.unpivot(on, index, variable_name, value_name)`.  
+**Implication:** Polars branches must map common agg function names: `"avg"→"mean"`, `"count"→"len"`. Always check for LazyFrame and collect before pivot/unpivot.
+
+## Session: 2026-04-30 — Polars Relational Transformers (#212, Task 12)
+
+### Work Done
+- Added Polars branches to `pivot()` and `unpivot()` in `odibi/transformers/relational.py` (+56 LOC)
+- Created `tests/unit/transformers/test_relational_polars.py` (232 LOC, 15 test methods)
+- Built campaign notebook `campaign/10_polars_relational_transformers` (14 tests)
+- All 14 Databricks integration tests pass (pivot, unpivot, join, union, aggregate + parity)
+- join/union/aggregate already work via `context.sql()` — no new code needed
+
+### Verification Report
+- Tests written: 15 unit tests + 14 campaign tests
+- Tests passing: 14/14 (campaign), unit tests pending formal run
+- Concrete value assertions: East Q1 pivot=250, Widget jan revenue=1000, Polars==Pandas parity
+- Edge cases tested: LazyFrame auto-collect, single-row unpivot, avg→mean mapping
+- Production code: +56 LOC (under 250 limit)
+- Total code: +288 LOC (production + tests)
+
+### New Entries Added
+- [x] Discovery: V-009 — Polars Pivot/Unpivot API and Agg Function Mapping
