@@ -812,3 +812,31 @@ ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, eng
 **Root Cause:** `evaluate_gate` computes pass rate as: a row passes if it passes ALL tests. When validation_results lists have failures at the same positions (e.g., rows 97-99 for all tests), only 3 unique rows fail instead of 8. The positional overlap means rows are counted once, not per-test.
 **Fix:** When simulating validation_results for testing, spread failures across non-overlapping row positions to match the expected unique failure count. Example: rows 82-84 for status, 85-87 for nulls, 88-89 for negatives = 8 unique failures.
 **Modules:** Any test code constructing per-row validation_results for evaluate_gate
+
+## Session: 2026-04-30 — Aggregation Pattern Stress Test (Task 19, #225)
+
+### Work Done
+- Created `examples/aggregation_stress/stress_test.py` (250 LOC) — runs `AggregationPattern` on Pandas + Spark engines for 8 scenarios and asserts row-level parity.
+- Created `examples/aggregation_stress/README.md` (60 LOC).
+- Verified all 8 scenarios pass against real Spark Connect cluster `1121-215743-ak1cop0m` (DBR 17.3 LTS, Spark 4.0.0). 100k → 1k aggregation completes in 3.4s.
+- No bugs filed — Pandas (DuckDB) and Spark engines produce identical aggregates including null grain handling and `having` filters.
+
+### Verification Report
+- Scenarios: 8/8 pass
+- Engines: Pandas + Spark both verified
+- Concrete asserts: row count, every measure column compared via `np.allclose` (numeric) or `==` (categorical)
+- Edge cases: nulls in grain, empty result via `having`, audit `load_timestamp` recency
+- Performance: 100k rows → 1000 buckets in 3.4s combined Pandas+Spark
+
+### New Entries Added
+- [x] Verified: V-011 — Aggregation Pattern Pandas/Spark Engines Produce Identical Results
+- [x] Pattern: P-008 — Audit Columns (load_timestamp) Are Generated at Runtime — Exclude From Engine-Parity Comparisons
+
+### V-011: Aggregation Pattern Pandas/Spark Engines Produce Identical Results
+**Verified:** 2026-04-30 against DBR 17.3 LTS (Spark 4.0.0) via Databricks Connect
+**Finding:** `AggregationPattern.execute()` produces row-for-row identical aggregates on Pandas (DuckDB SQL) and Spark engines for: simple SUM/AVG/COUNT/MIN/MAX, multi-column grain, null grain values (NULL becomes its own group on both engines), `having` filtering to empty result. The `_merge_replace` and `_merge_sum` incremental helpers also work identically on Pandas inputs.
+**Implication:** No follow-up bug tickets. Future regressions can be caught by re-running `examples/aggregation_stress/stress_test.py`.
+
+### P-008: Audit Columns (load_timestamp) Are Generated at Runtime — Exclude From Engine-Parity Comparisons
+**Pattern:** When asserting Pandas vs Spark output equality for patterns with `audit: {load_timestamp: true}`, the timestamp is set independently per engine run and will differ. Pass an `ignore_cols=("load_timestamp",)` filter to your parity helper, and assert recency/dtype separately on each engine.
+**Modules:** Any cross-engine parity test for `AggregationPattern`, `DimensionPattern`, `FactPattern`, `MergePattern` audit features.
