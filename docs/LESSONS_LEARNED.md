@@ -153,6 +153,13 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Fix:** Replace `if rows_before and rows_after:` with `if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float)):` — explicit type checks instead of truthiness.  
 **Modules:** `odibi/transformers/sql_core.py`, `odibi/transformers/advanced.py`, `odibi/transformers/relational.py`
 
+### T-014: Always Run `ruff format` Before Committing
+**Date:** 2026-04
+**Symptom:** CI fails on `ruff format --check odibi/ tests/` after merging agent-authored code
+**Root Cause:** Agent edited transformer files but did not run the formatter. Long lines and expression formatting diverged from project style.
+**Fix:** Every commit touching `.py` files in `odibi/` or `tests/` must run `ruff format <changed files>` before `git add`. CI checks both `ruff check` (linting) and `ruff format --check` (formatting).
+**Modules:** All Python files
+
 ### T-013: Polars SQL Dialect Gaps — EXCEPT vs EXCLUDE, No Subqueries
 **Date:** 2026-04  
 **Symptom:** `polars.exceptions.SQLInterfaceError` on deduplicate: "EXCEPT syntax not supported" and "subqueries not supported"  
