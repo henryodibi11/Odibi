@@ -9,10 +9,10 @@
 ## Campaign Overview
 
 ```
-Phase 1: Foundation (Tasks 1-4)     → Fix stale docs, lesson system, Databricks scaffolding
-Phase 2: Spark Reality (Tasks 5-10) → Test Spark paths WITH REAL SPARK (not mocks)
-Phase 3: Polars Parity (Tasks 11-14)→ Fill missing Polars branches (#212)
-Phase 4: Validation E2E (Tasks 15-18)→ Real data quality pipelines on Databricks
+Phase 1: Foundation (Tasks 1-4)     → Fix stale docs, lesson system, Databricks scaffolding  ✅
+Phase 2: Spark Reality (Tasks 5-10) → Test Spark paths WITH REAL SPARK (not mocks)           ✅
+Phase 3: Polars Parity (Tasks 11-14)→ Fill missing Polars branches (#212)                    ✅
+Phase 4: Validation E2E (Tasks 15-18)→ Real data quality pipelines on Databricks             ← NEXT
 Phase 5: Pattern Stress (Tasks 19-23)→ Every pattern with real data, edge cases
 Phase 6: Bug Fixes (Tasks 24-26)    → Open issues (#248, YAML validation, etc.)
 Phase 7: New Features (Tasks 27-30) → row_number, flatten_struct, apply_mapping transformers
@@ -34,7 +34,7 @@ Before starting any task, the agent must:
 
 ---
 
-## Phase 1: Foundation (Tasks 1-4)
+## Phase 1: Foundation (Tasks 1-4) ✅ COMPLETE
 
 ### Task 1: Update ROADMAP.md and Stale Numbers
 
@@ -216,7 +216,7 @@ Success criteria:
 
 ---
 
-## Phase 2: Spark Reality Testing (Tasks 5-10)
+## Phase 2: Spark Reality Testing (Tasks 5-10) ✅ COMPLETE
 
 > **This is the campaign's biggest value-add.** CI can't run Spark (no JVM). Databricks HAS Spark. Test the real Spark paths that have only been mock-tested.
 
@@ -564,7 +564,7 @@ Success criteria:
 
 ---
 
-## Phase 3: Polars Parity (Tasks 11-14)
+## Phase 3: Polars Parity (Tasks 11-14) ✅ COMPLETE
 
 ### Task 11: Polars Missing Branches Audit (#212)
 
@@ -754,11 +754,13 @@ Rules:
 - Compare with Pandas results
 
 Success criteria:
-- [ ] delete_detection works on Polars
-- [ ] manufacturing Polars paths verified correct
-- [ ] Tests pass
-- [ ] Cross-engine comparison passes
+- [x] delete_detection works on Polars
+- [x] manufacturing Polars paths verified correct (cross-engine parity on Databricks Campaign 11)
+- [x] Tests pass (24/24)
+- [x] Cross-engine comparison passes (4 parity tests: hard delete, soft delete sql_compare, soft delete snapshot_diff, ensure_delete_column)
 ```
+
+**Completed:** 2026-04-30. Production: +185 LOC (`delete_detection.py` — snapshot_diff, sql_compare, apply_soft_delete, apply_hard_delete, ensure_delete_column, get_row_count Polars branches). Tests: +392 LOC (`test_delete_detect_polars.py`, 24 tests). Lessons: T-023 (coverage --source NumPy), P-005 (anti-join), P-006 (LazyFrame guard).
 
 ---
 

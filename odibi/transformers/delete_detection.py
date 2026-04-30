@@ -75,6 +75,8 @@ def _detect_deletes_snapshot_diff(
     """
     if context.engine_type == EngineType.SPARK:
         return _snapshot_diff_spark(context, config)
+    elif context.engine_type == EngineType.POLARS:
+        return _snapshot_diff_polars(context, config)
     else:
         return _snapshot_diff_pandas(context, config)
 
@@ -266,6 +268,104 @@ def _snapshot_diff_pandas(
     return _apply_deletes(context, deleted_keys, config, prev_df=prev_df)
 
 
+def _snapshot_diff_polars(
+    context: EngineContext,
+    config: DeleteDetectionConfig,
+) -> EngineContext:
+    """Polars implementation of snapshot_diff using deltalake library."""
+    try:
+        from deltalake import DeltaTable
+    except ImportError:
+        raise ImportError(
+            "detect_deletes snapshot_diff mode requires 'deltalake' package. "
+            "Install with: pip install deltalake"
+        )
+    import polars as pl
+
+    keys = config.keys
+
+    table_path = None
+    if config.connection and config.path:
+        conn = _get_connection(context, config.connection)
+        if conn and hasattr(conn, "get_path"):
+            table_path = conn.get_path(config.path)
+        else:
+            logger.warning(
+                f"detect_deletes: Connection '{config.connection}' not found or doesn't support get_path."
+            )
+
+    if not table_path:
+        table_path = _get_target_path(context)
+
+    if not table_path:
+        logger.warning(
+            "detect_deletes: Could not determine target table path. Skipping. "
+            "Provide 'connection' and 'path' params, or ensure the node has a 'write' block."
+        )
+        return _ensure_delete_column(context, config)
+
+    try:
+        dt = DeltaTable(table_path)
+    except Exception as e:
+        logger.info(f"detect_deletes: Target is not a Delta table ({e}). Skipping.")
+        return _ensure_delete_column(context, config)
+
+    current_version = dt.version()
+
+    if current_version == 0:
+        if config.on_first_run == FirstRunBehavior.ERROR:
+            raise ValueError("detect_deletes: No previous version exists for snapshot_diff.")
+        logger.info("detect_deletes: First run detected (version 0). Skipping delete detection.")
+        return _ensure_delete_column(context, config)
+
+    history_list = dt.history()
+    versions = sorted(
+        [entry["version"] for entry in history_list if entry["version"] < current_version],
+        reverse=True,
+    )
+    if not versions:
+        if config.on_first_run == FirstRunBehavior.ERROR:
+            raise ValueError("detect_deletes: No previous version available for snapshot_diff.")
+        logger.info(
+            "detect_deletes: No previous version available after VACUUM. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+    prev_version = versions[0]
+    logger.debug(
+        f"detect_deletes: Using version {prev_version} as previous (current: {current_version})"
+    )
+
+    curr_df = context.df
+    if isinstance(curr_df, pl.LazyFrame):
+        curr_df = curr_df.collect()
+
+    curr_columns = [c.lower() for c in curr_df.columns]
+    missing_curr_keys = [k for k in keys if k.lower() not in curr_columns]
+    if missing_curr_keys:
+        logger.warning(
+            f"detect_deletes: Keys {missing_curr_keys} not found in current DataFrame. "
+            f"Available columns: {curr_df.columns}. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+
+    prev_df = pl.read_delta(table_path, version=prev_version)
+    prev_columns = [c.lower() for c in prev_df.columns]
+    missing_prev_keys = [k for k in keys if k.lower() not in prev_columns]
+    if missing_prev_keys:
+        logger.warning(
+            f"detect_deletes: Keys {missing_prev_keys} not found in previous version (v{prev_version}). "
+            f"Schema may have changed. Skipping delete detection."
+        )
+        return _ensure_delete_column(context, config)
+
+    curr_keys = curr_df.select(keys).unique()
+    prev_keys = prev_df.select(keys).unique()
+
+    deleted_keys = prev_keys.join(curr_keys, on=keys, how="anti")
+
+    return _apply_deletes(context, deleted_keys, config, prev_df=prev_df)
+
+
 def _detect_deletes_sql_compare(
     context: EngineContext,
     config: DeleteDetectionConfig,
@@ -276,6 +376,8 @@ def _detect_deletes_sql_compare(
     """
     if context.engine_type == EngineType.SPARK:
         return _sql_compare_spark(context, config)
+    elif context.engine_type == EngineType.POLARS:
+        return _sql_compare_polars(context, config)
     else:
         return _sql_compare_pandas(context, config)
 
@@ -341,6 +443,41 @@ def _sql_compare_pandas(
 
     merged = silver_keys.merge(source_keys, on=keys, how="left", indicator=True)
     deleted_keys = merged[merged["_merge"] == "left_only"][keys].copy()
+
+    return _apply_deletes(context, deleted_keys, config)
+
+
+def _sql_compare_polars(
+    context: EngineContext,
+    config: DeleteDetectionConfig,
+) -> EngineContext:
+    """Polars implementation of sql_compare using SQLAlchemy."""
+    import pandas as pd
+    import polars as pl
+
+    keys = config.keys
+
+    conn = _get_connection(context, config.source_connection)
+    if conn is None:
+        raise ValueError(
+            f"detect_deletes: Connection '{config.source_connection}' not found in engine connections. "
+            f"Available connections: {list(context.engine.connections.keys()) if hasattr(context, 'engine') and hasattr(context.engine, 'connections') else 'None'}. "
+            f"Define the connection in your project config or check the connection name."
+        )
+
+    source_keys_query = _build_source_keys_query(config)
+
+    engine = _get_sqlalchemy_engine(conn)
+    source_keys_pd = pd.read_sql(source_keys_query, engine)
+    source_keys = pl.from_pandas(source_keys_pd)
+
+    curr_df = context.df
+    if isinstance(curr_df, pl.LazyFrame):
+        curr_df = curr_df.collect()
+
+    silver_keys = curr_df.select(keys).unique()
+
+    deleted_keys = silver_keys.join(source_keys, on=keys, how="anti")
 
     return _apply_deletes(context, deleted_keys, config)
 
@@ -451,6 +588,32 @@ def _apply_soft_delete(
             )
             result = result.drop("_del_flag")
 
+    elif context.engine_type == EngineType.POLARS:
+        import polars as pl
+
+        df = context.df
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        if prev_df is not None:
+            df = df.with_columns(pl.lit(False).alias(soft_delete_col))
+            deleted_rows = prev_df.join(deleted_keys, on=keys, how="inner")
+            deleted_rows = deleted_rows.with_columns(pl.lit(True).alias(soft_delete_col))
+            for col_name in df.columns:
+                if col_name not in deleted_rows.columns:
+                    deleted_rows = deleted_rows.with_columns(pl.lit(None).alias(col_name))
+            deleted_rows = deleted_rows.select(df.columns)
+            result = pl.concat([df, deleted_rows])
+        else:
+            deleted_keys_flagged = deleted_keys.with_columns(pl.lit(True).alias("_del_flag"))
+            df = df.join(deleted_keys_flagged, on=keys, how="left")
+            df = df.with_columns(pl.col("_del_flag").fill_null(False).alias(soft_delete_col)).drop(
+                "_del_flag"
+            )
+            result = df
+
+        return context.with_df(result)
+
     else:
         import pandas as pd
 
@@ -501,6 +664,13 @@ def _apply_hard_delete(
 
     if context.engine_type == EngineType.SPARK:
         result = context.df.join(deleted_keys, on=keys, how="left_anti")
+    elif context.engine_type == EngineType.POLARS:
+        import polars as pl
+
+        df = context.df
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+        result = df.join(deleted_keys, on=keys, how="anti")
     else:
         df = context.df.copy()
         merged = df.merge(deleted_keys, on=keys, how="left", indicator=True)
@@ -525,6 +695,15 @@ def _ensure_delete_column(
 
             result = context.df.withColumn(soft_delete_col, lit(False))
             return context.with_df(result)
+    elif context.engine_type == EngineType.POLARS:
+        import polars as pl
+
+        df = context.df
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+        if soft_delete_col not in df.columns:
+            result = df.with_columns(pl.lit(False).alias(soft_delete_col))
+            return context.with_df(result)
     else:
         if soft_delete_col not in context.df.columns:
             df = context.df.copy()
@@ -548,6 +727,12 @@ def _get_row_count(df: Any, engine_type: EngineType) -> int:
     """Get row count from DataFrame."""
     if engine_type == EngineType.SPARK:
         return df.count()
+    elif engine_type == EngineType.POLARS:
+        import polars as pl
+
+        if isinstance(df, pl.LazyFrame):
+            return df.collect().height
+        return df.height
     else:
         return len(df)
 

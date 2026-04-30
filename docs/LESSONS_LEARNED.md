@@ -226,6 +226,51 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Rule:** Cross joins must never have an ON clause. Validate join parameters holistically — field-level validators can't enforce cross-field constraints.  
 **Modules:** `odibi/transformers/relational.py` — `JoinParams`, `join()`
 
+
+
+### T-023: coverage --source Triggers NumPy Double-Import on Databricks
+**Date:** 2026-04-30  
+**Symptom:** `TypeError: int() argument must be a string, a bytes-like object or a real number, not '_NoValueType'` when running `coverage run --source=odibi.transformers.delete_detection`  
+**Root Cause:** `--source` activates coverage's import hooks, which cause NumPy to be imported twice. The double-import breaks `numpy._core._methods._sum` — the `_NoValue` sentinel from the first import is not recognized by the reloaded module. This only affects code paths using `pandas.merge(..., indicator=True)` which calls `.where()` internally.  
+**Fix:** Use `--include=odibi/transformers/delete_detection.py` instead of `--source=odibi.transformers.delete_detection`. The `--include` flag filters coverage reporting by file path without activating import hooks.  
+**Modules:** Any coverage measurement on Databricks clusters
+
+---
+
+## Patterns (Working Recipes)
+
+> Proven code recipes. Copy these instead of reinventing.
+
+### P-005: Polars Anti-Join for Delete Detection
+**Date:** 2026-04-30  
+**Context:** Porting Pandas `merge(..., indicator=True)` pattern to Polars  
+**Pattern:**  
+```python
+# Pandas: merge + indicator + filter
+merged = prev_keys.merge(curr_keys, on=keys, how="left", indicator=True)
+deleted_keys = merged[merged["_merge"] == "left_only"][keys]
+
+# Polars: native anti-join (cleaner, faster)
+deleted_keys = prev_keys.join(curr_keys, on=keys, how="anti")
+```
+**Why:** Polars has no `indicator` parameter on joins. The `anti` join type is purpose-built for this — returns rows from the left that have NO match in the right. No temporary columns to clean up.  
+**Also applies to:** hard delete (`df.join(deleted_keys, on=keys, how="anti")`), any "find missing" pattern  
+**Modules:** `odibi/transformers/delete_detection.py`
+
+### P-006: LazyFrame Guard Pattern for Polars Engine Branches
+**Date:** 2026-04-30  
+**Context:** Polars engine may receive either eager DataFrame or LazyFrame  
+**Pattern:**  
+```python
+import polars as pl
+
+df = context.df
+if isinstance(df, pl.LazyFrame):
+    df = df.collect()
+```
+**Why:** Several Polars operations (`.height`, column indexing, `.to_list()`) require an eager DataFrame. Always collect at the top of engine-specific branches.  
+**Modules:** All Polars branches in `delete_detection.py`, `manufacturing.py`
+
 ### T-020: Spark Connect Lazy Evaluation — `spark.table()` and `DeltaTable.forName()` Don't Throw for Missing Tables
 **Date:** 2026-04-30
 **Symptom:** SCD2 and Merge tests fail with `TABLE_OR_VIEW_NOT_FOUND` / `DELTA_MISSING_DELTA_TABLE` on first run. Table-existence checks pass (no exception), but operations on the returned object throw later.
