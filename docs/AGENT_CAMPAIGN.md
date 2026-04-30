@@ -1067,6 +1067,27 @@ Success criteria:
 - [ ] Bugs filed for any issues
 ```
 
+**Status: ✅ COMPLETE (2026-04-30)**
+
+**Branch:** `test/hodibi/aggregation-pattern-stress`
+
+**Deliverables:**
+- `examples/aggregation_stress/stress_test.py` (250 LOC) — runs 8 scenarios on Pandas + Spark via Databricks Connect, asserts row-level engine parity.
+- `examples/aggregation_stress/README.md` (60 LOC).
+
+**Verifications on DBR 17.3 / Spark 4.0.0 (Databricks Connect):**
+- 8/8 scenarios pass on both engines:
+  1. Simple aggregation (SUM/AVG/COUNT/MIN/MAX) — parity ✅
+  2. Multi-grain `[order_date, category, region]` — 264 groups, parity ✅
+  3. Incremental merge — `replace` strategy ✅
+  4. Incremental merge — `sum` strategy (outer-join + NULL→0 fallback) ✅
+  5. Audit `load_timestamp` present, recent, dtype-correct ✅
+  6. 100k rows → 1000 buckets in **3.4s** (well under 30s budget) ✅
+  7. Null grain values — NULL becomes its own group identically on both engines ✅
+  8. Empty result via `having: SUM(amount) < 0` — 0 rows ✅
+- No bugs filed — Pandas (DuckDB) and Spark engines produce identical aggregates.
+- New lessons captured: V-011 (engine parity verified), P-008 (audit timestamp must be excluded from parity checks).
+
 ---
 
 ### Task 20: Date Dimension Pattern — Full Feature Test
@@ -1893,7 +1914,7 @@ Phase 4: Validation E2E
 - [x] Task 18: Delta troubleshooting (#225) — 409 LOC tutorial, 10/10 issues covered, key claims verified on DBR 17.3
 
 Phase 5: Pattern Stress
-- [ ] Task 19: Aggregation stress test
+- [x] Task 19: Aggregation stress test
 - [ ] Task 20: Date dimension full test
 - [ ] Task 21: Star schema E2E
 - [ ] Task 22: Connection discovery
