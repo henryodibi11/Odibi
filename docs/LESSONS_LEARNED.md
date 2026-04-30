@@ -73,6 +73,14 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Rationale:** Simpler to test, compose, and reason about. Patterns need class hierarchy for polymorphism.  
 **Affected:** All odibi code
 
+
+### D-008: _safe_partition_count for Spark Connect Compatibility
+**Date:** 2026-04  
+**Context:** SparkEngine crashed on shared clusters because .rdd.getNumPartitions() is blocked by Spark Connect  
+**Decision:** Added `_safe_partition_count(df)` helper that wraps `df.rdd.getNumPartitions()` in try/except, returning -1 on failure. All partition-count logging uses this helper.  
+**Rationale:** Partition count is logging-only metadata. The -1 sentinel is visible in logs without crashing the pipeline. Core read/write/upsert don't depend on partition count.  
+**Affected:** `odibi/engine/spark_engine.py` — 7 call sites
+
 ---
 
 ## Traps (Known Pitfalls)
@@ -183,6 +191,20 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Impact:** Cannot recover workspace files from GitHub when accidentally overwritten. Cannot `pip install` from GitHub URLs. Cannot use `requests` or `urllib` for external data.
 **Fix:** Never rely on external HTTP for file recovery. Keep critical content in the conversation cache or workspace. For package installs, only use PyPI-hosted packages.
 **Modules:** Any agent workflow that assumes internet access
+
+
+### T-017: Spark Connect Blocks .rdd and .sparkContext on Shared Clusters
+**Date:** 2026-04  
+**Symptom:** `PySparkNotImplementedError: [NOT_IMPLEMENTED]` when SparkEngine calls `df.rdd.getNumPartitions()` or `spark.sparkContext.appName` on shared/user-isolation clusters  
+**Root Cause:** Databricks shared clusters use Spark Connect (thin client), which blocks JVM-dependent APIs: `df.rdd`, `spark.sparkContext`, `spark.sparkContext._gateway.jvm.*`. These are all used in SparkEngine for logging/metrics only — the core read/write/upsert functionality is fully Spark Connect-compatible.  
+**Affected locations (spark_engine.py):**  
+- `__init__`: `sparkContext.setLogLevel()` (x2), `sparkContext.appName` (x1)  
+- `read()`: `df.rdd.getNumPartitions()` (x3: JDBC, table, file paths)  
+- `sql()`: `result.rdd.getNumPartitions()` (x1)  
+- `write()`: `df.rdd.getNumPartitions()` (x1, already protected)  
+- `table_exists()`: `sparkContext._gateway.jvm` (x1, already protected)  
+**Fix:** Added `_safe_partition_count(df)` helper that returns -1 on failure. Wrapped all `sparkContext` access in try/except. All 6 unprotected locations now safe.  
+**Modules:** `odibi/engine/spark_engine.py`
 
 ---
 
@@ -404,3 +426,24 @@ Copy-paste this at the end of your session:
 - [x] Trap: T-015 — External Internet Blocked on Databricks Cluster
 - [x] Discovery: V-007 — Databricks Repos No .git Directory, No Local Git
 - [ ] AGENTS.md coverage updated (no test changes)
+
+## Session: 2026-04-30 — SparkEngine Shared Cluster Compatibility Fix
+
+### Work Done
+- Audited spark_engine.py: found 8 locations using .rdd or .sparkContext
+- Fixed 6 unprotected locations (2 were already protected)
+- Added `_safe_partition_count()` helper method
+- Built 03_spark_engine_readwrite.py with 8 integration tests
+- All 8 tests pass on shared cluster (USER_ISOLATION mode)
+
+### Verification Report
+- Tests written: 8 (CSV read, Parquet read, Delta read, overwrite, append, upsert, integrity, HWM)
+- Tests passing: 8/8
+- Concrete value assertions: row counts, column names, sample values (Alice/100.50, Bob_Updated/999.99, etc.)
+- Negative tests: future HWM cutoff → 0 rows
+- Edge cases tested: empty result set, overwrite replacement, upsert update+insert+untouched
+- Bug found: SparkEngine crashes on shared clusters — filed as T-017
+
+### New Entries Added
+- [x] Trap: T-017 — Spark Connect Blocks .rdd and .sparkContext
+- [x] Decision: D-008 — _safe_partition_count for Spark Connect Compatibility

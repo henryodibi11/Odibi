@@ -129,7 +129,10 @@ class SparkEngine(Engine):
                 )
 
                 self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
-                self.spark.sparkContext.setLogLevel("ERROR")
+                try:
+                    self.spark.sparkContext.setLogLevel("ERROR")
+                except Exception:
+                    pass  # Spark Connect: sparkContext not available
 
                 ctx.debug("Delta Lake support enabled")
 
@@ -149,7 +152,10 @@ class SparkEngine(Engine):
                 )
 
                 self.spark = builder.getOrCreate()
-                self.spark.sparkContext.setLogLevel("ERROR")
+                try:
+                    self.spark.sparkContext.setLogLevel("ERROR")
+                except Exception:
+                    pass  # Spark Connect: sparkContext not available
 
         self.config = config or {}
         self.connections = connections or {}
@@ -161,10 +167,14 @@ class SparkEngine(Engine):
         self._apply_spark_config()
 
         elapsed = (time.time() - start_time) * 1000
+        try:
+            app_name = self.spark.sparkContext.appName
+        except Exception:
+            app_name = "unknown"  # Spark Connect: sparkContext not available
         ctx.info(
             "SparkEngine initialized",
             elapsed_ms=round(elapsed, 2),
-            app_name=self.spark.sparkContext.appName,
+            app_name=app_name,
             spark_version=self.spark.version,
             connections_configured=len(self.connections),
             using_existing_session=spark_session is not None,
@@ -225,6 +235,18 @@ class SparkEngine(Engine):
                     error_message=str(e),
                     suggestion="This config may require session restart",
                 )
+
+    def _safe_partition_count(self, df) -> int:
+        """Get DataFrame partition count, with fallback for Spark Connect.
+
+        On shared/user-isolation clusters (Spark Connect), df.rdd is blocked.
+        Since partition count is only used for logging/metrics, we return -1
+        as a safe fallback rather than crashing the pipeline.
+        """
+        try:
+            return df.rdd.getNumPartitions()
+        except Exception:
+            return -1
 
     def _apply_table_properties(
         self, target: str, properties: Dict[str, str], is_table: bool = False
@@ -557,7 +579,7 @@ class SparkEngine(Engine):
             try:
                 df = self.spark.read.format("jdbc").options(**merged_options).load()
                 elapsed = (time.time() - start_time) * 1000
-                partition_count = df.rdd.getNumPartitions()
+                partition_count = self._safe_partition_count(df)
 
                 ctx.log_file_io(path=source_identifier, format=format, mode="read")
                 ctx.log_spark_metrics(partition_count=partition_count)
@@ -642,7 +664,7 @@ class SparkEngine(Engine):
                 elapsed = (time.time() - start_time) * 1000
 
                 if not streaming:
-                    partition_count = df.rdd.getNumPartitions()
+                    partition_count = self._safe_partition_count(df)
                     ctx.log_spark_metrics(partition_count=partition_count)
                     ctx.log_file_io(path=table, format=format, mode="read")
                     ctx.info(
@@ -839,7 +861,7 @@ class SparkEngine(Engine):
                 elapsed = (time.time() - start_time) * 1000
 
                 if not streaming:
-                    partition_count = df.rdd.getNumPartitions()
+                    partition_count = self._safe_partition_count(df)
                     ctx.log_spark_metrics(partition_count=partition_count)
                     ctx.log_file_io(path=path, format=format, mode="read")
                     ctx.info(
@@ -2017,7 +2039,7 @@ class SparkEngine(Engine):
         try:
             result = self.spark.sql(sql)
             elapsed = (time.time() - start_time) * 1000
-            partition_count = result.rdd.getNumPartitions()
+            partition_count = self._safe_partition_count(result)
 
             ctx.log_spark_metrics(partition_count=partition_count)
             ctx.info(
