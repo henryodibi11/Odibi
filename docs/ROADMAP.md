@@ -22,7 +22,7 @@
 |--------|----------|----------|-------|
 | `engine/spark_engine.py` | 4% | OK | CI-skipped; mock-tested + Databricks validated |
 | `diagnostics/delta.py` | 13% | OK | Hard skip — Delta/Spark-bound |
-| `pipeline.py` | 35% | HIGH | Utility methods covered; run() + PipelineManager uncovered (~1000 lines) |
+| `pipeline.py` | 20% | HIGH | Utility methods covered; run() + PipelineManager uncovered (~1000 lines) |
 | `transformers/scd.py` | 49% | HIGH | Pandas/DuckDB paths covered; Spark/Delta MERGE uncovered |
 | `patterns/date_dimension.py` | 57% | MEDIUM | Pandas paths covered; Spark paths remaining |
 | `engine/polars_engine.py` | 57% | MEDIUM | Up from 7% — major improvement |
@@ -205,7 +205,7 @@ See [`docs/AGENT_CAMPAIGN.md`](AGENT_CAMPAIGN.md) for the full campaign plan —
 
 Most modules below 80% are there because Spark-specific branches are untested in CI (no JVM). The remaining coverage work is primarily:
 
-1. **pipeline.py** (35%) — `Pipeline.run()` execution paths, `PipelineManager.from_yaml/__init__/validate/run_node` (~1000 lines, mostly integration-level)
+1. **pipeline.py** (20%) — `Pipeline.run()` execution paths, `PipelineManager.from_yaml/__init__/validate/run_node` (~1000 lines, mostly integration-level)
 2. **transformers/scd.py** (49%) — `_scd2_spark` and Delta MERGE paths
 3. **patterns/date_dimension.py** (57%) — Spark generation paths
 4. **writers/sql_server_writer.py** (67%) — Spark-only paths (~466 stmts)
