@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from odibi.context import EngineContext, PandasContext, SparkContext
+from odibi.context import EngineContext, PandasContext, PolarsContext, SparkContext
 
 from odibi.utils.logging_context import get_logging_context
 
@@ -357,9 +357,14 @@ def merge(
         )
     elif isinstance(real_context, PandasContext):
         result = _merge_pandas(context, current, target, keys, strategy, audit_cols, kwargs)
+    elif isinstance(real_context, PolarsContext):
+        result = _merge_polars(context, current, target, keys, strategy, audit_cols, merge_params)
     else:
         ctx.error("Merge failed: unsupported context", context_type=str(type(real_context)))
-        raise ValueError(f"Unsupported context type: {type(real_context)}")
+        raise ValueError(
+            f"Merge transformer does not support context type '{type(real_context).__name__}'. "
+            f"Supported: SparkContext, PandasContext, PolarsContext."
+        )
 
     # Register table in metastore if requested (Spark only)
     if register_table and isinstance(real_context, SparkContext):
@@ -872,4 +877,112 @@ def _merge_pandas(
     # Write back
     final_df.to_parquet(path, index=False)
 
+    return final_df
+
+
+def _merge_polars(
+    context: EngineContext,
+    source_df: Any,
+    target: str,
+    keys: List[str],
+    strategy: MergeStrategy,
+    audit_cols: Optional[AuditColumnsConfig],
+    params: MergeParams,
+) -> Any:
+    """
+    Internal helper for merge transformer on Polars engine.
+
+    Handles upsert, append-only, and delete-match strategies using native Polars API.
+    Resolves target as path, manages audit columns, and writes directly to target.
+    """
+    import polars as pl
+    from datetime import datetime, timezone
+
+    path = target
+
+    # Resolve connection path (same pattern as Pandas)
+    if hasattr(context, "engine") and context.engine:
+        if "." in target:
+            parts = target.split(".", 1)
+            conn_name, rel_path = parts[0], parts[1]
+            if (
+                hasattr(context.engine, "connections")
+                and context.engine.connections
+                and conn_name in context.engine.connections
+            ):
+                try:
+                    path = context.engine.connections[conn_name].get_path(rel_path)
+                except Exception:
+                    pass
+
+    # Collect LazyFrame if needed (V-009)
+    if isinstance(source_df, pl.LazyFrame):
+        source_df = source_df.collect()
+
+    # Audit columns (T-006: use UTC)
+    now = datetime.now(timezone.utc)
+    if audit_cols:
+        source_df = source_df.clone()
+        if audit_cols.updated_col:
+            source_df = source_df.with_columns(pl.lit(now).alias(audit_cols.updated_col))
+        if audit_cols.created_col and audit_cols.created_col not in source_df.columns:
+            source_df = source_df.with_columns(pl.lit(now).alias(audit_cols.created_col))
+
+    # Load target
+    target_df = pl.DataFrame()
+    if os.path.exists(path):
+        try:
+            target_df = pl.read_parquet(path)
+        except Exception:
+            pass
+
+    if target_df.is_empty():
+        if strategy == MergeStrategy.DELETE_MATCH:
+            return source_df
+        dir_name = os.path.dirname(path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+        source_df.write_parquet(path)
+        return source_df
+
+    # Validate keys exist in both DataFrames
+    for k in keys:
+        if k not in target_df.columns or k not in source_df.columns:
+            raise ValueError(
+                f"Merge key column '{k}' not found in DataFrame. "
+                f"Target columns: {list(target_df.columns)}. "
+                f"Source columns: {list(source_df.columns)}."
+            )
+
+    if strategy == MergeStrategy.UPSERT:
+        # Target rows not in source → keep as-is
+        unchanged = target_df.join(source_df.select(keys), on=keys, how="anti")
+
+        if audit_cols and audit_cols.created_col:
+            created_col = audit_cols.created_col
+            # Preserve target's created_col for existing rows
+            target_created = target_df.select(keys + [created_col])
+            updated_source = source_df.join(target_created, on=keys, how="left", suffix="_tgt")
+            tgt_created_col = f"{created_col}_tgt"
+            updated_source = updated_source.with_columns(
+                pl.coalesce([pl.col(tgt_created_col), pl.col(created_col)]).alias(created_col)
+            ).drop(tgt_created_col)
+            final_df = pl.concat([unchanged, updated_source], how="diagonal_relaxed")
+        else:
+            final_df = pl.concat([unchanged, source_df], how="diagonal_relaxed")
+
+    elif strategy == MergeStrategy.APPEND_ONLY:
+        # Only insert rows with keys not already in target
+        new_rows = source_df.join(target_df.select(keys), on=keys, how="anti")
+        final_df = pl.concat([target_df, new_rows], how="diagonal_relaxed")
+
+    elif strategy == MergeStrategy.DELETE_MATCH:
+        # Remove target rows that match source keys
+        final_df = target_df.join(source_df.select(keys), on=keys, how="anti")
+
+    else:
+        raise ValueError(f"Unsupported merge strategy: {strategy}")
+
+    # Write back
+    final_df.write_parquet(path)
     return final_df

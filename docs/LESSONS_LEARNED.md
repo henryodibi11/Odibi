@@ -641,3 +641,29 @@ Copy-paste this at the end of your session:
 
 ### New Entries Added
 - [x] Discovery: V-009 — Polars Pivot/Unpivot API and Agg Function Mapping
+
+## Session: 2026-04-30 — Polars SCD2 & Merge Transformers (#212, Task 13)
+
+### Work Done
+- Added `_scd2_polars()` to `odibi/transformers/scd.py` (+152 LOC)
+  - Native Polars change detection using `ne_missing()` + `is_nan()` for NaN-safe comparison
+  - LazyFrame auto-collection, file-based target (parquet/csv), self-contained write
+  - NaN == NaN confirmed NOT a false positive (#248 resolved for Polars SCD2)
+- Added `_merge_polars()` to `odibi/transformers/merge_transformer.py` (+113 LOC)
+  - All 3 strategies: upsert (anti_join + concat), append_only (anti_join), delete_match (anti_join)
+  - Audit columns: created_at preserved on update via coalesce, updated_at set to UTC now
+  - PolarsContext import added to dispatcher
+- Created `tests/unit/transformers/test_scd_merge_polars.py` (283 LOC, 13 tests)
+- Smoke tested 10/10 on Databricks: 6 SCD2 lifecycle + 4 merge strategies
+
+### Verification Report
+- Tests written: 13 unit tests + 10 smoke tests
+- Tests passing: 10/10 (Databricks smoke), unit tests pending formal run
+- Concrete value assertions: Bob expired→Marketing, NaN==NaN→3 rows, NaN→60000→4 rows
+- Negative tests: NaN false-positive prevention
+- Edge cases: LazyFrame, empty target, audit column preservation
+- Production code: +265 LOC (152 scd + 113 merge)
+- Total code: +548 LOC (265 production + 283 tests)
+
+### New Entries Added
+- No new D/T/P/V entries (NaN behavior documented under existing V-009 and T-009)

@@ -199,11 +199,13 @@ def scd2(context: EngineContext, params: SCD2Params, current: Any = None) -> Eng
         result = _scd2_spark(context, source_df, resolved_params)
     elif context.engine_type == EngineType.PANDAS:
         result = _scd2_pandas(context, source_df, resolved_params)
+    elif context.engine_type == EngineType.POLARS:
+        result = _scd2_polars(context, source_df, resolved_params)
     else:
         ctx.error("SCD2 failed: unsupported engine", engine_type=str(context.engine_type))
         raise ValueError(
             f"SCD2 transformer does not support engine type '{context.engine_type}'. "
-            f"Supported engines: SPARK, PANDAS. "
+            f"Supported engines: SPARK, PANDAS, POLARS. "
             f"Check your engine configuration or use a different transformer."
         )
 
@@ -1012,4 +1014,154 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
         target=path,
     )
 
+    return context.with_df(result)
+
+
+def _scd2_polars(context: EngineContext, source_df, params: SCD2Params) -> EngineContext:
+    """
+    Internal helper for SCD2 logic on Polars engine.
+
+    Handles SCD Type 2 logic using native Polars API. Compares source and target,
+    detects changes (NaN-safe), closes old records, and inserts new versions.
+    Writes directly to target file (self-contained).
+    """
+    import polars as pl
+
+    path = params.target
+    keys = params.keys
+    eff_col = params.effective_time_col
+    start_col = params.start_time_col
+    end_col = params.end_time_col
+    flag_col = params.current_flag_col
+    track = params.track_cols
+    ctx = get_logging_context()
+
+    # Collect LazyFrame if needed (V-009)
+    if isinstance(source_df, pl.LazyFrame):
+        source_df = source_df.collect()
+
+    # Resolve connection path (same pattern as Pandas)
+    if hasattr(context, "engine") and context.engine:
+        if "." in path:
+            parts = path.split(".", 1)
+            conn_name, rel_path = parts[0], parts[1]
+            if (
+                hasattr(context.engine, "connections")
+                and context.engine.connections
+                and conn_name in context.engine.connections
+            ):
+                try:
+                    path = context.engine.connections[conn_name].get_path(rel_path)
+                except Exception:
+                    pass
+
+    # Prepare source: copy eff_col → start_col, add end_col=null, flag_col=True
+    eff_dtype = source_df.schema.get(eff_col)
+    source_df = source_df.with_columns(
+        pl.col(eff_col).alias(start_col),
+        pl.lit(None).cast(eff_dtype or pl.Datetime("us")).alias(end_col),
+        pl.lit(True).alias(flag_col),
+    )
+
+    # Load target
+    target_df = pl.DataFrame()
+    if os.path.exists(path):
+        try:
+            if str(path).endswith(".parquet") or os.path.isdir(path):
+                target_df = pl.read_parquet(path)
+            elif str(path).endswith(".csv"):
+                target_df = pl.read_csv(path)
+        except Exception:
+            pass
+
+    # First run: write directly
+    if target_df.is_empty():
+        dir_name = os.path.dirname(path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+        if str(path).endswith(".csv"):
+            source_df.write_csv(path)
+        else:
+            source_df.write_parquet(path)
+        ctx.info("SCD2 Polars first run: wrote initial data", target=path)
+        return context.with_df(source_df)
+
+    # Filter current records from target
+    if flag_col in target_df.columns:
+        current_target = target_df.filter(pl.col(flag_col) == True)  # noqa: E712
+    else:
+        current_target = target_df
+
+    # Left join source to current target on keys
+    suffix = "_tgt"
+    merged = source_df.join(current_target, on=keys, how="left", suffix=suffix)
+
+    # Detect new records: right-side flag_col is null after left join
+    indicator_col = f"{flag_col}{suffix}"
+    new_mask = pl.col(indicator_col).is_null()
+    new_inserts = merged.filter(new_mask).select(source_df.columns)
+
+    # Detect changes in matched records
+    matched = merged.filter(~new_mask)
+
+    if not matched.is_empty():
+        # Build NaN-safe change detection expression (per T-009, #248)
+        any_changed = pl.lit(False)
+        for col in track:
+            s = pl.col(col)
+            t = pl.col(f"{col}{suffix}")
+            not_equal = s.ne_missing(t)
+            # NaN == NaN → not a change (for float columns)
+            col_dtype = matched.schema.get(col)
+            if col_dtype in (pl.Float32, pl.Float64):
+                both_nan = s.is_nan().fill_null(False) & t.is_nan().fill_null(False)
+                not_equal = not_equal & ~both_nan
+            any_changed = any_changed | not_equal
+
+        changed = matched.filter(any_changed)
+        changed_inserts = changed.select(source_df.columns)
+    else:
+        changed_inserts = source_df.clear()
+        changed = pl.DataFrame()
+
+    all_inserts = pl.concat([new_inserts, changed_inserts])
+
+    # Expire old records in target
+    final_target = target_df.clone()
+
+    if not changed.is_empty():
+        # Build lookup: keys → new end date
+        keys_to_close = changed.select(keys + [start_col]).rename({start_col: "__new_end"})
+        keys_to_close = keys_to_close.sort("__new_end").unique(subset=keys, keep="last")
+
+        # Left join target with closing info
+        final_target = final_target.join(keys_to_close, on=keys, how="left")
+
+        # Identify rows to expire
+        has_end = pl.col("__new_end").is_not_null()
+        if flag_col in final_target.columns:
+            mask = has_end & (pl.col(flag_col) == True)  # noqa: E712
+        else:
+            mask = has_end
+
+        # Apply updates: set end_col and flag_col for expired rows
+        final_target = final_target.with_columns(
+            pl.when(mask).then(pl.col("__new_end")).otherwise(pl.col(end_col)).alias(end_col),
+            pl.when(mask)
+            .then(pl.lit(False))
+            .otherwise(pl.col(flag_col) if flag_col in final_target.columns else pl.lit(True))
+            .alias(flag_col),
+        )
+        final_target = final_target.drop("__new_end")
+
+    # Combine: expired/unchanged target + new inserts + changed inserts
+    result = pl.concat([final_target, all_inserts], how="diagonal_relaxed")
+
+    # Write to target (self-contained)
+    if str(path).endswith(".csv"):
+        result.write_csv(path)
+    else:
+        result.write_parquet(path)
+
+    ctx.info("SCD2 Polars: wrote full history to target", target=path)
     return context.with_df(result)
