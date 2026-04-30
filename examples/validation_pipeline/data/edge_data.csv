@@ -1,0 +1,4 @@
+customer_id,name,email,status,age,created_at,updated_at
+100,José García,jose.garcia@example.com,active,40,2026-04-25 08:00:00,2026-04-29 09:00:00
+101,Müller Straße,muller.s@example.com,active,35,2026-04-25 09:00:00,2026-04-29 10:00:00
+102,田中太郎,tanaka@example.com,inactive,50,2026-04-25 10:00:00,2026-04-29 11:00:00

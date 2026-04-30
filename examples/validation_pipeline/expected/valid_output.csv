@@ -1,0 +1,13 @@
+customer_id,name,email,status,age,created_at,updated_at
+2,Bob Smith,bob.smith@example.com,active,45,2026-04-02 09:00:00,2026-04-29 11:00:00
+4,David Wilson,david.w@example.com,pending,52,2026-04-04 11:00:00,2026-04-28 13:00:00
+5,Eve Martinez,eve.m@example.com,active,35,2026-04-05 12:00:00,2026-04-29 14:00:00
+7,Grace Lee,grace.lee@example.com,inactive,67,2026-04-07 14:00:00,2026-04-27 10:00:00
+9,Iris Chen,iris.c@example.com,pending,38,2026-04-09 16:00:00,2026-04-28 16:00:00
+11,Kim Park,kim.park@example.com,active,29,2026-04-11 08:00:00,2026-04-29 08:00:00
+13,Mia Garcia,mia.g@example.com,active,33,2026-04-13 10:00:00,2026-04-29 10:00:00
+14,Nate Young,nate.y@example.com,pending,26,2026-04-14 11:00:00,2026-04-28 11:00:00
+16,Paul Scott,paul.s@example.com,active,37,2026-04-16 13:00:00,2026-04-29 13:00:00
+18,Rosa Lopez,rosa.l@example.com,active,31,2026-04-18 15:00:00,2026-04-29 15:00:00
+19,Sam Turner,sam.t@example.com,pending,49,2026-04-28 20:00:00,2026-04-19 16:00:00
+20,Tina Clark,tina.c@example.com,active,36,2026-04-20 17:00:00,2026-04-29 17:00:00
