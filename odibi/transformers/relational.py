@@ -158,7 +158,9 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
             join_type=params.how,
             rows_before=rows_before,
             rows_after=rows_after,
-            row_delta=(rows_after - rows_before) if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float)) else None,
+            row_delta=(rows_after - rows_before)
+            if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float))
+            else None,
             right_rows=right_rows,
             elapsed_ms=round(elapsed_ms, 2),
         )
@@ -220,7 +222,9 @@ def join(context: EngineContext, params: JoinParams) -> EngineContext:
         join_type=params.how,
         rows_before=rows_before,
         rows_after=rows_after,
-        row_delta=(rows_after - rows_before) if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float)) else None,
+        row_delta=(rows_after - rows_before)
+        if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float))
+        else None,
         right_rows=right_rows,
         elapsed_ms=round(elapsed_ms, 2),
     )

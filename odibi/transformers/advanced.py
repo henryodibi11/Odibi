@@ -94,7 +94,11 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
         ctx.debug(f"Could not get row count after transform: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
-    duplicates_removed = (rows_before - rows_after) if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float)) else None
+    duplicates_removed = (
+        (rows_before - rows_after)
+        if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float))
+        else None
+    )
     ctx.debug(
         "Deduplicate completed",
         keys=params.keys,

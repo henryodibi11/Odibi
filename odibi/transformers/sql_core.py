@@ -70,7 +70,11 @@ def filter_rows(context: EngineContext, params: FilterRowsParams) -> EngineConte
         ctx.debug(f"Could not get row count after transform: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
-    rows_filtered = (rows_before - rows_after) if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float)) else None
+    rows_filtered = (
+        (rows_before - rows_after)
+        if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float))
+        else None
+    )
     ctx.debug(
         "FilterRows completed",
         rows_before=rows_before,
