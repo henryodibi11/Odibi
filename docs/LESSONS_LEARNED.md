@@ -166,6 +166,22 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 
 > Copy-paste these. They're battle-tested.
 
+
+### T-014: Databricks `editAsset` for Files Replaces Entire Content
+**Date:** 2026-04  
+**Symptom:** CHANGELOG.md (61,524 chars) truncated to 5,984 chars after using `editAsset` with `type: file`  
+**Root Cause:** The `editAsset` tool for workspace files replaces the **entire file body** with the provided content — it does NOT patch or append. When the content parameter only contained the new [Unreleased] section + a version header, all 50+ historical version entries were lost.  
+**Fix:** For large files, use Python `open(path, 'a')` to append, or read the full file first and include ALL content in the editAsset body. Never use editAsset for partial updates to large files.  
+**Modules:** Any workspace file editing via Databricks assistant tools
+
+### T-015: External Internet Blocked on Databricks Cluster — No GitHub Recovery
+**Date:** 2026-04  
+**Symptom:** `SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING]'))` when calling `raw.githubusercontent.com`, `api.github.com`, or any external HTTPS endpoint from the `shared-173-LTS` cluster.  
+**Root Cause:** Corporate proxy or firewall blocks outbound HTTPS to non-approved hosts. PyPI works (via allowed proxy), but GitHub, raw content, and API endpoints do not.  
+**Impact:** Cannot recover workspace files from GitHub when accidentally overwritten. Cannot `pip install` from GitHub URLs. Cannot use `requests` or `urllib` for external data.  
+**Fix:** Never rely on external HTTP for file recovery. Keep critical content in the conversation cache or workspace. For package installs, only use PyPI-hosted packages.  
+**Modules:** Any agent workflow that assumes internet access
+
 ### P-001: Standard CatalogManager Test Fixture
 ```python
 from odibi.catalog import CatalogManager
@@ -303,6 +319,12 @@ from lib.setup import *
 **Finding:** `hasattr(df, 'collect')` is True for both Polars LazyFrames AND Spark DataFrames. But Spark's `.collect()` returns `list[Row]`, while Polars' `.collect()` returns a `pl.DataFrame`. Using `hasattr` to detect "needs .collect()" will mis-route Spark DataFrames.  
 **Implication:** Always use `isinstance(df, pl.LazyFrame)` to detect Polars lazy frames. Never use `hasattr(df, 'collect')` as a Polars check.
 
+### V-007: Databricks Repos — No `.git` Directory, No Local Git Commands
+**Verified:** 2026-04  
+**Finding:** Databricks Repos are managed externally — there is no `.git` directory on disk. `git log`, `git diff`, `git checkout` all fail with "not a git repository". Branch operations must use the Repos REST API (`PATCH /api/2.0/repos/{id}`). Switching branches via the API does a full checkout but does NOT restore files that were modified through the workspace API (`editAsset`) — workspace file changes appear to propagate across branches or persist beyond the checkout.  
+**Implication:** If you overwrite a file via `editAsset`, you cannot recover it with `git checkout -- file`. The only recovery options are: (1) conversation cache from a prior `readAssetById` call, (2) a separate backup copy, or (3) manual reconstruction. Always read and cache large files before editing them.
+
+
 ---
 
 ## Session Log Template
@@ -354,3 +376,23 @@ Copy-paste this at the end of your session:
 - [x] Trap: T-013 — Polars SQL Dialect Gaps
 - [x] Discovery: V-005 — Module Caching on Shared Clusters
 - [x] Discovery: V-006 — Spark Connect .collect() Returns List of Rows
+
+## Session: 2026-04-29 — CHANGELOG Catch-Up (#228)
+
+### Work Done
+- Updated CHANGELOG.md [Unreleased] section with all post-3.9.0 changes
+- Documented: skills system (15 docs), CUSTOM_INSTRUCTIONS.md, LESSONS_LEARNED.md, AGENT_CAMPAIGN.md, campaign workspace, bug audit (43/46 fixed)
+- Recovered CHANGELOG.md after accidental truncation from editAsset file replacement
+- Reconstructed 67,192-char file from conversation cache in 6 append chunks
+
+### Verification Report
+- Tests written: 0 (docs-only change)
+- All 52 version entries preserved
+- 12/12 success criteria passing
+- Command: `python -c "import re; content=open('CHANGELOG.md').read(); versions=re.findall(r'## \[([^\]]+)\]', content); print(f'{len(versions)} versions found')"`
+
+### New Entries Added
+- [x] Trap: T-014 — Databricks editAsset for Files Replaces Entire Content
+- [x] Trap: T-015 — External Internet Blocked on Databricks Cluster
+- [x] Discovery: V-007 — Databricks Repos No .git Directory, No Local Git
+- [ ] AGENTS.md coverage updated (no test changes)

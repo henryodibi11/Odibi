@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Agent Skills System** — 15 skill documents in `docs/skills/` providing structured AI agent guidance for every task type (#228):
+  - 01 Think/Plan/Critique, 02 Odibi-First Lookup, 03 Write a Transformer, 04 Write a Pattern, 05 Pipeline YAML Authoring, 06 Add a Connection, 07 Testing, 08 Validation Workflow, 09 Code Review Standards, 10 Task Document Template, 11 Lessons Learned Protocol, 12 Databricks Notebook Protocol, 13 Testing Standards, 14 Code Standards, 15 Engine Parity Standards
+  - Skill Router with automatic workflow chains per task type (e.g., "add transformer" → 01 → 02 → 14 → 03 → 15 → 13 → 07 → 09)
+  - `docs/skills/README.md` — skill index and loading guide
+
+- **CUSTOM_INSTRUCTIONS.md** — comprehensive AI agent system prompt (#228):
+  - Pre-Code Gate: mandatory checklist before any code change (read context → think/plan/critique → odibi-first check → scope check)
+  - Correctness Verification Protocol: prevents batch-read-and-confirm failure mode — requires concrete value assertions, negative tests, edge cases, and Verification Report
+  - Automatic Workflows: session start/end, before/after code change, delivery protocols
+  - Output Contract: every code response must include THINK → PLAN → CRITIQUE → CODE → VERIFY → LESSONS
+  - 8 workflow loops triggered by task type with full skill chains
+  - Critical rules codified: standalone functions, return-don't-write, Pydantic for config, engine parity, YAML field names, test conventions
+
+- **Lessons Learned System** (`docs/LESSONS_LEARNED.md`):
+  - 4 searchable categories: Decisions (D-001 – D-007), Traps (T-001 – T-013+), Patterns (P-001+), Discoveries (V-001+)
+  - Captures knowledge that previously was buried in AGENTS.md's "Testing Gotchas" blob
+  - Key decisions documented: SQL-first transformers (D-001), Pydantic for config (D-002), no %run on Databricks (D-003), coverage via `coverage run` not `pytest --cov` (D-004), test batching required (D-005)
+  - Key traps documented: caplog vs structured logging (T-001), mock PySpark import order (T-002), Spark Connect temp view lifecycle (T-011), `bool(LazyFrame)` TypeError (T-012), Polars SQL dialect gaps (T-013)
+  - Auto-update protocol: every agent session adds new entries
+
+- **Agent Hardening Campaign** (`docs/AGENT_CAMPAIGN.md`):
+  - 35 tasks across 8 phases: Foundation, Spark Reality, Polars Parity, Validation E2E, Pattern Stress, Bug Fixes, New Features, Docs & Polish
+  - Detailed prompts with exact file paths, success criteria, and branch naming conventions
+  - Estimated 3–5 weeks with daily agent sessions
+  - Pre-campaign setup protocol linking to CUSTOM_INSTRUCTIONS.md, LESSONS_LEARNED.md, and skills
+
+- **Databricks Campaign Workspace** (`campaign/`):
+  - `lib/` bootstrap pattern: `setup.py` (auto-installs deps, exports odibi API), `config.py` (paths, UC settings), `__init__.py`
+  - `01_smoke_test.py` — verifies odibi imports, SparkEngine/PandasEngine/PolarsEngine creation, basic transforms on all 3 engines, Unity Catalog read/write
+  - `02_engine_matrix.py` — runs `filter_rows`, `derive_columns`, `deduplicate` on a 100-row DataFrame across Pandas, Spark, and Polars; asserts identical output shapes and values (9 tests, all passing)
+  - Follows Skill 12 (Databricks Notebook Protocol) — no `%run` anywhere, each notebook self-contained via `from lib.setup import *`
+
+- **Bug Audit documentation** — comprehensive triage of all open issues (Feb 2026):
+  - 46 bug issues filed (#238–#280)
+  - **43 bugs fixed and closed** — all critical and high-priority bugs resolved
+  - 3 remaining open: #268 and #265 (MCP security — deferred, MCP not in use), #199 (aggregation multi-format support, low-pri)
+  - #248 (SCD2 float/NaN comparison) triaged as known trap (T-009 in LESSONS_LEARNED.md)
+
+### Changed
+
+- **ROADMAP.md refreshed** — updated coverage milestone (80%), module-by-module coverage table matching AGENTS.md, bug audit completion status, engine parity marked as functionally complete
+- **AGENTS.md expanded** — comprehensive per-module coverage tracking with test file counts, coverage percentages, remaining work, known pre-existing failures, and 5-phase coverage roadmap showing progression from 66% → 80% (34,363 stmts, 6,854 missed)
+- **Coverage target reached: 80%** — the culmination of a multi-week campaign spanning versions 2.18.0 through 3.9.0, starting from 62% baseline and adding 2,000+ new tests across 60+ test files
+
+### Documentation
+
+- **Databricks Notebook Protocol** (Skill 12) — `lib/` pattern replacing `%run` (which hangs on Databricks), self-contained notebooks via `sys.path.insert` + `from lib.setup import *`, project structure template
+- **Engine Parity Standards** (Skill 15) — guidelines for maintaining Pandas/Spark/Polars parity, SQL-first approach, engine-specific branch conventions
+- **Testing Standards** (Skill 13) — comprehensive test-writing conventions: naming, structure, assertion patterns, coverage measurement, anti-patterns to avoid
+- **Code Standards** (Skill 14) — coding conventions for all odibi contributors: standalone functions, type hints, logging, error handling
+- **Code Review Standards** (Skill 09) — self-review checklist for PR quality
+- **Transformer/Pattern/Connection authoring guides** (Skills 03, 04, 06) — step-by-step guides for extending the framework
+- **Pipeline YAML Authoring** (Skill 05) — correct YAML field usage, common mistakes, validation
+- **Validation Workflow** (Skill 08) — data quality pipeline design and test type selection
+- **Task Document Template** (Skill 10) — multi-phase project planning template
+- **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
+
 ## [3.9.0] - 2026-04-20
 
 ### Added
@@ -99,6 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lineage save path doubling** — `write_file_local` was prepending `base_path` to an already-resolved path, creating `data/data/stories/lineage/` instead of `data/stories/lineage/`
 - **Ruff F401 lint errors** — replaced unused `import sqlalchemy` and `import delta.tables` with `importlib.util.find_spec()` in delete detection tests
 
+
 ## [3.6.0] - 2026-03-30
 
 ### Added
@@ -162,14 +222,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **🎓 Complete ChemE × Data Engineering Course** (35 working examples, 16 lessons):
+- **Complete ChemE x Data Engineering Course** (35 working examples, 16 lessons):
   - **Educational framework**: Teaches chemical engineers both process control (Seborg textbook) and data engineering through hands-on Odibi simulations
   - **16 comprehensive lessons** (L00-L15): Setup → Basics → First/Second-Order Systems → PID Control → Advanced Topics → Digital Twin
   - **35 tested YAML examples** (100% success rate): All examples verified with `odibi run`
   - **Progressive difficulty**: Beginner-friendly (L00-L05) → Intermediate (L06-L09) → Advanced (L10-L14) → Expert (L15)
   - **Full documentation**: Theory, exercises, solutions, and real-world applications
   - **Test automation**: `scripts/test_all_cheme_examples.py` validates all 35 examples
-  - **mkdocs integration**: Course accessible via "Learn → ChemE × Data Engineering Course"
+  - **mkdocs integration**: Course accessible via "Learn → ChemE x Data Engineering Course"
 
 - **Process Control Topics Covered**:
   - L00: Odibi basics, data formats, reproducibility
@@ -220,7 +280,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **🚀 Major Performance Optimizations** (~58% faster for multi-pipeline runs):
+- **Major Performance Optimizations** (~58% faster for multi-pipeline runs):
   - **Smart Caching**: Auto-cache nodes with 3+ dependencies (configurable via `auto_cache_threshold`)
   - **Fixed Spark DataFrame caching**: Now actually calls `df.cache()` when `cache: true` (was only storing lazy plan)
   - **Cross-pipeline cache optimization**: `inputs` now check temp views before Delta fallback (uses Silver's cache in Gold)
@@ -229,7 +289,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Databricks optimization**: Auto-detects Databricks and skips sync wait (saves ~90s)
   - **Comprehensive overhead audit**: Detailed timing report showing inter-pipeline overhead breakdown
 
-- **⚡ Catalog Sync Optimizations**:
+- **Catalog Sync Optimizations**:
   - **State tracking**: Properly implemented via meta_state table (only syncs new records, saves ~225s)
   - **Reduced timeout**: 300s → 30s configurable via `sync_timeout_seconds`
   - **Skip wait in Databricks**: `skip_sync_wait_in_databricks: true` (default)
@@ -299,7 +359,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **🎲 Simulation Read Source (V3.2)**: Complete synthetic data generation system with 11 generator types
+- **Simulation Read Source (V3.2)**: Complete synthetic data generation system with 11 generator types
   - **Core generators**: range (uniform/normal), categorical, boolean, timestamp, sequential, constant
   - **Advanced generators**: derived (calculated fields with dependency resolution), uuid (V4/V5), email, ipv4 (with subnet), geo coordinates
   - **Entity-based**: Domain-agnostic entity abstraction for pumps, sensors, users, devices, etc.
@@ -377,7 +437,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - Power user cheatsheet with printable worksheets and 8 decision trees
-- Developer cheatsheet for contributors  
+- Developer cheatsheet for contributors
 - Bronze `append_once` strategy guide (maturity progression, key selection, change log pattern)
 - Incremental merge strategy documentation for aggregation pattern
 - SCD2: audit columns, orphan handling, grain validation, incremental patterns
@@ -394,7 +454,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `vacuum_hours: 168` retains 7 days of history
   - Spark only - silently skipped on Pandas
 
-```yaml
+``` yaml
 - function: merge
   params:
     target: silver.orders
@@ -420,7 +480,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **sql_file + incremental now works correctly**: When using `sql_file` with `incremental` config, the query is now wrapped as a subquery with the incremental filter applied to the outer query. This fixes the "Incorrect syntax near 'AND'" error that occurred when the sql_file query already contained a WHERE clause.
 
-```sql
+``` sql
 -- Before (broken): tried to append AND to existing WHERE
 -- After (fixed): wraps as subquery
 SELECT * FROM (
@@ -447,7 +507,7 @@ Enables external SQL files for read queries, keeping large source queries in sep
   - Better git diffs, IDE syntax highlighting, cleaner YAML
 
 **Example:**
-```yaml
+``` yaml
 read:
   connection: enterprise_dw
   format: sql_server
@@ -475,7 +535,7 @@ programmatic generation that uses the actual Pydantic models.
 
 - **New MCP Tool**: `validate_odibi_config` - Enhanced YAML validation using Pydantic models
   - Catches `inputs:` vs `read:` confusion
-  - Catches `sql:` vs `query:` mistakes  
+  - Catches `sql:` vs `query:` mistakes
   - Validates node name format
   - Checks for missing `pipelines:` key in imported files
   - Provides actionable error messages with fix suggestions
@@ -1018,13 +1078,13 @@ These optimizations target the ~96% write phase overhead identified in Bronze pi
 - Updated PHASES.md and STATUS.md to reflect Phase 2C completion
 
 ### Databricks Validation
-- ✅ Multi-account ADLS (2 storage accounts configured and verified)
-- ✅ Cross-account data transfer (medallion architecture: Bronze → Silver)
-- ✅ Delta Lake time travel (versionAsOf tested)
-- ✅ Schema introspection (get_schema, get_shape, count_rows)
-- ✅ SQL transformations with temp view registration
-- ✅ Complete pipeline execution
-- ✅ All Phase 2 features validated in production Databricks environment
+- Multi-account ADLS (2 storage accounts configured and verified)
+- Cross-account data transfer (medallion architecture: Bronze → Silver)
+- Delta Lake time travel (versionAsOf tested)
+- Schema introspection (get_schema, get_shape, count_rows)
+- SQL transformations with temp view registration
+- Complete pipeline execution
+- All Phase 2 features validated in production Databricks environment
 
 ### Performance
 - 3x faster startup with 3 Key Vault connections
@@ -1089,7 +1149,7 @@ These optimizations target the ~96% write phase overhead identified in Bronze pi
 ### Migration Guide (v1.0 → v1.1)
 
 **Before (v1.0):**
-```yaml
+``` yaml
 connections:
   local:
     type: local
@@ -1099,7 +1159,7 @@ connections:
 ```
 
 **After (v1.1):**
-```yaml
+``` yaml
 connections:
   data:
     type: local
