@@ -1247,8 +1247,11 @@ def normalize_column_names(
     """
     import re
 
+    from odibi.enums import EngineType
+
     current_cols = context.columns
     select_parts = []
+    q = "`" if context.engine_type == EngineType.SPARK else '"'
 
     for col in current_cols:
         new_name = col
@@ -1273,9 +1276,9 @@ def normalize_column_names(
             new_name = new_name.strip("_")
 
         if new_name != col:
-            select_parts.append(f'"{col}" AS {new_name}')
+            select_parts.append(f"{q}{col}{q} AS {new_name}")
         else:
-            select_parts.append(f'"{col}"')
+            select_parts.append(f"{q}{col}{q}")
 
     cols_str = ", ".join(select_parts)
     sql_query = f"SELECT {cols_str} FROM df"
