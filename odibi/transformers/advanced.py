@@ -62,12 +62,17 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
             "Deduplicate without order_by is non-deterministic — results may vary between runs",
             keys=params.keys,
         )
-    order_clause = params.order_by if params.order_by else "(SELECT NULL)"
+    if params.order_by:
+        order_clause = params.order_by
+    elif context.engine_type == EngineType.POLARS:
+        order_clause = "1"  # Polars SQL doesn't support subqueries
+    else:
+        order_clause = "(SELECT NULL)"
 
     # Dialect handling for EXCEPT/EXCLUDE
     except_clause = "EXCEPT"
-    if context.engine_type == EngineType.PANDAS:
-        # DuckDB uses EXCLUDE
+    if context.engine_type in (EngineType.PANDAS, EngineType.POLARS):
+        # DuckDB (Pandas) and Polars SQL use EXCLUDE syntax
         except_clause = "EXCLUDE"
 
     sql_query = f"""
@@ -89,7 +94,7 @@ def deduplicate(context: EngineContext, params: DeduplicateParams) -> EngineCont
         ctx.debug(f"Could not get row count after transform: {type(e).__name__}")
 
     elapsed_ms = (time.time() - start_time) * 1000
-    duplicates_removed = rows_before - rows_after if rows_before and rows_after else None
+    duplicates_removed = (rows_before - rows_after) if isinstance(rows_before, (int, float)) and isinstance(rows_after, (int, float)) else None
     ctx.debug(
         "Deduplicate completed",
         keys=params.keys,

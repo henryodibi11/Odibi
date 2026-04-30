@@ -1,0 +1,3 @@
+id,status,updated_at,valid_to,is_current,valid_from
+1,active,2023-01-01,,True,
+2,new,2024-01-01,,True,2024-01-01
