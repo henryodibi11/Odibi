@@ -348,24 +348,29 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
 
     # Legacy path: read entire target, join in memory, return full history
     # 1. Check if target exists
+    # NOTE: spark.table() is lazy on Spark Connect and does NOT throw for
+    # non-existent tables. Use spark.catalog.tableExists() for table names.
     target_df = None
-    try:
-        # Try reading as table first
-        target_df = spark.table(params.target)
-    except Exception as e:
-        logger = get_logging_context()
-        logger.debug(
-            f"Target table '{params.target}' not found as registered table: {type(e).__name__}: {e}"
-        )
+    is_path = (
+        "/" in params.target
+        or "\\" in params.target
+        or ":" in params.target
+        or params.target.startswith(".")
+    )
+    if is_path:
         try:
-            # Try reading as Delta path
             target_df = spark.read.format("delta").load(params.target)
-        except Exception as e2:
-            logger.debug(
-                f"Target '{params.target}' not found as Delta path - assuming first run: {type(e2).__name__}: {e2}"
+        except Exception as e:
+            get_logging_context().debug(
+                f"Target '{params.target}' not found as Delta path - assuming first run: {type(e).__name__}: {e}"
             )
-            # Target doesn't exist yet - First Run
-            pass
+    else:
+        if spark.catalog.tableExists(params.target):
+            target_df = spark.table(params.target)
+        else:
+            get_logging_context().debug(
+                f"Target table '{params.target}' does not exist - assuming first run"
+            )
 
     # Prepare Source: Add SCD metadata columns
     # New records start as Current
@@ -587,16 +592,18 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
 
     if not is_delta:
         # Target doesn't exist yet or is not Delta — check for first run
-        target_exists = False
-        try:
-            spark.table(target)
-            target_exists = True
-        except Exception:
+        # NOTE: spark.table() is lazy on Spark Connect and does NOT throw
+        # for non-existent tables. Use spark.catalog.tableExists() instead.
+        is_path = "/" in target or "\\" in target or ":" in target or target.startswith(".")
+        if is_path:
+            target_exists = False
             try:
                 spark.read.format("delta").load(target)
                 target_exists = True
             except Exception:
                 pass
+        else:
+            target_exists = spark.catalog.tableExists(target)
 
         if not target_exists:
             # First run: write directly to target (same pattern as merge transformer)
