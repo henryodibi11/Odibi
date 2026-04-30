@@ -840,3 +840,25 @@ ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, eng
 ### P-008: Audit Columns (load_timestamp) Are Generated at Runtime — Exclude From Engine-Parity Comparisons
 **Pattern:** When asserting Pandas vs Spark output equality for patterns with `audit: {load_timestamp: true}`, the timestamp is set independently per engine run and will differ. Pass an `ignore_cols=("load_timestamp",)` filter to your parity helper, and assert recency/dtype separately on each engine.
 **Modules:** Any cross-engine parity test for `AggregationPattern`, `DimensionPattern`, `FactPattern`, `MergePattern` audit features.
+
+## Session: 2026-04-30 — Date Dimension Pattern Full Feature Test (Task 20, #225)
+
+### Work Done
+- Created `examples/date_dimension_test/full_test.py` (210 LOC) — 8 scenarios covering all 19 generated columns, Pandas/Spark parity, every fiscal-year start month boundary, unknown-member, single-day, leap-year, and 10-year range performance.
+- Created `examples/date_dimension_test/README.md` (60 LOC).
+- Verified against real Spark Connect cluster `1121-215743-ak1cop0m` (DBR 17.3 LTS, Spark 4.0.0).
+
+### Verification Report
+- 8/8 scenarios pass on both engines
+- All 19 generated columns populated (date_sk, full_date, day_of_week, day_of_week_num, day_of_month, day_of_year, is_weekend, week_of_year, month, month_name, quarter, quarter_name, year, fiscal_year, fiscal_quarter, is_month_start, is_month_end, is_year_start, is_year_end)
+- 8 fiscal-year boundary cases (FY start 1/4/7/10) all return correct FY+FQ
+- 2024-02-29 generated in leap year, absent in 2023
+- 10-year range: 3653 rows in 0.19s (Pandas)
+
+### New Entries Added
+- [x] Verified: V-012 — DateDimensionPattern Pandas/Spark Parity Across All 19 Generated Columns
+
+### V-012: DateDimensionPattern Pandas/Spark Parity Across All 19 Generated Columns
+**Verified:** 2026-04-30 against DBR 17.3 LTS (Spark 4.0.0) via Databricks Connect
+**Finding:** `DateDimensionPattern.execute()` produces row-for-row identical values for all 18 non-`full_date` columns on Pandas and Spark for a 91-day window. The `full_date` column is `datetime.date` on Pandas and a Spark date-typed column on Spark; both serialize to the same ISO string, so `astype(str)` comparison is sufficient. Day-of-week numbering matches between engines because the Spark generator explicitly remaps `dayofweek` (Sunday=1 default) to ISO Monday=1/Sunday=7 to align with Pandas's `dayofweek + 1` convention.
+**Implication:** No engine-parity bug in date_dimension.py. The script in `examples/date_dimension_test/full_test.py` doubles as a regression detector if either engine path drifts.

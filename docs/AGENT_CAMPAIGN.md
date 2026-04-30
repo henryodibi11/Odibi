@@ -1133,6 +1133,22 @@ Success criteria:
 - [ ] 10-year range generates quickly
 ```
 
+**Status: ✅ COMPLETE (2026-04-30)**
+
+**Branch:** `test/hodibi/date-dimension-full-test`
+
+**Deliverables:**
+- `examples/date_dimension_test/full_test.py` (210 LOC) — 8 scenarios on Pandas + Spark via Databricks Connect.
+- `examples/date_dimension_test/README.md`.
+
+**Verifications on DBR 17.3 / Spark 4.0.0 (Databricks Connect):**
+- 8/8 scenarios pass; all 19 generated columns row-for-row identical between Pandas and Spark over a 91-day window.
+- Fiscal year/quarter logic verified for FY start months 1/4/7/10 with 8 boundary cases (2024-03-15, 2024-04-01, 2024-12-31, 2024-06-30, 2024-07-01, 2024-09-30, 2024-10-01).
+- Unknown member row (`date_sk=0`, `day_of_week='Unknown'`, `full_date=1900-01-01`) verified on both engines.
+- Single-day range = 1 row; 2024-02-29 included in leap year, absent in 2023.
+- 10-year range (2015-01-01..2024-12-31, 3653 rows) generates in 0.19s (Pandas).
+- New lesson captured: V-012 (DateDimensionPattern engine parity verified).
+
 ---
 
 ### Task 21: End-to-End Star Schema Build
@@ -1915,7 +1931,7 @@ Phase 4: Validation E2E
 
 Phase 5: Pattern Stress
 - [x] Task 19: Aggregation stress test
-- [ ] Task 20: Date dimension full test
+- [x] Task 20: Date dimension full test
 - [ ] Task 21: Star schema E2E
 - [ ] Task 22: Connection discovery
 - [ ] Task 23: State management
