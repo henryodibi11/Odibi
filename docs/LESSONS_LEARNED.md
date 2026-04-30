@@ -718,3 +718,52 @@ Copy-paste this at the end of your session:
 
 ### New Entries Added
 - No new D/T/P/V entries (NaN behavior documented under existing V-009 and T-009)
+
+
+## Session: 2026-04-30 — Delete Detection Tutorial & E2E Campaign (Task 16, #223)
+
+### Work Done
+- Created `docs/tutorials/delete_detection.md` (218 lines) — covers snapshot_diff, sql_compare, soft/hard delete, reappearing records, safety threshold, first run behavior
+- Created `examples/delete_detection/config.yaml` (55 lines) — valid ProjectConfig with detect_deletes step
+- Created `examples/delete_detection/data/` — 3 CSV files (day1: 100 rows, day2: 95, day3: 100)
+- Created `examples/delete_detection/README.md` (62 lines)
+- Created campaign notebook `campaign/11_delete_detection_e2e` (11 cells, 9 tests)
+- All 9 tests PASS: snapshot_diff (day2/day3), first_run_skip, sql_compare_soft, hard_delete, threshold_warn, threshold_error, mode_none, config_yaml
+
+### Verification Report
+- Tests written: 9
+- Tests passing: 9/9
+- Concrete value assertions: deleted_ids == [12,27,45,68,91], returned IDs 12/45 active, new IDs 101-103, 95 active after hard delete, DeleteThresholdExceeded raised at 3% threshold
+- Negative tests: threshold_error (DeleteThresholdExceeded), first_run_skip (0 deletes on v0-only Delta)
+- Edge cases tested: reappearing records, new records beyond original range, mode=none passthrough, config YAML parse
+
+### New Entries Added
+- [x] Trap: T-024 — EngineContext Constructor Requires Positional `context` Arg
+- [x] Discovery: V-010 — deltalake 0.x vs 1.x API Differences (schema_mode vs overwrite_schema)
+- [x] Trap: T-025 — DeleteDetectionConfig Requires source_connection for SQL_COMPARE Mode
+
+### T-024: EngineContext Constructor Requires Positional `context` Arg
+**Date:** 2026-04-30
+**Symptom:** `TypeError` when constructing `EngineContext(df=..., engine_type=...)` without `context`.
+**Root Cause:** `EngineContext.__init__` has `context` as a required positional argument (PandasContext, SparkContext, or PolarsContext). Passing only `df` and `engine_type` skips it.
+**Fix:** Always instantiate the appropriate context first, then pass it:
+```python
+pd_ctx = PandasContext()
+ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, engine=my_engine)
+```
+**Modules:** `odibi/context.py` — any code constructing EngineContext directly (campaigns, tests)
+
+### T-025: DeleteDetectionConfig Requires source_connection for SQL_COMPARE
+**Date:** 2026-04-30
+**Symptom:** `ValidationError: 'source_connection' is required` when creating `DeleteDetectionConfig(mode=SQL_COMPARE, ...)` without `source_connection`.
+**Root Cause:** Pydantic `model_post_init` validation enforces `source_connection` is set when `mode=SQL_COMPARE`. Even when simulating sql_compare by calling `_apply_deletes` directly (which doesn't use `source_connection`), the config validation still runs.
+**Fix:** Pass `source_connection="dummy"` (or any string) to satisfy validation when simulating sql_compare without a live JDBC connection. `_apply_deletes` only uses `keys`, `soft_delete_col`, `max_delete_percent`, `on_threshold_breach`.
+**Modules:** `odibi/config.py` — DeleteDetectionConfig; any test/campaign simulating sql_compare mode
+
+### V-010: deltalake 0.x vs 1.x API Differences
+**Verified:** 2026-04-30
+**Finding:** The `deltalake` Python package has breaking API changes between 0.x and 1.x series. Key differences:
+- **write_deltalake schema override:** 0.x uses `schema_mode="overwrite"`, 1.x uses `overwrite_schema=True`
+- **Rust engine kwarg:** 0.x supports `engine='rust'`, 1.x removed it (Rust is the only engine)
+- odibi pins `deltalake>=0.18.0,<0.30.0` (resolves to 0.25.5 on Databricks). Cluster pre-installs 1.5.1.
+**Implication:** Campaign notebooks that write Delta via `deltalake` must `%pip install "deltalake>=0.18.0,<0.30.0"` and `%restart_python` to match odibi's pinned version. Use `schema_mode="overwrite"` (not `overwrite_schema=True`).

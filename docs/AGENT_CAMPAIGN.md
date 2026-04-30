@@ -887,11 +887,13 @@ Rules:
 - ≤500 LOC
 
 Success criteria:
-- [ ] Tutorial covers both detection modes
-- [ ] Example runs successfully
-- [ ] Correctly identifies deleted records
-- [ ] Handles reappearing records
-- [ ] Works on Pandas engine
+- [x] Tutorial covers both detection modes (snapshot_diff + sql_compare)
+- [x] Example runs successfully (config.yaml validated via ProjectConfig)
+- [x] Correctly identifies deleted records (5 deleted Day1→2, 3 still deleted Day2→3)
+- [x] Handles reappearing records (IDs 12, 45 returned in Day 3)
+- [x] Works on Pandas engine (9/9 tests PASS)
+
+**Completed:** 2026-04-30. Notebook: `campaign/11_delete_detection_e2e` (11 cells, 9 tests). Files created: `docs/tutorials/delete_detection.md` (218 lines), `examples/delete_detection/config.yaml` (55 lines), `examples/delete_detection/README.md` (62 lines), `examples/delete_detection/data/{day1_customers.csv, day2_customers.csv, day3_customers.csv}`. Additional coverage: soft/hard delete, safety threshold (warn/error), first run skip, mode none passthrough.
 ```
 
 ---
@@ -1860,7 +1862,7 @@ Phase 3: Polars Parity ✅
 
 Phase 4: Validation E2E
 - [ ] Task 15: Validation tutorial (#224)
-- [ ] Task 16: Delete detection tutorial (#223)
+- [x] Task 16: Delete detection tutorial (#223) — 9/9 PASS, 6 files
 - [ ] Task 17: Quarantine tutorial (#222)
 - [ ] Task 18: Delta troubleshooting (#225)
 
