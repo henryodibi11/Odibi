@@ -77,7 +77,11 @@ def _seed_outputs(cm, records):
         }
     )
     table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
-    write_deltalake(cm.tables["meta_outputs"], table, mode="overwrite", engine="rust")
+    write_deltalake(
+        cm.tables["meta_outputs"],
+        table,
+        mode="overwrite",
+    )
 
 
 def _make_write_config(

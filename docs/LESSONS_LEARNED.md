@@ -1062,3 +1062,19 @@ ctx = EngineContext(context=SparkContext(spark), df=df, engine_type=EngineType.S
 **Fix:** `@model_validator(mode="before")` runs BEFORE Pydantic processes the dict, so it can see all raw keys including those that would be ignored. This is the correct hook for detecting unknown/hallucinated fields without breaking configs that legitimately pass extra data.
 **Caveat:** Cannot raise errors for fields that ARE valid Pydantic fields (e.g., `inputs:` is a real NodeConfig field). Only check for known-wrong names.
 **Modules:** `odibi/config.py` — `NodeConfig.check_hallucinated_fields`
+
+---
+
+## Session: 2026-05-01 (Task 26 — Pre-Existing Test Failures)
+
+### T-034: deltalake write_deltalake() engine="rust" Removed in v1.0+
+**Problem:** 127 catalog + state test failures — `TypeError: write_deltalake() got an unexpected keyword argument 'engine'`.
+**Cause:** `deltalake` (delta-rs) >=1.0 removed the `engine` parameter because Rust became the default and only engine. The codebase still passed `engine="rust"` in 16 call sites across 8 files.
+**Fix:** Remove `engine="rust"` from all `write_deltalake()` calls. Rust is the default — no behavioral change.
+**Files:** `odibi/catalog.py` (2), `odibi/state/__init__.py` (3), `odibi/engine/pandas_engine.py` (1), + 5 test files (10).
+**Result:** 127 failures → 0 failures. All 557 catalog tests pass.
+**Modules:** `odibi/catalog.py`, `odibi/state/__init__.py`, `odibi/engine/pandas_engine.py`
+
+### D-007: Pre-Existing Test Failures Were Mostly Already Fixed
+**Decision:** The three documented failure categories (caplog ~25, pandas engine ~94, ADF profiler ~70-93) were all already resolved by prior work. Only the `engine="rust"` incompatibility remained as a real blocker causing 127 failures. The 16 failures in `test_catalog_mock_engine_writes.py` are stale Spark mock expectations — deferred to Task 26a.
+**Rationale:** Document what was already fixed to avoid future agents re-investigating resolved issues.

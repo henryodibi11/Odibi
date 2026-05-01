@@ -423,7 +423,6 @@ class CatalogStateBackend(StateBackend):
                 mode="append",
                 storage_options=self.storage_options,
                 schema_mode="merge",
-                engine="rust",
             )
 
     def _spark_table_exists(self, path: str) -> bool:
@@ -526,7 +525,6 @@ class CatalogStateBackend(StateBackend):
                 df,
                 mode="overwrite",
                 storage_options=self.storage_options,
-                engine="rust",
             )
         logger.debug(f"Batch set {len(rows)} HWM value(s) locally")
 
@@ -1149,7 +1147,6 @@ def _write_runs_to_catalog(target: CatalogStateBackend, records: List[Dict]) -> 
             df,
             mode="append",
             storage_options=target.storage_options,
-            engine="rust",
         )
 
     _retry_delta_operation(_write)

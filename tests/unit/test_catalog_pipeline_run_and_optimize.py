@@ -113,7 +113,11 @@ def _seed_pipeline_runs(cm, records):
         }
     )
     table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
-    write_deltalake(cm.tables["meta_pipeline_runs"], table, mode="overwrite", engine="rust")
+    write_deltalake(
+        cm.tables["meta_pipeline_runs"],
+        table,
+        mode="overwrite",
+    )
 
 
 # ===========================================================================
