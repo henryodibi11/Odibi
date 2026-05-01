@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 import yaml
 
@@ -299,6 +299,50 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
                 logger.debug("Overwriting key during merge", key=key)
             result[key] = value
     return result
+
+
+def build_yaml_line_map(content: str) -> Dict[Tuple[Any, ...], Tuple[int, int]]:
+    """Build a path-to-(line, col) map from raw YAML content using yaml.compose.
+
+    Walks the YAML node tree and records the 1-indexed (line, column) start
+    position of every node, keyed by the path tuple to that node from the root.
+
+    Path elements are dict keys (str) for mapping nodes and integer indices for
+    sequence nodes. Example: ``('pipelines', 0, 'nodes', 2, 'name')``.
+
+    Args:
+        content: Raw YAML file content (before env-var substitution is fine —
+            substitution does not change line numbers as long as values are
+            single-line, which load_yaml_with_env already warns about).
+
+    Returns:
+        Dict mapping path tuple to (line, column), both 1-indexed. Returns
+        empty dict on parse error.
+    """
+    try:
+        root = yaml.compose(content)
+    except yaml.YAMLError:
+        return {}
+    if root is None:
+        return {}
+
+    line_map: Dict[Tuple[Any, ...], Tuple[int, int]] = {}
+
+    def _walk(node, path: tuple) -> None:
+        if node.start_mark is not None:
+            line_map[path] = (node.start_mark.line + 1, node.start_mark.column + 1)
+        if isinstance(node, yaml.MappingNode):
+            for key_node, val_node in node.value:
+                key = getattr(key_node, "value", None)
+                if key is None:
+                    continue
+                _walk(val_node, path + (key,))
+        elif isinstance(node, yaml.SequenceNode):
+            for i, item in enumerate(node.value):
+                _walk(item, path + (i,))
+
+    _walk(root, ())
+    return line_map
 
 
 def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:

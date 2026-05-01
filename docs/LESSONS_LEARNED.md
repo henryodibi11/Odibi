@@ -1034,3 +1034,31 @@ ctx = EngineContext(context=SparkContext(spark), df=df, engine_type=EngineType.S
 ```
 **Note:** `EngineContext.spark` is a property that delegates to `self.context.spark`. It returns `None` for Pandas/Polars contexts.
 **Modules:** Any code constructing `EngineContext` directly (campaigns, tests, patterns)
+
+---
+
+## Session: 2026-05-01 (Task 25 — YAML Validation Hardening)
+
+### V-017: Pydantic Validators Catch YAML Misconfigurations at Parse Time
+**Problem:** Invalid YAML configs (bad names, hallucinated fields, wrong connections) only caught by `odibi validate` CLI, not at `ProjectConfig(**data)` parse time.
+**Cause:** Pydantic models in `config.py` lacked field-level and cross-model validators.
+**Fix:** Added 4 validators (92 LOC) to `config.py`:
+1. `NodeConfig.validate_node_name_format` — Regex `^[a-zA-Z_][a-zA-Z0-9_]*$`, rejects hyphens/dots/spaces/leading digits
+2. `PipelineConfig.validate_pipeline_name_format` — Same regex
+3. `NodeConfig.check_hallucinated_fields` — `@model_validator(mode="before")` detects `source:`, `sink:`, `target:`, `outputs:`, `sql:` in raw dict before Pydantic drops them
+4. `ProjectConfig.validate_node_connection_references` — Cross-references all node read/write connections against `connections:` section
+**Key Insight:** `model_validator(mode="before")` runs on the raw dict input, so it can detect extra keys that Pydantic would otherwise silently ignore (when `extra="ignore"` is the default).
+**Verified:** 137 existing YAML configs (130 project + 5 pipeline files) still parse — 0 new validator failures.
+**Modules:** `odibi/config.py` — NodeConfig, PipelineConfig, ProjectConfig
+
+### T-032: Line Numbers Not Available from PyYAML safe_load
+**Problem:** Task requested YAML error messages with line numbers.
+**Cause:** `yaml.safe_load()` (PyYAML) discards position info during parsing. Only `ruamel.yaml` preserves `lc` (line/column) attributes.
+**Workaround:** Not implemented. Would require switching YAML parser in `utils/config_loader.py` from PyYAML to `ruamel.yaml`. All error messages include the field name and value instead, which is sufficient for debugging.
+**Modules:** `odibi/utils/config_loader.py`
+
+### T-033: model_validator(mode="before") for Hallucination Detection
+**Problem:** NodeConfig uses `model_config = {"populate_by_name": True}` without `extra="forbid"`, so extra fields (hallucinated names like `source:`, `sink:`) are silently dropped.
+**Fix:** `@model_validator(mode="before")` runs BEFORE Pydantic processes the dict, so it can see all raw keys including those that would be ignored. This is the correct hook for detecting unknown/hallucinated fields without breaking configs that legitimately pass extra data.
+**Caveat:** Cannot raise errors for fields that ARE valid Pydantic fields (e.g., `inputs:` is a real NodeConfig field). Only check for known-wrong names.
+**Modules:** `odibi/config.py` — `NodeConfig.check_hallucinated_fields`
