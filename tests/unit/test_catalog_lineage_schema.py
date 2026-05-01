@@ -89,8 +89,11 @@ def _seed_schemas(cm, records):
         }
     )
     table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
-    write_deltalake(cm.tables["meta_schemas"], table, mode="overwrite",
-)
+    write_deltalake(
+        cm.tables["meta_schemas"],
+        table,
+        mode="overwrite",
+    )
 
 
 def _seed_lineage(cm, records):
@@ -123,8 +126,11 @@ def _seed_lineage(cm, records):
         }
     )
     table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
-    write_deltalake(cm.tables["meta_lineage"], table, mode="overwrite",
-)
+    write_deltalake(
+        cm.tables["meta_lineage"],
+        table,
+        mode="overwrite",
+    )
 
 
 # ===========================================================================

@@ -50,8 +50,11 @@ def _write_pipelines(cm, names):
         }
     )
     table = pa.Table.from_pandas(df, preserve_index=False)
-    write_deltalake(cm.tables["meta_pipelines"], table, mode="overwrite",
-)
+    write_deltalake(
+        cm.tables["meta_pipelines"],
+        table,
+        mode="overwrite",
+    )
 
 
 def _write_nodes(cm, entries):
@@ -71,8 +74,11 @@ def _write_nodes(cm, entries):
         }
     )
     table = pa.Table.from_pandas(df, preserve_index=False)
-    write_deltalake(cm.tables["meta_nodes"], table, mode="overwrite",
-)
+    write_deltalake(
+        cm.tables["meta_nodes"],
+        table,
+        mode="overwrite",
+    )
 
 
 def _write_state(cm, entries):
@@ -90,8 +96,11 @@ def _write_state(cm, entries):
         }
     )
     table = pa.Table.from_pandas(df, preserve_index=False)
-    write_deltalake(cm.tables["meta_state"], table, mode="overwrite",
-)
+    write_deltalake(
+        cm.tables["meta_state"],
+        table,
+        mode="overwrite",
+    )
 
 
 def _make_config(*pipeline_defs):
