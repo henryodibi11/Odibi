@@ -181,6 +181,10 @@ tests/generated/
 _delta_log/
 _system_catalog/
 
+# Stray root-level scratch outputs (e.g., SCD2 demo writes)
+/data.csv
+/dummy.csv
+
 # Projects folder (user-specific)
 projects/
 .odibi/
