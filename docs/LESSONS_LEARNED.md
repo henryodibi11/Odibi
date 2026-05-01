@@ -1118,3 +1118,17 @@ ctx = EngineContext(context=SparkContext(spark), df=df, engine_type=EngineType.S
 **Verified:** After adding `row_number` transformer (Task 27), the full test suite shows 9,207 passed (+14 from new tests), 5 failed (same pre-existing failures documented in D-007). Zero regressions introduced.
 **Pre-existing failures:** `test_delta_format` (delta-rs mock), `test_env_override` (LocalFileSystem), `test_schema_lake_format` (delta schema), `test_dl_format_schema` (delta schema), `test_spark_real_session` (shared cluster).
 **Where:** All 332 test files across `tests/`
+
+### P-012: Adding a Multi-Engine Transformer with Recursive Logic (flatten_struct Recipe)
+**Pattern:** For transformers that need engine-specific recursion (e.g., walking nested struct schemas), keep the dispatcher thin and push all logic into per-engine helpers. The Pandas path used `pd.json_normalize(max_level=depth-1)` for built-in depth control; the Spark path used a recursive `_collect_struct_fields()` that walks `StructType` to build `(dot_path, alias)` pairs with backtick escaping for special-char field names.
+**Key decisions:** (1) Use `.drop(column)` instead of `SELECT * EXCEPT` for `drop_source` — avoids a second SQL round-trip and temp view. (2) Backtick-escape every field name in dot-path SQL (`metadata.\`my field\``) since struct fields commonly have spaces/hyphens. (3) Polars raises `NotImplementedError` with a helpful message rather than a silent fallback.
+**Where:** `odibi/transformers/advanced.py` (#15), tested in `tests/unit/transformers/test_flatten_struct.py`
+
+### V-020: Spark Connect Subprocess Limitation — SparkSession Not Reachable from pytest Child Process
+**Verified:** On Databricks shared clusters (USER_ISOLATION / Spark Connect), `SparkSession.builder.getOrCreate()` fails in subprocess-spawned pytest with `[INVALID_CONNECT_URL]` because the Spark Connect socket is only available to the notebook driver process. `SparkSession.builder.master("local[1]")` also fails with `[CANNOT_CONFIGURE_SPARK_CONNECT_MASTER]`.
+**Workaround:** Use `SparkSession.getActiveSession()` as the primary path (works in notebook cells). In the pytest fixture, try `getActiveSession()` first, fall back to `builder.getOrCreate()`, and `pytest.skip()` if both fail. Verify Spark tests via notebook direct execution (all 8 passed), and let them skip gracefully in subprocess CI.
+**Where:** `tests/unit/transformers/test_flatten_struct.py` `spark_fixture()`
+
+### V-021: Full Suite Regression Count — 9,224 PASS / 5 FAIL (Post-Task 28)
+**Verified:** After adding `flatten_struct` transformer (Task 28) with Spark test coverage and `drop_source` simplification, the full test suite shows 9,224 passed (+17 from new Pandas tests, +8 Spark skipped in subprocess but verified in notebook), 5 failed (same pre-existing failures). Zero regressions introduced.
+**Where:** All test files across `tests/`

@@ -1510,3 +1510,153 @@ def _split_by_shift(context: EngineContext, params: SplitEventsByPeriodParams) -
             f"Supported engines: SPARK, PANDAS. "
             f"Check your engine configuration."
         )
+
+
+# -------------------------------------------------------------------------
+# 15. Flatten Struct
+# -------------------------------------------------------------------------
+
+
+class FlattenStructParams(BaseModel):
+    """
+    Configuration for flattening nested struct/dict columns.
+
+    Recursive alternative to ``unpack_struct`` with depth control, custom
+    prefix, and separator.
+
+    Example — single level:
+    ```yaml
+    flatten_struct:
+      column: metadata
+    ```
+
+    Example — multi-level with prefix:
+    ```yaml
+    flatten_struct:
+      column: metadata
+      prefix: meta_
+      depth: 2
+      separator: _
+    ```
+    """
+
+    column: str = Field(..., description="Struct/dict column to flatten")
+    prefix: Optional[str] = Field(
+        default=None,
+        description="Prefix for output columns (default: '{column}{separator}')",
+    )
+    depth: int = Field(1, description="Max nesting depth to flatten (default: 1)", ge=1)
+    separator: str = Field("_", description="Separator between nested field names")
+    drop_source: bool = Field(True, description="Drop the original struct column after flattening")
+
+
+def flatten_struct(context: EngineContext, params: FlattenStructParams) -> EngineContext:
+    """
+    Flattens a nested struct/dict column into top-level columns.
+
+    Design:
+    - Engine-specific: Struct access syntax differs per engine.
+    - Pandas: pd.json_normalize with max_level for depth control.
+    - Spark: Schema walking + SQL dot-path expressions.
+    """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    col_prefix = (
+        params.prefix if params.prefix is not None else f"{params.column}{params.separator}"
+    )
+
+    ctx.debug(
+        "FlattenStruct starting",
+        column=params.column,
+        prefix=col_prefix,
+        depth=params.depth,
+    )
+
+    if context.engine_type == EngineType.PANDAS:
+        result = _flatten_struct_pandas(context, params, col_prefix)
+    elif context.engine_type == EngineType.SPARK:
+        result = _flatten_struct_spark(context, params, col_prefix)
+    else:
+        raise NotImplementedError(
+            f"flatten_struct does not yet support engine '{context.engine_type}'. "
+            f"Supported: PANDAS, SPARK. Use 'unpack_struct' as a single-level alternative."
+        )
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug("FlattenStruct completed", elapsed_ms=round(elapsed_ms, 2))
+
+    return result
+
+
+def _flatten_struct_pandas(
+    context: EngineContext, params: FlattenStructParams, col_prefix: str
+) -> EngineContext:
+    """Flatten struct via pd.json_normalize (supports depth via max_level)."""
+    import pandas as pd
+
+    df = context.df.copy()
+    records = df[params.column].tolist()
+    # Replace non-dict values (None, NaN, etc.) with empty dicts
+    records = [r if isinstance(r, dict) else {} for r in records]
+
+    if not records:
+        return context.with_df(df)
+
+    # max_level=0 → top-level only (our depth=1)
+    normalized = pd.json_normalize(records, sep=params.separator, max_level=params.depth - 1)
+    normalized.columns = [f"{col_prefix}{c}" for c in normalized.columns]
+    normalized.index = df.index
+
+    result = pd.concat([df, normalized], axis=1)
+    if params.drop_source:
+        result = result.drop(columns=[params.column])
+    return context.with_df(result)
+
+
+def _flatten_struct_spark(
+    context: EngineContext, params: FlattenStructParams, col_prefix: str
+) -> EngineContext:
+    """Flatten struct via schema walking + SQL dot-path expressions."""
+    try:
+        from pyspark.sql.types import StructType
+    except ImportError:
+        raise NotImplementedError("flatten_struct Spark path requires pyspark")
+
+    df = context.df
+    struct_field = df.schema[params.column]
+
+    if not isinstance(struct_field.dataType, StructType):
+        # Not a struct — return as-is
+        return context
+
+    pairs = _collect_struct_fields(
+        struct_field.dataType, params.column, col_prefix, params.depth, params.separator
+    )
+    exprs = ", ".join(f"{path} AS `{alias}`" for path, alias in pairs)
+    sql_query = f"SELECT *, {exprs} FROM df"
+    result = context.sql(sql_query)
+
+    if params.drop_source:
+        result = result.with_df(result.df.drop(params.column))
+
+    return result
+
+
+def _collect_struct_fields(dtype, path: str, alias_prefix: str, depth: int, sep: str) -> list:
+    """Recursively collect (spark_dot_path, output_alias) pairs for struct fields."""
+    from pyspark.sql.types import StructType
+
+    pairs = []
+    for field in dtype.fields:
+        child_path = f"{path}.`{field.name}`"
+        child_alias = f"{alias_prefix}{field.name}"
+        if isinstance(field.dataType, StructType) and depth > 1:
+            pairs.extend(
+                _collect_struct_fields(
+                    field.dataType, child_path, f"{child_alias}{sep}", depth - 1, sep
+                )
+            )
+        else:
+            pairs.append((child_path, child_alias))
+    return pairs

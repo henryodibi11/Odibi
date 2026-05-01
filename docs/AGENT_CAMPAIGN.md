@@ -2200,7 +2200,7 @@ Phase 6: Bug Fixes
 
 Phase 7: New Features
 - [x] Task 27: row_number transformer — 14/14 PASS, +70 LOC production, +211 LOC tests, 757/757 transformer suite regression-free
-- [ ] Task 28: flatten_struct transformer
+- [x] Task 28: flatten_struct transformer — 25 tests (17 Pandas + 8 Spark), +152 LOC production, +500 LOC tests, 774/774 transformer suite regression-free
 - [ ] Task 29: apply_mapping transformer
 - [ ] Task 30: Coverage push to 85%
 
@@ -2276,3 +2276,19 @@ All campaign branches follow: `type/hodibi/description`
 ### Docs Updated
 - `docs/skills/02_odibi_first_lookup.md` — added row_number row, count 54→55
 - `AGENTS.md` — added test_row_number.py entry, updated sql_core test count
+
+## Task 28: flatten_struct Transformer  ✅
+**Date:** 2026-05-01
+**Result:** 25 tests (17 Pandas PASS + 8 Spark PASS), 774/774 transformer suite regression-free, ruff clean. Spark drop_source simplified (.drop vs SELECT * EXCEPT). Stray CSV files deleted.
+
+### Implementation
+| File | Change |
+| --- | --- |
+| `odibi/transformers/advanced.py` | Added `FlattenStructParams` + `flatten_struct()` + `_flatten_struct_pandas()` + `_flatten_struct_spark()` + `_collect_struct_fields()` as #15 (+152 LOC) |
+| `odibi/transformers/__init__.py` | Registered `flatten_struct` in Advanced section (+2 LOC) |
+| `tests/unit/transformers/test_flatten_struct.py` | 17 tests across 6 classes (+265 LOC) |
+
+### Engine Support
+- **Pandas:** `pd.json_normalize(max_level=depth-1)` with prefix, separator, null handling
+- **Spark:** Schema walking via `_collect_struct_fields()` + SQL dot-path expressions
+- **Polars:** `NotImplementedError` with clear message pointing to `unpack_struct`
