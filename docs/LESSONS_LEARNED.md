@@ -135,13 +135,19 @@ AGENTS.md keeps its existing role: **coverage tracker + test infrastructure note
 **Fix:** Use `sys.modules` manipulation: set `sys.modules["pkg"] = None`, restore in finally  
 **Modules:** Any tests simulating missing optional dependencies
 
-### T-009: SCD2 Float/NaN Comparison — Resolved on Spark
-**Date:** 2026-04-30 (resolved)  
+### T-009: SCD2 Float/NaN Comparison — Resolved (All Engines)
+**Date:** 2026-04-30 (Spark), 2026-05-01 (Pandas/Polars/DuckDB verified)  
 **Symptom:** SCD2 change detection false-positives on float columns containing NaN.  
-**Root Cause:** NaN != NaN in Python/Pandas. float comparison precision issues.  
-**Resolution:** On Spark, `eqNullSafe()` (used in Delta MERGE conditions) treats NaN == NaN correctly — no false positives. Confirmed in campaign 06 test `scd2_float_nan`. Pandas/Polars paths may still be affected.  
-**Status:** Resolved for Spark engine. #248 remains open for Pandas/Polars.  
-**Modules:** `transformers/scd.py`
+**Root Cause:** NaN != NaN in IEEE 754. Without NaN-safe comparison, every SCD2 re-run creates spurious new versions for rows with NaN in tracked columns.  
+**Resolution:** All 5 comparison paths now handle NaN correctly:  
+- **Spark legacy** (L439-452): `eqNullSafe()` treats NaN == NaN → no false positive  
+- **Spark Delta MERGE** (L654-656): `<=>` operator is NaN-safe in Spark SQL  
+- **DuckDB SQL** (L801-804): `IS DISTINCT FROM` treats NaN == NaN as `False` in DuckDB (unlike standard SQL)  
+- **Pandas fallback** (L933-952): `_safe_isna()` detects NaN via `pd.isna()`, `math.isclose(rel_tol=1e-9, abs_tol=1e-12)` handles float epsilon  
+- **Polars** (L1108-1119): `ne_missing()` already treats NaN == NaN natively; defensive `is_nan()` guard on Float32/Float64 columns  
+**Verified:** campaign/18_scd2_nan_fix — 5/5 tests PASS across Pandas, Polars, Spark, DuckDB  
+**Status:** Resolved for all engines. #248 closeable.  
+**Modules:** `odibi/transformers/scd.py`
 
 ### T-010: Polars `repeat_by` + `list.join` Hangs
 **Symptom:** Test suite hangs when anonymize "mask" method runs in Polars  
@@ -589,7 +595,7 @@ Copy-paste this at the end of your session:
   - `scd.py _scd2_spark` (lines 349–373): Same pattern — gate on `tableExists()` before `spark.table()`.
   - `merge_transformer.py merge_batch` (lines 450–475): Gate on `tableExists()`, then verify Delta format with `DeltaTable.forName()` inside try/except (handles non-Delta Hive tables).
 
-**T-009 resolved (Spark engine):** Spark's `eqNullSafe()` handles NaN == NaN correctly — no false positives in SCD2 change detection. #248 remains open for Pandas/Polars paths.
+**T-009 resolved (all engines):** Spark's `eqNullSafe()`, DuckDB's `IS DISTINCT FROM`, Pandas' `_safe_isna`+`math.isclose`, and Polars' `ne_missing` all handle NaN == NaN correctly. #248 closeable — verified in campaign/18_scd2_nan_fix (5/5 PASS).
 
 **Follow-up fix — non-Delta table safety:**
 - Original merge fix assumed any existing table is Delta (`tableExists → is_delta = True`). Tightened to two-step: `tableExists()` gate + `DeltaTable.forName()` verification, so non-Delta Hive tables on non-UC environments fall through correctly.
@@ -974,3 +980,57 @@ df_runs.write.format("delta").mode("overwrite").save(RUNS_PATH)
 **Verified:** 2026-05-01 against DBR 17.3 LTS (Spark 4.0.0) on shared cluster (USER_ISOLATION)
 **Finding:** `set_hwm` uses Delta MERGE INTO (matched → update, not matched → insert). Calling `set_hwm("key", 99999)` then `set_hwm("key", 100500)` results in exactly 1 row for that key (value=100500), not 2 rows. The meta_state table schema is `(key STRING, value STRING, environment STRING, updated_at TIMESTAMP)`. The MERGE condition matches on `key` + `environment`.
 **Implication:** HWM updates are idempotent and safe for retry loops. No deduplication needed after repeated set_hwm calls on the same key.
+
+
+## Session: 2026-05-01 — SCD2 NaN Fix Verification (Task 24, #248)
+
+### Work Done
+- Created `campaign/18_scd2_nan_fix` notebook (10 cells, ~200 LOC) — verifies SCD2 NaN handling across all 4 engine paths end-to-end.
+- 5/5 tests PASS: nan_equality (Pandas+Polars), nan_transitions (Pandas+Polars), float_epsilon (Pandas), spark_nan (Delta MERGE), duckdb_nan (IS DISTINCT FROM).
+- Updated T-009 to mark fully resolved across all engines. #248 closeable.
+- No source code changes needed — all 5 comparison paths already handle NaN correctly.
+
+### Verification Report
+- Tests written: 5
+- Tests passing: 5/5
+- Concrete value assertions: NaN==NaN → 0 new versions, NaN→99.9 detected, 42.5→NaN detected, epsilon perturbation (1e-12) → 0 changes, DuckDB IS DISTINCT FROM NaN==NaN → False
+- Negative tests: big_change beyond epsilon detected, NaN IS DISTINCT FROM value = True
+- Edge cases tested: NULL vs NaN (distinct in DuckDB), Polars NaN→None parquet roundtrip, Spark Connect lazy DeltaTable.forName
+
+### New Entries Added
+- [x] Verified: V-016 — SCD2 NaN Handling Verified Across All 4 Engine Paths
+- [x] Trap: T-030 — Spark SCD2 Delta MERGE with ADLS Paths Fails on Spark Connect
+- [x] Trap: T-031 — EngineContext API Requires Concrete Context Subclass
+
+### V-016: SCD2 NaN Handling Verified Across All 4 Engine Paths
+**Verified:** 2026-05-01 against DBR 17.3 LTS (Spark 4.0.0) on shared cluster (USER_ISOLATION)
+**Finding:** SCD2 change detection handles float NaN correctly on all engine paths:
+- **Pandas fallback** (`has_changed`): `_safe_isna(val)` via `pd.isna()` catches NaN; `math.isclose(rel_tol=1e-9, abs_tol=1e-12)` prevents epsilon false positives. Both NaN → continue (no change). One NaN → change. Float within tolerance → no change.
+- **DuckDB SQL** (`_scd2_pandas` DuckDB branch): `IS DISTINCT FROM` treats NaN == NaN as `False` in DuckDB — unlike standard SQL where NaN is a regular float and NaN != NaN. No additional NaN handling needed.
+- **Polars** (`_scd2_polars`): `ne_missing()` already returns `False` for NaN vs NaN (Polars treats NaN as equal in missing-aware comparison). The `is_nan()` guard on Float32/Float64 is defensive but not strictly necessary.
+- **Spark legacy** (`_scd2_spark`): `eqNullSafe()` handles NaN == NaN → True.
+- **Spark MERGE** (`_scd2_spark_delta_merge`): `<=>` operator in MERGE condition is NaN-safe.
+**Implication:** #248 closeable. No source code changes needed — the fix was already in place across all engines. The `campaign/18_scd2_nan_fix` notebook serves as a regression test.
+
+### T-030: Spark SCD2 Delta MERGE with ADLS Paths Fails on Spark Connect
+**Date:** 2026-05-01
+**Symptom:** `scd2(target="abfss://...")` with `use_delta_merge=True` fails with `PATH_NOT_FOUND` on first run, even though the initial write path should handle non-existent targets.
+**Root Cause:** `DeltaTable.forName(spark, target)` is lazy on Spark Connect (T-020). When given an ADLS URI like `abfss://container@account/path`, it returns a lazy object without throwing. This sets `is_delta = True` incorrectly, skipping the initial write path. Later, when the code tries to use the `delta_table` object, it fails with `INVALID_IDENTIFIER` (ADLS URIs are not valid SQL identifiers). The fallback `_scd2_spark()` then tries to read the non-existent target → `PATH_NOT_FOUND`.
+**Fix:** Use UC managed table names (e.g., `catalog.schema.table`) instead of ADLS paths for Spark SCD2 targets. The `DeltaTable.forName()` API is designed for table names, not file paths. For path-based targets, the `DeltaTable.isDeltaTable()` + `DeltaTable.forPath()` fallback works on classic Spark but not reliably on Spark Connect.
+**Modules:** `odibi/transformers/scd.py` — `_scd2_spark_delta_merge()`, any Spark SCD2 campaign tests
+
+### T-031: EngineContext API Requires Concrete Context Subclass
+**Date:** 2026-05-01
+**Symptom:** `TypeError: EngineContext.__init__() missing 1 required positional argument: 'context'` when constructing `EngineContext(df=df, engine_type=EngineType.PANDAS)`.
+**Root Cause:** `EngineContext.__init__` signature changed to require a `context: Context` as the first positional arg. `Context` is an ABC with abstract methods (`get`, `register`, `has`, etc.). The concrete subclasses are `PandasContext()`, `PolarsContext()`, `SparkContext(spark_session)`.
+**Fix:** Always pass the appropriate concrete context:
+```python
+# Pandas
+ctx = EngineContext(context=PandasContext(), df=df, engine_type=EngineType.PANDAS, engine=engine)
+# Polars
+ctx = EngineContext(context=PolarsContext(), df=df, engine_type=EngineType.POLARS, engine=engine)
+# Spark
+ctx = EngineContext(context=SparkContext(spark), df=df, engine_type=EngineType.SPARK, engine=engine)
+```
+**Note:** `EngineContext.spark` is a property that delegates to `self.context.spark`. It returns `None` for Pandas/Polars contexts.
+**Modules:** Any code constructing `EngineContext` directly (campaigns, tests, patterns)
