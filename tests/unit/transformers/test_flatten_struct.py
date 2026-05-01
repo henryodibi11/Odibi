@@ -296,12 +296,12 @@ def spark_fixture():
     On Databricks shared clusters (Spark Connect), getActiveSession() works
     but builder.getOrCreate() may fail. Falls back gracefully.
     """
-    spark = SparkSession.getActiveSession()
-    if spark is None:
-        try:
+    try:
+        spark = SparkSession.getActiveSession()
+        if spark is None:
             spark = SparkSession.builder.getOrCreate()
-        except Exception:
-            pytest.skip("SparkSession not available (CI or subprocess)")
+    except Exception:
+        pytest.skip("SparkSession not available (CI or subprocess)")
     yield spark
 
 

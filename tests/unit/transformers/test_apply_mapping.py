@@ -27,7 +27,7 @@ pytestmark_spark = pytest.mark.skipif(
 # -------------------------------------------------------------------------
 
 
-def setup_context(df: pd.DataFrame, extra_datasets: dict | None = None) -> EngineContext:
+def setup_context(df: pd.DataFrame, extra_datasets=None) -> EngineContext:
     """Create EngineContext with DuckDB SQL executor and optional extra datasets."""
     pandas_ctx = PandasContext()
     pandas_ctx.register("df", df.copy())
@@ -413,12 +413,12 @@ def spark_fixture():
     On Databricks shared clusters (Spark Connect), getActiveSession() works
     but builder.getOrCreate() may fail. Falls back gracefully.
     """
-    spark = SparkSession.getActiveSession()
-    if spark is None:
-        try:
+    try:
+        spark = SparkSession.getActiveSession()
+        if spark is None:
             spark = SparkSession.builder.getOrCreate()
-        except Exception:
-            pytest.skip("SparkSession not available (CI or subprocess)")
+    except Exception:
+        pytest.skip("SparkSession not available (CI or subprocess)")
     yield spark
 
 
