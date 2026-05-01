@@ -1696,9 +1696,9 @@ class ApplyMappingParams(BaseModel):
         default=None,
         description="Output column name (default: overwrite the source column)",
     )
-    default: Optional[str] = Field(
+    default: Optional[Union[str, int, float, bool]] = Field(
         default=None,
-        description="Default value for unmatched rows (default: NULL)",
+        description="Default value for unmatched rows (default: NULL). Accepts str/int/float/bool.",
     )
 
 
@@ -1751,11 +1751,17 @@ def apply_mapping(context: EngineContext, params: ApplyMappingParams) -> EngineC
         f"FROM {mapping_view}"
     )
 
-    # 5. Build COALESCE expression for default handling
+    # 5. Build COALESCE expression for default handling (type-aware literal)
     mapped_expr = f"_m.{q}{params.source_value}{q}"
     if params.default is not None:
-        safe_default = params.default.replace("'", "''")
-        mapped_expr = f"COALESCE(_m.{q}{params.source_value}{q}, '{safe_default}')"
+        if isinstance(params.default, bool):
+            default_literal = "TRUE" if params.default else "FALSE"
+        elif isinstance(params.default, (int, float)):
+            default_literal = str(params.default)
+        else:
+            safe_default = str(params.default).replace("'", "''")
+            default_literal = f"'{safe_default}'"
+        mapped_expr = f"COALESCE(_m.{q}{params.source_value}{q}, {default_literal})"
 
     # 6. Build the full query
     if overwrite:
