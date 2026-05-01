@@ -3,13 +3,20 @@
 import pandas as pd
 import pytest
 
-from pyspark.sql import SparkSession
-from pyspark.sql.types import (
-    IntegerType,
-    StringType,
-    StructField,
-    StructType,
-)
+try:
+    from pyspark.sql import SparkSession
+    from pyspark.sql.types import (
+        IntegerType,
+        StringType,
+        StructField,
+        StructType,
+    )
+
+    PYSPARK_AVAILABLE = True
+except ImportError:
+    PYSPARK_AVAILABLE = False
+    SparkSession = None  # type: ignore[assignment]
+    IntegerType = StringType = StructField = StructType = None  # type: ignore[assignment]
 
 from odibi.context import EngineContext, PandasContext, SparkContext
 from odibi.engine.pandas_engine import PandasEngine
@@ -314,45 +321,55 @@ def setup_spark_context(spark, sdf):
 
 # ── Schema helpers ──────────────────────────────────────────────────────
 
-SIMPLE_SCHEMA = StructType(
-    [
-        StructField("id", IntegerType()),
-        StructField(
-            "metadata",
-            StructType(
-                [
-                    StructField("owner", StringType()),
-                    StructField("version", IntegerType()),
-                ]
+if PYSPARK_AVAILABLE:
+    SIMPLE_SCHEMA = StructType(
+        [
+            StructField("id", IntegerType()),
+            StructField(
+                "metadata",
+                StructType(
+                    [
+                        StructField("owner", StringType()),
+                        StructField("version", IntegerType()),
+                    ]
+                ),
             ),
-        ),
-    ]
-)
+        ]
+    )
 
-NESTED_SCHEMA = StructType(
-    [
-        StructField("id", IntegerType()),
-        StructField(
-            "metadata",
-            StructType(
-                [
-                    StructField(
-                        "owner",
-                        StructType(
-                            [
-                                StructField("name", StringType()),
-                                StructField("dept", StringType()),
-                            ]
+    NESTED_SCHEMA = StructType(
+        [
+            StructField("id", IntegerType()),
+            StructField(
+                "metadata",
+                StructType(
+                    [
+                        StructField(
+                            "owner",
+                            StructType(
+                                [
+                                    StructField("name", StringType()),
+                                    StructField("dept", StringType()),
+                                ]
+                            ),
                         ),
-                    ),
-                    StructField("version", IntegerType()),
-                ]
+                        StructField("version", IntegerType()),
+                    ]
+                ),
             ),
-        ),
-    ]
+        ]
+    )
+else:
+    SIMPLE_SCHEMA = None  # type: ignore[assignment]
+    NESTED_SCHEMA = None  # type: ignore[assignment]
+
+
+pytestmark_spark = pytest.mark.skipif(
+    not PYSPARK_AVAILABLE, reason="pyspark types not importable in this environment"
 )
 
 
+@pytestmark_spark
 class TestFlattenStructSparkBasic:
     """Spark path: single-level struct flatten."""
 
@@ -387,6 +404,7 @@ class TestFlattenStructSparkBasic:
         assert "metadata_version" in pdf.columns
 
 
+@pytestmark_spark
 class TestFlattenStructSparkNested:
     """Spark path: nested struct with depth control."""
 
@@ -428,6 +446,7 @@ class TestFlattenStructSparkNested:
         assert list(pdf["metadata_version"]) == [2, 5]
 
 
+@pytestmark_spark
 class TestFlattenStructSparkCustom:
     """Spark path: custom prefix, separator."""
 
@@ -459,6 +478,7 @@ class TestFlattenStructSparkCustom:
         assert "metadata__version" in pdf.columns
 
 
+@pytestmark_spark
 class TestFlattenStructSparkSpecialChars:
     """Spark path: field names with special characters (backtick escaping)."""
 
