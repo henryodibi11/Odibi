@@ -60,38 +60,19 @@ DBR 17.3 LTS, Spark 4.0.0). Sandbox catalog: `eaai_dev.hardening_scratch`.
 | Calculated measure | `extended_amount == quantity * unit_price` for all rows |
 | Audit columns | `load_timestamp` and `source_system` non-null on every fact row |
 
-## Bug Notes (P-009)
+## Bug Notes (P-009) — ✅ RESOLVED
 
-`DimensionPattern` with `scd_type=2` is **not usable as-is** on Spark
-Connect when combined with surrogate-key generation. Two distinct issues:
+All three Spark Connect bugs documented as P-009 are now fixed (Task 26a):
 
-1. **`_ensure_unknown_member` (line 602):** calls
-   `spark.createDataFrame([row_values], cols)` with a `valid_to`
-   value of `None`. Spark Connect fails with
-   `[CANNOT_DETERMINE_TYPE] Some of types cannot be determined after
-   inferring.` because the all-`None` column has no inferable type.
-   Workaround: build the unknown-member row with explicit `cast()`
-   per column (see `_inject_unknown_member_scd2` in the test).
-2. **SK + history mismatch:** with the default `use_delta_merge=True`,
-   the `scd2` transformer writes history via `MERGE` and returns only
-   the new/changed rows. `DimensionPattern` adds `product_sk` to that
-   partial DataFrame and the caller overwrites the target — destroying
-   the merged history. Setting `use_delta_merge=False` triggers the
-   legacy path, which then fails in `unionByName` because
-   `rows_to_insert` (source schema) has no `product_sk` column while
-   `final_target` (target schema) does. **Workaround:** drive the
-   `scd2` transformer directly, then read the target back, assign
-   sequential `product_sk` to any rows missing one, inject the unknown
-   member, and overwrite.
+1. **`_ensure_unknown_member`** — replaced `spark.createDataFrame()` with
+   `spark.range(1).select(F.lit().cast(dtype).alias())` using `df.schema.fields`.
+2. **SCD2 SK + history mismatch** — after `scd2()` on Spark, re-read the target
+   to get complete history before surrogate-key assignment.
+3. **FactPattern `dim_key == sk_col`** — project the column once when
+   `dim_key == sk_col` to avoid `AMBIGUOUS_REFERENCE`.
 
-`FactPattern` dimension lookup also has a column-aliasing bug when
-`dimension_key == surrogate_key` (e.g., `date_sk` → `date_sk`). Both
-columns get aliased to `_dim_date_sk`, producing `[AMBIGUOUS_REFERENCE]`
-on Spark. **Workaround:** skip date-dim from the fact's `dimensions`
-list (the source already carries `order_date_sk`) and verify the FK via
-direct SQL.
-
-These three issues are captured as P-009 in `docs/LESSONS_LEARNED.md`.
+All workarounds removed from this test. The test now uses standard
+`DimensionPattern` for dim_product SCD2 and includes dim_date in `FactPattern`.
 
 ## Config validation
 

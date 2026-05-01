@@ -10,6 +10,7 @@ Run:
     & "C:\\Users\\HOdibi\\Repos\\.venv\\Scripts\\python.exe" \\
         examples\\star_schema_e2e\\star_schema_e2e.py
 """
+
 from __future__ import annotations
 
 import random
@@ -32,15 +33,10 @@ from odibi.enums import EngineType  # noqa: E402
 from odibi.patterns.date_dimension import DateDimensionPattern  # noqa: E402
 from odibi.patterns.dimension import DimensionPattern  # noqa: E402
 from odibi.patterns.fact import FactPattern  # noqa: E402
-from odibi.transformers.scd import SCD2Params, scd2  # noqa: E402
 
-# NOTE (P-009 — see README): On Spark Connect, ``DimensionPattern`` with
-# ``scd_type=2`` mishandles the surrogate-key column when chained with the
-# ``scd2`` transformer's Delta MERGE optimization (the returned DataFrame
-# only contains new versions, so re-overwriting destroys MERGE history) and
-# the legacy fallback path also fails (``unionByName`` resolves source
-# schema, which lacks the SK column added later). For dim_product we drive
-# the ``scd2`` transformer directly and assign the SK ourselves.
+# NOTE (P-009 RESOLVED): All three Spark Connect bugs (unknown_member type
+# inference, SCD2 MERGE + SK mismatch, FactPattern dim_key==sk_col ambiguity)
+# are now fixed in DimensionPattern and FactPattern.  No workarounds needed.
 
 CATALOG = "eaai_dev"
 SCHEMA = "hardening_scratch"
@@ -55,8 +51,13 @@ DIM_PRODUCT = f"{FQ}.dim_product"
 FACT_ORDERS = f"{FQ}.fact_orders"
 
 ALL_TABLES = [
-    SRC_CUSTOMER, SRC_PRODUCT, SRC_ORDERS,
-    DIM_DATE, DIM_CUSTOMER, DIM_PRODUCT, FACT_ORDERS,
+    SRC_CUSTOMER,
+    SRC_PRODUCT,
+    SRC_ORDERS,
+    DIM_DATE,
+    DIM_CUSTOMER,
+    DIM_PRODUCT,
+    FACT_ORDERS,
 ]
 
 random.seed(42)
@@ -65,6 +66,7 @@ random.seed(42)
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_pattern(cls, params: dict, name: str):
     cfg = MagicMock()
@@ -85,9 +87,7 @@ def make_ctx(spark, df=None) -> EngineContext:
 
 
 def write_delta(df, table: str) -> None:
-    df.write.format("delta").mode("overwrite").option(
-        "overwriteSchema", "true"
-    ).saveAsTable(table)
+    df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(table)
 
 
 def cleanup(spark) -> None:
@@ -105,32 +105,35 @@ PRODUCT_CATEGORIES = ["Widgets", "Gadgets", "Sprockets"]
 
 
 def gen_customers(n: int = 100) -> pd.DataFrame:
-    return pd.DataFrame([
-        {
-            "customer_id": i + 1,
-            "name": f"Customer {i + 1}",
-            "email": f"customer{i + 1}@example.com",
-            "segment": random.choice(CUSTOMER_SEGMENTS),
-            "country": random.choice(COUNTRIES),
-        }
-        for i in range(n)
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "customer_id": i + 1,
+                "name": f"Customer {i + 1}",
+                "email": f"customer{i + 1}@example.com",
+                "segment": random.choice(CUSTOMER_SEGMENTS),
+                "country": random.choice(COUNTRIES),
+            }
+            for i in range(n)
+        ]
+    )
 
 
 def gen_products(n: int = 50) -> pd.DataFrame:
-    return pd.DataFrame([
-        {
-            "product_id": i + 1,
-            "name": f"Product {i + 1}",
-            "category": random.choice(PRODUCT_CATEGORIES),
-            "price": round(random.uniform(5.0, 500.0), 2),
-        }
-        for i in range(n)
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "product_id": i + 1,
+                "name": f"Product {i + 1}",
+                "category": random.choice(PRODUCT_CATEGORIES),
+                "price": round(random.uniform(5.0, 500.0), 2),
+            }
+            for i in range(n)
+        ]
+    )
 
 
-def gen_orders(n: int, n_customers: int, n_products: int,
-               orphans: int = 0) -> pd.DataFrame:
+def gen_orders(n: int, n_customers: int, n_products: int, orphans: int = 0) -> pd.DataFrame:
     start = date(2024, 1, 1)
     end = date(2024, 12, 31)
     span = (end - start).days
@@ -139,26 +142,30 @@ def gen_orders(n: int, n_customers: int, n_products: int,
         d = start + timedelta(days=random.randint(0, span))
         cust = random.randint(1, n_customers)
         prod = random.randint(1, n_products)
-        rows.append({
-            "order_id": i + 1,
-            "customer_id": cust,
-            "product_id": prod,
-            "order_date_sk": int(d.strftime("%Y%m%d")),
-            "quantity": random.randint(1, 10),
-            "unit_price": round(random.uniform(5.0, 500.0), 2),
-        })
+        rows.append(
+            {
+                "order_id": i + 1,
+                "customer_id": cust,
+                "product_id": prod,
+                "order_date_sk": int(d.strftime("%Y%m%d")),
+                "quantity": random.randint(1, 10),
+                "unit_price": round(random.uniform(5.0, 500.0), 2),
+            }
+        )
     # Inject orphan FKs to exercise unknown-member handling on customer +
     # product. Use a valid order_date_sk (dim_date has full 2024) so the date
     # FK still passes while customer/product map to SK=0.
     for j in range(orphans):
-        rows.append({
-            "order_id": n + j + 1,
-            "customer_id": 99_999 + j,           # unknown customer
-            "product_id": 99_999 + j,            # unknown product
-            "order_date_sk": 20240101,           # valid date in dim_date
-            "quantity": 1,
-            "unit_price": 1.0,
-        })
+        rows.append(
+            {
+                "order_id": n + j + 1,
+                "customer_id": 99_999 + j,  # unknown customer
+                "product_id": 99_999 + j,  # unknown product
+                "order_date_sk": 20240101,  # valid date in dim_date
+                "quantity": 1,
+                "unit_price": 1.0,
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -166,13 +173,18 @@ def gen_orders(n: int, n_customers: int, n_products: int,
 # Pattern execution
 # ---------------------------------------------------------------------------
 
+
 def build_dim_date(spark) -> int:
-    pat = make_pattern(DateDimensionPattern, {
-        "start_date": "2024-01-01",
-        "end_date": "2024-12-31",
-        "fiscal_year_start_month": 1,
-        "unknown_member": True,
-    }, "dim_date")
+    pat = make_pattern(
+        DateDimensionPattern,
+        {
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "fiscal_year_start_month": 1,
+            "unknown_member": True,
+        },
+        "dim_date",
+    )
     pat.validate()
     df = pat.execute(make_ctx(spark))
     write_delta(df, DIM_DATE)
@@ -180,15 +192,19 @@ def build_dim_date(spark) -> int:
 
 
 def build_dim_customer(spark, source_df) -> int:
-    pat = make_pattern(DimensionPattern, {
-        "natural_key": "customer_id",
-        "surrogate_key": "customer_sk",
-        "scd_type": 1,
-        "track_cols": ["name", "email", "segment", "country"],
-        "target": DIM_CUSTOMER,
-        "unknown_member": True,
-        "audit": {"load_timestamp": True, "source_system": "stress_test"},
-    }, "dim_customer")
+    pat = make_pattern(
+        DimensionPattern,
+        {
+            "natural_key": "customer_id",
+            "surrogate_key": "customer_sk",
+            "scd_type": 1,
+            "track_cols": ["name", "email", "segment", "country"],
+            "target": DIM_CUSTOMER,
+            "unknown_member": True,
+            "audit": {"load_timestamp": True, "source_system": "stress_test"},
+        },
+        "dim_customer",
+    )
     pat.validate()
     df = pat.execute(make_ctx(spark, source_df))
     write_delta(df, DIM_CUSTOMER)
@@ -196,91 +212,24 @@ def build_dim_customer(spark, source_df) -> int:
 
 
 def build_dim_product(spark, source_df) -> int:
-    """Build SCD2 dim_product directly via the scd2 transformer.
-
-    See module-level NOTE (P-009) for why we bypass ``DimensionPattern`` here.
-    Flow: scd2 transformer writes/merges history to ``DIM_PRODUCT`` →
-    re-read target → assign sequential ``product_sk`` to any rows missing
-    it (preserving previously-assigned SKs) → ensure SK=0 unknown member
-    exists → overwrite back.
-    """
-    from pyspark.sql import functions as F
-    from pyspark.sql.window import Window
-
-    ctx = make_ctx(spark, source_df.withColumn("valid_from", F.current_timestamp()))
-    params = SCD2Params(
-        target=DIM_PRODUCT,
-        keys=["product_id"],
-        track_cols=["price", "category"],
-        effective_time_col="valid_from",
-        end_time_col="valid_to",
-        current_flag_col="is_current",
+    """Build SCD2 dim_product via DimensionPattern (P-009 bugs now fixed)."""
+    pat = make_pattern(
+        DimensionPattern,
+        {
+            "natural_key": "product_id",
+            "surrogate_key": "product_sk",
+            "scd_type": 2,
+            "track_cols": ["price", "category"],
+            "target": DIM_PRODUCT,
+            "unknown_member": True,
+            "audit": {"load_timestamp": True, "source_system": "stress_test"},
+        },
+        "dim_product",
     )
-    scd2(ctx, params)
-
-    # After MERGE, re-read target and finalize SK + unknown member.
-    df = spark.table(DIM_PRODUCT)
-
-    # Assign SK if missing (first run) or to newly-appended history rows.
-    if "product_sk" not in df.columns:
-        window = Window.orderBy("valid_from", "product_id")
-        df = df.withColumn(
-            "product_sk", F.row_number().over(window).cast("int")
-        )
-    else:
-        max_sk = df.agg(F.max("product_sk")).collect()[0][0] or 0
-        null_df = df.filter(F.col("product_sk").isNull())
-        has_df = df.filter(F.col("product_sk").isNotNull())
-        if null_df.count() > 0:
-            window = Window.orderBy("valid_from", "product_id")
-            null_df = null_df.withColumn(
-                "product_sk",
-                (F.row_number().over(window) + F.lit(max_sk)).cast("int"),
-            )
-            df = has_df.unionByName(null_df)
-
-    # Audit columns
-    if "load_timestamp" not in df.columns:
-        df = df.withColumn("load_timestamp", F.current_timestamp())
-    if "source_system" not in df.columns:
-        df = df.withColumn("source_system", F.lit("stress_test"))
-
-    df = _inject_unknown_member_scd2(spark, df)
+    pat.validate()
+    df = pat.execute(make_ctx(spark, source_df))
     write_delta(df, DIM_PRODUCT)
     return df.count()
-
-
-def _inject_unknown_member_scd2(spark, df):
-    """Add SK=0 unknown member row to a SCD2 dimension. Idempotent."""
-    from pyspark.sql import functions as F
-
-    if df.filter(F.col("product_sk") == 0).limit(1).count() > 0:
-        return df
-
-    select_exprs = []
-    for field in df.schema.fields:
-        name, dtype = field.name, field.dataType.simpleString()
-        if name == "product_sk":
-            select_exprs.append(F.lit(0).cast(dtype).alias(name))
-        elif name == "product_id":
-            select_exprs.append(F.lit(-1).cast(dtype).alias(name))
-        elif name == "price":
-            select_exprs.append(F.lit(0.0).cast(dtype).alias(name))
-        elif name == "is_current":
-            select_exprs.append(F.lit(True).cast(dtype).alias(name))
-        elif name == "valid_from":
-            select_exprs.append(F.lit("1900-01-01 00:00:00").cast(dtype).alias(name))
-        elif name == "valid_to":
-            select_exprs.append(F.lit(None).cast(dtype).alias(name))
-        elif name == "load_timestamp":
-            select_exprs.append(F.current_timestamp().cast(dtype).alias(name))
-        elif name == "source_system":
-            select_exprs.append(F.lit("stress_test").cast(dtype).alias(name))
-        else:
-            select_exprs.append(F.lit("Unknown").cast(dtype).alias(name))
-
-    unknown = spark.range(1).select(*select_exprs)
-    return unknown.unionByName(df)
 
 
 def build_fact_orders(spark, source_df) -> tuple[int, int]:
@@ -291,30 +240,44 @@ def build_fact_orders(spark, source_df) -> tuple[int, int]:
     ctx.register_temp_view("dim_product", spark.table(DIM_PRODUCT))
     ctx.register_temp_view("dim_date", spark.table(DIM_DATE))
 
-    pat = make_pattern(FactPattern, {
-        "grain": ["order_id"],
-        "deduplicate": True,
-        "keys": ["order_id"],
-        # NOTE: dim_date FK skipped from FactPattern dimensions because
-        # FactPattern aliases both dim_key and surrogate_key as `_dim_<col>`,
-        # which collides when dim_key == surrogate_key (date_sk == date_sk)
-        # and triggers AMBIGUOUS_REFERENCE on Spark. We verify the dim_date FK
-        # directly via SQL in verify().
-        "dimensions": [
-            {"source_column": "customer_id", "dimension_table": "dim_customer",
-             "dimension_key": "customer_id", "surrogate_key": "customer_sk"},
-            {"source_column": "product_id", "dimension_table": "dim_product",
-             "dimension_key": "product_id", "surrogate_key": "product_sk",
-             "scd2": True},
-        ],
-        "orphan_handling": "unknown",
-        "measures": [
-            "quantity",
-            "unit_price",
-            {"extended_amount": "quantity * unit_price"},
-        ],
-        "audit": {"load_timestamp": True, "source_system": "stress_test"},
-    }, "fact_orders")
+    pat = make_pattern(
+        FactPattern,
+        {
+            "grain": ["order_id"],
+            "deduplicate": True,
+            "keys": ["order_id"],
+            # dim_date included: Bug 3 (dim_key == sk_col ambiguity) now fixed.
+            "dimensions": [
+                {
+                    "source_column": "customer_id",
+                    "dimension_table": "dim_customer",
+                    "dimension_key": "customer_id",
+                    "surrogate_key": "customer_sk",
+                },
+                {
+                    "source_column": "product_id",
+                    "dimension_table": "dim_product",
+                    "dimension_key": "product_id",
+                    "surrogate_key": "product_sk",
+                    "scd2": True,
+                },
+                {
+                    "source_column": "order_date_sk",
+                    "dimension_table": "dim_date",
+                    "dimension_key": "date_sk",
+                    "surrogate_key": "date_sk",
+                },
+            ],
+            "orphan_handling": "unknown",
+            "measures": [
+                "quantity",
+                "unit_price",
+                {"extended_amount": "quantity * unit_price"},
+            ],
+            "audit": {"load_timestamp": True, "source_system": "stress_test"},
+        },
+        "fact_orders",
+    )
     pat.validate()
     df = pat.execute(ctx)
     write_delta(df, FACT_ORDERS)
@@ -324,6 +287,7 @@ def build_fact_orders(spark, source_df) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 # Verifications
 # ---------------------------------------------------------------------------
+
 
 def verify(spark, expected: dict) -> None:
     print("\n=== Verifications ===")
@@ -344,9 +308,11 @@ def verify(spark, expected: dict) -> None:
     assert n_prod >= 51, f"dim_product: expected >= 51, got {n_prod}"
 
     # 2) Surrogate keys: unique and start at 0 (unknown member)
-    for table, sk in [(DIM_CUSTOMER, "customer_sk"),
-                      (DIM_PRODUCT, "product_sk"),
-                      (DIM_DATE, "date_sk")]:
+    for table, sk in [
+        (DIM_CUSTOMER, "customer_sk"),
+        (DIM_PRODUCT, "product_sk"),
+        (DIM_DATE, "date_sk"),
+    ]:
         sks = [r[0] for r in spark.table(table).select(sk).collect()]
         assert len(sks) == len(set(sks)), f"{table}: SK not unique"
         assert 0 in sks, f"{table}: missing unknown-member SK=0"
@@ -372,12 +338,10 @@ def verify(spark, expected: dict) -> None:
     # 4) Unknown-member usage — orphan customer/product source rows should
     #    map to SK=0 in fact via FactPattern's orphan_handling="unknown".
     n_unknown = spark.sql(
-        f"SELECT COUNT(*) FROM {FACT_ORDERS} "
-        "WHERE customer_sk = 0 OR product_sk = 0"
+        f"SELECT COUNT(*) FROM {FACT_ORDERS} WHERE customer_sk = 0 OR product_sk = 0"
     ).collect()[0][0]
     assert n_unknown >= expected["orphan_count"], (
-        f"expected >= {expected['orphan_count']} unknown-member rows, "
-        f"got {n_unknown}"
+        f"expected >= {expected['orphan_count']} unknown-member rows, got {n_unknown}"
     )
     print(f"  ✓ {n_unknown} fact rows used unknown member (SK=0)")
 
@@ -408,8 +372,7 @@ def verify(spark, expected: dict) -> None:
 
     # 8) audit columns populated
     null_audit = spark.sql(
-        f"SELECT COUNT(*) FROM {FACT_ORDERS} "
-        "WHERE load_timestamp IS NULL OR source_system IS NULL"
+        f"SELECT COUNT(*) FROM {FACT_ORDERS} WHERE load_timestamp IS NULL OR source_system IS NULL"
     ).collect()[0][0]
     assert null_audit == 0, f"{null_audit} rows missing audit columns"
     print("  ✓ Audit columns populated on every fact row")
@@ -418,6 +381,7 @@ def verify(spark, expected: dict) -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     print("Connecting to Databricks Connect...")
@@ -433,8 +397,10 @@ def main() -> int:
     prod_pdf = gen_products(n_products)
     ord_pdf = gen_orders(n_orders, n_customers, n_products, orphans=n_orphans)
 
-    print(f"Writing {n_customers} customers, {n_products} products, "
-          f"{n_orders + n_orphans} orders to source tables...")
+    print(
+        f"Writing {n_customers} customers, {n_products} products, "
+        f"{n_orders + n_orphans} orders to source tables..."
+    )
     write_delta(spark.createDataFrame(cust_pdf), SRC_CUSTOMER)
     write_delta(spark.createDataFrame(prod_pdf), SRC_PRODUCT)
     write_delta(spark.createDataFrame(ord_pdf), SRC_ORDERS)
@@ -481,9 +447,7 @@ def main() -> int:
 
     print(f"\nCleaning up tables in {FQ}...")
     cleanup(spark)
-    remaining = spark.sql(f"SHOW TABLES IN {FQ}") \
-        .filter("isTemporary = false") \
-        .count()
+    remaining = spark.sql(f"SHOW TABLES IN {FQ}").filter("isTemporary = false").count()
     print(f"  remaining managed tables: {remaining}")
     assert remaining == 0, "cleanup failed — managed tables still present"
 

@@ -888,7 +888,7 @@ ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, eng
 - [x] Pattern: P-009 — DimensionPattern SCD2 + Surrogate Keys Has Three Distinct Failures On Spark Connect (Workarounds Documented)
 - [x] Verified: V-013 — FactPattern + Dimension SCD2 + Unknown Member Compose Cleanly When Workarounds Applied
 
-### P-009: DimensionPattern SCD2 + Surrogate Keys Has Three Distinct Failures On Spark Connect
+### P-009: DimensionPattern SCD2 + Surrogate Keys Has Three Distinct Failures On Spark Connect  ✅ RESOLVED
 **Pattern:** Three independent bugs in `odibi/patterns/dimension.py` and `odibi/patterns/fact.py` make the documented "SCD2 dim with unknown member + surrogate key" path unusable on Spark Connect:
 
 1. **`_ensure_unknown_member` line 602** calls `spark.createDataFrame([row_values], cols)` where `valid_to` is `None`. Spark Connect raises `[CANNOT_DETERMINE_TYPE] Some of types cannot be determined after inferring`. Fix: build the unknown-member row using `spark.range(1).select(F.lit(...).cast(dtype).alias(name) ...)` so every column has an explicit type.
@@ -901,7 +901,9 @@ ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, eng
 - For dim_product SCD2: bypass DimensionPattern entirely. Call the `scd2` transformer directly (default Delta MERGE, history written to target by MERGE), re-read the target, assign sequential `product_sk` to any rows missing it, inject the unknown member with explicit casts, then overwrite.
 - For fact_orders dim_date FK: omit dim_date from `dimensions:`. Source already carries `order_date_sk`; verify the FK directly with `LEFT JOIN dim_date ON f.order_date_sk = d.date_sk`.
 
-**Modules:** `odibi/patterns/dimension.py` (lines 467-538, 546-641), `odibi/patterns/fact.py` (lines 454-485). Three separate fixes needed — none are addressed in this task (test-only by user direction).
+**Modules:** `odibi/patterns/dimension.py` (lines 467-538, 546-641), `odibi/patterns/fact.py` (lines 454-485).
+
+**RESOLVED (Task 26a):** All three bugs fixed. Workarounds removed from `star_schema_e2e.py`. E2E test passes with 15/15 verifications. See T-035, T-036, T-037 below.
 
 ### V-013: FactPattern + Dimension SCD2 + Unknown Member Compose Cleanly When Workarounds Applied
 **Verified:** 2026-04-30 against DBR 17.3 LTS (Spark 4.0.0) via Databricks Connect
@@ -1078,3 +1080,15 @@ ctx = EngineContext(context=SparkContext(spark), df=df, engine_type=EngineType.S
 ### D-007: Pre-Existing Test Failures Were Mostly Already Fixed
 **Decision:** The three documented failure categories (caplog ~25, pandas engine ~94, ADF profiler ~70-93) were all already resolved by prior work. Only the `engine="rust"` incompatibility remained as a real blocker causing 127 failures. The 16 failures in `test_catalog_mock_engine_writes.py` are stale Spark mock expectations — deferred to Task 26a.
 **Rationale:** Document what was already fixed to avoid future agents re-investigating resolved issues.
+
+### T-035: Spark Connect — Use `spark.range(1).select()` for Schema-Typed Single Rows
+**Pattern:** `spark.createDataFrame([values], column_names)` fails on Spark Connect when any value is `None`, raising `[CANNOT_DETERMINE_TYPE]`. Instead, build single rows with `spark.range(1).select(F.lit(val).cast(dtype).alias(name) for field in df.schema.fields)`. For string columns, use `F.lit("Unknown")`; for numeric/other types, use `F.lit(None).cast(dtype)` to avoid `CAST_INVALID_INPUT`.
+**Where:** `odibi/patterns/dimension.py` `_ensure_unknown_member()`, P-009 Bug 1.
+
+### T-036: SCD2 Delta MERGE Returns Partial Result — Re-Read Target for SK Assignment
+**Pattern:** The `scd2` transformer's Delta MERGE path writes history directly to the target table via `MERGE INTO`. The returned `EngineContext.df` contains only new/changed rows. If the calling pattern (e.g., `DimensionPattern`) assigns surrogate keys to this partial result and overwrites the target, the merged history is destroyed. **Fix:** after `scd2()` on Spark, re-read the full target with `_load_existing_target()` before assigning surrogate keys.
+**Where:** `odibi/patterns/dimension.py` `_execute_scd2()`, P-009 Bug 2.
+
+### T-037: FactPattern `dim_key == sk_col` Causes AMBIGUOUS_REFERENCE
+**Pattern:** `FactPattern._join_dimension_spark` aliases both `dim_key` and `sk_col` as `_dim_<col>`. When they're the same column (e.g., date_sk → date_sk), this creates duplicate column names → `[AMBIGUOUS_REFERENCE]`. **Fix:** when `dim_key == sk_col`, project the column once. In Pandas, handle the analogous problem where the rename eliminates `sk_col`. Guard `.drop(columns=[f"_dim_{dim_key}"])` with `if col in df.columns`.
+**Where:** `odibi/patterns/fact.py` `_join_dimension_spark()` and `_join_dimension_pandas()`, P-009 Bug 3.

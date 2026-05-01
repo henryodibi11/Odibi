@@ -468,14 +468,23 @@ class FactPattern(Pattern):
         # Use a unique alias for the SK column to avoid ambiguity if sk_col
         # already exists in fact_df (e.g., from a previous dimension lookup)
         sk_alias = f"_dim_{sk_col}"
-        dim_subset = dim_df.select(
-            F.col(dim_key).alias(f"_dim_{dim_key}"),
-            F.col(sk_col).alias(sk_alias),
-        )
+
+        # When dim_key == sk_col (e.g., date_sk → date_sk), project the
+        # column once to avoid AMBIGUOUS_REFERENCE from duplicate aliases.
+        # (P-009 Bug 3)
+        if dim_key == sk_col:
+            dim_subset = dim_df.select(F.col(sk_col).alias(sk_alias))
+            join_key_alias = sk_alias
+        else:
+            dim_subset = dim_df.select(
+                F.col(dim_key).alias(f"_dim_{dim_key}"),
+                F.col(sk_col).alias(sk_alias),
+            )
+            join_key_alias = f"_dim_{dim_key}"
 
         joined = fact_df.join(
             dim_subset,
-            fact_df[source_col] == dim_subset[f"_dim_{dim_key}"],
+            fact_df[source_col] == dim_subset[join_key_alias],
             "left",
         )
 
@@ -522,16 +531,32 @@ class FactPattern(Pattern):
     ):
         import pandas as pd
 
-        dim_subset = dim_df[[dim_key, sk_col]].copy()
-        dim_subset = dim_subset.rename(columns={dim_key: f"_dim_{dim_key}"})
-
-        merged = pd.merge(
-            fact_df,
-            dim_subset,
-            left_on=source_col,
-            right_on=f"_dim_{dim_key}",
-            how="left",
-        )
+        # When dim_key == sk_col (e.g., date_sk → date_sk), selecting both
+        # yields one column; the rename then removes the sk_col name, breaking
+        # downstream references.  Handle as a single-column select.  (P-009 Bug 3)
+        if dim_key == sk_col:
+            dim_subset = dim_df[[sk_col]].copy()
+            dim_subset.columns = [f"_dim_{sk_col}"]
+            merged = pd.merge(
+                fact_df,
+                dim_subset,
+                left_on=source_col,
+                right_on=f"_dim_{sk_col}",
+                how="left",
+            )
+            # _dim_{sk_col} IS the SK value; copy to sk_col and drop the alias
+            merged[sk_col] = merged[f"_dim_{sk_col}"]
+            merged = merged.drop(columns=[f"_dim_{sk_col}"])
+        else:
+            dim_subset = dim_df[[dim_key, sk_col]].copy()
+            dim_subset = dim_subset.rename(columns={dim_key: f"_dim_{dim_key}"})
+            merged = pd.merge(
+                fact_df,
+                dim_subset,
+                left_on=source_col,
+                right_on=f"_dim_{dim_key}",
+                how="left",
+            )
 
         orphan_mask = merged[sk_col].isna()
         orphan_count = orphan_mask.sum()
@@ -548,14 +573,20 @@ class FactPattern(Pattern):
             merged[sk_col] = merged[sk_col].fillna(0).infer_objects(copy=False).astype(int)
 
         if orphan_handling == "quarantine" and orphan_count > 0:
-            orphan_rows = merged[orphan_mask].drop(columns=[f"_dim_{dim_key}"]).copy()
+            orphan_rows = merged[orphan_mask].copy()
+            if f"_dim_{dim_key}" in orphan_rows.columns:
+                orphan_rows = orphan_rows.drop(columns=[f"_dim_{dim_key}"])
             orphan_rows = self._add_quarantine_metadata_pandas(
                 orphan_rows, dim_table, source_col, quarantine_config
             )
             quarantined_df = orphan_rows
             merged = merged[~orphan_mask].copy()
 
-        result = merged.drop(columns=[f"_dim_{dim_key}"])
+        # When dim_key == sk_col, _dim_{dim_key} was already handled above
+        if f"_dim_{dim_key}" in merged.columns:
+            result = merged.drop(columns=[f"_dim_{dim_key}"])
+        else:
+            result = merged
 
         return result, int(orphan_count), quarantined_df
 
