@@ -194,8 +194,9 @@ This ensures all conditional branches are exercised in CI.
   - `delete_detection.py` — **58%** (76 tests across 2 files, all Pandas + Polars paths covered — Spark paths skipped)
   - `relational.py` — **67%** (30 tests). Join full/right/cross, union by_name/by_position/missing dataset, pivot all agg funcs, unsupported engine errors. Remaining: Spark paths.
     - `tests/unit/transformers/test_relational_coverage.py` (30 tests) — join types, union variants, pivot/unpivot engine errors
-  - `sql_core.py` — **93%** (31 tests). extract_date_parts, normalize_schema, sort, limit, sample, distinct, fill_nulls, split_part, date_add, date_trunc, date_diff, case_when, convert_timezone, concat_columns, normalize_column_names, coalesce_columns drop_source. Remaining: Spark-only paths.
+  - `sql_core.py` — **93%** (31+14 tests). extract_date_parts, normalize_schema, sort, limit, sample, distinct, fill_nulls, split_part, date_add, date_trunc, date_diff, case_when, convert_timezone, concat_columns, normalize_column_names, coalesce_columns drop_source, **row_number** (Task 27). Remaining: Spark-only paths.
     - `tests/unit/transformers/test_sql_core_coverage.py` (31 tests) — all 16 previously uncovered SQL transformers
+    - `tests/unit/transformers/test_row_number.py` (14 tests) — row_number: basic, partition_by, order_by, combined, edge cases, registration
   - `merge_transformer.py` — **61%** (Pandas + DuckDB merge paths fully covered. Remaining: _merge_spark lines 424-631)
   - `scd.py` — **49%** (36 tests, all Pandas + DuckDB paths covered. Remaining: _scd2_spark and Delta MERGE lines 289-719)
   - Test files:

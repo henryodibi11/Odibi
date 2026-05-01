@@ -1092,3 +1092,29 @@ ctx = EngineContext(context=SparkContext(spark), df=df, engine_type=EngineType.S
 ### T-037: FactPattern `dim_key == sk_col` Causes AMBIGUOUS_REFERENCE
 **Pattern:** `FactPattern._join_dimension_spark` aliases both `dim_key` and `sk_col` as `_dim_<col>`. When they're the same column (e.g., date_sk → date_sk), this creates duplicate column names → `[AMBIGUOUS_REFERENCE]`. **Fix:** when `dim_key == sk_col`, project the column once. In Pandas, handle the analogous problem where the rename eliminates `sk_col`. Guard `.drop(columns=[f"_dim_{dim_key}"])` with `if col in df.columns`.
 **Where:** `odibi/patterns/fact.py` `_join_dimension_spark()` and `_join_dimension_pandas()`, P-009 Bug 3.
+
+---
+
+## Session: 2026-05-01 (Task 27 — row_number Transformer)
+
+### P-011: Adding a New SQL-First Transformer (End-to-End Recipe)
+**Recipe:** The complete checklist for adding a new transformer to odibi:
+1. **Params:** Add Pydantic model to `sql_core.py` with YAML example in docstring, `Field()` for defaults
+2. **Function:** `(context: EngineContext, params: Params) -> EngineContext` — use `context.sql()`, `get_logging_context()`, time with `elapsed_ms`
+3. **Register:** Add `registry.register(module.fn, "name", module.Params)` to `odibi/transformers/__init__.py`
+4. **Test:** Create `tests/unit/transformers/test_<name>.py` — use `PandasContext` + `PandasEngine` + `EngineContext` fixture, assert concrete values
+5. **Docs:** Update `docs/skills/02_odibi_first_lookup.md` (table + count), `AGENTS.md` (test entry), `AGENT_CAMPAIGN.md`, `CUSTOM_INSTRUCTIONS.md` (count)
+6. **Lint:** `ruff check --fix --no-cache` + `ruff format --no-cache` on all touched files
+7. **Regression:** Run full `tests/unit/transformers/` suite to confirm 0 regressions
+**Timing:** ~30 min for a simple SQL transformer (row_number: 70 LOC prod + 211 LOC test).
+**Modules:** `odibi/transformers/sql_core.py`, `odibi/transformers/__init__.py`
+
+### V-018: ROW_NUMBER() OVER () Works on Both DuckDB and Spark SQL
+**Verified:** `ROW_NUMBER() OVER ()` (empty OVER clause — no PARTITION BY, no ORDER BY) is valid SQL on both DuckDB and Spark SQL. DuckDB assigns deterministic row numbers based on physical row order. Spark assigns arbitrary but stable numbers within a single partition. Both return valid sequential integers starting at 1.
+**Caveat:** Without ORDER BY, the numbering is non-deterministic across runs on Spark (data may be reshuffled). Tests that assert exact ordering without ORDER BY should sort results before comparison, or only assert that values are a permutation of [1..N].
+**Where:** `odibi/transformers/sql_core.py` `row_number()`, tested in `tests/unit/transformers/test_row_number.py`
+
+### V-019: Full Suite Regression Count — 9,207 PASS / 5 FAIL (All Pre-Existing)
+**Verified:** After adding `row_number` transformer (Task 27), the full test suite shows 9,207 passed (+14 from new tests), 5 failed (same pre-existing failures documented in D-007). Zero regressions introduced.
+**Pre-existing failures:** `test_delta_format` (delta-rs mock), `test_env_override` (LocalFileSystem), `test_schema_lake_format` (delta schema), `test_dl_format_schema` (delta schema), `test_spark_real_session` (shared cluster).
+**Where:** All 332 test files across `tests/`

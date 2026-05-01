@@ -66,6 +66,7 @@ def register_standard_library():
     registry.register(sql_core.coalesce_columns, "coalesce_columns", sql_core.CoalesceColumnsParams)
     registry.register(sql_core.replace_values, "replace_values", sql_core.ReplaceValuesParams)
     registry.register(sql_core.trim_whitespace, "trim_whitespace", sql_core.TrimWhitespaceParams)
+    registry.register(sql_core.row_number, "row_number", sql_core.RowNumberParams)
 
     # Relational
     registry.register(relational.join, "join", relational.JoinParams)

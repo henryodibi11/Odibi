@@ -14,8 +14,8 @@ Phase 2: Spark Reality (Tasks 5-10) → Test Spark paths WITH REAL SPARK (not mo
 Phase 3: Polars Parity (Tasks 11-14)→ Fill missing Polars branches (#212)                    ✅
 Phase 4: Validation E2E (Tasks 15-18)→ Real data quality pipelines on Databricks             ✅
 Phase 5: Pattern Stress (Tasks 19-23)→ Every pattern with real data, edge cases              ✅
-Phase 6: Bug Fixes (Tasks 24-26)    → Open issues (#248, YAML validation, etc.)              ← NEXT
-Phase 7: New Features (Tasks 27-30) → row_number, flatten_struct, apply_mapping transformers
+Phase 6: Bug Fixes (Tasks 24-26)    → Open issues (#248, YAML validation, etc.)              ✅
+Phase 7: New Features (Tasks 27-30) → row_number, flatten_struct, apply_mapping transformers  ← NEXT
 Phase 8: Docs & Polish (Tasks 31-35)→ Tutorials, examples, CHANGELOG, parity table
 ```
 
@@ -2199,7 +2199,7 @@ Phase 6: Bug Fixes
 - [x] Task 26a: P-009 — DimensionPattern SCD2 + FactPattern bug fixes — 15/15 star schema E2E PASS, 3 Spark Connect bugs fixed (~50 LOC)
 
 Phase 7: New Features
-- [ ] Task 27: row_number transformer
+- [x] Task 27: row_number transformer — 14/14 PASS, +70 LOC production, +211 LOC tests, 757/757 transformer suite regression-free
 - [ ] Task 28: flatten_struct transformer
 - [ ] Task 29: apply_mapping transformer
 - [ ] Task 30: Coverage push to 85%
@@ -2250,3 +2250,29 @@ All campaign branches follow: `type/hodibi/description`
 - T-035: `spark.range(1).select()` for schema-typed single rows
 - T-036: SCD2 Delta MERGE returns partial result — re-read target
 - T-037: FactPattern `dim_key == sk_col` AMBIGUOUS_REFERENCE fix
+
+## Task 27: row_number Transformer  ✅
+**Date:** 2026-05-01
+**Result:** 14/14 PASS, 757/757 transformer suite regression-free, ruff clean
+
+### Implementation
+| File | Change |
+| --- | --- |
+| `odibi/transformers/sql_core.py` | Added `RowNumberParams` + `row_number()` as #27 (+70 LOC) |
+| `odibi/transformers/__init__.py` | Registered `row_number` in SQL Core section (+1 LOC) |
+| `tests/unit/transformers/test_row_number.py` | 14 tests across 6 classes (+211 LOC) |
+
+### Test Classes
+| Class | Tests | Coverage |
+| --- | --- | --- |
+| TestRowNumberBasic | 3 | no-partition/no-order, default output, custom output |
+| TestRowNumberPartitionBy | 2 | single partition, multiple columns |
+| TestRowNumberOrderBy | 2 | ascending, descending |
+| TestRowNumberPartitionAndOrder | 1 | partition + order with concrete value assertions |
+| TestRowNumberEdgeCases | 3 | empty df, single row, all-same partition |
+| TestRowNumberParams | 2 | defaults, all fields |
+| TestRowNumberRegistration | 1 | FunctionRegistry lookup |
+
+### Docs Updated
+- `docs/skills/02_odibi_first_lookup.md` — added row_number row, count 54→55
+- `AGENTS.md` — added test_row_number.py entry, updated sql_core test count
