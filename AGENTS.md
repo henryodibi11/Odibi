@@ -425,10 +425,12 @@ finally:
 ```
 
 ### Pre-Existing Test Failures (Not Regressions)
-These failures exist in older test files and are NOT caused by recent changes:
-- **~25 caplog failures** in `test_catalog_batch_and_utils.py`, `test_catalog_bootstrap.py`, `test_catalog_observability.py`, `test_catalog_lineage_schema.py` — `logger.warning` goes to stderr, `caplog` doesn't capture it.
-- **~94 failures** in `test_pandas_engine_core.py` and `test_pandas_engine_full_coverage.py` when run in batch — logging context pollution (pass individually).
-- **~70-93 failures** in `test_adf_profiler_coverage.py` — Excel report generation and caching issues (environment-specific).
+Most documented failures have been resolved:
+- **~25 caplog failures** — ✅ RESOLVED. caplog removed from all test files.
+- **~94 batch failures** in `test_pandas_engine_core.py` — ✅ RESOLVED. 67/67 pass.
+- **~70-93 failures** in `test_adf_profiler_coverage.py` — ✅ RESOLVED. 70/70 pass.
+- **~127 failures** in catalog tests — ✅ RESOLVED (Task 26). Removed deprecated `engine="rust"` from `write_deltalake()` calls (16 occurrences, 8 files). deltalake >=1.0 removed this parameter.
+- **16 failures** in `test_catalog_mock_engine_writes.py` — ⚠️ OPEN. Stale Spark mock expectations. Requires mock rewrite to match current catalog write paths.
 
 ### Pattern Test Construction
 When testing patterns (AggregationPattern, FactPattern, DimensionPattern), NodeConfig's Pydantic validation checks required params at construction time. For tests that intentionally pass invalid/empty params to test pattern-level validation, **use a MagicMock config instead of NodeConfig**:

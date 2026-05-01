@@ -94,7 +94,8 @@ def _seed_runs(cm, records):
         }
     )
     table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
-    write_deltalake(cm.tables["meta_runs"], table, mode="overwrite", engine="rust")
+    write_deltalake(cm.tables["meta_runs"], table, mode="overwrite",
+)
 
 
 def _seed_tables(cm, records):
@@ -123,7 +124,8 @@ def _seed_tables(cm, records):
         }
     )
     table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
-    write_deltalake(cm.tables["meta_tables"], table, mode="overwrite", engine="rust")
+    write_deltalake(cm.tables["meta_tables"], table, mode="overwrite",
+)
 
 
 def _seed_pipelines(cm, records):
@@ -152,7 +154,8 @@ def _seed_pipelines(cm, records):
         }
     )
     table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
-    write_deltalake(cm.tables["meta_pipelines"], table, mode="overwrite", engine="rust")
+    write_deltalake(cm.tables["meta_pipelines"], table, mode="overwrite",
+)
 
 
 # ===========================================================================

@@ -1879,7 +1879,6 @@ class PandasEngine(Engine):
                     df,
                     mode=delta_mode,
                     storage_options=storage_opts,
-                    engine="rust",
                     **write_kwargs,
                 )
 

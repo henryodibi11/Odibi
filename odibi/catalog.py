@@ -510,7 +510,6 @@ class CatalogManager:
                         mode="overwrite",
                         partition_by=partition_cols,
                         storage_options=storage_opts if storage_opts else None,
-                        engine="rust",
                     )
                     logger.info(f"Initialized Delta table: {name}")
 
@@ -657,7 +656,6 @@ class CatalogManager:
                         mode="overwrite",
                         overwrite_schema=True,
                         storage_options=storage_opts if storage_opts else None,
-                        engine="rust",
                     )
                     logger.info(f"Schema migration completed for {name}")
 
