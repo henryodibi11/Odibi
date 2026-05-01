@@ -2196,7 +2196,7 @@ Phase 6: Bug Fixes
 - [x] Task 25: YAML validation hardening — 6/6 PASS, 4 Pydantic validators (92 LOC), 137 configs backward compat
 
 - [x] Task 26: Pre-existing test failures — engine="rust" removed (16 occurrences, 8 files), 127→0 failures, 335/335 pass
-- [ ] Task 26a: P-009 — DimensionPattern SCD2 + FactPattern bug fixes
+- [x] Task 26a: P-009 — DimensionPattern SCD2 + FactPattern bug fixes — 15/15 star schema E2E PASS, 3 Spark Connect bugs fixed (~50 LOC)
 
 Phase 7: New Features
 - [ ] Task 27: row_number transformer
