@@ -1270,12 +1270,40 @@ Rules:
 - ≤250 LOC
 
 Success criteria:
-- [ ] At least one storage type tested with real data
-- [ ] Discovery API returns correct metadata
-- [ ] Profile shows accurate statistics
-- [ ] Preview returns requested row count
-- [ ] Freshness reported accurately
+- [x] At least one storage type tested with real data
+- [x] Discovery API returns correct metadata
+- [x] Profile shows accurate statistics
+- [x] Preview returns requested row count
+- [x] Freshness reported accurately
 ```
+
+**Status: ✅ COMPLETE (2026-04-30)**
+
+**Branch:** `test/hodibi/connection-discovery-task22` (notebook lives in Databricks workspace)
+
+**Deliverables:**
+- `campaign/16_connection_discovery` — Databricks notebook (10 cells, 9/9 PASS).
+
+**Storage tested:**
+- `LocalConnection` against `examples/quarantine_workflow/data/` (3 CSV files).
+- `LocalConnection` against `examples/odibi-metrics/data/_system_catalog/meta_runs/` (Hive-partitioned parquet).
+- `AzureADLS` against `abfss://databricks@azncuscdbksdeveaaistrg1.dfs.core.windows.net/` via UC external location `adls-eaai-dev`.
+
+**Tests (9/9 PASS on DBR 17.3 / Spark 4.0.0):**
+1. `discover_catalog` — found 3 CSV files; `dim_*` pattern filter works.
+2. `get_schema` — `fact_orders.csv` (5 cols), `day1_customers.csv` (≥4 cols), dtypes populated.
+3. `profile` — 100 rows sampled; cardinality, completeness, candidate keys returned.
+4. `preview` — 5 rows, column-subset projection, `truncated` flag set correctly.
+5. `get_freshness` — metadata source, `last_updated` populated, `age_hours > 0`.
+6. `detect_partitions` — Hive-style keys detected from `pipeline_name=.../date=...` structure.
+7. `adls_init` — `AzureADLS(auth_mode=managed_identity)` validates; `get_path` returns `abfss://` URIs.
+8. `adls_spark` — `results.parquet`: 840 rows × 22 cols read via external-location credential.
+9. `adls_list` — `LIST` SQL returns 16 files in `training/`.
+
+**Key findings:**
+- `LocalConnection` discovery only handles filesystem paths, not URIs (`abfss://...`).
+- `AzureADLS` `managed_identity` mode needs no explicit creds on Databricks; actual reads use Spark + UC external-location credentials, not odibi auth.
+- `pint` package is required by an odibi transformer module but not pre-installed on DBR 17.3 (cluster install added).
 
 ---
 
@@ -2043,7 +2071,7 @@ Phase 5: Pattern Stress
 - [x] Task 19: Aggregation stress test
 - [x] Task 20: Date dimension full test
 - [x] Task 21: Star schema E2E
-- [ ] Task 22: Connection discovery
+- [x] Task 22: Connection discovery
 - [ ] Task 23: State management
 
 Phase 6: Bug Fixes
