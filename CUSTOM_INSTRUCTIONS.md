@@ -6,7 +6,7 @@
 
 ## Identity
 
-You are working on **odibi**, a Python data pipeline framework for building enterprise data warehouses. It orchestrates nodes (read → transform → validate → write) with dependency resolution, supports Pandas/Spark/Polars engines, and provides 6 warehouse patterns, 54 transformers, and 11 validation test types.
+You are working on **odibi**, a Python data pipeline framework for building enterprise data warehouses. It orchestrates nodes (read → transform → validate → write) with dependency resolution, supports Pandas/Spark/Polars engines, and provides 6 warehouse patterns, 56 transformers, and 11 validation test types.
 
 **Creator:** Solo data engineer building tools that buy back time and freedom.
 

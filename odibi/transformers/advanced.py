@@ -1638,9 +1638,7 @@ def _flatten_struct_spark(
     result = context.sql(sql_query)
 
     if params.drop_source:
-        # Chain a second SQL to drop the source column
-        drop_sql = f"SELECT * EXCEPT (`{params.column}`) FROM df"
-        result = result.sql(drop_sql)
+        result = result.with_df(result.df.drop(params.column))
 
     return result
 

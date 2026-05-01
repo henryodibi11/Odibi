@@ -2200,7 +2200,7 @@ Phase 6: Bug Fixes
 
 Phase 7: New Features
 - [x] Task 27: row_number transformer — 14/14 PASS, +70 LOC production, +211 LOC tests, 757/757 transformer suite regression-free
-- [x] Task 28: flatten_struct transformer — 17/17 PASS, +152 LOC production, +265 LOC tests, 774/774 transformer suite regression-free
+- [x] Task 28: flatten_struct transformer — 25 tests (17 Pandas + 8 Spark), +152 LOC production, +500 LOC tests, 774/774 transformer suite regression-free
 - [ ] Task 29: apply_mapping transformer
 - [ ] Task 30: Coverage push to 85%
 
@@ -2279,7 +2279,7 @@ All campaign branches follow: `type/hodibi/description`
 
 ## Task 28: flatten_struct Transformer  ✅
 **Date:** 2026-05-01
-**Result:** 17/17 PASS, 774/774 transformer suite regression-free, ruff clean
+**Result:** 25 tests (17 Pandas PASS + 8 Spark PASS), 774/774 transformer suite regression-free, ruff clean. Spark drop_source simplified (.drop vs SELECT * EXCEPT). Stray CSV files deleted.
 
 ### Implementation
 | File | Change |

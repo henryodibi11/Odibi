@@ -3,8 +3,17 @@
 import pandas as pd
 import pytest
 
-from odibi.context import EngineContext, PandasContext
+from pyspark.sql import SparkSession
+from pyspark.sql.types import (
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+)
+
+from odibi.context import EngineContext, PandasContext, SparkContext
 from odibi.engine.pandas_engine import PandasEngine
+from odibi.engine.spark_engine import SparkEngine
 from odibi.enums import EngineType
 from odibi.transformers.advanced import FlattenStructParams, flatten_struct
 
@@ -266,3 +275,251 @@ class TestFlattenStructRegistration:
 
         register_standard_library()
         assert "flatten_struct" in FunctionRegistry.list_functions()
+
+
+# =========================================================================
+# Spark Tests — verify _flatten_struct_spark + _collect_struct_fields
+# =========================================================================
+
+
+@pytest.fixture(scope="module")
+def spark_fixture():
+    """Module-scoped SparkSession for Spark tests.
+
+    On Databricks shared clusters (Spark Connect), getActiveSession() works
+    but builder.getOrCreate() may fail. Falls back gracefully.
+    """
+    spark = SparkSession.getActiveSession()
+    if spark is None:
+        try:
+            spark = SparkSession.builder.getOrCreate()
+        except Exception:
+            pytest.skip("SparkSession not available (CI or subprocess)")
+    yield spark
+
+
+def setup_spark_context(spark, sdf):
+    """Create EngineContext wrapping a Spark DataFrame."""
+    spark_ctx = SparkContext(spark)
+    spark_ctx.register("df", sdf)
+    engine = SparkEngine(spark_session=spark)
+    return EngineContext(
+        spark_ctx,
+        sdf,
+        EngineType.SPARK,
+        sql_executor=engine.execute_sql,
+        engine=engine,
+    )
+
+
+# ── Schema helpers ──────────────────────────────────────────────────────
+
+SIMPLE_SCHEMA = StructType(
+    [
+        StructField("id", IntegerType()),
+        StructField(
+            "metadata",
+            StructType(
+                [
+                    StructField("owner", StringType()),
+                    StructField("version", IntegerType()),
+                ]
+            ),
+        ),
+    ]
+)
+
+NESTED_SCHEMA = StructType(
+    [
+        StructField("id", IntegerType()),
+        StructField(
+            "metadata",
+            StructType(
+                [
+                    StructField(
+                        "owner",
+                        StructType(
+                            [
+                                StructField("name", StringType()),
+                                StructField("dept", StringType()),
+                            ]
+                        ),
+                    ),
+                    StructField("version", IntegerType()),
+                ]
+            ),
+        ),
+    ]
+)
+
+
+class TestFlattenStructSparkBasic:
+    """Spark path: single-level struct flatten."""
+
+    def test_basic_flatten(self, spark_fixture):
+        spark = spark_fixture
+        data = [(1, ("Alice", 1)), (2, ("Bob", 2)), (3, ("Charlie", 3))]
+        sdf = spark.createDataFrame(data, SIMPLE_SCHEMA)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="metadata")
+        result = flatten_struct(ctx, params)
+        pdf = result.df.orderBy("id").toPandas()
+
+        assert "metadata_owner" in pdf.columns
+        assert "metadata_version" in pdf.columns
+        assert "metadata" not in pdf.columns  # drop_source=True
+        assert list(pdf["metadata_owner"]) == ["Alice", "Bob", "Charlie"]
+        assert list(pdf["metadata_version"]) == [1, 2, 3]
+
+    def test_keep_source(self, spark_fixture):
+        spark = spark_fixture
+        data = [(1, ("Alice", 1))]
+        sdf = spark.createDataFrame(data, SIMPLE_SCHEMA)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="metadata", drop_source=False)
+        result = flatten_struct(ctx, params)
+        pdf = result.df.toPandas()
+
+        assert "metadata" in pdf.columns
+        assert "metadata_owner" in pdf.columns
+        assert "metadata_version" in pdf.columns
+
+
+class TestFlattenStructSparkNested:
+    """Spark path: nested struct with depth control."""
+
+    def test_depth_1_keeps_nested(self, spark_fixture):
+        spark = spark_fixture
+        data = [(1, (("Alice", "Eng"), 2))]
+        sdf = spark.createDataFrame(data, NESTED_SCHEMA)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="metadata", depth=1)
+        result = flatten_struct(ctx, params)
+        pdf = result.df.toPandas()
+
+        assert "metadata_owner" in pdf.columns
+        assert "metadata_version" in pdf.columns
+        assert pdf["metadata_version"].iloc[0] == 2
+        # depth=1: owner stays as struct (Row object in Pandas)
+        owner = pdf["metadata_owner"].iloc[0]
+        assert hasattr(owner, "name") or isinstance(owner, dict)
+
+    def test_depth_2_flattens_nested(self, spark_fixture):
+        spark = spark_fixture
+        data = [
+            (1, (("Alice", "Eng"), 2)),
+            (2, (("Bob", "Sales"), 5)),
+        ]
+        sdf = spark.createDataFrame(data, NESTED_SCHEMA)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="metadata", depth=2)
+        result = flatten_struct(ctx, params)
+        pdf = result.df.orderBy("id").toPandas()
+
+        assert "metadata_owner_name" in pdf.columns
+        assert "metadata_owner_dept" in pdf.columns
+        assert "metadata_version" in pdf.columns
+        assert list(pdf["metadata_owner_name"]) == ["Alice", "Bob"]
+        assert list(pdf["metadata_owner_dept"]) == ["Eng", "Sales"]
+        assert list(pdf["metadata_version"]) == [2, 5]
+
+
+class TestFlattenStructSparkCustom:
+    """Spark path: custom prefix, separator."""
+
+    def test_custom_prefix(self, spark_fixture):
+        spark = spark_fixture
+        data = [(1, (("Alice", "Eng"), 2))]
+        sdf = spark.createDataFrame(data, NESTED_SCHEMA)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="metadata", prefix="m_", depth=2)
+        result = flatten_struct(ctx, params)
+        pdf = result.df.toPandas()
+
+        assert "m_owner_name" in pdf.columns
+        assert "m_owner_dept" in pdf.columns
+        assert "m_version" in pdf.columns
+
+    def test_custom_separator(self, spark_fixture):
+        spark = spark_fixture
+        data = [(1, ("Alice", 1))]
+        sdf = spark.createDataFrame(data, SIMPLE_SCHEMA)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="metadata", separator="__")
+        result = flatten_struct(ctx, params)
+        pdf = result.df.toPandas()
+
+        assert "metadata__owner" in pdf.columns
+        assert "metadata__version" in pdf.columns
+
+
+class TestFlattenStructSparkSpecialChars:
+    """Spark path: field names with special characters (backtick escaping)."""
+
+    def test_special_char_field_names(self, spark_fixture):
+        spark = spark_fixture
+        schema = StructType(
+            [
+                StructField("id", IntegerType()),
+                StructField(
+                    "metadata",
+                    StructType(
+                        [
+                            StructField("my field", StringType()),
+                            StructField("cost-usd", IntegerType()),
+                        ]
+                    ),
+                ),
+            ]
+        )
+        data = [(1, ("Alice", 100)), (2, ("Bob", 200))]
+        sdf = spark.createDataFrame(data, schema)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="metadata")
+        result = flatten_struct(ctx, params)
+        pdf = result.df.orderBy("id").toPandas()
+
+        assert "metadata_my field" in pdf.columns
+        assert "metadata_cost-usd" in pdf.columns
+        assert list(pdf["metadata_my field"]) == ["Alice", "Bob"]
+        assert list(pdf["metadata_cost-usd"]) == [100, 200]
+
+    def test_nested_special_chars(self, spark_fixture):
+        spark = spark_fixture
+        schema = StructType(
+            [
+                StructField("id", IntegerType()),
+                StructField(
+                    "info",
+                    StructType(
+                        [
+                            StructField(
+                                "sub-data",
+                                StructType(
+                                    [
+                                        StructField("val 1", IntegerType()),
+                                    ]
+                                ),
+                            ),
+                        ]
+                    ),
+                ),
+            ]
+        )
+        data = [(1, (((42,),),))]
+        sdf = spark.createDataFrame(data, schema)
+        ctx = setup_spark_context(spark, sdf)
+
+        params = FlattenStructParams(column="info", depth=2)
+        result = flatten_struct(ctx, params)
+        pdf = result.df.toPandas()
+
+        assert "info_sub-data_val 1" in pdf.columns
+        assert pdf["info_sub-data_val 1"].iloc[0] == 42
