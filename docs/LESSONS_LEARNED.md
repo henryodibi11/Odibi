@@ -901,3 +901,76 @@ ctx = EngineContext(context=pd_ctx, df=my_df, engine_type=EngineType.PANDAS, eng
 **Verified:** 2026-04-30 against DBR 17.3 LTS (Spark 4.0.0) via Databricks Connect
 **Finding:** With the P-009 workarounds in place, the full star-schema flow (date dim + SCD1 dim + SCD2 dim with history + fact with FK lookups, deduplication, grain validation, calculated measures, orphan→unknown-member) executes end-to-end against real Unity Catalog tables in 37s for 100 customers, 50 products, 10,025 orders + 25 orphans. SCD2 MERGE correctly produces 10 history rows when prices change on 10 of 50 products. All FK joins yield zero orphans. The unknown-member SK=0 row is used by 25 fact rows whose customer/product source IDs were absent from the dimensions.
 **Implication:** The pattern stack is functionally complete once the three P-009 bugs are fixed. The integration test `examples/star_schema_e2e/star_schema_e2e.py` doubles as a regression detector — if a future change re-introduces any of the three bugs, the script's existing assertions will catch it.
+
+
+## Session: 2026-05-01 — State Management E2E (Task 23, #225)
+
+### Work Done
+- Created `campaign/17_state_management` notebook (10 cells, ~200 LOC) — tests CatalogStateBackend HWM and run history with real Delta tables on ADLS via Unity Catalog external location.
+- 6/6 tests pass: hwm_roundtrip, hwm_batch, run_history, isolation, incremental, data_types.
+- Verified HWM roundtrip (string, int, update-in-place via MERGE), batch set (4 mixed types), run history (seed + retrieve latest), pipeline isolation (two pipelines, no cross-contamination), incremental load cycle (full → HWM → incremental → 0 dupes), and JSON type preservation (int, float, bool, None, list, dict, nested dict, string).
+
+### Verification Report
+- Tests written: 6
+- Tests passing: 6/6
+- Concrete value assertions: HWM string/int values, MERGE row count = 2 (not 3), batch 4 keys verified, run status = FAILED (latest), metadata.rows = 950, incremental = 5 new rows, target = 25 total, 0 duplicate IDs, 8 data types roundtripped
+- Negative tests: get_hwm(nonexistent) = None, get_last_run_info(nonexistent_pipeline) = None
+- Edge cases tested: None value roundtrip (JSON null), nested dict 3 levels deep, HWM update (MERGE not append), pipeline key isolation after update
+
+### New Entries Added
+- [x] Pattern: P-010 — CatalogStateBackend Test Setup: ADLS Scratch Paths + Direct Delta Seeding
+- [x] Verified: V-014 — CatalogStateBackend HWM JSON Roundtrip Preserves All Python Types
+- [x] Verified: V-015 — CatalogStateBackend MERGE Correctly Updates HWM In-Place (No Row Duplication)
+- [x] Trap: T-029 — CatalogStateBackend.save_pipeline_run Is a No-Op — Seed meta_runs Directly
+
+### P-010: CatalogStateBackend Test Setup: ADLS Scratch Paths + Direct Delta Seeding
+**Date:** 2026-05-01
+**Context:** Testing CatalogStateBackend with real Delta on Databricks shared cluster (USER_ISOLATION)
+**Pattern:**
+```python
+# 1. Use ADLS external location's files/ area for scratch Delta paths
+ADLS_BASE = "abfss://databricks@azncuscdbksdeveaaistrg1.dfs.core.windows.net/"
+SCRATCH_DIR = f"{ADLS_BASE}files/odibi_state_test"
+STATE_PATH = f"{SCRATCH_DIR}/meta_state"
+RUNS_PATH = f"{SCRATCH_DIR}/meta_runs"
+
+# 2. Init backend with Spark session
+backend = CatalogStateBackend(
+    meta_runs_path=RUNS_PATH,
+    meta_state_path=STATE_PATH,
+    spark_session=spark,
+    environment="test",
+)
+
+# 3. Seed meta_runs directly (save_pipeline_run is a no-op)
+schema = StructType([
+    StructField("pipeline_name", StringType(), False),
+    StructField("node_name", StringType(), False),
+    StructField("status", StringType(), False),       # "SUCCESS" or "FAILED"
+    StructField("metrics_json", StringType(), True),   # JSON-encoded dict
+    StructField("timestamp", TimestampType(), True),
+])
+df_runs = spark.createDataFrame(rows, schema)
+df_runs.write.format("delta").mode("overwrite").save(RUNS_PATH)
+
+# 4. Clean up with dbutils.fs.rm(path, recurse=True)
+```
+**Why:** CatalogStateBackend uses `delta.\`path\`` in MERGE SQL, requiring paths accessible to the Spark cluster. The ADLS external location's `files/` directory works as scratch space without conflicting with UC managed storage (`__unitystorage/`). The `save_pipeline_run` method is a no-op — CatalogManager handles run logging — so tests must seed the meta_runs Delta table directly with the exact schema above.
+**Modules:** `odibi/state/__init__.py`, any integration tests for CatalogStateBackend
+
+### T-029: CatalogStateBackend.save_pipeline_run Is a No-Op — Seed meta_runs Directly
+**Date:** 2026-05-01
+**Symptom:** Calling `backend.log_run()` or `backend.save_pipeline_run()` writes nothing to the meta_runs Delta table. `get_last_run_info()` returns None even after logging.
+**Root Cause:** `CatalogStateBackend.save_pipeline_run` is intentionally a no-op. Run history is written by `CatalogManager` (the orchestrator), not the state backend. The backend only reads run history via `get_last_run_info()` and `get_last_run_status()`.
+**Fix:** For integration tests, seed the meta_runs Delta table directly using `spark.createDataFrame().write.format("delta").save()`. Use the exact schema: `(pipeline_name STRING, node_name STRING, status STRING, metrics_json STRING, timestamp TIMESTAMP)`. The `status` field uses string values `"SUCCESS"`/`"FAILED"` — `get_last_run_info` maps these to `success: bool`. The `metrics_json` field is JSON-decoded into `metadata: dict`.
+**Modules:** `odibi/state/__init__.py` — any test or campaign exercising run history
+
+### V-014: CatalogStateBackend HWM JSON Roundtrip Preserves All Python Types
+**Verified:** 2026-05-01 against DBR 17.3 LTS (Spark 4.0.0) on shared cluster (USER_ISOLATION)
+**Finding:** `set_hwm` / `get_hwm` correctly roundtrips all common Python types through JSON serialization in the Delta meta_state table: `int` (42), `float` (3.14159), `bool` (True), `None` (stored as JSON null, retrieved as None), `list` ([1, "two", 3.0]), `dict` ({"a": 1, "b": [2, 3]}), nested dict (3 levels deep), and `string`. Values are stored in a `value STRING` column as JSON and deserialized on read. No type coercion or precision loss observed.
+**Implication:** Safe to use HWM for any JSON-serializable watermark value. No special handling needed for complex types.
+
+### V-015: CatalogStateBackend MERGE Correctly Updates HWM In-Place (No Row Duplication)
+**Verified:** 2026-05-01 against DBR 17.3 LTS (Spark 4.0.0) on shared cluster (USER_ISOLATION)
+**Finding:** `set_hwm` uses Delta MERGE INTO (matched → update, not matched → insert). Calling `set_hwm("key", 99999)` then `set_hwm("key", 100500)` results in exactly 1 row for that key (value=100500), not 2 rows. The meta_state table schema is `(key STRING, value STRING, environment STRING, updated_at TIMESTAMP)`. The MERGE condition matches on `key` + `environment`.
+**Implication:** HWM updates are idempotent and safe for retry loops. No deduplication needed after repeated set_hwm calls on the same key.
