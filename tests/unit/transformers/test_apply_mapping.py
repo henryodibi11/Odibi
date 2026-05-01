@@ -3,13 +3,23 @@
 import pandas as pd
 import pytest
 
-from pyspark.sql import SparkSession
+try:
+    from pyspark.sql import SparkSession
+
+    PYSPARK_AVAILABLE = True
+except ImportError:
+    PYSPARK_AVAILABLE = False
+    SparkSession = None  # type: ignore[assignment]
 
 from odibi.context import EngineContext, PandasContext, SparkContext
 from odibi.engine.pandas_engine import PandasEngine
 from odibi.engine.spark_engine import SparkEngine
 from odibi.enums import EngineType
 from odibi.transformers.advanced import ApplyMappingParams, apply_mapping
+
+pytestmark_spark = pytest.mark.skipif(
+    not PYSPARK_AVAILABLE, reason="pyspark not importable in this environment"
+)
 
 
 # -------------------------------------------------------------------------
@@ -373,6 +383,7 @@ def setup_spark_context(spark, sdf, extra_datasets=None):
     )
 
 
+@pytestmark_spark
 class TestApplyMappingSparkBasic:
     """Spark path: core mapping scenarios."""
 
@@ -453,6 +464,7 @@ class TestApplyMappingSparkBasic:
         assert pdf["label"].iloc[1] is None or pd.isna(pdf["label"].iloc[1])
 
 
+@pytestmark_spark
 class TestApplyMappingSparkOutput:
     """Spark path: output column behavior."""
 
@@ -508,6 +520,7 @@ class TestApplyMappingSparkOutput:
         assert pdf["mapped"].iloc[0] == "Alpha"
 
 
+@pytestmark_spark
 class TestApplyMappingSparkEdgeCases:
     """Spark path: duplicate keys and edge cases."""
 
