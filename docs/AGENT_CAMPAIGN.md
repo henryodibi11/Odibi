@@ -2225,3 +2225,28 @@ All campaign branches follow: `type/hodibi/description`
 | `fix/` | Bug fixes (#248, test failures) |
 | `docs/` | Tutorials, examples, skill updates |
 | `chore/` | ROADMAP updates, workspace setup |
+
+## Task 26a: P-009 Bug Fixes — DimensionPattern + FactPattern Spark Connect  ✅
+**Date:** 2026-05-01
+**Result:** 3/3 bugs fixed, e2e passes 15/15 verifications, all workarounds removed
+
+### Bugs Fixed
+| Bug | Location | Root Cause | Fix |
+| --- | --- | --- | --- |
+| 1 | `dimension.py:_ensure_unknown_member` | `createDataFrame([vals], cols)` fails with `None` on Spark Connect (`CANNOT_DETERMINE_TYPE`) | Replaced with `spark.range(1).select(F.lit(v).cast(dtype).alias(n))` using `df.schema.fields`; string → "Unknown", numeric → `NULL` |
+| 2 | `dimension.py:_execute_scd2` | Delta MERGE writes history to target but returns only new/changed rows; caller overwrites target with partial result destroying history | After `scd2()` on Spark, re-read target via `_load_existing_target()` for complete history before SK assignment |
+| 3 | `fact.py:_join_dimension_spark/pandas` | When `dim_key == sk_col`, two aliases `_dim_<col>` created → `AMBIGUOUS_REFERENCE` (Spark) / `KeyError` (Pandas) | Project column once when `dim_key == sk_col`; guard `.drop()` with `if col in df.columns` |
+
+### Source Changes (+41 LOC)
+- `odibi/patterns/dimension.py`: +16 lines (Bug 1 + Bug 2)
+- `odibi/patterns/fact.py`: +25 lines (Bug 3 Spark + Pandas paths)
+
+### E2E Workarounds Removed (-76 LOC in `star_schema_e2e.py`)
+- `build_dim_product`: Replaced 52-line manual workaround with 12-line `DimensionPattern` call
+- `_inject_unknown_member_scd2`: Removed 30-line helper function
+- `build_fact_orders`: Added `dim_date` to FactPattern dimensions (was skipped due to Bug 3)
+
+### LESSONS_LEARNED Entries
+- T-035: `spark.range(1).select()` for schema-typed single rows
+- T-036: SCD2 Delta MERGE returns partial result — re-read target
+- T-037: FactPattern `dim_key == sk_col` AMBIGUOUS_REFERENCE fix

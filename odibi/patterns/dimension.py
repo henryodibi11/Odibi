@@ -494,7 +494,15 @@ class DimensionPattern(Pattern):
         )
 
         result_context = scd2(temp_context, scd_params)
-        result_df = result_context.df
+
+        # The scd2 transformer with Delta MERGE writes history directly to
+        # the target and returns only new/changed rows.  Re-read the full
+        # target so surrogate-key assignment covers every row.  (P-009 Bug 2)
+        if context.engine_type == EngineType.SPARK:
+            full_target = self._load_existing_target(context, target)
+            result_df = full_target if full_target is not None else result_context.df
+        else:
+            result_df = result_context.df
 
         max_sk = self._get_max_sk(existing_df, surrogate_key, context.engine_type)
 
@@ -578,28 +586,37 @@ class DimensionPattern(Pattern):
             if existing_unknown.count() > 0:
                 return df
 
-            columns = df.columns
-            unknown_values = []
-            for col in columns:
-                if col == surrogate_key:
-                    unknown_values.append(0)
-                elif col == natural_key:
-                    unknown_values.append("-1")
-                elif col == valid_from_col:
-                    unknown_values.append(datetime(1900, 1, 1, tzinfo=timezone.utc))
-                elif col == valid_to_col:
-                    unknown_values.append(None)
-                elif col == is_current_col:
-                    unknown_values.append(True)
-                elif col == "load_timestamp":
-                    # Use timezone-aware timestamp for Delta Lake compatibility
-                    unknown_values.append(datetime.now(timezone.utc))
-                elif col == "source_system":
-                    unknown_values.append(audit_config.get("source_system", "Unknown"))
+            # Build unknown-member row with explicit casts from df.schema
+            # to avoid [CANNOT_DETERMINE_TYPE] on Spark Connect when None
+            # values prevent type inference.  (P-009 Bug 1)
+            select_exprs = []
+            for field in df.schema.fields:
+                name, dtype = field.name, field.dataType.simpleString()
+                if name == surrogate_key:
+                    select_exprs.append(F.lit(0).cast(dtype).alias(name))
+                elif name == natural_key:
+                    select_exprs.append(F.lit("-1").cast(dtype).alias(name))
+                elif name == valid_from_col:
+                    select_exprs.append(F.lit("1900-01-01 00:00:00").cast(dtype).alias(name))
+                elif name == valid_to_col:
+                    select_exprs.append(F.lit(None).cast(dtype).alias(name))
+                elif name == is_current_col:
+                    select_exprs.append(F.lit(True).cast(dtype).alias(name))
+                elif name == "load_timestamp":
+                    select_exprs.append(F.current_timestamp().cast(dtype).alias(name))
+                elif name == "source_system":
+                    select_exprs.append(
+                        F.lit(audit_config.get("source_system", "Unknown")).cast(dtype).alias(name)
+                    )
                 else:
-                    unknown_values.append("Unknown")
+                    # Use "Unknown" for string types; NULL for numeric/other
+                    # to avoid CAST_INVALID_INPUT errors.
+                    if dtype == "string":
+                        select_exprs.append(F.lit("Unknown").alias(name))
+                    else:
+                        select_exprs.append(F.lit(None).cast(dtype).alias(name))
 
-            unknown_row = context.spark.createDataFrame([unknown_values], columns)
+            unknown_row = context.spark.range(1).select(*select_exprs)
             return unknown_row.unionByName(df)
         else:
             import pandas as pd
