@@ -12,6 +12,10 @@ except ImportError:
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+# Regex for valid pipeline/node names: alphanumeric + underscore, no leading digits
+_VALID_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+_VALID_NAME_PATTERN = "^[a-zA-Z_][a-zA-Z0-9_]*$"
+
 
 class EngineType(str, Enum):
     """Supported execution engines."""
@@ -4733,6 +4737,49 @@ class NodeConfig(BaseModel):
 
     model_config = {"populate_by_name": True}
 
+    @model_validator(mode="before")
+    @classmethod
+    def check_hallucinated_fields(cls, data):
+        """Detect commonly hallucinated field names and suggest correct ones."""
+        if not isinstance(data, dict):
+            return data
+
+        _HALLUCINATED_FIELDS = {
+            "source": "read",
+            "sink": "write",
+            "target": "write",
+            "outputs": "write",
+            "sql": "query (inside read:)",
+        }
+
+        found = []
+        for wrong, correct in _HALLUCINATED_FIELDS.items():
+            if wrong in data:
+                found.append(f"'{wrong}:' is not a valid field — use '{correct}:' instead")
+
+        if found:
+            node_name = data.get("name", "<unnamed>")
+            raise ValueError(
+                f"Node '{node_name}' contains hallucinated field name(s):\n"
+                + "\n".join(f"  - {f}" for f in found)
+                + "\nSee docs/skills/05_pipeline_yaml_authoring.md for valid fields."
+            )
+        return data
+
+    @field_validator("name")
+    @classmethod
+    def validate_node_name_format(cls, v):
+        """Ensure node names are valid SQL identifiers (alphanumeric + underscore)."""
+        if not _VALID_NAME_RE.match(v):
+            sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", v).strip("_")
+            raise ValueError(
+                f"Node name '{v}' contains invalid characters. "
+                f"Names must match {_VALID_NAME_PATTERN} (alphanumeric + underscore, no leading digits). "
+                f"Suggested fix: '{sanitized}'"
+            )
+        return v
+
+
     @model_validator(mode="after")
     def check_at_least_one_operation(self):
         """Ensure at least one operation is defined."""
@@ -4852,6 +4899,20 @@ class PipelineConfig(BaseModel):
             "Individual nodes can override with explicit cache: true/false."
         ),
     )
+
+
+    @field_validator("pipeline")
+    @classmethod
+    def validate_pipeline_name_format(cls, v):
+        """Ensure pipeline names are valid identifiers (alphanumeric + underscore)."""
+        if not _VALID_NAME_RE.match(v):
+            sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", v).strip("_")
+            raise ValueError(
+                f"Pipeline name '{v}' contains invalid characters. "
+                f"Names must match {_VALID_NAME_PATTERN} (alphanumeric + underscore, no leading digits). "
+                f"Suggested fix: '{sanitized}'"
+            )
+        return v
 
     @field_validator("nodes")
     @classmethod
@@ -5653,6 +5714,37 @@ class ProjectConfig(BaseModel):
 
         return self
 
+
+
+    @model_validator(mode="after")
+    def validate_node_connection_references(self):
+        """Ensure all node read/write connections reference defined connections."""
+        available = set(self.connections.keys())
+        errors = []
+
+        for pipeline in self.pipelines:
+            for node in pipeline.nodes:
+                if node.read and node.read.connection:
+                    if node.read.connection not in available:
+                        errors.append(
+                            f"Node '{node.name}' (pipeline '{pipeline.pipeline}'): "
+                            f"read.connection '{node.read.connection}' not found"
+                        )
+                if node.write and node.write.connection not in available:
+                    errors.append(
+                        f"Node '{node.name}' (pipeline '{pipeline.pipeline}'): "
+                        f"write.connection '{node.write.connection}' not found"
+                    )
+
+        if errors:
+            available_str = ", ".join(sorted(available)) or "(none defined)"
+            raise ValueError(
+                f"Connection reference error(s):\n"
+                + "\n".join(f"  - {e}" for e in errors)
+                + f"\nAvailable connections: [{available_str}]. "
+                + "Add the missing connection(s) to the 'connections:' section or fix the typo."
+            )
+        return self
 
 def load_config_from_file(path: str) -> ProjectConfig:
     """

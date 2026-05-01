@@ -1477,14 +1477,49 @@ Rules:
 - Don't break existing valid configs
 
 Success criteria:
-- [ ] Node name format validated
-- [ ] Missing format detected
-- [ ] Invalid connection reference detected
-- [ ] Hallucination suggestions work
-- [ ] All existing valid configs still pass
-- [ ] Error messages are clear and actionable
-- [ ] Tests pass
+- [x] Node name format validated
+
+- [x] Missing format detected (already required by Pydantic — ReadFormat is non-Optional)
+
+- [x] Invalid connection reference detected
+
+- [x] Hallucination suggestions work
+
+- [x] All existing valid configs still pass
+
+- [x] Error messages are clear and actionable
+
+- [x] Tests pass
+
 ```
+
+
+**Completion: 2026-05-01**
+
+**Results: 6/6 PASS**
+- node_name_format — valid/invalid names with suggestions
+- pipeline_name_format — valid/invalid pipeline names
+- hallucination_detection — source/sink/target/outputs/sql caught
+- connection_refs — nonexistent read/write connections caught
+- backward_compat — 137 YAML files, 0 new validator failures
+- error_quality — all errors contain value + problem + fix
+
+**Validators added to `odibi/config.py` (92 LOC):**
+1. `NodeConfig.validate_node_name_format` — `^[a-zA-Z_][a-zA-Z0-9_]*$`
+2. `PipelineConfig.validate_pipeline_name_format` — same regex
+3. `NodeConfig.check_hallucinated_fields` — `@model_validator(mode="before")` for source/sink/target/outputs/sql
+4. `ProjectConfig.validate_node_connection_references` — cross-references connections dict
+
+**Items NOT implemented (with rationale):**
+- Line numbers: PyYAML `safe_load` doesn't preserve position info (T-032)
+- Transformer registry validation: risk of circular imports; already in `validate/pipeline.py`
+- Missing format: already required by Pydantic (ReadFormat is non-Optional)
+
+**Lessons learned:** V-017, T-032, T-033
+
+**Files changed (2):**
+- `odibi/config.py` — Modified (+92 lines, 5677→5769)
+- `campaign/19_yaml_validation` — Added (9 cells, ~150 LOC)
 
 ---
 
@@ -2119,7 +2154,8 @@ Phase 5: Pattern Stress
 
 Phase 6: Bug Fixes
 - [x] Task 24: SCD2 float/NaN (#248) — 5/5 PASS, all engines verified (Pandas/Polars/Spark/DuckDB), no source changes needed, #248 closeable
-- [ ] Task 25: YAML validation hardening
+- [x] Task 25: YAML validation hardening — 6/6 PASS, 4 Pydantic validators (92 LOC), 137 configs backward compat
+
 - [ ] Task 26: Pre-existing test failures
 - [ ] Task 26a: P-009 — DimensionPattern SCD2 + FactPattern bug fixes
 
