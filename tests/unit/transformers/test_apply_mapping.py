@@ -141,6 +141,64 @@ class TestApplyMappingBasic:
         assert pdf["status_desc"].iloc[0] == "Active"
         assert pd.isna(pdf["status_desc"].iloc[4])  # "D" not in mapping → NULL
 
+    def test_numeric_default_int(self, main_df):
+        """Integer default for unmatched rows (no quoting in SQL literal)."""
+        score_mapping = pd.DataFrame({"code": ["A", "B"], "score": [10, 20]})
+        ctx = setup_context(main_df, {"ref_scores": score_mapping})
+
+        params = ApplyMappingParams(
+            column="status_code",
+            mapping_source="ref_scores",
+            source_key="code",
+            source_value="score",
+            output="score",
+            default=0,
+        )
+        result = apply_mapping(ctx, params)
+        pdf = result.df.sort_values("id").reset_index(drop=True)
+
+        assert pdf["score"].iloc[0] == 10  # A → 10
+        assert pdf["score"].iloc[1] == 20  # B → 20
+        assert pdf["score"].iloc[4] == 0  # D → default 0
+
+    def test_numeric_default_float(self, main_df):
+        """Float default for unmatched rows."""
+        rate_mapping = pd.DataFrame({"code": ["A"], "rate": [1.5]})
+        ctx = setup_context(main_df, {"ref_rates": rate_mapping})
+
+        params = ApplyMappingParams(
+            column="status_code",
+            mapping_source="ref_rates",
+            source_key="code",
+            source_value="rate",
+            output="rate",
+            default=-1.5,
+        )
+        result = apply_mapping(ctx, params)
+        pdf = result.df.sort_values("id").reset_index(drop=True)
+
+        assert pdf["rate"].iloc[0] == 1.5
+        assert pdf["rate"].iloc[1] == -1.5  # B unmatched → default
+
+    def test_bool_default(self, main_df):
+        """Boolean default for unmatched rows (TRUE/FALSE literal)."""
+        flag_mapping = pd.DataFrame({"code": ["A"], "active": [True]})
+        ctx = setup_context(main_df, {"ref_flags": flag_mapping})
+
+        params = ApplyMappingParams(
+            column="status_code",
+            mapping_source="ref_flags",
+            source_key="code",
+            source_value="active",
+            output="active",
+            default=False,
+        )
+        result = apply_mapping(ctx, params)
+        pdf = result.df.sort_values("id").reset_index(drop=True)
+
+        assert bool(pdf["active"].iloc[0]) is True
+        assert bool(pdf["active"].iloc[1]) is False  # default
+
 
 # -------------------------------------------------------------------------
 # TestApplyMappingOutput

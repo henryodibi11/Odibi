@@ -356,6 +356,39 @@ When mocking PySpark for Spark branch testing:
 3. **Mock `pyspark.sql.types` must use the real fallback classes** from `odibi.catalog` (e.g., `StringType`, `StructField`, `StructType`), NOT `MagicMock()`. Otherwise `StructType(fields)` creates a MagicMock where `.fields` is auto-generated garbage.
 4. **When multiple test files install mock pyspark at module level**, the last file loaded wins. The writes file should reuse the reads file's `_MockFunctions` via `sys.modules.get("pyspark.sql.functions")` to avoid clobbering `col()`, `avg()`, etc.
 
+### CI: Guard Top-Level pyspark Imports in Test Files
+GitHub Actions CI installs PySpark but `pyspark.sql.types` symbols (e.g. `IntegerType`, `StringType`, `StructType`) may be unimportable in some runners (`ImportError: cannot import name 'IntegerType' from 'pyspark.sql.types' (unknown location)`). A bare `from pyspark.sql.types import StructType` at module level breaks **collection** for the entire test file. Use this guard pattern in every transformer test file that touches Spark:
+
+```python
+import pytest
+
+try:
+    from pyspark.sql import SparkSession
+    from pyspark.sql.types import StructType, StructField, StringType, IntegerType  # if needed
+    PYSPARK_AVAILABLE = True
+except ImportError:
+    PYSPARK_AVAILABLE = False
+    SparkSession = None  # type: ignore[assignment]
+    StructType = StructField = StringType = IntegerType = None  # type: ignore[assignment]
+
+from odibi.context import EngineContext, SparkContext  # other imports
+
+# Define pytestmark_spark AFTER all imports to satisfy ruff E402
+pytestmark_spark = pytest.mark.skipif(
+    not PYSPARK_AVAILABLE, reason="pyspark not importable in this environment"
+)
+
+# Wrap module-level schema constants in `if PYSPARK_AVAILABLE:` so they don't
+# crash at import time when StructType is None.
+
+@pytestmark_spark
+class TestMyTransformerSpark:
+    def test_basic(self, spark_fixture):
+        ...
+```
+
+This makes Pandas tests pass on CI while Spark classes skip cleanly. **Genie has repeatedly missed this** (Tasks 28 and 29 both shipped with bare pyspark imports). Apply this pattern proactively in every new Spark-touching test file.
+
 ### MagicMock Dunder Methods
 **Setting `mock_obj.__getitem__ = ...` on a MagicMock INSTANCE does NOT work.** Python resolves dunder methods on the TYPE, not the instance. Use plain tuples instead (e.g., `mock_stats = (100.0,)` for code that does `stats[0]`).
 
