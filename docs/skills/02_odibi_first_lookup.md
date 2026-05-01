@@ -12,7 +12,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 
 ---
 
-## Transformers (54 registered in FunctionRegistry)
+## Transformers (55 registered in FunctionRegistry)
 
 ### SQL Core (`odibi/transformers/sql_core.py`)
 | Need | Use | YAML |
@@ -41,6 +41,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 | Coalesce columns | `coalesce_columns` | `columns: [a, b], output: result` |
 | Replace values | `replace_values` | `column: status, mapping: {0: "inactive"}` |
 | Trim whitespace | `trim_whitespace` | `columns: [name, email]` |
+| Assign sequential row numbers | `row_number` | `output: row_num, partition_by: [dept], order_by: [date]` |
 | Add prefix to columns | `add_prefix` | `prefix: src_` |
 | Add suffix to columns | `add_suffix` | `suffix: _raw` |
 
@@ -158,7 +159,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 ## CLI Commands (Don't Rebuild These)
 
 ```bash
-odibi list transformers             # List all 54 transformers
+odibi list transformers             # List all 55 transformers
 odibi list patterns                 # List all 6 patterns
 odibi list connections              # List all connection types
 odibi explain <name>                # Detailed docs for any feature

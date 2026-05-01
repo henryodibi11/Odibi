@@ -1535,3 +1535,76 @@ def trim_whitespace(context: EngineContext, params: TrimWhitespaceParams) -> Eng
     cols_str = ", ".join(select_parts)
     sql_query = f"SELECT {cols_str} FROM df"
     return context.sql(sql_query)
+
+
+# -------------------------------------------------------------------------
+# 27. Row Number
+# -------------------------------------------------------------------------
+
+
+class RowNumberParams(BaseModel):
+    """
+    Configuration for row_number — assigns sequential integers to rows.
+
+    Simpler alternative to ``window_calculation`` for the common case of
+    numbering rows within optional partitions.
+
+    Example — global row number:
+    ```yaml
+    row_number:
+      output: row_num
+    ```
+
+    Example — per-department, ordered by hire_date:
+    ```yaml
+    row_number:
+      output: row_num
+      partition_by: [department]
+      order_by: [hire_date]
+    ```
+    """
+
+    output: str = Field("row_num", description="Name of the output column")
+    partition_by: Optional[List[str]] = Field(
+        default=None, description="Columns to partition by (optional)"
+    )
+    order_by: Optional[List[str]] = Field(
+        default=None, description="Columns to order by within each partition (optional)"
+    )
+
+
+def row_number(context: EngineContext, params: RowNumberParams) -> EngineContext:
+    """
+    Assigns sequential row numbers, optionally partitioned and ordered.
+
+    Design:
+    - SQL-First: ROW_NUMBER() OVER (...) pushed to engine optimizer.
+    - Zero-Copy: No data movement to Python.
+    """
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    ctx.debug(
+        "RowNumber starting",
+        output=params.output,
+        partition_by=params.partition_by,
+        order_by=params.order_by,
+    )
+
+    parts = []
+    if params.partition_by:
+        parts.append(f"PARTITION BY {', '.join(params.partition_by)}")
+    if params.order_by:
+        parts.append(f"ORDER BY {', '.join(params.order_by)}")
+
+    over_clause = " ".join(parts)
+    sql_query = f"SELECT *, ROW_NUMBER() OVER ({over_clause}) AS {params.output} FROM df"
+    result = context.sql(sql_query)
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "RowNumber completed",
+        elapsed_ms=round(elapsed_ms, 2),
+    )
+
+    return result
