@@ -1132,3 +1132,18 @@ ctx = EngineContext(context=SparkContext(spark), df=df, engine_type=EngineType.S
 ### V-021: Full Suite Regression Count — 9,224 PASS / 5 FAIL (Post-Task 28)
 **Verified:** After adding `flatten_struct` transformer (Task 28) with Spark test coverage and `drop_source` simplification, the full test suite shows 9,224 passed (+17 from new Pandas tests, +8 Spark skipped in subprocess but verified in notebook), 5 failed (same pre-existing failures). Zero regressions introduced.
 **Where:** All test files across `tests/`
+
+## Session: 2026-05-01 (Task 29 — apply_mapping Transformer)
+
+### P-013: Cross-Dataset SQL Transformer Pattern (apply_mapping Recipe)
+**Pattern:** When a transformer needs data from another named dataset (not just the current df), use `context.get(name)` to fetch it and `context.register_temp_view(view_name, df)` to make it available in SQL. This mirrors the join transformer's approach. The `context.sql()` dispatcher auto-registers the current df as "df" and replaces references, but additional datasets must be registered explicitly with a unique view name (e.g., `_mapping_{source_name}`).
+**Key decisions:** (1) Wrap `context.get()` in try/except `KeyError` — it raises, not returns None. (2) Use ROW_NUMBER() OVER (PARTITION BY key ORDER BY value) to dedup mapping tables, preventing row multiplication. (3) For column overwrite, use explicit projection (list all columns, replacing the target) rather than SELECT * EXCLUDE — avoids engine-specific SQL dialects.
+**Where:** `odibi/transformers/advanced.py` (#16), tested in `tests/unit/transformers/test_apply_mapping.py`
+
+### V-022: context.get() Raises KeyError, Not Returns None
+**Verified:** `PandasContext.get(name)` raises `KeyError` when the dataset is not registered, not returns `None`. Transformer code must catch `KeyError` (or `KeyError | ValueError`) rather than checking `if result is None`. Discovered when `test_missing_mapping_source` failed — the `if mapping_df is None` guard never triggered.
+**Where:** `odibi/context.py` `PandasContext.get()`, `odibi/transformers/advanced.py` `apply_mapping()`
+
+### V-023: Full Suite Regression Count — 9,238 PASS / 5 FAIL (Post-Task 29)
+**Verified:** After adding `apply_mapping` transformer (Task 29), the full test suite shows 9,238 passed (+14 new tests), 5 failed (same pre-existing). Zero regressions.
+**Where:** All test files across `tests/`

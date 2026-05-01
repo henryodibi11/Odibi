@@ -104,6 +104,7 @@ def register_standard_library():
         advanced.SplitEventsByPeriodParams,
     )
     registry.register(advanced.flatten_struct, "flatten_struct", advanced.FlattenStructParams)
+    registry.register(advanced.apply_mapping, "apply_mapping", advanced.ApplyMappingParams)
 
     # SCD
     registry.register(scd.scd2, "scd2", scd.SCD2Params)

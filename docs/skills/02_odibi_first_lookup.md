@@ -12,7 +12,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 
 ---
 
-## Transformers (56 registered in FunctionRegistry)
+## Transformers (57 registered in FunctionRegistry)
 
 ### SQL Core (`odibi/transformers/sql_core.py`)
 | Need | Use | YAML |
@@ -62,6 +62,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 | Map values via dictionary | `dict_based_mapping` | `column: code, mapping: {A: Active}` |
 | Sessionize event data | `sessionize` | `timestamp: ts, user: uid, gap: 30m` |
 | Flatten nested struct/dict columns | `flatten_struct` | `column: metadata, prefix: meta_, depth: 2` |
+| Lookup-based value replacement | `apply_mapping` | `column: status_code, mapping_source: ref_codes, source_key: code, source_value: desc` |
 | Split events by time period | `split_events_by_period` | `timestamp: ts, period: day` |
 | Fill missing time series | `fill_missing_timestamps` | `timestamp: ts, freq: 1h` |
 
@@ -160,7 +161,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 ## CLI Commands (Don't Rebuild These)
 
 ```bash
-odibi list transformers             # List all 56 transformers
+odibi list transformers             # List all 57 transformers
 odibi list patterns                 # List all 6 patterns
 odibi list connections              # List all connection types
 odibi explain <name>                # Detailed docs for any feature

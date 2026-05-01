@@ -1660,3 +1660,133 @@ def _collect_struct_fields(dtype, path: str, alias_prefix: str, depth: int, sep:
         else:
             pairs.append((child_path, child_alias))
     return pairs
+
+
+# -------------------------------------------------------------------------
+# 16. Apply Mapping (lookup-based value replacement via external table)
+# -------------------------------------------------------------------------
+
+
+class ApplyMappingParams(BaseModel):
+    """
+    Configuration for lookup-based value replacement using an external mapping table.
+
+    Unlike ``dict_based_mapping`` (inline dict), this joins to a named dataset
+    in context — suitable for large reference tables loaded from connections.
+
+    Example:
+    ```yaml
+    apply_mapping:
+      column: status_code
+      mapping_source: ref_status_codes
+      source_key: code
+      source_value: description
+      output: status_description
+      default: "Unknown"
+    ```
+    """
+
+    column: str = Field(..., description="Column in the main DataFrame to map")
+    mapping_source: str = Field(
+        ..., description="Name of the mapping dataset registered in context"
+    )
+    source_key: str = Field(..., description="Key column in the mapping table to join on")
+    source_value: str = Field(..., description="Value column in the mapping table to pull from")
+    output: Optional[str] = Field(
+        default=None,
+        description="Output column name (default: overwrite the source column)",
+    )
+    default: Optional[str] = Field(
+        default=None,
+        description="Default value for unmatched rows (default: NULL)",
+    )
+
+
+def apply_mapping(context: EngineContext, params: ApplyMappingParams) -> EngineContext:
+    """
+    Replace values in a column by LEFT JOINing to an external mapping table.
+
+    Design:
+    - SQL-First: LEFT JOIN + COALESCE, pushed to engine optimizer.
+    - Dedup-Safe: Uses ROW_NUMBER() to pick first match per key, preventing
+      row multiplication from duplicate mapping keys.
+    - Engine-Agnostic: Works via context.sql() on DuckDB (Pandas) and Spark SQL.
+    """
+    from odibi.enums import EngineType
+
+    ctx = get_logging_context()
+    start_time = time.time()
+
+    output_col = params.output or params.column
+    overwrite = output_col == params.column
+
+    ctx.debug(
+        "ApplyMapping starting",
+        column=params.column,
+        mapping_source=params.mapping_source,
+        output=output_col,
+    )
+
+    # 1. Fetch mapping table from context
+    try:
+        mapping_df = context.get(params.mapping_source)
+    except (KeyError, ValueError):
+        raise ValueError(
+            f"apply_mapping: mapping source '{params.mapping_source}' not found in context. "
+            f"Ensure it is listed in 'depends_on' for this node."
+        )
+
+    # 2. Register mapping table as a temp view
+    mapping_view = f"_mapping_{params.mapping_source}"
+    context.register_temp_view(mapping_view, mapping_df)
+
+    # 3. Build quote character for engine parity
+    q = "`" if context.engine_type == EngineType.SPARK else '"'
+
+    # 4. Build the deduped mapping subquery (ROW_NUMBER picks first match)
+    dedup_sql = (
+        f"SELECT {q}{params.source_key}{q}, {q}{params.source_value}{q}, "
+        f"ROW_NUMBER() OVER (PARTITION BY {q}{params.source_key}{q} "
+        f"ORDER BY {q}{params.source_value}{q}) AS _rn "
+        f"FROM {mapping_view}"
+    )
+
+    # 5. Build COALESCE expression for default handling
+    mapped_expr = f"_m.{q}{params.source_value}{q}"
+    if params.default is not None:
+        safe_default = params.default.replace("'", "''")
+        mapped_expr = f"COALESCE(_m.{q}{params.source_value}{q}, '{safe_default}')"
+
+    # 6. Build the full query
+    if overwrite:
+        # Replace original column: project all EXCEPT original, add mapped value
+        current_cols = context.columns
+        projections = []
+        for col in current_cols:
+            if col == params.column:
+                projections.append(f"{mapped_expr} AS {q}{output_col}{q}")
+            else:
+                projections.append(f"df.{q}{col}{q}")
+        select_clause = ", ".join(projections)
+    else:
+        # Add new column alongside all originals
+        select_clause = f"df.*, {mapped_expr} AS {q}{output_col}{q}"
+
+    sql_query = (
+        f"SELECT {select_clause} "
+        f"FROM df "
+        f"LEFT JOIN ({dedup_sql}) _m "
+        f"ON df.{q}{params.column}{q} = _m.{q}{params.source_key}{q} AND _m._rn = 1"
+    )
+
+    result = context.sql(sql_query)
+
+    elapsed_ms = (time.time() - start_time) * 1000
+    ctx.debug(
+        "ApplyMapping completed",
+        elapsed_ms=round(elapsed_ms, 2),
+        output=output_col,
+        overwrite=overwrite,
+    )
+
+    return result

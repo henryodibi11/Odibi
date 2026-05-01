@@ -2201,7 +2201,7 @@ Phase 6: Bug Fixes
 Phase 7: New Features
 - [x] Task 27: row_number transformer — 14/14 PASS, +70 LOC production, +211 LOC tests, 757/757 transformer suite regression-free
 - [x] Task 28: flatten_struct transformer — 25 tests (17 Pandas + 8 Spark), +152 LOC production, +500 LOC tests, 774/774 transformer suite regression-free
-- [ ] Task 29: apply_mapping transformer
+- [x] Task 29: apply_mapping transformer — 14/14 PASS, +129 LOC production, +330 LOC tests, 788/788 transformer suite regression-free
 - [ ] Task 30: Coverage push to 85%
 
 Phase 8: Docs & Polish
@@ -2292,3 +2292,26 @@ All campaign branches follow: `type/hodibi/description`
 - **Pandas:** `pd.json_normalize(max_level=depth-1)` with prefix, separator, null handling
 - **Spark:** Schema walking via `_collect_struct_fields()` + SQL dot-path expressions
 - **Polars:** `NotImplementedError` with clear message pointing to `unpack_struct`
+
+## Task 29: apply_mapping Transformer  ✅
+**Date:** 2026-05-01
+**Result:** 14/14 PASS, 788/788 transformer suite regression-free, 9,238/9,238+5 full suite, ruff clean
+
+### Implementation
+- `ApplyMappingParams`: column, mapping_source, source_key, source_value, output (optional), default (optional)
+- SQL LEFT JOIN with ROW_NUMBER() dedup to prevent row multiplication from duplicate mapping keys
+- COALESCE for default value handling
+- Explicit projection for column overwrite vs new column
+- context.get() + register_temp_view() for cross-dataset access (follows join transformer pattern)
+
+### Files Changed
+- `odibi/transformers/advanced.py`: +129 LOC (#16)
+- `odibi/transformers/__init__.py`: +1 LOC
+- `tests/unit/transformers/test_apply_mapping.py`: +330 LOC (14 tests, 5 classes)
+
+### Test Classes
+- TestApplyMappingBasic (3): all match, partial + default, no default (NULL)
+- TestApplyMappingOutput (3): custom output, overwrite, default overwrites
+- TestApplyMappingEdgeCases (4): duplicate keys (dedup), empty df, missing source, single row
+- TestApplyMappingParams (3): defaults, all fields, missing required
+- TestApplyMappingRegistration (1): FunctionRegistry lookup
