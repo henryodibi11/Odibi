@@ -12,9 +12,9 @@
 Phase 1: Foundation (Tasks 1-4)     → Fix stale docs, lesson system, Databricks scaffolding  ✅
 Phase 2: Spark Reality (Tasks 5-10) → Test Spark paths WITH REAL SPARK (not mocks)           ✅
 Phase 3: Polars Parity (Tasks 11-14)→ Fill missing Polars branches (#212)                    ✅
-Phase 4: Validation E2E (Tasks 15-18)→ Real data quality pipelines on Databricks             ← NEXT
-Phase 5: Pattern Stress (Tasks 19-23)→ Every pattern with real data, edge cases
-Phase 6: Bug Fixes (Tasks 24-26)    → Open issues (#248, YAML validation, etc.)
+Phase 4: Validation E2E (Tasks 15-18)→ Real data quality pipelines on Databricks             ✅
+Phase 5: Pattern Stress (Tasks 19-23)→ Every pattern with real data, edge cases              ✅
+Phase 6: Bug Fixes (Tasks 24-26)    → Open issues (#248, YAML validation, etc.)              ← NEXT
 Phase 7: New Features (Tasks 27-30) → row_number, flatten_struct, apply_mapping transformers
 Phase 8: Docs & Polish (Tasks 31-35)→ Tutorials, examples, CHANGELOG, parity table
 ```
@@ -1407,16 +1407,40 @@ Rules:
 - Update docs/LESSONS_LEARNED.md T-009 with the resolution
 
 Success criteria:
-- [ ] NaN == NaN returns True (no false-positive changes)
-- [ ] NaN → value is detected as a change
-- [ ] value → NaN is detected as a change
-- [ ] Float epsilon handled
-- [ ] Works on Pandas, Spark, Polars
-- [ ] Unit tests pass
-- [ ] #248 closeable
+- [x] NaN == NaN returns True (no false-positive changes)
+- [x] NaN → value is detected as a change
+- [x] value → NaN is detected as a change
+- [x] Float epsilon handled
+- [x] Works on Pandas, Spark, Polars
+- [x] Unit tests pass
+- [x] #248 closeable
 ```
 
 ---
+
+#### Task 24 Completion — 2026-05-01
+
+**Result:** All 5 comparison paths already handle NaN correctly. No source code changes needed.
+
+**Notebook:** `campaign/18_scd2_nan_fix` (10 cells, ~200 LOC)
+
+**Tests (5/5 PASS):**
+1. `nan_equality` — NaN==NaN → 0 new versions (Pandas + Polars)
+2. `nan_transitions` — NaN→value and value→NaN both detected (Pandas + Polars)
+3. `float_epsilon` — math.isclose(rel_tol=1e-9) prevents epsilon false positives (Pandas)
+4. `spark_nan` — Delta MERGE with eqNullSafe/<=> handles NaN (Spark, UC table)
+5. `duckdb_nan` — IS DISTINCT FROM treats NaN==NaN as False (DuckDB)
+
+**NaN handling per engine path:**
+- **Pandas fallback** (L933-952): `_safe_isna()` + `math.isclose(rel_tol=1e-9, abs_tol=1e-12)`
+- **DuckDB SQL** (L801-804): `IS DISTINCT FROM` treats NaN==NaN (unlike standard SQL)
+- **Polars** (L1108-1119): `ne_missing()` returns False for NaN==NaN; defensive `is_nan()` guard
+- **Spark legacy** (L439-452): `eqNullSafe()` handles NaN
+- **Spark MERGE** (L654-656): `<=>` operator is NaN-safe
+
+**Lessons learned:** T-009 updated (all engines resolved), V-016 (verified), T-030 (ADLS path fails on Spark Connect), T-031 (EngineContext API change)
+
+
 
 ### Task 25: YAML Validation Hardening
 
@@ -2094,7 +2118,7 @@ Phase 5: Pattern Stress
 - [x] Task 23: State management — 6/6 PASS, HWM roundtrip/batch/isolation + run history + incremental + data types
 
 Phase 6: Bug Fixes
-- [ ] Task 24: SCD2 float/NaN (#248)
+- [x] Task 24: SCD2 float/NaN (#248) — 5/5 PASS, all engines verified (Pandas/Polars/Spark/DuckDB), no source changes needed, #248 closeable
 - [ ] Task 25: YAML validation hardening
 - [ ] Task 26: Pre-existing test failures
 - [ ] Task 26a: P-009 — DimensionPattern SCD2 + FactPattern bug fixes
