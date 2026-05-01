@@ -3,7 +3,7 @@
 import re
 import warnings
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 try:
     from typing import Annotated
@@ -4779,7 +4779,6 @@ class NodeConfig(BaseModel):
             )
         return v
 
-
     @model_validator(mode="after")
     def check_at_least_one_operation(self):
         """Ensure at least one operation is defined."""
@@ -4899,7 +4898,6 @@ class PipelineConfig(BaseModel):
             "Individual nodes can override with explicit cache: true/false."
         ),
     )
-
 
     @field_validator("pipeline")
     @classmethod
@@ -5714,8 +5712,6 @@ class ProjectConfig(BaseModel):
 
         return self
 
-
-
     @model_validator(mode="after")
     def validate_node_connection_references(self):
         """Ensure all node read/write connections reference defined connections."""
@@ -5739,12 +5735,13 @@ class ProjectConfig(BaseModel):
         if errors:
             available_str = ", ".join(sorted(available)) or "(none defined)"
             raise ValueError(
-                f"Connection reference error(s):\n"
+                "Connection reference error(s):\n"
                 + "\n".join(f"  - {e}" for e in errors)
                 + f"\nAvailable connections: [{available_str}]. "
                 + "Add the missing connection(s) to the 'connections:' section or fix the typo."
             )
         return self
+
 
 def load_config_from_file(path: str) -> ProjectConfig:
     """
@@ -5755,15 +5752,69 @@ def load_config_from_file(path: str) -> ProjectConfig:
     2. Recipe resolution (expand recipe references in nodes)
     3. Pydantic validation
 
+    On validation failure, error messages are augmented with line/column
+    positions from the source YAML file when the failing path can be located
+    in the original (pre-recipe-resolution, pre-import-merge) tree. Paths that
+    came from imported files or resolved recipes are reported without line
+    info.
+
     Args:
         path: Path to YAML file
 
     Returns:
         ProjectConfig
+
+    Raises:
+        ValueError: When Pydantic validation fails. The message is augmented
+            with file path and line/column positions where available.
     """
+    from pydantic import ValidationError as _PydanticValidationError
+
     from odibi.recipes import resolve_recipes
     from odibi.utils import load_yaml_with_env
+    from odibi.utils.config_loader import build_yaml_line_map
 
     config_dict = load_yaml_with_env(path)
     config_dict = resolve_recipes(config_dict)
-    return ProjectConfig(**config_dict)
+    try:
+        return ProjectConfig(**config_dict)
+    except _PydanticValidationError as e:
+        line_map: Dict[Tuple[Any, ...], Tuple[int, int]] = {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                line_map = build_yaml_line_map(f.read())
+        except Exception:
+            line_map = {}
+
+        lines = []
+        for err in e.errors():
+            loc = tuple(err.get("loc", ()))
+            loc_str = ".".join(str(x) for x in loc) if loc else "<root>"
+            line_info = line_map.get(loc)
+            # Walk up the path until we find a known position (handles errors
+            # on fields that exist via recipe-resolved or imported nodes).
+            ancestor: Optional[Tuple[Any, ...]] = None
+            if line_info is None:
+                for i in range(len(loc) - 1, -1, -1):
+                    candidate = loc[:i]
+                    if candidate in line_map:
+                        ancestor = candidate
+                        line_info = line_map[candidate]
+                        break
+            msg = err.get("msg", "")
+            if line_info is not None:
+                if ancestor is not None and ancestor != loc:
+                    anc_str = ".".join(str(x) for x in ancestor) if ancestor else "<root>"
+                    lines.append(
+                        f"  {path}:{line_info[0]}:{line_info[1]} - "
+                        f"{loc_str}: {msg} (nearest located ancestor: {anc_str})"
+                    )
+                else:
+                    lines.append(f"  {path}:{line_info[0]}:{line_info[1]} - {loc_str}: {msg}")
+            else:
+                lines.append(
+                    f"  {path} - {loc_str}: {msg} "
+                    f"(line not available — likely from imported file or resolved recipe)"
+                )
+
+        raise ValueError(f"Configuration validation failed for {path}:\n" + "\n".join(lines)) from e

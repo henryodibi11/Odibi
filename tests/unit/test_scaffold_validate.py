@@ -236,7 +236,14 @@ pipelines:
 """
         result = validate_yaml(yaml_content)
         assert result["valid"] is False
-        assert any(e["code"] == "INVALID_NODE_NAME" for e in result["errors"])
+        # Either the post-Pydantic _check_node_name surfaces INVALID_NODE_NAME, or
+        # the new Pydantic validate_node_name_format validator (Task 25) raises a
+        # PYDANTIC_VALIDATION_FAILED. Both indicate the bad name was rejected.
+        assert any(
+            e["code"] in ("INVALID_NODE_NAME", "PYDANTIC_VALIDATION_FAILED")
+            and "my-invalid-name" in (e.get("message", "") + e.get("fix", ""))
+            for e in result["errors"]
+        )
 
     def test_wrong_key_source(self):
         yaml_content = """
