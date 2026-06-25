@@ -504,7 +504,7 @@ def detect_drift(
         from deltalake import DeltaTable
 
         dt = DeltaTable(table_path)
-        dt.load_version(baseline_version)
+        dt.load_as_version(baseline_version)
         base_count = len(dt.to_pandas())
 
     if base_count == 0:

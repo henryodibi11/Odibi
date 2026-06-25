@@ -699,10 +699,10 @@ class CatalogManager:
             if not os.path.exists(path):
                 return False
             if os.path.isdir(path):
-                # Check if empty or contains relevant files
-                if not os.listdir(path):
-                    return False
-                return True
+                # A valid Delta table has a `_delta_log/` directory. A non-empty directory
+                # WITHOUT one is not a table — returning True here previously caused bootstrap
+                # to skip creating the table, after which reads returned empty and writes failed.
+                return os.path.isdir(os.path.join(path, "_delta_log"))
             return False
         return False
 
@@ -4041,6 +4041,17 @@ class CatalogManager:
             for pipeline in current_config.pipelines:
                 current_pipelines.add(pipeline.pipeline)
                 current_nodes[pipeline.pipeline] = {node.name for node in pipeline.nodes}
+
+            # An empty pipeline set removes EVERY registered pipeline/node (orphan cleanup
+            # treats all existing rows as orphans). That is intended for a genuinely empty
+            # config, but a partially-parsed or wrong config would silently wipe the whole
+            # catalog — so make the destructive case loud rather than silent.
+            if not current_pipelines:
+                logger.warning(
+                    "cleanup_orphans: current config has NO pipelines — this will delete ALL "
+                    "registered pipelines and nodes from the system catalog. If this is "
+                    "unintended (e.g. a misparsed/empty config), stop and check the config."
+                )
 
             if self.spark:
                 from pyspark.sql import functions as F
