@@ -165,7 +165,7 @@ class TestSyncCommand:
         args.dry_run = False
 
         mock_manager = Mock()
-        mock_manager.config.system = None
+        mock_manager.project_config.system = None
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _sync_command(args)
@@ -188,7 +188,7 @@ class TestSyncCommand:
         mock_system.sync_from = None
 
         mock_manager = Mock()
-        mock_manager.config.system = mock_system
+        mock_manager.project_config.system = mock_system
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _sync_command(args)
@@ -214,8 +214,8 @@ class TestSyncCommand:
         mock_system.connection = "target_db"
 
         mock_manager = Mock()
-        mock_manager.config.system = mock_system
-        mock_manager.config.connections = {}
+        mock_manager.project_config.system = mock_system
+        mock_manager.project_config.connections = {}
         mock_manager_class.from_yaml.return_value = mock_manager
 
         with patch("odibi.cli.system.create_sync_source_backend"):
@@ -256,8 +256,8 @@ class TestSyncCommand:
         mock_system.connection = "target_db"
 
         mock_manager = Mock()
-        mock_manager.config.system = mock_system
-        mock_manager.config.connections = {}
+        mock_manager.project_config.system = mock_system
+        mock_manager.project_config.connections = {}
         mock_manager_class.from_yaml.return_value = mock_manager
 
         mock_sync_data.return_value = {"runs": 100, "state": 50}
@@ -304,7 +304,7 @@ class TestRebuildSummariesCommand:
         args.max_age_minutes = None
 
         mock_manager = Mock()
-        mock_manager.config.system = None
+        mock_manager.project_config.system = None
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _rebuild_summaries_command(args)
@@ -327,7 +327,7 @@ class TestRebuildSummariesCommand:
         args.max_age_minutes = None
 
         mock_manager = Mock()
-        mock_manager.config.system = Mock()
+        mock_manager.project_config.system = Mock()
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _rebuild_summaries_command(args)
@@ -350,7 +350,7 @@ class TestRebuildSummariesCommand:
         args.max_age_minutes = None
 
         mock_manager = Mock()
-        mock_manager.config.system = Mock()
+        mock_manager.project_config.system = Mock()
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _rebuild_summaries_command(args)
@@ -373,7 +373,7 @@ class TestRebuildSummariesCommand:
         args.max_age_minutes = None
 
         mock_manager = Mock()
-        mock_manager.config.system = Mock()
+        mock_manager.project_config.system = Mock()
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _rebuild_summaries_command(args)
@@ -396,8 +396,8 @@ class TestRebuildSummariesCommand:
         args.max_age_minutes = None
 
         mock_manager = Mock()
-        mock_manager.config.system = Mock()
-        mock_manager.get_catalog.return_value = None
+        mock_manager.project_config.system = Mock()
+        mock_manager.catalog_manager = None
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _rebuild_summaries_command(args)
@@ -425,8 +425,8 @@ class TestRebuildSummariesCommand:
         mock_catalog.get_run_ids.return_value = []
 
         mock_manager = Mock()
-        mock_manager.config.system = Mock()
-        mock_manager.get_catalog.return_value = mock_catalog
+        mock_manager.project_config.system = Mock()
+        mock_manager.catalog_manager = mock_catalog
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _rebuild_summaries_command(args)
@@ -466,8 +466,8 @@ class TestRebuildSummariesCommand:
         mock_updater_class.return_value = mock_updater
 
         mock_manager = Mock()
-        mock_manager.config.system = Mock()
-        mock_manager.get_catalog.return_value = mock_catalog
+        mock_manager.project_config.system = Mock()
+        mock_manager.catalog_manager = mock_catalog
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _rebuild_summaries_command(args)
@@ -509,7 +509,7 @@ class TestCleanupCommand:
         args.dry_run = False
 
         mock_manager = Mock()
-        mock_manager.config.system = None
+        mock_manager.project_config.system = None
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _cleanup_command(args)
@@ -529,8 +529,8 @@ class TestCleanupCommand:
         args.dry_run = False
 
         mock_manager = Mock()
-        mock_manager.config.system = Mock()
-        mock_manager.get_catalog.return_value = None
+        mock_manager.project_config.system = Mock()
+        mock_manager.catalog_manager = None
         mock_manager_class.from_yaml.return_value = mock_manager
 
         result = _cleanup_command(args)
@@ -560,8 +560,8 @@ class TestCleanupCommand:
         mock_catalog = Mock()
 
         mock_manager = Mock()
-        mock_manager.config.system = mock_system
-        mock_manager.get_catalog.return_value = mock_catalog
+        mock_manager.project_config.system = mock_system
+        mock_manager.catalog_manager = mock_catalog
         mock_manager_class.from_yaml.return_value = mock_manager
 
         mock_count.return_value = {
@@ -598,8 +598,8 @@ class TestCleanupCommand:
         mock_catalog = Mock()
 
         mock_manager = Mock()
-        mock_manager.config.system = mock_system
-        mock_manager.get_catalog.return_value = mock_catalog
+        mock_manager.project_config.system = mock_system
+        mock_manager.catalog_manager = mock_catalog
         mock_manager_class.from_yaml.return_value = mock_manager
 
         mock_delete.return_value = {
