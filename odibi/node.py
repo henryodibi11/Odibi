@@ -677,6 +677,21 @@ class NodeExecutor:
                         except (json.JSONDecodeError, TypeError):
                             pass
 
+                    # Restore stateful-function state (prev/ema/pid/delay) for continuity
+                    es_state_key = f"{config.name}_entity_state"
+                    es_state = (
+                        self.state_manager.get_hwm(es_state_key) if self.state_manager else None
+                    )
+                    if es_state:
+                        import json
+
+                        try:
+                            read_options["_entity_state"] = (
+                                json.loads(es_state) if isinstance(es_state, str) else es_state
+                            )
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
             # Execute Read
             df = self.engine.read(
                 connection=connection,
@@ -765,6 +780,19 @@ class NodeExecutor:
 
                         se_state_key = f"{config.name}_se_state"
                         self.state_manager.set_hwm(se_state_key, json.dumps(se_final))
+
+                    # Capture stateful-function state (prev/ema/pid/delay) for persistence
+                    es_final = None
+                    if hasattr(df, "attrs"):
+                        es_final = df.attrs.get("_simulation_entity_state")
+                    elif hasattr(df, "_simulation_entity_state"):
+                        es_final = df._simulation_entity_state
+
+                    if es_final and self.state_manager:
+                        import json
+
+                        es_state_key = f"{config.name}_entity_state"
+                        self.state_manager.set_hwm(es_state_key, json.dumps(es_final))
                 else:
                     df, pending_hwm = self._apply_incremental_filtering(df, config, hwm_state)
                     if pending_hwm:

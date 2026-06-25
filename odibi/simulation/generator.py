@@ -129,6 +129,7 @@ class SimulationEngine:
         hwm_timestamp: Optional[str] = None,
         random_walk_state: Optional[Dict[str, Dict[str, float]]] = None,
         scheduled_event_state: Optional[Dict[str, Dict[int, Dict[str, Any]]]] = None,
+        entity_state: Optional[Dict[str, Dict[str, Any]]] = None,
     ):
         """Initialize simulation engine.
 
@@ -137,6 +138,8 @@ class SimulationEngine:
             hwm_timestamp: High-water mark timestamp for incremental generation
             random_walk_state: Last random walk values per entity per column from previous run
             scheduled_event_state: Condition-based event state per entity per event from previous run
+            entity_state: Per-entity stateful-function state (prev/ema/pid/delay) from previous
+                run, so these functions stay continuous across incremental runs.
         """
         self.config = config
         self.hwm_timestamp = hwm_timestamp
@@ -145,9 +148,11 @@ class SimulationEngine:
         self.random_walk_state = random_walk_state or {}
         self.rng = np.random.default_rng(config.scope.seed)
 
-        # NEW: Per-entity state tracking for prev() and stateful functions
-        # Format: {"entity_name": {"column_name": prev_value, "_pid_column_name": {"integral": 0.0, "prev_error": 0.0}, ...}}
-        self.entity_state: Dict[str, Dict[str, Any]] = {}
+        # Per-entity state tracking for prev() and stateful functions (ema/pid/delay).
+        # Restored from the previous run when provided so stateful derived columns
+        # stay continuous across incremental batches (no reset at run boundaries).
+        # Format: {"entity_name": {"column_name": prev_value, "_pid_<expr>": {...}, ...}}
+        self.entity_state: Dict[str, Dict[str, Any]] = entity_state or {}
 
         # Parse timestep
         self.timestep_seconds = self._parse_timestep(config.scope.timestep)
@@ -280,6 +285,15 @@ class SimulationEngine:
                 # Extract column references from expression
                 deps = self._extract_column_references(generator.expression, all_columns)
                 dependencies[col_config.name] = deps
+            elif (
+                isinstance(generator, RandomWalkGeneratorConfig)
+                and generator.mean_reversion_to
+                and generator.mean_reversion_to in all_columns
+            ):
+                # A random walk reverting to a dynamic setpoint column must be
+                # generated AFTER that column, or the lookup silently falls back
+                # to the static `start` value (the dynamic setpoint is ignored).
+                dependencies[col_config.name] = {generator.mean_reversion_to}
             else:
                 dependencies[col_config.name] = set()
 
@@ -1308,6 +1322,7 @@ class SimulationEngine:
                 entity_state if entity_state is not None else {},
                 row_idx,
                 timestamp,
+                rng,
             )
         else:
             raise ValueError(f"Unknown generator type: {type(generator)}")
@@ -1686,6 +1701,7 @@ class SimulationEngine:
         entity_state: Dict[str, Any],
         row_idx: int = 0,
         timestamp: datetime = None,
+        rng: np.random.Generator = None,
     ) -> Any:
         """Generate derived value from expression.
 
@@ -1856,8 +1872,10 @@ class SimulationEngine:
             # Calculate error
             error = sp - pv
 
-            # Get PID state for this combination
-            pid_key = f"_pid_{id(config)}"  # Unique key per PID expression
+            # Get PID state for this combination. Key on the expression text (stable
+            # across processes) rather than id(config), so PID integral/derivative
+            # state survives serialization for incremental runs.
+            pid_key = f"_pid_{config.expression}"
             pid_state = entity_state.get(pid_key, {"integral": 0.0, "prev_error": 0.0})
 
             # Proportional term
@@ -1895,8 +1913,14 @@ class SimulationEngine:
             return clamped_output
 
         def _random():
-            """Generate a random float in [0, 1) for use in expressions."""
-            return float(np.random.default_rng().random())
+            """Generate a deterministic random float in [0, 1) for use in expressions.
+
+            Uses the per-entity RNG threaded in from generation so that the same
+            seed reproduces the same data. (Previously created a fresh, unseeded
+            RNG on every call, which broke reproducibility.)
+            """
+            source = rng if rng is not None else self.rng
+            return float(source.random())
 
         safe_builtins = {
             "abs": abs,
@@ -2114,3 +2138,26 @@ class SimulationEngine:
             for event_id, state in events.items():
                 serialized[entity][event_id] = {k: _serialize(v) for k, v in state.items()}
         return serialized
+
+    def get_entity_state_final(self) -> Dict[str, Dict[str, Any]]:
+        """Get per-entity stateful-function state for persistence across incremental runs.
+
+        Captures prev()/ema()/pid()/delay() state so these functions stay continuous
+        across incremental batches. numpy scalars (e.g. from categorical columns stored
+        as prev values) are converted to native Python types so the result is
+        JSON-serializable.
+
+        Returns:
+            Dict mapping entity_name -> state dict (prev column values + stateful keys)
+        """
+
+        def _native(v: Any) -> Any:
+            if isinstance(v, np.generic):
+                return v.item()
+            if isinstance(v, dict):
+                return {k: _native(x) for k, x in v.items()}
+            if isinstance(v, (list, tuple)):
+                return [_native(x) for x in v]
+            return v
+
+        return {entity: _native(state) for entity, state in self.entity_state.items()}
