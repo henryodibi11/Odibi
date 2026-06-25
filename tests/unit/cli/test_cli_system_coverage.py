@@ -29,12 +29,16 @@ from odibi.cli.system import (
 
 
 def _make_manager(system=None, catalog=None):
-    """Return a mock PipelineManager with configurable system config."""
+    """Return a mock PipelineManager with configurable system config.
+
+    Mirrors the REAL PipelineManager API: project config is on `.project_config`
+    and the catalog is the `.catalog_manager` attribute (not `.config`/`.get_catalog()`).
+    """
     manager = MagicMock()
     config = MagicMock()
     config.system = system
-    manager.config = config
-    manager.get_catalog.return_value = catalog
+    manager.project_config = config
+    manager.catalog_manager = catalog
     return manager
 
 

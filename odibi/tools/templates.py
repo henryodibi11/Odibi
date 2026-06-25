@@ -184,6 +184,43 @@ class TemplateGenerator:
         inner_type = self._unwrap_annotated(args[0])
         return self._is_discriminated_union(inner_type)
 
+    def _is_list_of_single_model(self, type_hint: Any) -> bool:
+        """Check if type is List[SomeModel] for a single (non-union) Pydantic model.
+
+        List[Union[...]] is handled separately by _is_list_of_unions; this catches the
+        common List[OneModel] case (e.g. transform.steps, pipeline.nodes) that would
+        otherwise be mis-rendered as a nested mapping.
+        """
+        inner = self._unwrap_annotated(type_hint)
+        if get_origin(inner) is not list:
+            return False
+        args = get_args(inner)
+        if not args:
+            return False
+        element = self._unwrap_annotated(args[0])
+        return self._is_nested_model(element) and not self._is_discriminated_union(element)
+
+    def _as_list_item(self, nested_yaml: str, indent_level: int) -> str:
+        """Turn a nested-model YAML block into a single YAML list item.
+
+        Prefixes the first content line with '- ' and indents the remaining lines one
+        level so the block reads as one entry of a list.
+        """
+        indent = self._indent * indent_level
+        out: List[str] = []
+        first = True
+        for line in nested_yaml.split("\n"):
+            if not line.strip():
+                out.append(line)
+                continue
+            if first:
+                rest = line[len(indent):] if line.startswith(indent) else line.lstrip()
+                out.append(f"{indent}- {rest}")
+                first = False
+            else:
+                out.append(f"{self._indent}{line}")
+        return "\n".join(out)
+
     def _get_list_union_models(self, type_hint: Any) -> List[Type[BaseModel]]:
         """Get models from List[Union[Model1, Model2, ...]]."""
         inner = self._unwrap_annotated(type_hint)
@@ -412,6 +449,24 @@ class TemplateGenerator:
                         show_comments,
                     )
                     lines.append(list_yaml)
+            elif self._is_list_of_single_model(type_hint):
+                # List[SomeModel] (single, non-union) must render as a YAML *list*,
+                # not a nested mapping — otherwise the emitted template is structurally
+                # invalid and fails validation when copy-pasted (e.g. transform.steps).
+                element_model = self._get_nested_models(
+                    self._get_inner_type(self._unwrap_annotated(type_hint))
+                )[0]
+                if show_comments and comment_parts:
+                    lines.append(f"{indent}{field_key}:  # {' | '.join(comment_parts[:2])}")
+                else:
+                    lines.append(f"{indent}{field_key}:")
+                nested_yaml = self.generate_template(
+                    element_model,
+                    indent_level=indent_level + 1,
+                    show_optional=show_optional,
+                    show_comments=show_comments,
+                )
+                lines.append(self._as_list_item(nested_yaml, indent_level + 1))
             elif self._is_nested_model(inner_type):
                 nested_models = self._get_nested_models(inner_type)
                 if nested_models:

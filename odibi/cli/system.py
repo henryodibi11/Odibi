@@ -151,8 +151,8 @@ def _sync_command(args) -> int:
         if config_path.parent != Path.cwd():
             load_extensions(Path.cwd())
 
-        manager = PipelineManager.from_yaml(args.config, environment=getattr(args, "env", None))
-        project_config = manager.config
+        manager = PipelineManager.from_yaml(args.config, env=getattr(args, "env", None))
+        project_config = manager.project_config
 
         if not project_config.system:
             print("Error: System Catalog not configured. Add 'system' section to config.")
@@ -225,8 +225,8 @@ def _rebuild_summaries_command(args) -> int:
         if config_path.parent != Path.cwd():
             load_extensions(Path.cwd())
 
-        manager = PipelineManager.from_yaml(args.config, environment=getattr(args, "env", None))
-        project_config = manager.config
+        manager = PipelineManager.from_yaml(args.config, env=getattr(args, "env", None))
+        project_config = manager.project_config
 
         if not project_config.system:
             logger.error("System Catalog not configured. Add 'system' section to config.")
@@ -251,7 +251,7 @@ def _rebuild_summaries_command(args) -> int:
 
         max_age_minutes = args.max_age_minutes or MAX_CLAIM_AGE_MINUTES
 
-        catalog = manager.get_catalog()
+        catalog = manager.catalog_manager
         if catalog is None:
             logger.error("CatalogManager not available")
             return 1
@@ -336,14 +336,14 @@ def _optimize_command(args) -> int:
         if config_path.parent != Path.cwd():
             load_extensions(Path.cwd())
 
-        manager = PipelineManager.from_yaml(args.config, environment=getattr(args, "env", None))
-        project_config = manager.config
+        manager = PipelineManager.from_yaml(args.config, env=getattr(args, "env", None))
+        project_config = manager.project_config
 
         if not project_config.system:
             print("Error: System Catalog not configured. Add 'system' section to config.")
             return 1
 
-        catalog = manager.get_catalog()
+        catalog = manager.catalog_manager
         if catalog is None:
             print("Error: CatalogManager not available")
             return 1
@@ -395,14 +395,14 @@ def _cleanup_command(args) -> int:
         if config_path.parent != Path.cwd():
             load_extensions(Path.cwd())
 
-        manager = PipelineManager.from_yaml(args.config, environment=getattr(args, "env", None))
-        project_config = manager.config
+        manager = PipelineManager.from_yaml(args.config, env=getattr(args, "env", None))
+        project_config = manager.project_config
 
         if not project_config.system:
             logger.error("System Catalog not configured. Add 'system' section to config.")
             return 1
 
-        catalog = manager.get_catalog()
+        catalog = manager.catalog_manager
         if catalog is None:
             logger.error("CatalogManager not available")
             return 1
