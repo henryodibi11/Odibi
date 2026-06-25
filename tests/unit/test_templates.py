@@ -317,12 +317,12 @@ class TestTemplateGenerator:
         from odibi.tools.templates import TemplateGenerator
 
         result = TemplateGenerator().generate_template(TransformConfig)
-        body = "\n".join(
-            line for line in result.splitlines() if not line.strip().startswith("#")
-        )
+        body = "\n".join(line for line in result.splitlines() if not line.strip().startswith("#"))
         parsed = yaml.safe_load(body)
         # The structural bug rendered `steps` as a dict; it must be a list now.
-        assert isinstance(parsed["steps"], list), f"steps should be a list, got {type(parsed['steps'])}"
+        assert isinstance(parsed["steps"], list), (
+            f"steps should be a list, got {type(parsed['steps'])}"
+        )
         assert isinstance(parsed["steps"][0], dict)
         # First list element should carry the TransformStep keys.
         assert "sql" in parsed["steps"][0]

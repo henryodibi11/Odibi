@@ -214,7 +214,7 @@ class TemplateGenerator:
                 out.append(line)
                 continue
             if first:
-                rest = line[len(indent):] if line.startswith(indent) else line.lstrip()
+                rest = line[len(indent) :] if line.startswith(indent) else line.lstrip()
                 out.append(f"{indent}- {rest}")
                 first = False
             else:
