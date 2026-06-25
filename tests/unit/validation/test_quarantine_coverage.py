@@ -513,3 +513,35 @@ def test_has_quarantine_tests_false():
 
 def test_has_quarantine_tests_empty():
     assert has_quarantine_tests([]) is False
+
+
+# ── Regression: Polars null-safety + parity (no silent data loss) ─────────────
+
+
+def test_polars_accepted_values_null_is_quarantined_not_dropped():
+    """Regression: a null Polars value must be quarantined (invalid), not vanish from
+    BOTH valid and invalid. Previously `True & null`/`~null` dropped the row entirely."""
+    tests = [AcceptedValuesTest(column="b", values=["A", "B"], on_fail=ContractSeverity.QUARANTINE)]
+    df = pl.DataFrame({"b": ["A", "B", None]})
+    result = split_valid_invalid(df, tests, _make_engine())
+    assert result.rows_valid + result.rows_quarantined == 3  # no row lost
+    assert result.rows_quarantined == 1  # null treated as invalid, matching Pandas
+
+
+def test_polars_unique_quarantine_catches_duplicates():
+    """Regression: UNIQUE had no Polars branch (fell through to lit(True)) so duplicates
+    were never quarantined."""
+    tests = [UniqueTest(columns=["id"], on_fail=ContractSeverity.QUARANTINE)]
+    df = pl.DataFrame({"id": [1, 1, 2]})
+    result = split_valid_invalid(df, tests, _make_engine())
+    assert result.rows_quarantined == 2  # both members of the dup group
+
+
+def test_polars_range_null_parity_with_pandas():
+    """Polars RANGE + null must classify the same as Pandas (null -> invalid)."""
+    tests = [RangeTest(column="v", min=0, max=10, on_fail=ContractSeverity.QUARANTINE)]
+    pandas_res = split_valid_invalid(pd.DataFrame({"v": [5, None, 50]}), tests, _make_engine())
+    polars_res = split_valid_invalid(pl.DataFrame({"v": [5.0, None, 50.0]}), tests, _make_engine())
+    assert polars_res.rows_valid == pandas_res.rows_valid
+    assert polars_res.rows_quarantined == pandas_res.rows_quarantined
+    assert polars_res.rows_valid + polars_res.rows_quarantined == 3

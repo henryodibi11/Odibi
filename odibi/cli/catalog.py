@@ -670,7 +670,7 @@ def _sync_command(args) -> int:
 
         # Get target connection
         load_extensions(config_path.parent)
-        pm = PipelineManager(str(config_path))
+        pm = PipelineManager.from_yaml(args.config)
         target_conn = pm.connections.get(sync_config.connection)
         if not target_conn:
             print(f"Error: Target connection '{sync_config.connection}' not found.")
@@ -682,7 +682,7 @@ def _sync_command(args) -> int:
             sync_config=sync_config,
             target_connection=target_conn,
             spark=getattr(pm, "spark", None),
-            environment=project_config.system.environment,
+            environment=pm.project_config.system.environment,
         )
 
         print(f"Syncing catalog to {sync_config.connection}...")
@@ -788,7 +788,7 @@ def _sync_purge_command(args) -> int:
             return 1
 
         load_extensions(config_path.parent)
-        pm = PipelineManager(str(config_path))
+        pm = PipelineManager.from_yaml(args.config)
         target_conn = pm.connections.get(sync_config.connection)
         if not target_conn:
             print(f"Error: Target connection '{sync_config.connection}' not found.")
@@ -798,7 +798,7 @@ def _sync_purge_command(args) -> int:
             source_catalog=catalog,
             sync_config=sync_config,
             target_connection=target_conn,
-            environment=project_config.system.environment,
+            environment=pm.project_config.system.environment,
         )
 
         if syncer.target_type != "sql_server":

@@ -134,6 +134,16 @@ def _evaluate_test_mask(
                 return combined
             return pl.lit(True)
 
+        elif test.type == TestType.UNIQUE:
+            # Was missing entirely for Polars (fell through to lit(True)), so duplicates
+            # were never quarantined. is_duplicated() flags ALL members of a dup group,
+            # matching Pandas duplicated(keep=False).
+            cols = test.columns
+            existing = [c for c in cols if c in df.columns]
+            if existing:
+                return ~pl.struct(existing).is_duplicated()
+            return pl.lit(True)
+
         elif test.type == TestType.ACCEPTED_VALUES:
             col = test.column
             if col in df.columns:
@@ -156,6 +166,19 @@ def _evaluate_test_mask(
             if col in df.columns:
                 return pl.col(col).str.contains(test.pattern) | pl.col(col).is_null()
             return pl.lit(True)
+
+        elif test.type == TestType.CUSTOM_SQL:
+            # Previously fell through to lit(True) → the rule silently never quarantined
+            # anything on Polars. Evaluate the SQL condition as a Polars expression;
+            # warn loudly (not debug) if it can't be parsed instead of passing silently.
+            try:
+                return pl.sql_expr(test.condition)
+            except Exception as e:
+                logger.warning(
+                    "CUSTOM_SQL quarantine test could not be evaluated on Polars "
+                    f"({type(e).__name__}: {e}); rows were NOT quarantined for this test."
+                )
+                return pl.lit(True)
 
         return pl.lit(True)
 
@@ -327,6 +350,12 @@ def split_valid_invalid(
         combined_valid_mask = pl.lit(True)
         for mask in test_masks.values():
             combined_valid_mask = combined_valid_mask & mask
+
+        # Null-safety (prevents silent DATA LOSS): a Polars comparison/is_in against a
+        # null yields null, not False, and `~null` is also null — so a null row would be
+        # excluded from BOTH valid and invalid. Coalesce null -> False so null rows are
+        # quarantined (invalid), matching Pandas semantics, and valid+invalid == total.
+        combined_valid_mask = combined_valid_mask.fill_null(False)
 
         valid_df = df.filter(combined_valid_mask)
         invalid_df = df.filter(~combined_valid_mask)

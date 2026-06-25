@@ -1267,7 +1267,17 @@ class DistributionType(str, Enum):
     NORMAL = "normal"
 
 
-class RangeGeneratorConfig(BaseModel):
+class _SimGeneratorBase(BaseModel):
+    """Base for all simulation generator configs.
+
+    Forbids unknown fields so typos (e.g. ``volat ility``) raise a validation
+    error instead of being silently dropped and falling back to defaults.
+    """
+
+    model_config = {"extra": "forbid"}
+
+
+class RangeGeneratorConfig(_SimGeneratorBase):
     """Range generator for numeric values.
 
     Example:
@@ -1299,7 +1309,7 @@ class RangeGeneratorConfig(BaseModel):
         return self
 
 
-class CategoricalGeneratorConfig(BaseModel):
+class CategoricalGeneratorConfig(_SimGeneratorBase):
     """Categorical generator for discrete values.
 
     Example:
@@ -1331,7 +1341,7 @@ class CategoricalGeneratorConfig(BaseModel):
         return self
 
 
-class BooleanGeneratorConfig(BaseModel):
+class BooleanGeneratorConfig(_SimGeneratorBase):
     """Boolean generator.
 
     Example:
@@ -1345,7 +1355,7 @@ class BooleanGeneratorConfig(BaseModel):
     true_probability: float = Field(default=0.5, ge=0.0, le=1.0, description="Probability of True")
 
 
-class TimestampGeneratorConfig(BaseModel):
+class TimestampGeneratorConfig(_SimGeneratorBase):
     """Timestamp generator (uses simulation scope).
 
     Example:
@@ -1357,7 +1367,7 @@ class TimestampGeneratorConfig(BaseModel):
     type: Literal["timestamp"]
 
 
-class SequentialGeneratorConfig(BaseModel):
+class SequentialGeneratorConfig(_SimGeneratorBase):
     """Sequential number generator.
 
     By default, generates globally unique IDs across all entities by offsetting
@@ -1385,7 +1395,7 @@ class SequentialGeneratorConfig(BaseModel):
     )
 
 
-class ConstantGeneratorConfig(BaseModel):
+class ConstantGeneratorConfig(_SimGeneratorBase):
     """Constant value generator.
 
     Example:
@@ -1399,7 +1409,7 @@ class ConstantGeneratorConfig(BaseModel):
     value: Any = Field(description="Constant value for all rows")
 
 
-class UUIDGeneratorConfig(BaseModel):
+class UUIDGeneratorConfig(_SimGeneratorBase):
     """UUID/GUID generator.
 
     Example:
@@ -1420,7 +1430,7 @@ class UUIDGeneratorConfig(BaseModel):
     )
 
 
-class EmailGeneratorConfig(BaseModel):
+class EmailGeneratorConfig(_SimGeneratorBase):
     """Email address generator.
 
     Example:
@@ -1438,7 +1448,7 @@ class EmailGeneratorConfig(BaseModel):
     )
 
 
-class IPGeneratorConfig(BaseModel):
+class IPGeneratorConfig(_SimGeneratorBase):
     """IPv4 address generator.
 
     Example:
@@ -1454,7 +1464,7 @@ class IPGeneratorConfig(BaseModel):
     )
 
 
-class GeoGeneratorConfig(BaseModel):
+class GeoGeneratorConfig(_SimGeneratorBase):
     """Geographic coordinate generator.
 
     Example:
@@ -1494,7 +1504,7 @@ class InterpolationType(str, Enum):
     STEP = "step"
 
 
-class DerivedGeneratorConfig(BaseModel):
+class DerivedGeneratorConfig(_SimGeneratorBase):
     """Derived column generator (calculated from other columns).
 
     Example:
@@ -1522,7 +1532,7 @@ class DerivedGeneratorConfig(BaseModel):
     )
 
 
-class DailyProfileGeneratorConfig(BaseModel):
+class DailyProfileGeneratorConfig(_SimGeneratorBase):
     """Daily profile generator for time-of-day patterns.
 
     Produces values that follow a repeating daily curve defined by anchor points.
@@ -1634,7 +1644,7 @@ class DailyProfileGeneratorConfig(BaseModel):
         return self
 
 
-class RandomWalkGeneratorConfig(BaseModel):
+class RandomWalkGeneratorConfig(_SimGeneratorBase):
     """Random walk generator for realistic time-series data.
 
     Produces values where each row depends on the previous row's value,

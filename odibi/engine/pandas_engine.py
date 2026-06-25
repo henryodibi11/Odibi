@@ -794,12 +794,16 @@ class PandasEngine(Engine):
         # Check for scheduled event state (passed through options for incremental mode)
         scheduled_event_state = options.get("_scheduled_event_state")
 
+        # Check for stateful-function state (prev/ema/pid/delay) for incremental continuity
+        entity_state = options.get("_entity_state")
+
         # Create simulation engine
         engine = SimulationEngine(
             sim_config,
             hwm_timestamp=hwm_timestamp,
             random_walk_state=random_walk_state,
             scheduled_event_state=scheduled_event_state,
+            entity_state=entity_state,
         )
 
         # Generate data
@@ -836,6 +840,11 @@ class PandasEngine(Engine):
         se_state = engine.get_scheduled_event_final_state()
         if se_state and hasattr(df, "attrs"):
             df.attrs["_simulation_scheduled_event_state"] = se_state
+
+        # Store stateful-function state (prev/ema/pid/delay) for incremental persistence
+        entity_state_final = engine.get_entity_state_final()
+        if entity_state_final and hasattr(df, "attrs"):
+            df.attrs["_simulation_entity_state"] = entity_state_final
 
         ctx.info(
             "Simulation complete",

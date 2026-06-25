@@ -306,3 +306,23 @@ class TestTemplateGenerator:
 
         assert "auth:" in result
         assert "mode:" in result
+
+    def test_list_of_model_renders_as_yaml_list_not_dict(self):
+        """Regression: List[Model] fields (e.g. transform.steps) must render as a YAML
+        list, not a nested mapping — otherwise the emitted template is structurally
+        invalid and fails validation when copy-pasted."""
+        import yaml
+
+        from odibi.config import TransformConfig
+        from odibi.tools.templates import TemplateGenerator
+
+        result = TemplateGenerator().generate_template(TransformConfig)
+        body = "\n".join(line for line in result.splitlines() if not line.strip().startswith("#"))
+        parsed = yaml.safe_load(body)
+        # The structural bug rendered `steps` as a dict; it must be a list now.
+        assert isinstance(parsed["steps"], list), (
+            f"steps should be a list, got {type(parsed['steps'])}"
+        )
+        assert isinstance(parsed["steps"][0], dict)
+        # First list element should carry the TransformStep keys.
+        assert "sql" in parsed["steps"][0]

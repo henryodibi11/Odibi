@@ -115,7 +115,7 @@ class TestSyncCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {"sql_prod": MagicMock()}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         syncer_instance = MagicMock()
         syncer_instance.sync.return_value = {"meta_runs": {"success": True, "rows": 10}}
         mock_syncer_cls.return_value = syncer_instance
@@ -174,7 +174,7 @@ class TestSyncCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         args = Namespace(config="test.yaml", tables=None, mode=None, dry_run=False)
         result = _sync_command(args)
         assert result == 1
@@ -194,7 +194,7 @@ class TestSyncCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {"sql_prod": MagicMock()}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         syncer = MagicMock()
         syncer.sync.return_value = {
             "meta_runs": {"success": True, "rows": 50},
@@ -223,7 +223,7 @@ class TestSyncCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {"sql_prod": MagicMock()}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         syncer = MagicMock()
         syncer.sync.return_value = {
             "meta_runs": {"success": True, "rows": 50},
@@ -405,7 +405,7 @@ class TestSyncPurgeCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         args = Namespace(config="test.yaml", days=90, dry_run=False)
         result = _sync_purge_command(args)
         assert result == 1
@@ -423,7 +423,7 @@ class TestSyncPurgeCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {"sql_prod": MagicMock()}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         syncer = MagicMock()
         syncer.target_type = "delta"
         mock_syncer_cls.return_value = syncer
@@ -444,7 +444,7 @@ class TestSyncPurgeCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {"sql_prod": MagicMock()}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         syncer = MagicMock()
         syncer.target_type = "sql_server"
         mock_syncer_cls.return_value = syncer
@@ -467,7 +467,7 @@ class TestSyncPurgeCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {"sql_prod": MagicMock()}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         syncer = MagicMock()
         syncer.target_type = "sql_server"
         syncer.purge_sql_tables.return_value = {
@@ -494,7 +494,7 @@ class TestSyncPurgeCommand:
         mock_gcm.return_value = MagicMock()
         pm_instance = MagicMock()
         pm_instance.connections = {"sql_prod": MagicMock()}
-        mock_pm.return_value = pm_instance
+        mock_pm.from_yaml.return_value = pm_instance
         syncer = MagicMock()
         syncer.target_type = "sql_server"
         syncer.purge_sql_tables.return_value = {
