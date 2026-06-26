@@ -495,21 +495,18 @@ class DimensionPattern(Pattern):
 
         result_context = scd2(temp_context, scd_params)
 
-        # The scd2 transformer with Delta MERGE writes history directly to
-        # the target and returns only new/changed rows.  Re-read the full
-        # target so surrogate-key assignment covers every row.  (P-009 Bug 2)
-        if context.engine_type == EngineType.SPARK:
-            full_target = self._load_existing_target(context, target)
-            result_df = full_target if full_target is not None else result_context.df
-        else:
-            result_df = result_context.df
-
-        max_sk = self._get_max_sk(existing_df, surrogate_key, context.engine_type)
+        # The scd2 transformer writes the full history directly to the target and
+        # returns an inconsistent frame (source-only on the DuckDB/first-run paths,
+        # full history otherwise). Re-read the full target so surrogate-key
+        # assignment covers every persisted row. (P-009 Bug 2)
+        full_target = self._load_existing_target(context, target)
+        result_df = full_target if full_target is not None else result_context.df
 
         if context.engine_type == EngineType.SPARK:
             from pyspark.sql import functions as F
             from pyspark.sql.window import Window
 
+            max_sk = self._get_max_sk(result_df, surrogate_key, context.engine_type)
             if surrogate_key not in result_df.columns:
                 window = Window.orderBy(natural_key, valid_from_col)
                 result_df = result_df.withColumn(
@@ -525,8 +522,20 @@ class DimensionPattern(Pattern):
                         surrogate_key, (F.row_number().over(window) + F.lit(max_sk)).cast("int")
                     )
                     result_df = has_sk_df.unionByName(null_sk_df)
+            # NOTE: Spark self-contained SCD2 has the same persist-back gap as Pandas
+            # did, but writing back requires a live Delta target and cannot be verified
+            # without a Spark/JVM environment. Tracked separately; Pandas is fixed below.
         else:
             import pandas as pd
+
+            # Preserve any surrogate keys already persisted in the target (so an
+            # entity's key is stable across runs); only assign fresh keys to rows
+            # that don't have one yet. max_sk is taken from the full persisted
+            # history, falling back to the pre-run snapshot when the column is new.
+            if surrogate_key in result_df.columns:
+                max_sk = self._get_max_sk(result_df, surrogate_key, context.engine_type)
+            else:
+                max_sk = self._get_max_sk(existing_df, surrogate_key, context.engine_type)
 
             if surrogate_key not in result_df.columns:
                 result_df = result_df.sort_values([natural_key, valid_from_col]).reset_index(
@@ -542,6 +551,21 @@ class DimensionPattern(Pattern):
                     )
                     null_df[surrogate_key] = range(max_sk + 1, max_sk + 1 + len(null_df))
                     result_df = pd.concat([result_df[~null_mask], null_df], ignore_index=True)
+
+            # Cast to a clean integer key (filling NaNs above can leave float dtype).
+            result_df[surrogate_key] = result_df[surrogate_key].astype("int64")
+
+            # Persist the surrogate-key-bearing full history back to the target.
+            # scd2() wrote a target WITHOUT the SK column, so without this write the
+            # key would never survive and would be renumbered from 1 on the next run
+            # (silently breaking any fact-table join to this dimension).
+            #
+            # Once the SK column is in the target, the next run's scd2 DuckDB path
+            # sees a column the source lacks and falls back to the pure-pandas SCD2
+            # path, which carries the existing SK forward (NULL for new rows) — those
+            # NULLs are what the `surrogate_key in columns` branch above fills.
+            if full_target is not None:
+                self._write_pandas_target(context, result_df, target)
 
         return result_df
 

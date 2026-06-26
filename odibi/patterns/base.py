@@ -241,6 +241,39 @@ class Pattern(ABC):
             )
             return None
 
+    def _resolve_pandas_target_path(self, context: EngineContext, target: str) -> str:
+        """Resolve a (possibly connection-prefixed) target into a filesystem path.
+
+        Mirrors the resolution in ``_load_existing_pandas`` so reads and writes of
+        the same target land on the same path.
+        """
+        path = target
+        if hasattr(context, "engine") and context.engine and "." in path:
+            conn_name, rel_path = path.split(".", 1)
+            if conn_name in context.engine.connections:
+                try:
+                    path = context.engine.connections[conn_name].get_path(rel_path)
+                except Exception:
+                    pass
+        return path
+
+    def _write_pandas_target(self, context: EngineContext, df, target: str) -> None:
+        """Write a DataFrame back to a Pandas target path (parquet/csv).
+
+        Used by self-contained patterns (e.g. SCD2) that must persist a column the
+        transformer doesn't know about — notably the surrogate key — back into the
+        target so it survives across runs.
+        """
+        path = self._resolve_pandas_target_path(context, target)
+        path_lower = str(path).lower()
+        if path_lower.endswith(".csv"):
+            df.to_csv(path, index=False)
+        elif path_lower.endswith(".json"):
+            df.to_json(path, orient="records")
+        else:
+            # Parquet (file or directory) is the default for dimension targets.
+            df.to_parquet(path, index=False)
+
     def _add_audit_columns(self, context: EngineContext, df, audit_config: Dict):
         """Add audit columns (load_timestamp, source_system) to the DataFrame.
 

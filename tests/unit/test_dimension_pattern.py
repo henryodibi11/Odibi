@@ -416,10 +416,15 @@ class TestDimensionPatternUnknownMember:
         unknown = result[result["customer_sk"] == 0]
         assert len(unknown) == 1
 
-        # Check that valid_from is timezone-aware
+        # Check that valid_from is timezone-aware and UTC. Check the offset rather
+        # than tzinfo identity: SCD2 now round-trips the target through parquet to
+        # persist the surrogate key, so the tz object is pandas' UTC (<UTC>) rather
+        # than datetime.timezone.utc — same instant, same zone, zero offset.
+        from datetime import timedelta
+
         valid_from = unknown.iloc[0]["valid_from"]
         assert valid_from.tzinfo is not None, "valid_from should be timezone-aware"
-        assert valid_from.tzinfo == timezone.utc, "valid_from should use UTC timezone"
+        assert valid_from.utcoffset() == timedelta(0), "valid_from should use UTC timezone"
 
         # Check that load_timestamp is timezone-aware
         load_timestamp = unknown.iloc[0]["load_timestamp"]
