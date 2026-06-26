@@ -61,6 +61,23 @@ def _pydantic_errors_to_structured(exc: Exception, location: str) -> List[Dict[s
     return structured
 
 
+def format_validation_error(exc: Exception, header: str = "Configuration is invalid") -> str:
+    """Render a Pydantic ValidationError as an actionable, URL-free message.
+
+    Used by `odibi run` (and anywhere a raw Pydantic dump would otherwise reach the
+    user) so config errors read as "field: problem -> fix" instead of a stack of
+    errors.pydantic.dev links.
+    """
+    items = _pydantic_errors_to_structured(exc, "root")
+    n = len(items)
+    lines = [f"{header} ({n} error{'s' if n != 1 else ''}):"]
+    for it in items:
+        lines.append(f"  • {it['field_path']}: {it['message']}")
+        if it.get("fix"):
+            lines.append(f"      → {it['fix']}")
+    return "\n".join(lines)
+
+
 def validate_yaml(yaml_content: str) -> Dict[str, Any]:
     """Validate pipeline YAML configuration.
 

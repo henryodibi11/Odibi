@@ -8,7 +8,7 @@ runtime. These tests lock in the hard-fail + suggestion behavior.
 import pytest
 
 from odibi.config import NodeConfig, ProjectConfig, ReadConfig, WriteConfig
-from odibi.validate.pipeline import validate_yaml
+from odibi.validate.pipeline import format_validation_error, validate_yaml
 
 
 @pytest.mark.parametrize(
@@ -68,6 +68,20 @@ connections:
     # the missing 'project' key is reported.
     result = validate_yaml(yaml_content)
     assert result["valid"] is False
+
+
+def test_format_validation_error_is_actionable_and_url_free():
+    # P3: the text `odibi run` shows must be field-level and free of pydantic URLs.
+    from pydantic import ValidationError
+
+    try:
+        ReadConfig(connection="c", format="csv", pth="x")
+    except ValidationError as e:
+        text = format_validation_error(e)
+    assert "errors.pydantic.dev" not in text
+    assert "Configuration is invalid" in text
+    assert "pth" in text and "did you mean 'path'" in text
+    assert "→" in text  # a fix line is present
 
 
 def test_pipeline_tags_field_accepted():

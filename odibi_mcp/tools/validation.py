@@ -106,14 +106,9 @@ def validate_pipeline(yaml_content: str, check_connections: bool = False) -> Dic
         try:
             pipeline_config = PipelineConfig(**pipeline_dict)
         except Exception as e:
-            errors.append(
-                {
-                    "code": "PYDANTIC_VALIDATION_FAILED",
-                    "field_path": f"pipelines[{i}]",
-                    "message": str(e),
-                    "fix": "Check that all required fields are present and types are correct",
-                }
-            )
+            from odibi.validate.pipeline import _pydantic_errors_to_structured
+
+            errors.extend(_pydantic_errors_to_structured(e, f"pipelines[{i}]"))
             continue
 
         # Step 4: Validate pattern parameters for each node

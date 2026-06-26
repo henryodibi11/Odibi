@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from odibi.pipeline import PipelineManager
 from odibi.utils.extensions import load_extensions
 from odibi.utils.logging import logger
@@ -91,6 +93,13 @@ def run_command(args):
         else:
             return 0
 
+    except ValidationError as e:
+        # Config didn't match the schema — show actionable field-level errors
+        # instead of a raw Pydantic dump full of errors.pydantic.dev links.
+        from odibi.validate.pipeline import format_validation_error
+
+        logger.error(format_validation_error(e))
+        return 1
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
         return 1
