@@ -70,9 +70,8 @@ class TestCLIValidateCommand:
         config_file = tmp_path / "valid.yaml"
         config_file.write_text(
             """
-project:
-  name: Test Project
-  engine: pandas
+project: Test Project
+engine: pandas
 connections:
   local:
     type: local

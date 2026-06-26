@@ -8,8 +8,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/tank_foptd.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -111,4 +110,8 @@ pipelines:
                     type: derived
                     expression: "tank_temp_true_f + sensor_noise"
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: tank_foptd.parquet
+          mode: overwrite

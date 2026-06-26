@@ -1,12 +1,81 @@
-"""Pipeline YAML validation."""
+"""Pipeline YAML validation.
+
+Single source of structural truth: project configs are validated by constructing
+the *runtime* model (`ProjectConfig`) — the exact model `odibi run` builds — so
+"valid" means "will run". Semantic checks (transformer registry, dependency graph,
+wrong-key detection, pattern params) are layered on top. The CLI (`odibi validate`)
+and the MCP `validate_yaml` tool both route here, so they can never diverge.
+"""
 
 from typing import Any, Dict, List
 
 import yaml
 
-from odibi.config import PipelineConfig
+from odibi.config import PipelineConfig, ProjectConfig
 from odibi.patterns import _PATTERNS
 from odibi.registry import FunctionRegistry
+
+
+def _pydantic_errors_to_structured(exc: Exception, location: str) -> List[Dict[str, Any]]:
+    """Convert a Pydantic ValidationError (or any error) into our structured form.
+
+    Field paths and friendly fixes make the runtime model's errors actionable for
+    both humans and AI agents instead of raw Pydantic dumps.
+    """
+    structured: List[Dict[str, Any]] = []
+    raw_errors = getattr(exc, "errors", None)
+    if callable(raw_errors):
+        try:
+            for err in exc.errors():
+                loc = ".".join(str(p) for p in err.get("loc", ()))
+                field_path = f"{location}.{loc}" if loc else location
+                etype = err.get("type", "")
+                msg = err.get("msg", str(err))
+                if etype == "missing":
+                    fix = f"Add the required '{loc or 'field'}' block/field."
+                elif etype.endswith("_type"):
+                    fix = "Fix the value's type to match the field."
+                elif etype == "extra_forbidden":
+                    fix = "Remove the unknown key (or fix its spelling)."
+                else:
+                    fix = "Check this field against the schema."
+                structured.append(
+                    {
+                        "code": "PYDANTIC_VALIDATION_FAILED",
+                        "field_path": field_path,
+                        "message": msg,
+                        "fix": fix,
+                    }
+                )
+        except Exception:  # pragma: no cover - defensive
+            pass
+    if not structured:
+        structured.append(
+            {
+                "code": "PYDANTIC_VALIDATION_FAILED",
+                "field_path": location,
+                "message": str(exc),
+                "fix": "Check required fields and data types",
+            }
+        )
+    return structured
+
+
+def format_validation_error(exc: Exception, header: str = "Configuration is invalid") -> str:
+    """Render a Pydantic ValidationError as an actionable, URL-free message.
+
+    Used by `odibi run` (and anywhere a raw Pydantic dump would otherwise reach the
+    user) so config errors read as "field: problem -> fix" instead of a stack of
+    errors.pydantic.dev links.
+    """
+    items = _pydantic_errors_to_structured(exc, "root")
+    n = len(items)
+    lines = [f"{header} ({n} error{'s' if n != 1 else ''}):"]
+    for it in items:
+        lines.append(f"  • {it['field_path']}: {it['message']}")
+        if it.get("fix"):
+            lines.append(f"      → {it['fix']}")
+    return "\n".join(lines)
 
 
 def validate_yaml(yaml_content: str) -> Dict[str, Any]:
@@ -40,6 +109,16 @@ def validate_yaml(yaml_content: str) -> Dict[str, Any]:
     """
     errors: List[Dict[str, Any]] = []
     warnings: List[Dict[str, Any]] = []
+
+    # Register the standard transformer library so transformer/pattern checks match
+    # what `odibi run` sees. Without this the validator false-rejects builtin
+    # transformers (clean_text, deduplicate, ...) as "not found".
+    try:
+        from odibi.transformers import register_standard_library
+
+        register_standard_library()
+    except Exception:  # pragma: no cover - defensive; never block validation on this
+        pass
 
     try:
         config = yaml.safe_load(yaml_content)
@@ -125,10 +204,21 @@ def _validate_project_config(
     errors: List[Dict[str, Any]],
     warnings: List[Dict[str, Any]],
 ) -> None:
-    """Validate project.yaml config."""
+    """Validate a project config by constructing the runtime model.
+
+    Cheap structural pre-checks (with stable error codes callers/tests rely on)
+    run first; if they pass, the full `ProjectConfig` is constructed — the exact
+    model `odibi run` builds — so story/system requirements and connection-reference
+    existence are enforced identically to runtime. Semantic node checks then run on
+    the constructed model.
+    """
+    # Cheap pre-checks with stable codes (don't even attempt the model if the
+    # top-level shape is obviously wrong — keeps messages crisp).
+    has_missing_key = False
     required_keys = ["project", "connections"]
     for key in required_keys:
         if key not in config:
+            has_missing_key = True
             errors.append(
                 {
                     "code": "MISSING_KEY",
@@ -138,18 +228,9 @@ def _validate_project_config(
                 }
             )
 
-    recommended_keys = ["story", "system"]
-    for key in recommended_keys:
-        if key not in config:
-            warnings.append(
-                {
-                    "code": "MISSING_RECOMMENDED",
-                    "message": f"Missing recommended key: '{key}'",
-                }
-            )
-
     connections = config.get("connections", {})
-    if not isinstance(connections, dict):
+    if "connections" in config and not isinstance(connections, dict):
+        has_missing_key = True
         errors.append(
             {
                 "code": "INVALID_CONNECTIONS",
@@ -158,7 +239,7 @@ def _validate_project_config(
                 "fix": "Format as 'connections: {name: {type: ...}}'",
             }
         )
-    else:
+    elif isinstance(connections, dict):
         for conn_name, conn_config in connections.items():
             if isinstance(conn_config, dict) and "type" not in conn_config:
                 errors.append(
@@ -181,9 +262,41 @@ def _validate_project_config(
             }
         )
 
-    pipelines = config.get("pipelines", [])
-    if pipelines:
-        _validate_pipelines_list(pipelines, errors, warnings, "pipelines")
+    # If the top-level shape is broken, the model can't construct meaningfully —
+    # stop here with the crisp pre-check errors rather than a noisy Pydantic dump.
+    if has_missing_key:
+        return
+
+    # Pipelines may be absent legitimately: a scaffold skeleton (no pipelines yet)
+    # or an imports-based project (pipelines live in imported files we can't resolve
+    # from a bare string). Inject an empty list so the rest of the structure still
+    # validates, and warn only when there's truly nothing to run.
+    config_for_model = config
+    if "pipelines" not in config:
+        if "imports" not in config:
+            warnings.append(
+                {
+                    "code": "NO_PIPELINES",
+                    "message": (
+                        "Project defines no 'pipelines:' and no 'imports:'. Add pipelines "
+                        "(or imports) before running — a pipeline-less project cannot run."
+                    ),
+                }
+            )
+        config_for_model = {**config, "pipelines": []}
+
+    # Keystone: construct the runtime model. This is where validate stops being
+    # more lenient than run — story/system are required, connection references are
+    # checked, unknown keys (Phase 2) are rejected, all identically to `odibi run`.
+    try:
+        project_config = ProjectConfig(**config_for_model)
+    except Exception as e:
+        errors.extend(_pydantic_errors_to_structured(e, "root"))
+        return
+
+    # Semantic checks over the validated pipelines.
+    for i, pipeline_config in enumerate(project_config.pipelines):
+        _validate_pipeline_nodes(pipeline_config, errors, warnings, f"pipelines[{i}]", i)
 
 
 def _validate_pipeline_file(
@@ -191,7 +304,21 @@ def _validate_pipeline_file(
     errors: List[Dict[str, Any]],
     warnings: List[Dict[str, Any]],
 ) -> None:
-    """Validate imported pipeline file."""
+    """Validate an imported pipeline fragment (no project/story/system).
+
+    A fragment is valid *as a fragment* but cannot be run directly — it must be
+    imported by a project config. We surface that as a warning so a green result
+    isn't mistaken for "this file will run".
+    """
+    warnings.append(
+        {
+            "code": "PIPELINE_FRAGMENT",
+            "message": (
+                "This file is a pipeline fragment (no 'project:'/'story:'/'system:'). "
+                "It must be imported by a project config; it cannot be run directly."
+            ),
+        }
+    )
     pipelines = config.get("pipelines")
     if pipelines is None:
         errors.append(
@@ -294,6 +421,37 @@ def _validate_pipeline_nodes(
         _check_dependencies(node, node_names, node_loc, errors)
         _validate_pattern_params(node, pipeline_idx, node_idx, errors)
         _validate_transformer_params(node, pipeline_idx, node_idx, errors)
+        _validate_simulation_block(node, node_loc, errors)
+
+
+def _validate_simulation_block(
+    node: Any,
+    location: str,
+    errors: List[Dict[str, Any]],
+) -> None:
+    """Validate a node's simulation spec.
+
+    Simulation lives under ``read.options.simulation`` as a raw dict, so it isn't
+    checked when ProjectConfig is built. Construct SimulationConfig here so typos
+    in the simulation/generator config (e.g. ``noise`` vs ``volatility``) are
+    caught at validate time, not at run time.
+    """
+    read = getattr(node, "read", None)
+    if read is None:
+        return
+    fmt = getattr(read, "format", None)
+    if getattr(fmt, "value", fmt) != "simulation":
+        return
+    options = getattr(read, "options", None) or {}
+    sim = options.get("simulation") if isinstance(options, dict) else None
+    if not isinstance(sim, dict):
+        return
+    from odibi.config import SimulationConfig
+
+    try:
+        SimulationConfig(**sim)
+    except Exception as e:
+        errors.extend(_pydantic_errors_to_structured(e, f"{location}.read.options.simulation"))
 
 
 def _check_node_name(name: str, location: str, errors: List[Dict[str, Any]]) -> None:
@@ -329,7 +487,9 @@ def _check_wrong_keys(
     }
 
     for wrong_key, (fix_msg, is_error) in wrong_keys.items():
-        if wrong_key in node_dict:
+        # Only flag a key the user actually *set* — model_dump() includes legacy
+        # fields (e.g. `inputs`) at their None default, which must not false-warn.
+        if node_dict.get(wrong_key):
             error_dict = {
                 "code": f"WRONG_KEY_{wrong_key.upper()}",
                 "field_path": location,

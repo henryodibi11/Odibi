@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/heat_exchanger.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -54,8 +53,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 220.0
-                    drift: 0.0
-                    noise: 1.0
+                    trend: 0.0
+                    volatility: 1.0
                     min: 200.0
                     max: 240.0
 
@@ -65,8 +64,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 150.0
-                    drift: 0.0
-                    noise: 2.0
+                    trend: 0.0
+                    volatility: 2.0
                     min: 100.0
                     max: 200.0
 
@@ -95,4 +94,8 @@ pipelines:
                     type: derived
                     expression: "0.001 * coolant_flow_gpm * coolant_flow_gpm + noise"
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: heat_exchanger.parquet
+          mode: overwrite

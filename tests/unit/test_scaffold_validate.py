@@ -170,6 +170,18 @@ story:
 system:
   connection: local
   path: _system
+pipelines:
+  - pipeline: test_pipeline
+    nodes:
+      - name: read_data
+        read:
+          connection: local
+          format: csv
+          path: data.csv
+        write:
+          connection: local
+          format: delta
+          table: output
 """
         result = validate_yaml(yaml_content)
         assert result["valid"] is True
@@ -304,15 +316,24 @@ connections:
         assert result["valid"] is False
         assert any(e["code"] == "MISSING_CONNECTION_TYPE" for e in result["errors"])
 
-    def test_warnings_for_missing_recommended(self):
+    def test_missing_story_system_now_errors(self):
+        # Previously story/system were "recommended" warnings, so validate passed a
+        # config that `odibi run` rejects. The unified validator constructs the real
+        # ProjectConfig, so these are now hard errors — validate tracks run.
         yaml_content = """
 project: test_project
 connections:
   local:
     type: local
     base_path: data/
+pipelines:
+  - pipeline: p
+    nodes:
+      - name: n
+        read: {connection: local, format: csv, path: data.csv}
+        write: {connection: local, format: delta, table: out}
 """
         result = validate_yaml(yaml_content)
-        assert result["valid"] is True
-        assert len(result["warnings"]) > 0
-        assert any("story" in w["message"].lower() for w in result["warnings"])
+        assert result["valid"] is False
+        joined = " ".join(e["field_path"] + e["message"] for e in result["errors"]).lower()
+        assert "story" in joined and "system" in joined

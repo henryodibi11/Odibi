@@ -33,6 +33,15 @@ def validate_pipeline(yaml_content: str, check_connections: bool = False) -> Dic
     errors = []
     warnings = []
 
+    # Register the standard transformer library so transformer checks match runtime
+    # (otherwise builtin transformers like clean_text/deduplicate false-red as "not found").
+    try:
+        from odibi.transformers import register_standard_library
+
+        register_standard_library()
+    except Exception:  # pragma: no cover - never block validation on this
+        pass
+
     # Step 1: Parse YAML
     try:
         config_dict = yaml_lib.safe_load(yaml_content)
@@ -97,14 +106,9 @@ def validate_pipeline(yaml_content: str, check_connections: bool = False) -> Dic
         try:
             pipeline_config = PipelineConfig(**pipeline_dict)
         except Exception as e:
-            errors.append(
-                {
-                    "code": "PYDANTIC_VALIDATION_FAILED",
-                    "field_path": f"pipelines[{i}]",
-                    "message": str(e),
-                    "fix": "Check that all required fields are present and types are correct",
-                }
-            )
+            from odibi.validate.pipeline import _pydantic_errors_to_structured
+
+            errors.extend(_pydantic_errors_to_structured(e, f"pipelines[{i}]"))
             continue
 
         # Step 4: Validate pattern parameters for each node

@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/valve_actuator.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -98,4 +97,8 @@ pipelines:
                     type: derived
                     expression: "50.0 + 0.1 * velocity"
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: valve_actuator.parquet
+          mode: overwrite

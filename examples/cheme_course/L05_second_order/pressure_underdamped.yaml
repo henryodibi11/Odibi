@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/pressure_underdamped.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -102,4 +101,8 @@ pipelines:
                     type: derived
                     expression: "prev('pressure_reading_psi', 0.0) + 10.0 * velocity"
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: pressure_underdamped.parquet
+          mode: overwrite
