@@ -1285,10 +1285,12 @@ class NodeExecutor:
 
         # Skip in-memory filtering for SQL sources (already pushed down)
         if is_sql_format(config.read.format):
-            # Still need to capture HWM for stateful mode
+            # Still need to capture HWM for stateful mode. The pushdown filter uses
+            # COALESCE(column, fallback_column), so capture must use the same fallback
+            # or the watermark lags the data it admitted -> double-processing.
             if inc.mode == IncrementalMode.STATEFUL:
                 state_key = inc.state_key or f"{config.name}_hwm"
-                new_max = self._get_column_max(df, inc.column)
+                new_max = self._get_column_max(df, inc.column, inc.fallback_column)
                 if new_max is not None:
                     return df, (state_key, new_max)
             return df, None
@@ -1302,10 +1304,11 @@ class NodeExecutor:
                 target_conn, table_to_check, config.write.path
             ):
                 # First Run detected -> Full Load
-                # We still need to capture HWM if stateful!
+                # We still need to capture HWM if stateful! Use the fallback column
+                # too so the captured watermark matches the COALESCE filter semantics.
                 if inc.mode == IncrementalMode.STATEFUL:
                     state_key = inc.state_key or f"{config.name}_hwm"
-                    new_max = self._get_column_max(df, inc.column)
+                    new_max = self._get_column_max(df, inc.column, inc.fallback_column)
                     if new_max is not None:
                         return df, (state_key, new_max)
 

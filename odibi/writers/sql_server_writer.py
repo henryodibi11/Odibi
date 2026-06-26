@@ -161,8 +161,12 @@ class SqlServerMergeWriter:
         return f"[{staging_schema}].[{table_name}_staging]"
 
     def escape_column(self, col: str) -> str:
-        """Escape column name for SQL Server."""
-        col = col.strip("[]")
+        """Escape column name for SQL Server.
+
+        Double any internal ``]`` so a column name containing a bracket can't
+        break out of the identifier quoting (T-SQL escapes ``]`` as ``]]``).
+        """
+        col = col.strip("[]").replace("]", "]]")
         return f"[{col}]"
 
     def parse_table_name(self, table: str) -> Tuple[str, str]:
@@ -727,7 +731,9 @@ class SqlServerMergeWriter:
             Dictionary mapping column names to full SQL types (e.g., 'nvarchar(255)')
         """
         schema, table_name = self.parse_table_name(table)
-        sql = f"""
+        # Bind schema/table as parameters (matches check_table_exists/check_schema_exists)
+        # instead of string-interpolating them into the SQL literal.
+        sql = """
         SELECT
             COLUMN_NAME,
             DATA_TYPE,
@@ -735,10 +741,12 @@ class SqlServerMergeWriter:
             NUMERIC_PRECISION,
             NUMERIC_SCALE
         FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{table_name}'
+        WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table_name
         ORDER BY ORDINAL_POSITION
         """
-        result = self.connection.execute_sql(sql)
+        result = self.connection.execute_sql(
+            sql, params={"schema": schema, "table_name": table_name}
+        )
         columns = {}
         for row in result:
             if isinstance(row, dict):
@@ -3433,10 +3441,10 @@ class SqlServerMergeWriter:
             # Remove leading '?' if present
             if sas_token.startswith("?"):
                 sas_token = sas_token[1:]
+            # Never log any portion of the SAS token (it's a credential).
             self.ctx.info(
                 "Creating SAS token credential",
                 credential_name=credential_name,
-                sas_token_prefix=sas_token[:20] + "..." if len(sas_token) > 20 else sas_token,
             )
             self._create_credential_with_sas(credential_name, sas_token)
             self.ctx.info("SAS token credential created successfully")

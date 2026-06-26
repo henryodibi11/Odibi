@@ -334,6 +334,13 @@ class CatalogStateBackend(StateBackend):
             if table.num_rows == 0:
                 return None
 
+            # Latest-wins: if more than one row exists for this key (e.g. a prior
+            # append-fallback left a duplicate), take the most recent by updated_at
+            # so the watermark never moves backward. Without this, row [0] is in
+            # arbitrary file/scan order and could be an older value.
+            if table.num_rows > 1 and "updated_at" in table.column_names:
+                table = table.sort_by([("updated_at", "descending")])
+
             val_str = table.column("value")[0].as_py()
             if val_str:
                 try:
@@ -403,20 +410,13 @@ class CatalogStateBackend(StateBackend):
         df = pd.DataFrame([row])
         df["updated_at"] = pd.to_datetime(df["updated_at"])
 
+        # Open the existing table; only a genuinely-missing table falls back to a
+        # create-via-append. A MERGE failure on an EXISTING table must NOT append
+        # (that leaves a duplicate row for the key, which can later be read back as
+        # an older watermark) — let it propagate so _retry_delta_operation retries.
         try:
             dt = DeltaTable(self.meta_state_path, storage_options=self.storage_options)
-            (
-                dt.merge(
-                    source=df,
-                    predicate="target.key = source.key",
-                    source_alias="source",
-                    target_alias="target",
-                )
-                .when_matched_update_all()
-                .when_not_matched_insert_all()
-                .execute()
-            )
-        except (ValueError, Exception):
+        except Exception:
             write_deltalake(
                 self.meta_state_path,
                 df,
@@ -424,6 +424,19 @@ class CatalogStateBackend(StateBackend):
                 storage_options=self.storage_options,
                 schema_mode="merge",
             )
+            return
+
+        (
+            dt.merge(
+                source=df,
+                predicate="target.key = source.key",
+                source_alias="source",
+                target_alias="target",
+            )
+            .when_matched_update_all()
+            .when_not_matched_insert_all()
+            .execute()
+        )
 
     def _spark_table_exists(self, path: str) -> bool:
         try:
