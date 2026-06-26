@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/tank_realistic.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -54,8 +53,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 50.0
-                    drift: 0.0
-                    noise: 0.5
+                    trend: 0.0
+                    volatility: 0.5
                     min: 45.0
                     max: 55.0
 
@@ -65,8 +64,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 45.0
-                    drift: 0.0
-                    noise: 0.2
+                    trend: 0.0
+                    volatility: 0.2
                     min: 40.0
                     max: 50.0
 
@@ -95,4 +94,8 @@ pipelines:
                     max: 0.1
                     distribution: normal
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: tank_realistic.parquet
+          mode: overwrite

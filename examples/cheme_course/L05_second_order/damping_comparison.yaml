@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/damping_comparison.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -96,4 +95,8 @@ pipelines:
                     type: derived
                     expression: "prev('output', 0.0) + 10.0 * velocity"
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: damping_comparison.parquet
+          mode: overwrite

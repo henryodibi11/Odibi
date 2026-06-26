@@ -404,6 +404,37 @@ def _validate_pipeline_nodes(
         _check_dependencies(node, node_names, node_loc, errors)
         _validate_pattern_params(node, pipeline_idx, node_idx, errors)
         _validate_transformer_params(node, pipeline_idx, node_idx, errors)
+        _validate_simulation_block(node, node_loc, errors)
+
+
+def _validate_simulation_block(
+    node: Any,
+    location: str,
+    errors: List[Dict[str, Any]],
+) -> None:
+    """Validate a node's simulation spec.
+
+    Simulation lives under ``read.options.simulation`` as a raw dict, so it isn't
+    checked when ProjectConfig is built. Construct SimulationConfig here so typos
+    in the simulation/generator config (e.g. ``noise`` vs ``volatility``) are
+    caught at validate time, not at run time.
+    """
+    read = getattr(node, "read", None)
+    if read is None:
+        return
+    fmt = getattr(read, "format", None)
+    if getattr(fmt, "value", fmt) != "simulation":
+        return
+    options = getattr(read, "options", None) or {}
+    sim = options.get("simulation") if isinstance(options, dict) else None
+    if not isinstance(sim, dict):
+        return
+    from odibi.config import SimulationConfig
+
+    try:
+        SimulationConfig(**sim)
+    except Exception as e:
+        errors.extend(_pydantic_errors_to_structured(e, f"{location}.read.options.simulation"))
 
 
 def _check_node_name(name: str, location: str, errors: List[Dict[str, Any]]) -> None:

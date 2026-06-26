@@ -13,8 +13,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/foptd_K0.5_tau10_theta2.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -122,4 +121,8 @@ pipelines:
                       (1.0 / tau) *
                       (K * input_delayed - prev('output', 0.0))
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: foptd_K0.5_tau10_theta2.parquet
+          mode: overwrite

@@ -61,8 +61,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 100.0
-                    drift: 0.0
-                    noise: 2.0
+                    trend: 0.0
+                    volatility: 2.0
                     min: 90.0
                     max: 110.0
 

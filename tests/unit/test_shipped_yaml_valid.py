@@ -22,11 +22,28 @@ from pathlib import Path
 import pytest
 import yaml
 
-from odibi.config import ProjectConfig
+from odibi.config import ProjectConfig, SimulationConfig
 from odibi.transformers import register_standard_library
 from odibi.utils.config_loader import load_yaml_with_env
 
 register_standard_library()
+
+
+def _validate_simulation_blocks(project_config):
+    """Simulation specs live in an untyped options dict, so ProjectConfig doesn't
+    check them. Construct SimulationConfig for every simulation read so the net
+    guarantees simulation nodes actually run (catches generator typos)."""
+    for pipeline in project_config.pipelines:
+        for node in pipeline.nodes:
+            read = getattr(node, "read", None)
+            fmt = getattr(read, "format", None) if read else None
+            if read is None or getattr(fmt, "value", fmt) != "simulation":
+                continue
+            options = getattr(read, "options", None) or {}
+            sim = options.get("simulation") if isinstance(options, dict) else None
+            if isinstance(sim, dict):
+                SimulationConfig(**sim)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEARCH_DIRS = ("examples", "docs", "odibi/scaffold")
@@ -118,7 +135,8 @@ def test_shipped_yaml_matches_declared_kind(rel, monkeypatch):
 
     cfg = load_yaml_with_env(str(REPO_ROOT / rel), _defer_substitution=True)
     try:
-        ProjectConfig(**cfg)
+        pc = ProjectConfig(**cfg)
+        _validate_simulation_blocks(pc)
     except Exception as e:  # pragma: no cover - failure path is the message
         pytest.fail(
             f"{rel} does not construct under the runtime model (ProjectConfig).\n"

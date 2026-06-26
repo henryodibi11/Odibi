@@ -24,53 +24,28 @@ pipelines:
     nodes:
       - name: bronze_production_orders
         description: "Land production orders from SAP as-is (Bronze = no transforms)"
-        
+
         read:
           connection: sap_erp_prod
           format: sql
           table: SAPPR1.dbo.AFKO
-          
-        incremental:
-          mode: rolling_window
-          column: AEDAT
-          lookback: 3
-          lookback_unit: day
-          fallback_column: ERDAT
-          
-        schema:
-          policy: allow_new_cols
-          
-        metadata:
-          columns:
-            - _extracted_at
-            - _batch_id
-            - _source_system
-            
-        bad_records:
-          path: bronze/bad_records/production_orders
-          
+          # Incremental load belongs inside read:
+          incremental:
+            mode: rolling_window
+            column: AEDAT
+            lookback: 3
+            unit: day
+            fallback_column: ERDAT
+
         write:
           connection: delta_lake
           format: delta
           path: bronze/production/orders
           mode: append  # Bronze always appends
-          
+
         validation:
-          contracts:
+          tests:
             - type: not_null
-              column: AUFNR
-              on_failure: error
-              is_quality_gate: true
-              
+              columns: [AUFNR]
             - type: row_count
-              params:
-                min: 1
-              on_failure: error
-              is_quality_gate: true
-              
-            - type: freshness
-              column: _extracted_at
-              params:
-                max_age: 24h
-              on_failure: warn
-              is_quality_gate: false
+              min: 1

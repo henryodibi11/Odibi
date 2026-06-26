@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/ema_filtering.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -60,8 +59,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 150.0
-                    drift: 0.0
-                    noise: 0.1
+                    trend: 0.0
+                    volatility: 0.1
                     min: 145.0
                     max: 155.0
 
@@ -95,4 +94,8 @@ pipelines:
                     type: derived
                     expression: "ema('raw_sensor_f', 0.05, 150.0)"
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: ema_filtering.parquet
+          mode: overwrite

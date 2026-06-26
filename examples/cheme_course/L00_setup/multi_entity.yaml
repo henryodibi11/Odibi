@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/multi_tank.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -53,7 +52,7 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 50.0
-                    noise: 1.0
+                    volatility: 1.0
                     min: 40.0
                     max: 60.0
 
@@ -62,7 +61,7 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 45.0
-                    noise: 0.5
+                    volatility: 0.5
                     min: 40.0
                     max: 50.0
 
@@ -74,4 +73,8 @@ pipelines:
                       prev('tank_level_ft', 10.0) +
                       (inlet_flow_gpm - outlet_flow_gpm) / 100.0
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: multi_tank.parquet
+          mode: overwrite

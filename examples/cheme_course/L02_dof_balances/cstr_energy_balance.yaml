@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/cstr_balance.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -62,8 +61,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 70.0
-                    drift: 0.0
-                    noise: 0.5
+                    trend: 0.0
+                    volatility: 0.5
                     min: 65.0
                     max: 75.0
 
@@ -72,8 +71,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 1000.0
-                    drift: 0.0
-                    noise: 50.0
+                    trend: 0.0
+                    volatility: 50.0
                     min: 0.0
                     max: 2000.0
 
@@ -108,4 +107,8 @@ pipelines:
                     type: derived
                     expression: "500.0 / feed_flow_gpm"
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: cstr_balance.parquet
+          mode: overwrite

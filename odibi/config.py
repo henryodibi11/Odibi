@@ -10,11 +10,53 @@ try:
 except ImportError:
     from typing_extensions import Annotated
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+import difflib
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Regex for valid pipeline/node names: alphanumeric + underscore, no leading digits
 _VALID_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _VALID_NAME_PATTERN = "^[a-zA-Z_][a-zA-Z0-9_]*$"
+
+
+class StrictModel(BaseModel):
+    """Base model that rejects unknown keys with a "did you mean?" hint.
+
+    Most config typos used to be silently dropped (Pydantic's default
+    ``extra="ignore"``), so an AI agent could misspell a key and get a green
+    validation with no effect at runtime. Strict models make that a hard error
+    and suggest the closest valid field — so wrong YAML fails loudly and early.
+
+    Genuinely open-ended payloads (engine ``options``, transformer ``params``,
+    custom connections) are typed as ``Dict[str, Any]`` / ``extra="allow"`` and
+    are intentionally NOT strict.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_unknown_keys(cls, data):
+        if not isinstance(data, dict):
+            return data
+        allowed = set()
+        for name, field in cls.model_fields.items():
+            allowed.add(name)
+            if field.alias:
+                allowed.add(field.alias)
+            if field.validation_alias and isinstance(field.validation_alias, str):
+                allowed.add(field.validation_alias)
+        unknown = [k for k in data if k not in allowed]
+        if unknown:
+            parts = []
+            for key in unknown:
+                near = difflib.get_close_matches(str(key), allowed, n=1, cutoff=0.6)
+                parts.append(f"'{key}' (did you mean '{near[0]}'?)" if near else f"'{key}'")
+            raise ValueError(
+                f"Unknown key(s) for {cls.__name__}: {', '.join(parts)}. "
+                f"Allowed keys: {', '.join(sorted(allowed))}."
+            )
+        return data
 
 
 class EngineType(str, Enum):
@@ -1267,14 +1309,14 @@ class DistributionType(str, Enum):
     NORMAL = "normal"
 
 
-class _SimGeneratorBase(BaseModel):
+class _SimGeneratorBase(StrictModel):
     """Base for all simulation generator configs.
 
-    Forbids unknown fields so typos (e.g. ``volat ility``) raise a validation
-    error instead of being silently dropped and falling back to defaults.
+    Inherits StrictModel: unknown fields (e.g. ``noise`` instead of
+    ``volatility``) raise a validation error with a did-you-mean hint and the
+    list of allowed keys, instead of being silently dropped and falling back to
+    defaults.
     """
-
-    model_config = {"extra": "forbid"}
 
 
 class RangeGeneratorConfig(_SimGeneratorBase):
@@ -2168,7 +2210,7 @@ class SimulationScope(BaseModel):
         return self
 
 
-class SimulationConfig(BaseModel):
+class SimulationConfig(StrictModel):
     """Complete simulation configuration.
 
     Example:
@@ -2304,7 +2346,7 @@ class IncrementalMode(str, Enum):
     STATEFUL = "stateful"  # New: WHERE col > last_hwm
 
 
-class IncrementalConfig(BaseModel):
+class IncrementalConfig(StrictModel):
     """
     Configuration for automatic incremental loading.
 
@@ -2437,7 +2479,7 @@ class IncrementalConfig(BaseModel):
         return self
 
 
-class ReadConfig(BaseModel):
+class ReadConfig(StrictModel):
     """
     Configuration for reading data into a node.
 
@@ -2637,7 +2679,7 @@ class ReadConfig(BaseModel):
         return self
 
 
-class TransformStep(BaseModel):
+class TransformStep(StrictModel):
     """
     Single transformation step.
 
@@ -2723,7 +2765,7 @@ class TransformStep(BaseModel):
         return self
 
 
-class TransformConfig(BaseModel):
+class TransformConfig(StrictModel):
     """
     Configuration for transformation steps within a node.
 
@@ -3358,7 +3400,7 @@ class GateConfig(BaseModel):
     )
 
 
-class ValidationConfig(BaseModel):
+class ValidationConfig(StrictModel):
     """
     Configuration for data validation (post-transform checks).
 
@@ -4009,7 +4051,7 @@ class StreamingWriteConfig(BaseModel):
     )
 
 
-class WriteConfig(BaseModel):
+class WriteConfig(StrictModel):
     """
     Configuration for writing data from a node.
 
@@ -4328,7 +4370,7 @@ class SchemaPolicyConfig(BaseModel):
         return self
 
 
-class NodeConfig(BaseModel):
+class NodeConfig(StrictModel):
     """
     Configuration for a single node.
 
@@ -4860,7 +4902,7 @@ class NodeConfig(BaseModel):
 # ============================================
 
 
-class PipelineConfig(BaseModel):
+class PipelineConfig(StrictModel):
     """
     Configuration for a pipeline.
 
@@ -4898,6 +4940,10 @@ class PipelineConfig(BaseModel):
         description="What defines freshness. Only 'run_completion' implemented initially.",
     )
     nodes: List[NodeConfig] = Field(description="List of nodes in this pipeline")
+    tags: List[str] = Field(
+        default_factory=list,
+        description="Free-form labels for the pipeline (documentation/grouping).",
+    )
     auto_cache_threshold: Optional[int] = Field(
         default=3,
         ge=2,
@@ -5096,7 +5142,7 @@ class PerformanceConfig(BaseModel):
     )
 
 
-class StoryConfig(BaseModel):
+class StoryConfig(StrictModel):
     """
     Story generation configuration.
 
@@ -5385,7 +5431,7 @@ class SyncToConfig(BaseModel):
     )
 
 
-class SystemConfig(BaseModel):
+class SystemConfig(StrictModel):
     """
     Configuration for the Odibi System Catalog (The Brain).
 
@@ -5524,7 +5570,7 @@ class LineageConfig(BaseModel):
     api_key: Optional[str] = Field(default=None, description="API Key")
 
 
-class ProjectConfig(BaseModel):
+class ProjectConfig(StrictModel):
     """
     Complete project configuration from YAML.
 

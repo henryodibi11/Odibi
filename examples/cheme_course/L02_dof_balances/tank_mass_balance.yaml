@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/tank_balance.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -56,8 +55,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 100.0
-                    drift: 0.0
-                    noise: 2.0
+                    trend: 0.0
+                    volatility: 2.0
                     min: 80.0
                     max: 120.0
 
@@ -66,8 +65,8 @@ pipelines:
                   generator:
                     type: random_walk
                     start: 95.0
-                    drift: 0.0
-                    noise: 1.5
+                    trend: 0.0
+                    volatility: 1.5
                     min: 80.0
                     max: 110.0
 
@@ -93,7 +92,7 @@ pipelines:
                       abs((tank_level_ft - prev('tank_level_ft', 10.0)) * 100.0 * 7.48 -
                       (inlet_flow_gpm - outlet_flow_gpm)) / (inlet_flow_gpm + 0.001) * 100.0
 
-        validate:
+        validation:
           tests:
             - type: range
               column: inlet_flow_gpm
@@ -110,4 +109,8 @@ pipelines:
               min: 0.0
               max: 20.0
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: tank_balance.parquet
+          mode: overwrite

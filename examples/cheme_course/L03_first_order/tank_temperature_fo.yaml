@@ -7,8 +7,7 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/first_order_tank.parquet
-    format: parquet
+    base_path: ./output
 story:
   connection: output
   path: stories
@@ -119,4 +118,8 @@ pipelines:
                       0.0 if minutes_elapsed < 60.0 else
                       ((tank_temp_f - 200.0) / 100.0) * 100.0
 
-        write:`n          connection: output
+        write:
+          connection: output
+          format: parquet
+          path: first_order_tank.parquet
+          mode: overwrite
