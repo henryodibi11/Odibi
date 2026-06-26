@@ -159,6 +159,24 @@ class MCPProjectContext:
                 resolved_config = self._resolve_env_vars(conn_config)
                 conn_type = resolved_config.get("type", "local")
 
+                # Rebase a relative local base_path against the CONFIG FILE's directory so
+                # path resolution matches the framework (which resolves relative to the
+                # config), not the MCP process CWD. Without this, profile_source / discovery
+                # resolve relative to wherever the server was launched and report
+                # "file not found" / empty profiles.
+                base_path = resolved_config.get("base_path")
+                if (
+                    conn_type == "local"
+                    and isinstance(base_path, str)
+                    and base_path
+                    and "://" not in base_path
+                    and not os.path.isabs(base_path)
+                ):
+                    resolved_config = {
+                        **resolved_config,
+                        "base_path": str((self.config_path.parent / base_path).resolve()),
+                    }
+
                 factory = get_connection_factory(conn_type)
                 if factory:
                     conn = factory(name, resolved_config)

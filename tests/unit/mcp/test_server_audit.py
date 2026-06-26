@@ -41,8 +41,9 @@ def test_audit_entry_logged(monkeypatch):
     monkeypatch.setattr("odibi_mcp.server.TextContent", FakeTextContent)
     # Prepare arguments
     args = {}
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(call_tool("list_transformers", args))
+    # asyncio.run() is robust to other tests having closed the default loop; the
+    # deprecated get_event_loop() raises in Python 3.12 once no loop is current.
+    asyncio.run(call_tool("list_transformers", args))
     # Validate dummy logger captured audit
     assert dummy.logged
     (msg, extra) = dummy.logged[0]
