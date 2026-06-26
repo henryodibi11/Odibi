@@ -33,6 +33,15 @@ def validate_pipeline(yaml_content: str, check_connections: bool = False) -> Dic
     errors = []
     warnings = []
 
+    # Register the standard transformer library so transformer checks match runtime
+    # (otherwise builtin transformers like clean_text/deduplicate false-red as "not found").
+    try:
+        from odibi.transformers import register_standard_library
+
+        register_standard_library()
+    except Exception:  # pragma: no cover - never block validation on this
+        pass
+
     # Step 1: Parse YAML
     try:
         config_dict = yaml_lib.safe_load(yaml_content)

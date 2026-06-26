@@ -769,101 +769,16 @@ pipelines:
     def validate_yaml(self, yaml_content: str) -> dict[str, Any]:
         """Validate odibi pipeline YAML and return any errors.
 
-        Args:
-            yaml_content: YAML string to validate
+        Delegates to the single canonical validator (`odibi.validate.pipeline`),
+        which constructs the runtime `ProjectConfig` — so the MCP `validate_yaml`
+        tool, `odibi validate` (CLI), and `odibi run` all agree on what's valid.
 
         Returns:
-            {"valid": bool, "errors": list, "warnings": list}
+            {"valid": bool, "errors": list, "warnings": list, "summary": str}
         """
-        import yaml as pyyaml
+        from odibi.validate.pipeline import validate_yaml as _validate_yaml
 
-        errors = []
-        warnings = []
-
-        try:
-            config = pyyaml.safe_load(yaml_content)
-        except pyyaml.YAMLError as e:
-            return {
-                "valid": False,
-                "errors": [f"YAML parse error: {e}"],
-                "warnings": [],
-            }
-
-        if not isinstance(config, dict):
-            return {
-                "valid": False,
-                "errors": ["Config must be a dictionary"],
-                "warnings": [],
-            }
-
-        # Check required top-level keys
-        required_keys = ["project", "connections", "story", "system", "pipelines"]
-        for key in required_keys:
-            if key not in config:
-                errors.append(f"Missing required key: '{key}'")
-
-        # Check pipelines structure
-        pipelines = config.get("pipelines", [])
-        if not isinstance(pipelines, list):
-            errors.append("'pipelines' must be a list")
-        else:
-            for i, pipeline in enumerate(pipelines):
-                if not isinstance(pipeline, dict):
-                    errors.append(f"Pipeline {i} must be a dictionary")
-                    continue
-
-                if "name" not in pipeline:
-                    errors.append(f"Pipeline {i} missing 'name'")
-
-                nodes = pipeline.get("nodes", [])
-                for j, node in enumerate(nodes):
-                    node_name = node.get("name", f"node_{j}")
-
-                    # Check node name format
-                    if node_name and not node_name.replace("_", "").isalnum():
-                        errors.append(
-                            f"Node '{node_name}': name must be alphanumeric + underscore only"
-                        )
-
-                    # Check for old syntax
-                    if "source" in node:
-                        errors.append(f"Node '{node_name}': use 'inputs:' instead of 'source:'")
-                    if "sink" in node:
-                        errors.append(f"Node '{node_name}': use 'outputs:' instead of 'sink:'")
-
-                    # Check inputs have format
-                    inputs = node.get("inputs", {})
-                    for inp_name, inp_config in inputs.items():
-                        if isinstance(inp_config, dict) and "format" not in inp_config:
-                            errors.append(
-                                f"Node '{node_name}' input '{inp_name}': missing required 'format'"
-                            )
-
-                    # Check outputs have format
-                    outputs = node.get("outputs", {})
-                    for out_name, out_config in outputs.items():
-                        if isinstance(out_config, dict) and "format" not in out_config:
-                            errors.append(
-                                f"Node '{node_name}' output '{out_name}': missing required 'format'"
-                            )
-
-                    # Check transform syntax
-                    transform = node.get("transform", {})
-                    if isinstance(transform, list):
-                        errors.append(
-                            f"Node '{node_name}': transform must be object with 'steps:', not a list"
-                        )
-                    elif isinstance(transform, dict):
-                        steps = transform.get("steps", [])
-                        for k, step in enumerate(steps):
-                            if "function" not in step:
-                                errors.append(f"Node '{node_name}' step {k}: missing 'function'")
-
-        return {
-            "valid": len(errors) == 0,
-            "errors": errors,
-            "warnings": warnings,
-        }
+        return _validate_yaml(yaml_content)
 
     def diagnose_error(self, error_message: str) -> dict[str, Any]:
         """Diagnose a common odibi error and suggest fixes.
