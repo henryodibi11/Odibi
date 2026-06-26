@@ -411,3 +411,32 @@ test: "${vars.undefined}_suffix"
             assert config["test"] == "_suffix"
         finally:
             os.remove(path)
+
+
+# ── Regression: vars substitution (numeric whole-string + import precedence) ──
+
+
+def test_vars_whole_string_numeric_preserves_type():
+    """Regression: a whole-string ${vars.X} where X is numeric/bool must return the raw
+    value (type preserved), not crash in the re.sub callback (which requires str)."""
+    from odibi.utils.config_loader import _substitute_vars
+
+    assert _substitute_vars("${vars.port}", {"port": 5432}) == 5432
+    assert _substitute_vars("${vars.flag}", {"flag": True}) is True
+    # Mid-string still stringifies.
+    assert _substitute_vars("host:${vars.port}", {"port": 5432}) == "host:5432"
+
+
+def test_imported_file_does_not_blank_parent_vars():
+    """Regression: an imported file referencing a parent-defined ${vars.X} must resolve
+    against the merged vars, not be blanked to '' by the child's own vars pass."""
+    d = tempfile.mkdtemp()
+    child = os.path.join(d, "child.yaml")
+    parent = os.path.join(d, "parent.yaml")
+    with open(child, "w") as f:
+        f.write('vars:\n  unrelated: foo\npaths:\n  out: "${vars.layer}/data"\n')
+    with open(parent, "w") as f:
+        f.write("imports:\n  - child.yaml\nvars:\n  layer: silver\n")
+
+    config = load_yaml_with_env(parent)
+    assert config["paths"]["out"] == "silver/data"

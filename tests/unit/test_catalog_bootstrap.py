@@ -205,6 +205,20 @@ class TestTableExists:
         os.makedirs(empty_dir, exist_ok=True)
         assert cm._table_exists(empty_dir) is False
 
+    def test_returns_false_for_nonempty_dir_without_delta_log(self, tmp_path):
+        """Regression: a non-empty directory that is NOT a Delta table (no _delta_log)
+        must return False. Previously it returned True, so bootstrap skipped creating the
+        table and later reads/writes failed."""
+        config = SystemConfig(connection="local", path="_odibi_system")
+        base_path = str(tmp_path / "_odibi_system")
+        engine = PandasEngine(config={})
+        cm = CatalogManager(spark=None, config=config, base_path=base_path, engine=engine)
+        stray_dir = str(tmp_path / "not_a_table")
+        os.makedirs(stray_dir, exist_ok=True)
+        with open(os.path.join(stray_dir, "random.txt"), "w") as f:
+            f.write("hello")
+        assert cm._table_exists(stray_dir) is False
+
     def test_returns_false_with_no_engine(self, tmp_path):
         """_table_exists should return False when no engine is set."""
         config = SystemConfig(connection="local", path="_odibi_system")

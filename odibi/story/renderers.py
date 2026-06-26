@@ -78,7 +78,11 @@ class HTMLStoryRenderer:
                     ":root {", theme_css.split("}")[0] + "}"
                 )
 
-            template = Template(template_content)
+            # autoescape=True so untrusted values (error messages, column names, sample
+            # cells) can't break the HTML or inject markup. Fields that are intentionally
+            # HTML use `| safe` (e.g. markdown explanation, tojson in <script>); `| e`
+            # returns Markup so it is not double-escaped.
+            template = Template(template_content, autoescape=True)
 
             # Register custom filters
             # Note: Template creates its own environment, so we attach to that

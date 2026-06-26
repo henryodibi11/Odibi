@@ -159,15 +159,25 @@ def _substitute_vars(data: Any, vars_dict: Dict[str, Any]) -> Any:
     elif isinstance(data, list):
         return [_substitute_vars(item, vars_dict) for item in data]
     elif isinstance(data, str):
+        # Whole-string single placeholder (e.g. "${vars.port}"): return the raw value so
+        # its type is preserved. This MUST happen before VARS_PATTERN.sub, whose callback
+        # is required to return a str and would raise TypeError for an int/bool/list value.
+        whole = VARS_PATTERN.fullmatch(data)
+        if whole is not None:
+            var_name = whole.group(1)
+            if var_name in vars_dict:
+                return vars_dict[var_name]
+            logger.warning(
+                "Undefined variable referenced",
+                variable=f"vars.{var_name}",
+                available_vars=list(vars_dict.keys()),
+            )
+            return ""
 
         def replace_var(match):
             var_name = match.group(1)
             if var_name in vars_dict:
-                value = vars_dict[var_name]
-                # If the entire string is just the variable, return the raw value (preserves type)
-                if match.group(0) == data:
-                    return value
-                return str(value)
+                return str(vars_dict[var_name])
             else:
                 logger.warning(
                     "Undefined variable referenced",
@@ -345,7 +355,9 @@ def build_yaml_line_map(content: str) -> Dict[Tuple[Any, ...], Tuple[int, int]]:
     return line_map
 
 
-def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
+def load_yaml_with_env(
+    path: str, env: str = None, _defer_substitution: bool = False
+) -> Dict[str, Any]:
     """Load YAML file with environment variable substitution and imports.
 
     Supports:
@@ -486,7 +498,13 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
             # Note: We pass env down to imported files too
             logger.debug("Loading imported configuration", path=full_import_path)
             try:
-                imported_data = load_yaml_with_env(full_import_path, env=env)
+                # Defer vars/date substitution: an imported file's ${vars.X} may reference
+                # vars defined in the PARENT. Resolving here (with only the child's vars)
+                # would blank those placeholders to "". The top-level call substitutes once
+                # over the fully-merged config (parent + child vars combined).
+                imported_data = load_yaml_with_env(
+                    full_import_path, env=env, _defer_substitution=True
+                )
             except Exception as e:
                 logger.error(
                     "Failed to load imported configuration",
@@ -543,7 +561,7 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
             # We pass env=None to avoid infinite recursion if it somehow references itself,
             # though strictly it shouldn't matter as we look for env.{env}.yaml based on the passed env.
             # But logically, an env specific file shouldn't load other env specific files for the same env.
-            env_data = load_yaml_with_env(env_file_path, env=None)
+            env_data = load_yaml_with_env(env_file_path, env=None, _defer_substitution=True)
             logger.debug(
                 "Merging external environment overrides",
                 env_file=env_file_path,
@@ -557,17 +575,20 @@ def load_yaml_with_env(path: str, env: str = None) -> Dict[str, Any]:
                 expected_path=env_file_path,
             )
 
-    # Apply vars substitution after all merges are complete
-    vars_dict = data.get("vars", {})
-    if vars_dict:
-        logger.debug(
-            "Applying vars substitution",
-            vars_keys=list(vars_dict.keys()),
-        )
-        data = _substitute_vars(data, vars_dict)
+    # Apply vars + date substitution after all merges are complete — but ONLY at the
+    # top level. Nested (imported / env-file) loads defer this so placeholders survive
+    # until the merged config has the full vars set (see _defer_substitution above).
+    if not _defer_substitution:
+        vars_dict = data.get("vars", {})
+        if vars_dict:
+            logger.debug(
+                "Applying vars substitution",
+                vars_keys=list(vars_dict.keys()),
+            )
+            data = _substitute_vars(data, vars_dict)
 
-    # Apply date substitution (${date:...} syntax)
-    data = _substitute_dates(data)
+        # Apply date substitution (${date:...} syntax)
+        data = _substitute_dates(data)
 
     logger.debug(
         "Configuration loading complete",

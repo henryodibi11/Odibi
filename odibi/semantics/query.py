@@ -699,7 +699,10 @@ class SemanticQuery:
                 if col == "*":
                     first_col = df.columns[0]
                     if metric_name not in agg_operations:
-                        agg_operations[metric_name] = (first_col, "count")
+                        # COUNT(*) = row count. Use the "size" sentinel so a *real*
+                        # COUNT(<first_col>) (which must ignore NULLs) is not mistaken
+                        # for COUNT(*) just because it targets the first column.
+                        agg_operations[metric_name] = (first_col, "size")
                 else:
                     agg_operations[metric_name] = (col, func)
 
@@ -710,7 +713,7 @@ class SemanticQuery:
 
         result_frames = []
         for metric_name, (col, func) in agg_operations.items():
-            if func == "count" and col == df.columns[0]:
+            if func == "size":
                 agg_result = grouped.size().rename(columns={"size": metric_name})
             else:
                 agg_result = grouped.agg(**{metric_name: (col, func)})

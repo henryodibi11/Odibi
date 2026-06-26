@@ -301,6 +301,37 @@ class TestSemanticQueryExecute:
         east_row = result.df[result.df["region"] == "East"]
         assert east_row["order_count"].iloc[0] == 3
 
+    def test_execute_count_column_ignores_nulls(self):
+        """Regression: COUNT(<col>) must ignore NULLs even when <col> is the DataFrame's
+        first column (it was being routed to size() = row count incl. nulls). COUNT(*)
+        must still count all rows."""
+        config = SemanticLayerConfig(
+            metrics=[
+                MetricDefinition(
+                    name="orders_with_id", expr="COUNT(order_id)", source="fact_orders"
+                ),
+                MetricDefinition(name="all_rows", expr="COUNT(*)", source="fact_orders"),
+            ],
+            dimensions=[DimensionDefinition(name="region")],
+        )
+        # order_id is the FIRST column and has a null for an East row.
+        df = pd.DataFrame(
+            {
+                "order_id": [1, None, 3, 4],
+                "region": ["East", "East", "West", "West"],
+            }
+        )
+        query = SemanticQuery(config)
+        context = create_pandas_context(df)
+
+        with_id = query.execute("orders_with_id BY region", context).df
+        all_rows = query.execute("all_rows BY region", context).df
+
+        east_id = int(with_id[with_id["region"] == "East"]["orders_with_id"].iloc[0])
+        east_all = int(all_rows[all_rows["region"] == "East"]["all_rows"].iloc[0])
+        assert east_id == 1  # null order_id ignored
+        assert east_all == 2  # COUNT(*) counts both East rows
+
     def test_execute_multiple_dimensions(self, sample_config, sample_df):
         """Test executing with multiple dimensions."""
         query = SemanticQuery(sample_config)

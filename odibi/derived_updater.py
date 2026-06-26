@@ -1750,8 +1750,12 @@ class DerivedUpdater:
                     "failures": int((day_runs["status"] == "FAILURE").sum()),
                     "total_rows": int(day_runs["rows_processed"].fillna(0).sum()),
                     "total_duration_ms": int(day_runs["duration_ms"].sum()),
-                    "estimated_cost_usd": float(estimated_cost_sum) if estimated_cost_sum else None,
-                    "actual_cost_usd": float(actual_cost_sum) if actual_cost_sum else None,
+                    "estimated_cost_usd": (
+                        float(estimated_cost_sum) if estimated_cost_sum is not None else None
+                    ),
+                    "actual_cost_usd": (
+                        float(actual_cost_sum) if actual_cost_sum is not None else None
+                    ),
                     "cost_source": cost_source,
                     "cost_is_actual": 1 if has_actual else 0,
                 }
@@ -1813,36 +1817,42 @@ class DerivedUpdater:
             if not existing.empty
             else pd.DataFrame()
         )
-
-        if current_row.empty:
-            total_runs = 1
-            total_successes = 1 if status == "SUCCESS" else 0
-            total_failures = 1 if status == "FAILURE" else 0
-            last_success_at = now if status == "SUCCESS" else None
-            last_failure_at = now if status == "FAILURE" else None
-        else:
-            row = current_row.iloc[0]
-            total_runs = int(row.get("total_runs", 0) or 0) + 1
-            total_successes = int(row.get("total_successes", 0) or 0) + (
-                1 if status == "SUCCESS" else 0
-            )
-            total_failures = int(row.get("total_failures", 0) or 0) + (
-                1 if status == "FAILURE" else 0
-            )
-            last_success_at = now if status == "SUCCESS" else row.get("last_success_at")
-            last_failure_at = now if status == "FAILURE" else row.get("last_failure_at")
+        prev_row = current_row.iloc[0] if not current_row.empty else None
 
         success_rate_7d = None
         success_rate_30d = None
         avg_duration_ms_7d = None
         total_rows_30d = None
 
+        pipe_runs = pd.DataFrame()
         if not runs_df.empty:
             runs_df["run_end_at"] = pd.to_datetime(runs_df["run_end_at"], utc=True)
+            pipe_runs = runs_df[runs_df["pipeline_name"] == pipeline_name]
+
+        if not pipe_runs.empty:
+            # Recompute lifetime counters from the runs table so they are IDEMPOTENT under
+            # rebuild-summaries (which reclaims + re-applies the same run_id). The previous
+            # read-modify-+1 double-counted on every rebuild. The current run is already
+            # logged to meta_pipeline_runs before derived updates run, so it is counted
+            # exactly once. Window metrics already work this way.
+            total_runs = int(len(pipe_runs))
+            total_successes = int((pipe_runs["status"] == "SUCCESS").sum())
+            total_failures = int((pipe_runs["status"] == "FAILURE").sum())
+            success_ends = pipe_runs[pipe_runs["status"] == "SUCCESS"]["run_end_at"]
+            failure_ends = pipe_runs[pipe_runs["status"] == "FAILURE"]["run_end_at"]
+            last_success_at = (
+                success_ends.max()
+                if len(success_ends)
+                else (prev_row.get("last_success_at") if prev_row is not None else None)
+            )
+            last_failure_at = (
+                failure_ends.max()
+                if len(failure_ends)
+                else (prev_row.get("last_failure_at") if prev_row is not None else None)
+            )
+
             cutoff_30d = now - timedelta(days=30)
             cutoff_7d = now - timedelta(days=7)
-
-            pipe_runs = runs_df[runs_df["pipeline_name"] == pipeline_name]
             runs_30d = pipe_runs[pipe_runs["run_end_at"] >= cutoff_30d]
             runs_7d = pipe_runs[pipe_runs["run_end_at"] >= cutoff_7d]
 
@@ -1853,6 +1863,24 @@ class DerivedUpdater:
             if len(runs_30d) > 0:
                 success_rate_30d = float((runs_30d["status"] == "SUCCESS").sum() / len(runs_30d))
                 total_rows_30d = int(runs_30d["rows_processed"].fillna(0).sum())
+        elif prev_row is None:
+            # Runs table unavailable and no prior row: seed from this single run.
+            total_runs = 1
+            total_successes = 1 if status == "SUCCESS" else 0
+            total_failures = 1 if status == "FAILURE" else 0
+            last_success_at = now if status == "SUCCESS" else None
+            last_failure_at = now if status == "FAILURE" else None
+        else:
+            # Runs table unavailable: fall back to incremental update of the prior row.
+            total_runs = int(prev_row.get("total_runs", 0) or 0) + 1
+            total_successes = int(prev_row.get("total_successes", 0) or 0) + (
+                1 if status == "SUCCESS" else 0
+            )
+            total_failures = int(prev_row.get("total_failures", 0) or 0) + (
+                1 if status == "FAILURE" else 0
+            )
+            last_success_at = now if status == "SUCCESS" else prev_row.get("last_success_at")
+            last_failure_at = now if status == "FAILURE" else prev_row.get("last_failure_at")
 
         new_row = pd.DataFrame(
             [

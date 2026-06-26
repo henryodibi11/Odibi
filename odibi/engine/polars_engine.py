@@ -344,6 +344,12 @@ class PolarsEngine(Engine):
             is_lazy = isinstance(df, pl.LazyFrame)
             options = {k: v for k, v in options.items() if k != "keys"}
 
+        # Handle plain append for file formats — Polars file writers overwrite by default,
+        # so without read-existing + concat an append would silently lose prior data.
+        if mode == "append" and format in ("parquet", "csv", "json"):
+            df, mode = self._handle_file_append(df, full_path, format)
+            is_lazy = isinstance(df, pl.LazyFrame)
+
         parent_dir = os.path.dirname(full_path)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
@@ -569,7 +575,9 @@ class PolarsEngine(Engine):
                 raise KeyError(f"Keys {missing_keys} not found in input data")
 
             new_rows = df.join(existing_df.select(keys), on=keys, how="anti")
-            return pl.concat([existing_df, new_rows]), "overwrite"
+            # diagonal_relaxed aligns by column NAME (not position) so a differing
+            # column order between the existing file and new data doesn't raise.
+            return pl.concat([existing_df, new_rows], how="diagonal_relaxed"), "overwrite"
 
         elif mode == "upsert":
             missing_keys = set(keys) - set(df.columns)
@@ -577,9 +585,36 @@ class PolarsEngine(Engine):
                 raise KeyError(f"Keys {missing_keys} not found in input data")
 
             rows_to_keep = existing_df.join(df.select(keys), on=keys, how="anti")
-            return pl.concat([rows_to_keep, df]), "overwrite"
+            return pl.concat([rows_to_keep, df], how="diagonal_relaxed"), "overwrite"
 
         return df, mode
+
+    def _handle_file_append(self, df: Any, full_path: str, format: str) -> tuple:
+        """Implement append for file formats by read-existing + concat.
+
+        Polars' write_parquet/write_csv/write_ndjson have no append mode and overwrite
+        the target, so a plain mode="append" would silently destroy existing data.
+        Returns (combined_df, "overwrite") — or the original df if there's nothing to
+        append to yet.
+        """
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        existing_df = None
+        try:
+            if format == "csv":
+                existing_df = pl.read_csv(full_path)
+            elif format == "parquet":
+                existing_df = pl.read_parquet(full_path)
+            elif format == "json":
+                existing_df = pl.read_ndjson(full_path)
+        except Exception:
+            return df, "overwrite"
+
+        if existing_df is None:
+            return df, "overwrite"
+
+        return pl.concat([existing_df, df], how="diagonal_relaxed"), "overwrite"
 
     def execute_sql(self, sql: str, context: Context) -> Any:
         """Execute SQL query using Polars SQLContext.
@@ -1098,7 +1133,18 @@ class PolarsEngine(Engine):
                     .then(
                         pl.concat_str(
                             [
-                                pl.lit("*").repeat_by(pl.col(c).str.len_chars() - 4).list.join(""),
+                                # Cast to signed Int64 BEFORE subtracting, then clip to 0:
+                                # len_chars() is UInt32, so `len - 4` for short strings would
+                                # underflow to a huge unsigned value. Polars evaluates .then()
+                                # for ALL rows (not just len>4), so without this repeat_by would
+                                # try to allocate tens of GB and abort the process.
+                                pl.lit("*")
+                                .repeat_by(
+                                    (pl.col(c).str.len_chars().cast(pl.Int64) - 4).clip(
+                                        lower_bound=0
+                                    )
+                                )
+                                .list.join(""),
                                 pl.col(c).str.slice(-4),
                             ]
                         )

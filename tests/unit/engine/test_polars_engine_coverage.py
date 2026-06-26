@@ -1285,3 +1285,52 @@ class TestWriteUpsertIntegration:
         )
         result = pl.read_csv(str(f))
         assert len(result) == 3
+
+
+# ── Regression: write parity + anonymize crash ────────────────────────────────
+
+
+class TestPolarsParityRegressions:
+    """Regressions for engine-parity / data-loss bugs."""
+
+    def test_append_does_not_overwrite(self, tmp_path):
+        """mode='append' must add rows, not silently overwrite the file."""
+        import polars as pl
+
+        e = PolarsEngine()
+        p = str(tmp_path / "t.parquet")
+        e.write(pl.DataFrame({"x": [1, 2]}), None, "parquet", path=p, mode="overwrite")
+        e.write(pl.DataFrame({"x": [3, 4]}), None, "parquet", path=p, mode="append")
+        assert len(pl.read_parquet(p)) == 4
+
+    def test_upsert_handles_different_column_order(self, tmp_path):
+        """upsert must align by column name, not position."""
+        import polars as pl
+
+        e = PolarsEngine()
+        p = str(tmp_path / "u.parquet")
+        e.write(
+            pl.DataFrame({"k": [1, 2], "v": [10, 20]}), None, "parquet", path=p, mode="overwrite"
+        )
+        # New data has columns in a different order.
+        e.write(
+            pl.DataFrame({"v": [30], "k": [2]}),
+            None,
+            "parquet",
+            path=p,
+            mode="upsert",
+            options={"keys": ["k"]},
+        )
+        out = pl.read_parquet(p).sort("k").to_dicts()
+        assert out == [{"k": 1, "v": 10}, {"k": 2, "v": 30}]
+
+    def test_anonymize_mask_short_strings_no_overflow(self):
+        """anonymize(mask) must not underflow on strings <= 4 chars (was a multi-GB
+        allocation that aborted the process)."""
+        import polars as pl
+
+        e = PolarsEngine()
+        result = e.anonymize(
+            pl.DataFrame({"s": ["12345", "abc", "x", "123456789"]}), ["s"], method="mask"
+        )
+        assert result["s"].to_list() == ["*2345", "abc", "x", "*****6789"]
