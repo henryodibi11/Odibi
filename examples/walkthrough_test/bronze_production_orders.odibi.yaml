@@ -11,6 +11,13 @@ connections:
     type: local
     base_path: ./data/lake
 
+story:
+  connection: delta_lake
+  path: _stories
+
+system:
+  connection: delta_lake
+
 pipelines:
   - pipeline: bronze_production
     tags: [daily, critical, production]
