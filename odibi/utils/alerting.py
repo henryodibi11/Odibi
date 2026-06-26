@@ -52,6 +52,20 @@ class AlertThrottler:
 
         return True
 
+    def rollback(self, alert_key: str) -> None:
+        """Undo the throttle commit for a key whose send ultimately failed.
+
+        ``should_send`` commits the throttle/rate-limit budget up front. If the
+        actual delivery then fails, that budget shouldn't be consumed — otherwise
+        a retry within the window is silently suppressed and the failed alert
+        looks like it was handled. Call this on delivery failure to free the slot.
+        """
+        self._last_alerts.pop(alert_key, None)
+        now = datetime.now(timezone.utc)
+        hour_key = f"{alert_key}:{now.strftime('%Y%m%d%H')}"
+        if hour_key in self._alert_counts:
+            self._alert_counts[hour_key] = max(0, self._alert_counts[hour_key] - 1)
+
     def reset(self) -> None:
         """Reset throttler state (useful for testing)."""
         self._last_alerts.clear()
@@ -83,6 +97,7 @@ def send_alert(
     Returns:
         True if alert was sent, False if throttled or failed
     """
+    throttle_key: Optional[str] = None
     if throttle:
         pipeline = context.get("pipeline", "unknown")
         event = context.get("event_type", "unknown")
@@ -104,10 +119,16 @@ def send_alert(
         with urllib.request.urlopen(req, timeout=10) as response:
             if response.status >= 400:
                 logger.error(f"Alert failed: HTTP {response.status}")
+                if throttle_key:
+                    _throttler.rollback(throttle_key)
                 return False
         return True
     except Exception as e:
         logger.error(f"Failed to send alert: {e}")
+        # Don't let a failed delivery burn the throttle budget — free the slot
+        # so the next attempt within the window can still get through.
+        if throttle_key:
+            _throttler.rollback(throttle_key)
         return False
 
 

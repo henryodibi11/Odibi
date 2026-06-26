@@ -42,7 +42,80 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
 import requests
-from azure.identity import DefaultAzureCredential
+
+try:
+    from azure.identity import DefaultAzureCredential
+except ImportError:  # optional dependency — only needed when no credential is passed
+    DefaultAzureCredential = None
+
+# Connection-property keys that carry credential material and must never be
+# surfaced verbatim in a profile (which gets written to JSON / Markdown / Excel).
+_SECRET_PROP_SUBSTRINGS = (
+    "connectionstring",
+    "encryptedcredential",
+    "password",
+    "accountkey",
+    "accesskey",
+    "secretaccesskey",
+    "sastoken",
+    "serviceprincipalkey",
+    "secret",
+    "token",
+)
+
+# Non-secret connection metadata that is safe to surface as-is.
+_SAFE_PROP_KEYS = (
+    "url",
+    "baseUrl",
+    "accountName",
+    "server",
+    "database",
+    "servicePrincipalId",
+    "tenant",
+    "functionAppUrl",
+    "authenticationType",
+    "userName",
+    "host",
+    "port",
+    "databaseName",
+)
+
+_REDACTED = "***REDACTED***"
+
+
+def _is_secret_prop(key: str) -> bool:
+    k = key.lower()
+    return any(s in k for s in _SECRET_PROP_SUBSTRINGS)
+
+
+def _redact_connection_props(type_props: dict) -> dict:
+    """Return a redacted view of a linked-service's typeProperties.
+
+    Surfaces non-secret connection metadata (host/server/database/...) verbatim,
+    but never emits credential material. Secret-bearing fields (connectionString,
+    encryptedCredential, *key/*password/...) and Azure Key Vault / SecureString
+    references (dict-shaped values) are replaced with a redaction marker so the
+    profile records that auth EXISTS without leaking it.
+    """
+    safe: dict = {}
+    for key in _SAFE_PROP_KEYS:
+        val = type_props.get(key)
+        if val is None:
+            continue
+        if isinstance(val, (dict, list)):
+            # Key Vault / SecureString references (e.g. {"type": "AzureKeyVaultSecret",
+            # "value": ...}) are secret-bearing — never emit their inner value.
+            safe[key] = _REDACTED
+        elif _is_secret_prop(key):
+            safe[key] = _REDACTED
+        else:
+            safe[key] = val
+    # Record the presence of any secret-bearing field (redacted), even if it
+    # wasn't in the safe-metadata list, so the profile notes auth without leaking.
+    for key in type_props:
+        if _is_secret_prop(key) and key not in safe:
+            safe[key] = _REDACTED
+    return safe
 
 
 class AdfProfiler:
@@ -62,7 +135,14 @@ class AdfProfiler:
         self.rg = resource_group
         self.factory = factory_name
         self.api_version = api_version
-        self.cred = credential or DefaultAzureCredential()
+        if credential is None:
+            if DefaultAzureCredential is None:
+                raise ImportError(
+                    "azure-identity is required to auto-create credentials. "
+                    "Install with `pip install odibi[azure]` or pass an explicit credential."
+                )
+            credential = DefaultAzureCredential()
+        self.cred = credential
         self.max_workers = max_workers
         self._on_progress = on_progress or self._default_progress
         self._headers: dict[str, str] = {}
@@ -126,6 +206,26 @@ class AdfProfiler:
         resp = requests.post(self._url(suffix), headers=self._headers, json=body)
         resp.raise_for_status()
         return resp.json()
+
+    def _post_paged(self, suffix: str, body: dict) -> list[dict]:
+        """POST a query endpoint and follow ADF's continuationToken pagination.
+
+        The queryPipelineRuns / queryActivityRuns endpoints page server-side
+        (~100 rows) and return a `continuationToken`; without following it the
+        run-history stats silently truncate for high-frequency pipelines.
+        """
+        results: list[dict] = []
+        token: Optional[str] = None
+        while True:
+            page_body = dict(body)
+            if token:
+                page_body["continuationToken"] = token
+            data = self._post(suffix, page_body)
+            results.extend(data.get("value", []))
+            token = data.get("continuationToken")
+            if not token:
+                break
+        return results
 
     # ------------------------------------------------------------------ #
     #  Factory metadata                                                    #
@@ -347,36 +447,7 @@ class AdfProfiler:
         return results
 
     def _safe_connection_info(self, type_props: dict) -> dict:
-        safe = {}
-        safe_keys = [
-            "url",
-            "baseUrl",
-            "connectionString",
-            "accountName",
-            "server",
-            "database",
-            "servicePrincipalId",
-            "tenant",
-            "functionAppUrl",
-            "encryptedCredential",
-            "authenticationType",
-            "userName",
-            "host",
-            "port",
-            "databaseName",
-        ]
-        for key in safe_keys:
-            val = type_props.get(key)
-            if val is not None:
-                if isinstance(val, dict) and "value" in val:
-                    safe[key] = val["value"]
-                elif isinstance(val, str) and (
-                    "secret" in key.lower() or "password" in key.lower()
-                ):
-                    safe[key] = "***REDACTED***"
-                else:
-                    safe[key] = val
-        return safe
+        return _redact_connection_props(type_props)
 
     # ------------------------------------------------------------------ #
     #  Triggers                                                            #
@@ -582,9 +653,8 @@ class AdfProfiler:
 
         body["orderBy"] = [{"orderBy": "RunEnd", "order": "DESC"}]
 
-        data = self._post("queryPipelineRuns", body)
         runs = []
-        for r in data.get("value", []):
+        for r in self._post_paged("queryPipelineRuns", body):
             runs.append(
                 {
                     "run_id": r.get("runId"),
@@ -608,9 +678,8 @@ class AdfProfiler:
             "lastUpdatedAfter": (now - timedelta(days=90)).isoformat(),
             "lastUpdatedBefore": now.isoformat(),
         }
-        data = self._post(f"pipelineRuns/{run_id}/queryActivityruns", body)
         runs = []
-        for a in data.get("value", []):
+        for a in self._post_paged(f"pipelineRuns/{run_id}/queryActivityruns", body):
             runs.append(
                 {
                     "activity_name": a.get("activityName"),
