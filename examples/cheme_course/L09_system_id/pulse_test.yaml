@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/pulse_test.parquet
-    format: parquet
 
 story:
   connection: output

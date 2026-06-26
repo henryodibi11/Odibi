@@ -344,7 +344,7 @@ class TestCheckSkipIfUnchanged:
         assert result["hash"] is None
 
     @patch("odibi.utils.content_hash.compute_dataframe_hash", return_value="abc123")
-    @patch("odibi.utils.content_hash.get_content_hash_from_state", return_value=None)
+    @patch("odibi.utils.content_hash.get_content_hash_record", return_value=None)
     def test_pandas_engine_calls_compute_dataframe_hash(
         self, mock_get, mock_compute, mock_context, mock_engine, connections
     ):
@@ -357,7 +357,7 @@ class TestCheckSkipIfUnchanged:
         mock_compute.assert_called_once()
 
     @patch("odibi.utils.content_hash.compute_dataframe_hash", return_value="hash_new")
-    @patch("odibi.utils.content_hash.get_content_hash_from_state", return_value=None)
+    @patch("odibi.utils.content_hash.get_content_hash_record", return_value=None)
     def test_no_previous_hash_returns_no_skip(
         self, mock_get, mock_compute, mock_context, mock_engine, connections
     ):
@@ -371,7 +371,7 @@ class TestCheckSkipIfUnchanged:
         assert result["hash"] == "hash_new"
 
     @patch("odibi.utils.content_hash.compute_dataframe_hash", return_value="same_hash")
-    @patch("odibi.utils.content_hash.get_content_hash_from_state", return_value="same_hash")
+    @patch("odibi.utils.content_hash.get_content_hash_record", return_value={"hash": "same_hash"})
     def test_matching_hash_and_target_exists_returns_skip(
         self, mock_get, mock_compute, mock_context, mock_engine, connections
     ):
@@ -387,7 +387,7 @@ class TestCheckSkipIfUnchanged:
         assert result["hash"] == "same_hash"
 
     @patch("odibi.utils.content_hash.compute_dataframe_hash", return_value="same_hash")
-    @patch("odibi.utils.content_hash.get_content_hash_from_state", return_value="same_hash")
+    @patch("odibi.utils.content_hash.get_content_hash_record", return_value={"hash": "same_hash"})
     def test_matching_hash_but_target_missing_returns_no_skip(
         self, mock_get, mock_compute, mock_context, mock_engine, connections
     ):
@@ -402,7 +402,7 @@ class TestCheckSkipIfUnchanged:
         assert result["hash"] == "same_hash"
 
     @patch("odibi.utils.content_hash.compute_dataframe_hash", return_value="new_hash")
-    @patch("odibi.utils.content_hash.get_content_hash_from_state", return_value="old_hash")
+    @patch("odibi.utils.content_hash.get_content_hash_record", return_value={"hash": "old_hash"})
     def test_hash_mismatch_returns_no_skip_with_pending(
         self, mock_get, mock_compute, mock_context, mock_engine, connections
     ):
@@ -417,7 +417,7 @@ class TestCheckSkipIfUnchanged:
         assert executor._pending_content_hash == "new_hash"
 
     @patch("odibi.utils.content_hash.compute_dataframe_hash", return_value="polars_hash")
-    @patch("odibi.utils.content_hash.get_content_hash_from_state", return_value=None)
+    @patch("odibi.utils.content_hash.get_content_hash_record", return_value=None)
     def test_polars_df_with_to_pandas_conversion(
         self, mock_get, mock_compute, mock_context, mock_engine, connections
     ):
@@ -434,7 +434,7 @@ class TestCheckSkipIfUnchanged:
         assert result["should_skip"] is False
 
     @patch("odibi.utils.content_hash.compute_dataframe_hash", return_value="h1")
-    @patch("odibi.utils.content_hash.get_content_hash_from_state", return_value=None)
+    @patch("odibi.utils.content_hash.get_content_hash_record", return_value=None)
     def test_skip_hash_columns_passed_through(
         self, mock_get, mock_compute, mock_context, mock_engine, connections
     ):
@@ -480,7 +480,9 @@ class TestStoreContentHashAfterWrite:
 
         executor._store_content_hash_after_write(config, connections["dst"])
 
-        mock_set.assert_called_once_with(state.backend, "test_node", "my_table", "abc123")
+        mock_set.assert_called_once_with(
+            state.backend, "test_node", "my_table", "abc123", engine=None
+        )
 
     @patch("odibi.utils.content_hash.set_content_hash_in_state")
     def test_clears_pending_hash_after_storing(

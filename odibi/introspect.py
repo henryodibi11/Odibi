@@ -822,13 +822,18 @@ def format_type_hint(annotation: Any) -> str:
         # Filter out NoneType
         non_none = [a for a in args if a is not type(None)]
 
-        # Check if this Union matches a known Alias
+        # Check if this Union matches a known Alias. Discriminated-union members
+        # are wrapped as Annotated[Model, Tag(...)] (no __name__), so unwrap them
+        # to the underlying model first or the alias collapse would never match.
         arg_names = set()
         for a in non_none:
-            if hasattr(a, "__name__"):
-                arg_names.add(a.__name__)
+            inner = a
+            if get_origin(a) is Annotated:
+                inner = get_args(a)[0]
+            if hasattr(inner, "__name__"):
+                arg_names.add(inner.__name__)
             else:
-                arg_names.add(str(a))
+                arg_names.add(str(inner))
 
         for alias, components in TYPE_ALIASES.items():
             if arg_names == set(components):

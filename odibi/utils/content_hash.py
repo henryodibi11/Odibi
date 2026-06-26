@@ -165,6 +165,21 @@ def get_content_hash_from_state(state_backend, node_name: str, table_name: str) 
     Returns:
         Previously stored hash string, or None if not found
     """
+    record = get_content_hash_record(state_backend, node_name, table_name)
+    return record.get("hash") if record else None
+
+
+def get_content_hash_record(state_backend, node_name: str, table_name: str) -> Optional[dict]:
+    """Retrieve the full stored content-hash record (hash + engine + timestamp).
+
+    The ``engine`` key lets callers detect a cross-engine comparison: the Pandas
+    and Spark hash algorithms differ by design (CSV-SHA256 vs distributed
+    xxhash64-sum), so a hash written by one engine never equals one computed by
+    another. Callers should treat an engine mismatch as "cannot compare" rather
+    than silently always-reprocessing with no explanation.
+
+    Returns the record dict, or None if not found.
+    """
     if state_backend is None:
         return None
 
@@ -172,7 +187,7 @@ def get_content_hash_from_state(state_backend, node_name: str, table_name: str) 
         key = make_content_hash_key(node_name, table_name)
         value = state_backend.get_hwm(key)
         if isinstance(value, dict):
-            return value.get("hash")
+            return value
         return None
     except Exception as e:
         logger.debug(
@@ -186,6 +201,7 @@ def set_content_hash_in_state(
     node_name: str,
     table_name: str,
     content_hash: str,
+    engine: Optional[str] = None,
 ) -> None:
     """Store content hash in state backend (catalog).
 
@@ -194,6 +210,9 @@ def set_content_hash_in_state(
         node_name: Pipeline node name
         table_name: Target table name
         content_hash: Hash string to store
+        engine: Engine that computed the hash (e.g. "pandas"/"spark"). Stored so a
+            later run on a different engine can detect that the stored hash is not
+            comparable instead of reprocessing with no explanation.
     """
     if state_backend is None:
         return
@@ -205,4 +224,6 @@ def set_content_hash_in_state(
         "hash": content_hash,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    if engine is not None:
+        value["engine"] = engine
     state_backend.set_hwm(key, value)

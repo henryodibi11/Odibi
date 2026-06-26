@@ -25,6 +25,7 @@ from odibi.config import (
     TestConfig,
     TestType,
 )
+from odibi.validation.regex_compat import anchor_match
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,8 @@ def _evaluate_test_mask(
         elif test.type == TestType.REGEX_MATCH:
             col = test.column
             if col in df.columns:
-                return F.col(col).rlike(test.pattern) | F.col(col).isNull()
+                # Anchor like pandas str.match so Spark rlike (unanchored) agrees.
+                return F.col(col).rlike(anchor_match(test.pattern)) | F.col(col).isNull()
             return F.lit(True)
 
         elif test.type == TestType.CUSTOM_SQL:
@@ -164,7 +166,8 @@ def _evaluate_test_mask(
         elif test.type == TestType.REGEX_MATCH:
             col = test.column
             if col in df.columns:
-                return pl.col(col).str.contains(test.pattern) | pl.col(col).is_null()
+                # Anchor like pandas str.match so Polars str.contains (substring) agrees.
+                return pl.col(col).str.contains(anchor_match(test.pattern)) | pl.col(col).is_null()
             return pl.lit(True)
 
         elif test.type == TestType.CUSTOM_SQL:

@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output_csv:
     type: local
-    path: ./output/tank_data.csv
-    format: csv
 
 story:
   connection: output_csv

@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/step_response.parquet
-    format: parquet
 
 story:
   connection: output

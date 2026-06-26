@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/level_cascade.parquet
-    format: parquet
 
 story:
   connection: output

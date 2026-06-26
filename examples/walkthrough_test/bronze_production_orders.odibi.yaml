@@ -6,7 +6,11 @@ project: walkthrough_test
 connections:
   sap_erp_prod:
     type: sql_server
-    connection_string: ${SAP_ERP_CONN}
+    host: sapsql.example.com
+    database: SAPPR1
+    auth:
+      mode: connection_string
+      connection_string: ${SAP_ERP_CONN}
   delta_lake:
     type: local
     base_path: ./data/lake

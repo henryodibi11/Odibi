@@ -18,6 +18,7 @@ from odibi.config import (
     ValidationConfig,
 )
 from odibi.utils.logging_context import get_logging_context
+from odibi.validation.regex_compat import anchor_match
 
 
 class Validator:
@@ -316,7 +317,10 @@ class Validator:
             elif test.type == TestType.REGEX_MATCH:
                 col = test.column
                 if col in columns:
-                    regex_cond = pl.col(col).is_not_null() & ~pl.col(col).str.contains(test.pattern)
+                    # Anchor like pandas str.match so Polars str.contains (substring) agrees.
+                    regex_cond = pl.col(col).is_not_null() & ~pl.col(col).str.contains(
+                        anchor_match(test.pattern)
+                    )
                     if is_lazy:
                         invalid_count = df.filter(regex_cond).select(pl.len()).collect().item()
                     else:
@@ -517,8 +521,9 @@ class Validator:
             elif test.type == TestType.REGEX_MATCH:
                 col = test.column
                 if col in df_work.columns:
-                    # Use SQL string filter to avoid Py4J .and() dispatch issues
-                    escaped_pattern = test.pattern.replace("'", "\\'")
+                    # Use SQL string filter to avoid Py4J .and() dispatch issues.
+                    # Anchor like pandas str.match so Spark rlike (unanchored) agrees.
+                    escaped_pattern = anchor_match(test.pattern).replace("'", "\\'")
                     invalid_count = df_work.filter(
                         f"`{col}` IS NOT NULL AND NOT `{col}` RLIKE '{escaped_pattern}'"
                     ).count()
