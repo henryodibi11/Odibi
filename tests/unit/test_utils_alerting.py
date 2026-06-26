@@ -111,6 +111,19 @@ def test_send_alert_exception(mock_urlopen, dummy_config, dummy_context):
     assert result is False
 
 
+@patch("odibi.utils.alerting.urllib.request.urlopen", side_effect=Exception("Network error"))
+def test_failed_send_does_not_burn_throttle_budget(mock_urlopen, dummy_config, dummy_context):
+    # With throttling on, should_send commits the budget up front; if delivery then
+    # fails it must be rolled back so a retry within the window isn't suppressed.
+    th = alerting.get_throttler()
+    th.reset()
+    result = alerting.send_alert(dummy_config, "msg", dummy_context, throttle=True)
+    assert result is False
+    # Slot is free again — the next attempt can still go through.
+    assert th.should_send("TestPipeline:TEST_EVENT") is True
+    th.reset()
+
+
 @patch("odibi.utils.alerting.urllib.request.urlopen")
 def test_send_alert_throttling_prevents_duplicate_calls(mock_urlopen, dummy_config, dummy_context):
     # Simulate a successful HTTP response.

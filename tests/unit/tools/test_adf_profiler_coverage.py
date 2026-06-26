@@ -506,14 +506,35 @@ class TestLinkedServices:
         assert info["url"] == "https://example.com"
         assert info["server"] == "myserver"
 
-    def test_safe_connection_info_dict_value(self):
+    def test_safe_connection_info_redacts_secrets(self):
+        # connectionString / Key Vault refs are secret-bearing: surface that they
+        # exist, but never emit the value (it can embed AccountKey/Password/SAS).
         p = _make_profiler()
         info = p._safe_connection_info(
             {
-                "connectionString": {"value": "Server=x;Database=y"},
+                "connectionString": {"value": "Server=x;Database=y;Password=p"},
+                "encryptedCredential": "ciphertext",
+                "accountName": "foo",
             }
         )
-        assert info["connectionString"] == "Server=x;Database=y"
+        assert info["connectionString"] == "***REDACTED***"
+        assert info["encryptedCredential"] == "***REDACTED***"
+        assert info["accountName"] == "foo"  # non-secret metadata still surfaced
+
+    def test_post_paged_follows_continuation_token(self):
+        # Run-history queries page server-side; _post_paged must follow the
+        # continuationToken so stats don't silently truncate at the first page.
+        p = _make_profiler()
+        pages = [
+            {"value": [{"runId": "1"}], "continuationToken": "tok"},
+            {"value": [{"runId": "2"}]},
+        ]
+        with patch.object(p, "_post", side_effect=pages) as mock_post:
+            out = p._post_paged("queryPipelineRuns", {"a": 1})
+        assert [r["runId"] for r in out] == ["1", "2"]
+        assert mock_post.call_count == 2
+        # the 2nd request carries the continuation token
+        assert mock_post.call_args_list[1].args[1].get("continuationToken") == "tok"
 
     def test_safe_connection_info_ignores_unknown_keys(self):
         p = _make_profiler()

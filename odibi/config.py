@@ -4884,6 +4884,11 @@ class NodeConfig(StrictModel):
                 f"Provided: {list(self.params.keys())}. "
                 f"Optional params: {pattern_cls.optional_params}."
             )
+        # NOTE: we intentionally do NOT reject "unknown" pattern params here. The
+        # patterns' optional_params lists are not an authoritative whitelist — some
+        # consumed params (e.g. scd2's track_cols) aren't declared — so a strict
+        # check would false-positive on legitimate params. Required-param checking
+        # above is the safe guard.
         return self
 
     @model_validator(mode="after")
