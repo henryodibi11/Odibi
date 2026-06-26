@@ -744,7 +744,9 @@ class SqlServerMergeWriter:
         WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table_name
         ORDER BY ORDINAL_POSITION
         """
-        result = self.connection.execute_sql(sql, params={"schema": schema, "table_name": table_name})
+        result = self.connection.execute_sql(
+            sql, params={"schema": schema, "table_name": table_name}
+        )
         columns = {}
         for row in result:
             if isinstance(row, dict):
