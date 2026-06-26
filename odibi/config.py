@@ -12,7 +12,15 @@ except ImportError:
 
 import difflib
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    Field,
+    Tag,
+    field_validator,
+    model_validator,
+)
 
 # Regex for valid pipeline/node names: alphanumeric + underscore, no leading digits
 _VALID_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -454,8 +462,13 @@ class WriteMetadataConfig(BaseModel):
 # ============================================
 
 
-class BaseConnectionConfig(BaseModel):
-    """Base configuration for all connections."""
+class BaseConnectionConfig(StrictModel):
+    """Base configuration for all connections.
+
+    Strict: unknown keys in a connection block (e.g. ``base_pth`` for
+    ``base_path``) are a hard error with a did-you-mean hint instead of being
+    silently dropped. The open-ended plugin escape hatch is
+    :class:`CustomConnectionConfig` (``extra="allow"``)."""
 
     type: ConnectionType
     validation_mode: ValidationMode = ValidationMode.LAZY
@@ -502,7 +515,7 @@ class AzureBlobAuthMode(str, Enum):
     AAD_MSI = "aad_msi"
 
 
-class AzureBlobKeyVaultAuth(BaseModel):
+class AzureBlobKeyVaultAuth(StrictModel):
     """Authentication using Azure Key Vault to retrieve storage account key.
 
     **When to Use:** Production environments where secrets are managed in Key Vault.
@@ -518,7 +531,7 @@ class AzureBlobKeyVaultAuth(BaseModel):
     secret: str
 
 
-class AzureBlobAccountKeyAuth(BaseModel):
+class AzureBlobAccountKeyAuth(StrictModel):
     """Authentication using storage account key directly.
 
     **When to Use:** Development/testing or when Key Vault is not available.
@@ -532,7 +545,7 @@ class AzureBlobAccountKeyAuth(BaseModel):
     account_key: str
 
 
-class AzureBlobSasAuth(BaseModel):
+class AzureBlobSasAuth(StrictModel):
     """Authentication using Shared Access Signature (SAS) token.
 
     **When to Use:** Temporary, limited-scope access or sharing data with external parties.
@@ -546,7 +559,7 @@ class AzureBlobSasAuth(BaseModel):
     sas_token: str
 
 
-class AzureBlobConnectionStringAuth(BaseModel):
+class AzureBlobConnectionStringAuth(StrictModel):
     """Authentication using Azure Storage connection string.
 
     **When to Use:** Simple local development or when a connection string is provided.
@@ -560,7 +573,7 @@ class AzureBlobConnectionStringAuth(BaseModel):
     connection_string: str
 
 
-class AzureBlobMsiAuth(BaseModel):
+class AzureBlobMsiAuth(StrictModel):
     """Authentication using Azure Active Directory Managed Service Identity.
 
     **When to Use:** Running in Azure (VM, App Service, Databricks) with managed identity enabled.
@@ -705,7 +718,7 @@ class SQLServerAuthMode(str, Enum):
     CONNECTION_STRING = "connection_string"
 
 
-class SQLLoginAuth(BaseModel):
+class SQLLoginAuth(StrictModel):
     """SQL Server authentication using username and password.
 
     **When to Use:** Traditional SQL Server authentication with database-level credentials.
@@ -721,7 +734,7 @@ class SQLLoginAuth(BaseModel):
     password: str
 
 
-class SQLAadPasswordAuth(BaseModel):
+class SQLAadPasswordAuth(StrictModel):
     """Azure Active Directory service principal authentication.
 
     **When to Use:** Azure SQL Database with service principal credentials.
@@ -739,7 +752,7 @@ class SQLAadPasswordAuth(BaseModel):
     client_secret: str
 
 
-class SQLMsiAuth(BaseModel):
+class SQLMsiAuth(StrictModel):
     """Azure SQL authentication using Managed Service Identity.
 
     **When to Use:** Running in Azure with managed identity enabled (recommended for production).
@@ -753,7 +766,7 @@ class SQLMsiAuth(BaseModel):
     client_id: Optional[str] = None
 
 
-class SQLConnectionStringAuth(BaseModel):
+class SQLConnectionStringAuth(StrictModel):
     """SQL Server authentication using a full connection string.
 
     **When to Use:** When you have a pre-constructed connection string with embedded credentials.
@@ -841,7 +854,7 @@ class HttpAuthMode(str, Enum):
     API_KEY = "api_key"
 
 
-class HttpBasicAuth(BaseModel):
+class HttpBasicAuth(StrictModel):
     """HTTP Basic authentication with username and password.
 
     **When to Use:** APIs requiring HTTP Basic Auth (RFC 7617).
@@ -857,7 +870,7 @@ class HttpBasicAuth(BaseModel):
     password: str
 
 
-class HttpBearerAuth(BaseModel):
+class HttpBearerAuth(StrictModel):
     """Bearer token authentication (OAuth 2.0 style).
 
     **When to Use:** APIs using OAuth 2.0 or similar bearer token schemes.
@@ -871,7 +884,7 @@ class HttpBearerAuth(BaseModel):
     token: str
 
 
-class HttpApiKeyAuth(BaseModel):
+class HttpApiKeyAuth(StrictModel):
     """Custom API key authentication with configurable header.
 
     **When to Use:** APIs requiring custom header-based authentication (e.g., X-API-Key).
@@ -887,7 +900,7 @@ class HttpApiKeyAuth(BaseModel):
     value_template: str = "Bearer {token}"
 
 
-class HttpNoAuth(BaseModel):
+class HttpNoAuth(StrictModel):
     """No authentication required for HTTP connection.
 
     **When to Use:** Public APIs or endpoints that don't require authentication.
@@ -956,14 +969,45 @@ class CustomConnectionConfig(BaseModel):
     model_config = {"extra": "allow"}
 
 
-# Connection config discriminated union
-ConnectionConfig = Union[
-    LocalConnectionConfig,
-    AzureBlobConnectionConfig,
-    DeltaConnectionConfig,
-    SQLServerConnectionConfig,
-    HttpConnectionConfig,
-    CustomConnectionConfig,
+# Connection config discriminated union.
+#
+# A plain Union would defeat the per-type strictness above: a typo'd known-type
+# block (e.g. type: azure_blob with a misspelled key) fails its strict model and
+# then silently falls through to the permissive CustomConnectionConfig
+# (extra="allow"), so the typo is swallowed again. A callable discriminator
+# routes each block by its `type`: known types go straight to their strict model
+# (so the did-you-mean error surfaces), and only genuinely-unknown plugin types
+# reach CustomConnectionConfig.
+_CUSTOM_CONNECTION_TAG = "__custom__"
+_KNOWN_CONNECTION_TYPES = {e.value for e in ConnectionType}
+
+
+def _connection_discriminator(value: Any) -> str:
+    """Pick the connection model tag from a block's ``type`` field.
+
+    Known ConnectionType values route to their strict model; anything else
+    (custom/plugin connections) routes to CustomConnectionConfig.
+    """
+    if isinstance(value, dict):
+        raw = value.get("type")
+    else:
+        raw = getattr(value, "type", None)
+    raw = raw.value if isinstance(raw, ConnectionType) else raw
+    if raw in _KNOWN_CONNECTION_TYPES:
+        return raw
+    return _CUSTOM_CONNECTION_TAG
+
+
+ConnectionConfig = Annotated[
+    Union[
+        Annotated[LocalConnectionConfig, Tag(ConnectionType.LOCAL.value)],
+        Annotated[AzureBlobConnectionConfig, Tag(ConnectionType.AZURE_BLOB.value)],
+        Annotated[DeltaConnectionConfig, Tag(ConnectionType.DELTA.value)],
+        Annotated[SQLServerConnectionConfig, Tag(ConnectionType.SQL_SERVER.value)],
+        Annotated[HttpConnectionConfig, Tag(ConnectionType.HTTP.value)],
+        Annotated[CustomConnectionConfig, Tag(_CUSTOM_CONNECTION_TAG)],
+    ],
+    Discriminator(_connection_discriminator),
 ]
 
 

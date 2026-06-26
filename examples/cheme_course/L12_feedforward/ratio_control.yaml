@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/ratio_control.parquet
-    format: parquet
 
 story:
   connection: output

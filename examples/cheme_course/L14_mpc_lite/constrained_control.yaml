@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/constrained_mpc.parquet
-    format: parquet
 
 story:
   connection: output

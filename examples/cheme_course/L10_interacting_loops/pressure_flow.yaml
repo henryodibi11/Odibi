@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/pressure_flow.parquet
-    format: parquet
 
 story:
   connection: output

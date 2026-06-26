@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/load_disturbance.parquet
-    format: parquet
 
 story:
   connection: output

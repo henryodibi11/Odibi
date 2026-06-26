@@ -15,7 +15,7 @@ _HEADER = (
     "connections:\n"  # line 2
     "  local_fs:\n"  # line 3
     "    type: local\n"  # line 4
-    "    path: /tmp\n"  # line 5
+    "    base_path: /tmp\n"  # line 5
     "story:\n"  # line 6
     "  connection: local_fs\n"  # line 7
     "  path: stories\n"  # line 8

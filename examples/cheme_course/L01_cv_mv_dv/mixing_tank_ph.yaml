@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/mixing_tank_ph.parquet
-    format: parquet
 story:
   connection: output
   path: stories

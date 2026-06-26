@@ -2853,9 +2853,10 @@ class NodeExecutor:
             return {"should_skip": False, "hash": None}
 
         from odibi.enums import EngineType
-        from odibi.utils.content_hash import get_content_hash_from_state
+        from odibi.utils.content_hash import get_content_hash_record
 
         engine_type = EngineType.SPARK if self.engine.name == "spark" else EngineType.PANDAS
+        current_engine = engine_type.value
         if engine_type == EngineType.SPARK:
             from odibi.utils.content_hash import compute_spark_dataframe_hash
 
@@ -2881,7 +2882,26 @@ class NodeExecutor:
         state_backend = (
             getattr(self.state_manager, "backend", None) if hasattr(self, "state_manager") else None
         )
-        previous_hash = get_content_hash_from_state(state_backend, config.name, table_name)
+        self._pending_content_engine = current_engine
+        previous_record = get_content_hash_record(state_backend, config.name, table_name)
+        previous_hash = previous_record.get("hash") if previous_record else None
+        previous_engine = previous_record.get("engine") if previous_record else None
+
+        # Pandas and Spark hash algorithms differ by design, so a stored hash from
+        # one engine can never equal one computed by another. Without this guard
+        # the run would just silently always-reprocess after an engine switch with
+        # no explanation; warn so the cause is diagnosable.
+        if previous_hash and previous_engine and previous_engine != current_engine:
+            from odibi.utils.logging_context import get_logging_context
+
+            get_logging_context().warning(
+                f"[{config.name}] skip_if_unchanged: stored content hash was computed on "
+                f"engine '{previous_engine}' but this run uses '{current_engine}'. The hash "
+                "algorithms differ across engines, so the values are not comparable — "
+                "reprocessing this write. This is expected after switching engines."
+            )
+            self._pending_content_hash = current_hash
+            return {"should_skip": False, "hash": current_hash}
 
         if previous_hash and current_hash == previous_hash:
             # Before skipping, verify the target actually exists
@@ -2924,7 +2944,13 @@ class NodeExecutor:
                 else None
             )
 
-            set_content_hash_in_state(state_backend, config.name, table_name, content_hash)
+            set_content_hash_in_state(
+                state_backend,
+                config.name,
+                table_name,
+                content_hash,
+                engine=getattr(self, "_pending_content_engine", None),
+            )
 
             from odibi.utils.logging import logger
 

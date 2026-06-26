@@ -439,11 +439,14 @@ def test_project_system_connection_missing():
 
 
 def test_project_system_sql_server_connection_raises():
+    # A valid sql_server connection that is (incorrectly) used as the system
+    # connection must raise "requires storage" — system state needs a storage
+    # backend, not a database. (auth defaults to MSI so the model constructs.)
     with pytest.raises(ValidationError, match="requires storage"):
         _make_project_config(
             connections={
                 "local": LocalConnectionConfig(base_path="./data"),
-                "sql": {"type": "sql_server", "connection_string": "fake"},
+                "sql": {"type": "sql_server", "host": "h", "database": "d"},
             },
             system=SystemConfig(connection="sql"),
         )

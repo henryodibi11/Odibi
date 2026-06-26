@@ -6,8 +6,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/tank_pi.parquet
-    format: parquet
 
 story:
   connection: output

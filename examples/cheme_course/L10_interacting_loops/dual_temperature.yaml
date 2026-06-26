@@ -7,8 +7,6 @@ engine: pandas
 connections:
   output:
     type: local
-    path: ./output/dual_temp.parquet
-    format: parquet
 
 story:
   connection: output

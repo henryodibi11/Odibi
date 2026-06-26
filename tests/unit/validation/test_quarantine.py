@@ -295,14 +295,18 @@ class TestEvaluateTestMaskPolars:
                 "email": ["a@b.com", "invalid", "x@y.org", None, "z@w.net"],
             }
         )
+        # REGEX_MATCH is anchored at the start on every engine (pandas str.match
+        # parity), so use a whole-value email pattern rather than a substring one
+        # like "@.*\." (no email *starts* with '@', which would fail all of them).
         test = RegexMatchTest(
             type=TestType.REGEX_MATCH,
             column="email",
-            pattern=r"@.*\.",
+            pattern=r".+@.+\..+",
             on_fail=ContractSeverity.QUARANTINE,
         )
         mask_expr = _evaluate_test_mask(df, test, is_spark=False, is_polars=True)
         result = df.select(mask_expr.alias("mask"))["mask"].to_list()
+        # Only "invalid" (index 1) fails; null (index 3) is treated as valid.
         assert result.count(False) == 1
         assert result[1] is False
 
