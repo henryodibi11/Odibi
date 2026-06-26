@@ -817,6 +817,125 @@ Returns complete pipeline YAML with all nodes configured.""",
                 "required": ["pipeline_name", "source_connection", "target_connection", "tables"],
             },
         ),
+        # ---- Re-exposed core tools ----
+        # These handlers already existed in call_tool() but were missing from list_tools(),
+        # making them undiscoverable (and therefore uncallable) by an MCP client.
+        Tool(
+            name="bootstrap_context",
+            description=(
+                "Load the current project context: connections, pipelines, and framework "
+                "rules. Call this FIRST to orient before building or validating pipelines."
+            ),
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="explain",
+            description=(
+                "Explain any Odibi feature (transformer, pattern, connection, or concept) by "
+                "name. Use to look up parameters and usage before generating YAML."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Feature name, e.g. 'scd2', 'dimension', 'fluid_properties'",
+                    }
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="list_connections",
+            description="List the connections defined in the current project context.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="get_validation_rules",
+            description="List the available data-quality validation test types and their parameters.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="story_read",
+            description=(
+                "Read a pipeline's Data Story (run report): node timings, row counts, schema, "
+                "anomalies, and errors. Reads the latest run unless run_id is provided."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run id/selector; defaults to the latest run",
+                    },
+                },
+                "required": ["pipeline"],
+            },
+        ),
+        Tool(
+            name="node_sample",
+            description="Return a sample of rows from a node's output for a pipeline run.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                    "max_rows": {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Maximum rows to return",
+                    },
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run id; defaults to the latest successful run",
+                    },
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        Tool(
+            name="node_failed_rows",
+            description=(
+                "Return rows that failed validation (were quarantined) for a node in a "
+                "pipeline run."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "node": {"type": "string", "description": "Node name"},
+                    "max_rows": {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Maximum failed rows to return",
+                    },
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run id; defaults to the latest successful run",
+                    },
+                },
+                "required": ["pipeline", "node"],
+            },
+        ),
+        Tool(
+            name="lineage_graph",
+            description=(
+                "Return the cross-node / cross-layer lineage graph for a pipeline "
+                "(nodes and edges)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline": {"type": "string", "description": "Pipeline name"},
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run id; defaults to the latest successful run",
+                    },
+                },
+                "required": ["pipeline"],
+            },
+        ),
         # DISABLED: diagnose_error - just read the error message
         # Tool(
         #     name="diagnose_error",
@@ -1618,9 +1737,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         # ============ MCP FACADE TOOL HANDLERS ============
         # Story tools
         elif name == "story_read":
+            _run_id = arguments.get("run_id")
             res = story_read(
                 pipeline=arguments["pipeline"],
-                run_selector=arguments.get("run_id"),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
             )
             result = to_json_serializable(res)
         # REMOVED: story_diff - story_read is enough
@@ -1640,10 +1760,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #     result = to_json_serializable(res)
         # Sample tools
         elif name == "node_sample":
+            _run_id = arguments.get("run_id")
             res = node_sample(
                 pipeline=arguments["pipeline"],
                 node=arguments["node"],
-                max_rows=arguments.get("max_rows", 100),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
+                limit=arguments.get("max_rows", 100),
             )
             result = to_json_serializable(res)
         # REMOVED: node_sample_in - node_sample is usually enough
@@ -1656,10 +1778,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #     )
         #     result = to_json_serializable(res)
         elif name == "node_failed_rows":
+            _run_id = arguments.get("run_id")
             res = node_failed_rows(
                 pipeline=arguments["pipeline"],
                 node=arguments["node"],
-                max_rows=arguments.get("max_rows", 50),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
+                limit=arguments.get("max_rows", 50),
             )
             result = to_json_serializable(res)
         # Catalog tools
@@ -1708,9 +1832,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #     )
         #     result = to_json_serializable(res)
         elif name == "lineage_graph":
+            _run_id = arguments.get("run_id")
             res = lineage_graph(
                 pipeline=arguments["pipeline"],
-                include_external=arguments.get("include_external", False),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
             )
             result = to_json_serializable(res)
         # Schema tools
