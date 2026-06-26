@@ -121,6 +121,36 @@ def test_relative_base_path_is_rebased_to_config_dir(smoke_project):
     assert os.path.normcase(str(base)) == os.path.normcase(str(expected))
 
 
+# ── Audit fix #3: run-inspection tools accept their advertised params ─────────
+# These tools (story_read/node_sample/node_failed_rows/lineage_graph) were exposed
+# in list_tools() but their call_tool() dispatch was stale — it passed kwargs
+# (max_rows/include_external) the handlers don't accept, so any client call with a
+# documented optional param raised TypeError. A live protocol dogfood caught it.
+# The smoke project has no run, so a graceful "not found" is fine — what must NOT
+# happen is a TypeError from a kwarg/signature mismatch.
+
+
+@pytest.mark.parametrize(
+    "name,args",
+    [
+        ("story_read", {"pipeline": "sim"}),
+        ("story_read", {"pipeline": "sim", "run_id": "some-run"}),
+        ("node_sample", {"pipeline": "sim", "node": "readings", "max_rows": 5}),
+        ("node_sample", {"pipeline": "sim", "node": "readings", "max_rows": 5, "run_id": "r"}),
+        ("node_failed_rows", {"pipeline": "sim", "node": "readings", "max_rows": 5}),
+        ("lineage_graph", {"pipeline": "sim"}),
+        ("lineage_graph", {"pipeline": "sim", "run_id": "r"}),
+    ],
+)
+def test_inspection_tools_accept_advertised_params(smoke_project, name, args):
+    """Calling these with their documented optional params must not raise a
+    signature/kwarg TypeError (the bug the live dogfood exposed)."""
+    payload = _call(name, args)
+    blob = json.dumps(payload).lower()
+    assert "unexpected keyword argument" not in blob, payload
+    assert "typeerror" not in blob, payload
+
+
 # ── Core tool smoke checks (real dispatch) ────────────────────────────────────
 
 

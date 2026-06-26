@@ -886,6 +886,10 @@ Returns complete pipeline YAML with all nodes configured.""",
                         "default": 100,
                         "description": "Maximum rows to return",
                     },
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run id; defaults to the latest successful run",
+                    },
                 },
                 "required": ["pipeline", "node"],
             },
@@ -906,6 +910,10 @@ Returns complete pipeline YAML with all nodes configured.""",
                         "default": 50,
                         "description": "Maximum failed rows to return",
                     },
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run id; defaults to the latest successful run",
+                    },
                 },
                 "required": ["pipeline", "node"],
             },
@@ -920,10 +928,9 @@ Returns complete pipeline YAML with all nodes configured.""",
                 "type": "object",
                 "properties": {
                     "pipeline": {"type": "string", "description": "Pipeline name"},
-                    "include_external": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Include external (source/sink) datasets",
+                    "run_id": {
+                        "type": "string",
+                        "description": "Optional run id; defaults to the latest successful run",
                     },
                 },
                 "required": ["pipeline"],
@@ -1730,9 +1737,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         # ============ MCP FACADE TOOL HANDLERS ============
         # Story tools
         elif name == "story_read":
+            _run_id = arguments.get("run_id")
             res = story_read(
                 pipeline=arguments["pipeline"],
-                run_selector=arguments.get("run_id"),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
             )
             result = to_json_serializable(res)
         # REMOVED: story_diff - story_read is enough
@@ -1752,10 +1760,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #     result = to_json_serializable(res)
         # Sample tools
         elif name == "node_sample":
+            _run_id = arguments.get("run_id")
             res = node_sample(
                 pipeline=arguments["pipeline"],
                 node=arguments["node"],
-                max_rows=arguments.get("max_rows", 100),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
+                limit=arguments.get("max_rows", 100),
             )
             result = to_json_serializable(res)
         # REMOVED: node_sample_in - node_sample is usually enough
@@ -1768,10 +1778,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #     )
         #     result = to_json_serializable(res)
         elif name == "node_failed_rows":
+            _run_id = arguments.get("run_id")
             res = node_failed_rows(
                 pipeline=arguments["pipeline"],
                 node=arguments["node"],
-                max_rows=arguments.get("max_rows", 50),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
+                limit=arguments.get("max_rows", 50),
             )
             result = to_json_serializable(res)
         # Catalog tools
@@ -1820,9 +1832,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         #     )
         #     result = to_json_serializable(res)
         elif name == "lineage_graph":
+            _run_id = arguments.get("run_id")
             res = lineage_graph(
                 pipeline=arguments["pipeline"],
-                include_external=arguments.get("include_external", False),
+                run_selector={"run_id": _run_id} if _run_id else "latest_successful",
             )
             result = to_json_serializable(res)
         # Schema tools
