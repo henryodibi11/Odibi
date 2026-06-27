@@ -13,11 +13,15 @@ engine: spark
 connections:
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
   path: stories
+
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_aggregates
@@ -27,22 +31,21 @@ pipelines:
           connection: warehouse
           path: fact_orders
           format: delta
-        
-        pattern:
-          type: aggregation
-          params:
-            grain: [date_sk, product_sk]
-            measures:
-              - name: total_revenue
-                expr: "SUM(line_total)"
-              - name: order_count
-                expr: "COUNT(*)"
-              - name: avg_order_value
-                expr: "AVG(line_total)"
-            having: "COUNT(*) > 0"
-            audit:
-              load_timestamp: true
-        
+
+        transformer: aggregation
+        params:
+          grain: [date_sk, product_sk]
+          measures:
+            - name: total_revenue
+              expr: "SUM(line_total)"
+            - name: order_count
+              expr: "COUNT(*)"
+            - name: avg_order_value
+              expr: "AVG(line_total)"
+          having: "COUNT(*) > 0"
+          audit:
+            load_timestamp: true
+
         write:
           connection: warehouse
           path: agg_daily_product_sales
@@ -149,19 +152,18 @@ nodes:
       connection: warehouse
       path: fact_orders
       format: delta
-    pattern:
-      type: aggregation
-      params:
-        grain: [date_sk, product_sk]
-        measures:
-          - name: total_revenue
-            expr: "SUM(line_total)"
-          - name: order_count
-            expr: "COUNT(*)"
-        incremental:
-          timestamp_column: order_date
-          merge_strategy: replace  # Default strategy
-        target: warehouse.agg_daily_sales
+    transformer: aggregation
+    params:
+      grain: [date_sk, product_sk]
+      measures:
+        - name: total_revenue
+          expr: "SUM(line_total)"
+        - name: order_count
+          expr: "COUNT(*)"
+      incremental:
+        timestamp_column: order_date
+        merge_strategy: replace  # Default strategy
+      target: warehouse.agg_daily_sales
     write:
       connection: warehouse
       path: agg_daily_sales
@@ -199,19 +201,18 @@ nodes:
       connection: warehouse
       path: fact_orders_incremental  # Only new/updated orders
       format: delta
-    pattern:
-      type: aggregation
-      params:
-        grain: [date_sk, product_sk]
-        measures:
-          - name: total_revenue
-            expr: "SUM(line_total)"
-          - name: order_count
-            expr: "COUNT(*)"
-        incremental:
-          timestamp_column: order_date
-          merge_strategy: sum  # Accumulate values
-        target: warehouse.agg_daily_sales
+    transformer: aggregation
+    params:
+      grain: [date_sk, product_sk]
+      measures:
+        - name: total_revenue
+          expr: "SUM(line_total)"
+        - name: order_count
+          expr: "COUNT(*)"
+      incremental:
+        timestamp_column: order_date
+        merge_strategy: sum  # Accumulate values
+      target: warehouse.agg_daily_sales
     write:
       connection: warehouse
       path: agg_daily_sales
@@ -247,19 +248,18 @@ nodes:
       connection: warehouse
       path: fact_orders
       format: delta
-    pattern:
-      type: aggregation
-      params:
-        grain: [date_sk, product_sk]
-        measures:
-          - name: min_unit_price
-            expr: "MIN(unit_price)"
-          - name: min_discount_pct
-            expr: "MIN(discount_pct)"
-        incremental:
-          timestamp_column: order_date
-          merge_strategy: min  # Keep minimum values
-        target: warehouse.agg_product_min_price
+    transformer: aggregation
+    params:
+      grain: [date_sk, product_sk]
+      measures:
+        - name: min_unit_price
+          expr: "MIN(unit_price)"
+        - name: min_discount_pct
+          expr: "MIN(discount_pct)"
+      incremental:
+        timestamp_column: order_date
+        merge_strategy: min  # Keep minimum values
+      target: warehouse.agg_product_min_price
     write:
       connection: warehouse
       path: agg_product_min_price
@@ -295,19 +295,18 @@ nodes:
       connection: warehouse
       path: fact_orders
       format: delta
-    pattern:
-      type: aggregation
-      params:
-        grain: [date_sk, product_sk]
-        measures:
-          - name: max_unit_price
-            expr: "MAX(unit_price)"
-          - name: max_discount_pct
-            expr: "MAX(discount_pct)"
-        incremental:
-          timestamp_column: order_date
-          merge_strategy: max  # Keep maximum values
-        target: warehouse.agg_product_max_price
+    transformer: aggregation
+    params:
+      grain: [date_sk, product_sk]
+      measures:
+        - name: max_unit_price
+          expr: "MAX(unit_price)"
+        - name: max_discount_pct
+          expr: "MAX(discount_pct)"
+      incremental:
+        timestamp_column: order_date
+        merge_strategy: max  # Keep maximum values
+      target: warehouse.agg_product_max_price
     write:
       connection: warehouse
       path: agg_product_max_price
@@ -351,18 +350,19 @@ pipelines:
         read:
           connection: warehouse
           path: fact_orders
-        pattern:
-          type: aggregation
-          params:
-            grain: [date_sk, product_sk]
-            measures:
-              - name: total_revenue
-                expr: "SUM(line_total)"
-              - name: order_count
-                expr: "COUNT(*)"
+          format: delta
+        transformer: aggregation
+        params:
+          grain: [date_sk, product_sk]
+          measures:
+            - name: total_revenue
+              expr: "SUM(line_total)"
+            - name: order_count
+              expr: "COUNT(*)"
         write:
           connection: warehouse
           path: agg_daily_sales
+          format: delta
           mode: overwrite
 
       # Monthly rollup (from daily aggregate)
@@ -377,18 +377,18 @@ pipelines:
                   total_revenue,
                   order_count
                 FROM df
-        pattern:
-          type: aggregation
-          params:
-            grain: [month_sk, product_sk]
-            measures:
-              - name: total_revenue
-                expr: "SUM(total_revenue)"
-              - name: order_count
-                expr: "SUM(order_count)"
+        transformer: aggregation
+        params:
+          grain: [month_sk, product_sk]
+          measures:
+            - name: total_revenue
+              expr: "SUM(total_revenue)"
+            - name: order_count
+              expr: "SUM(order_count)"
         write:
           connection: warehouse
           path: agg_monthly_sales
+          format: delta
           mode: overwrite
 ```
 
@@ -405,7 +405,8 @@ engine: spark
 connections:
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
@@ -425,34 +426,33 @@ pipelines:
           connection: warehouse
           path: fact_orders
           format: delta
-        pattern:
-          type: aggregation
-          params:
-            grain:
-              - date_sk
-              - product_sk
-              - region
-            measures:
-              - name: total_revenue
-                expr: "SUM(line_total)"
-              - name: total_cost
-                expr: "SUM(cost_amount)"
-              - name: order_count
-                expr: "COUNT(*)"
-              - name: units_sold
-                expr: "SUM(quantity)"
-              - name: unique_customers
-                expr: "COUNT(DISTINCT customer_sk)"
-              - name: avg_unit_price
-                expr: "AVG(unit_price)"
-            having: "SUM(line_total) > 0"
-            incremental:
-              timestamp_column: load_timestamp
-              merge_strategy: replace
-            target: warehouse.agg_daily_product_sales
-            audit:
-              load_timestamp: true
-              source_system: "aggregation_pipeline"
+        transformer: aggregation
+        params:
+          grain:
+            - date_sk
+            - product_sk
+            - region
+          measures:
+            - name: total_revenue
+              expr: "SUM(line_total)"
+            - name: total_cost
+              expr: "SUM(cost_amount)"
+            - name: order_count
+              expr: "COUNT(*)"
+            - name: units_sold
+              expr: "SUM(quantity)"
+            - name: unique_customers
+              expr: "COUNT(DISTINCT customer_sk)"
+            - name: avg_unit_price
+              expr: "AVG(unit_price)"
+          having: "SUM(line_total) > 0"
+          incremental:
+            timestamp_column: load_timestamp
+            merge_strategy: replace
+          target: warehouse.agg_daily_product_sales
+          audit:
+            load_timestamp: true
+            source_system: "aggregation_pipeline"
         write:
           connection: warehouse
           path: agg_daily_product_sales

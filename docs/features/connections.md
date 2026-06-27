@@ -423,6 +423,7 @@ connections:
     type: http
     base_url: https://api.example.com/v1/
     auth:
+      mode: bearer
       token: ${API_TOKEN}
 ```
 
@@ -444,6 +445,7 @@ connections:
     type: http
     base_url: https://api.example.com/
     auth:
+      mode: bearer
       token: ${API_BEARER_TOKEN}
 ```
 
@@ -455,6 +457,7 @@ connections:
     type: http
     base_url: https://api.example.com/
     auth:
+      mode: basic
       username: ${API_USER}
       password: ${API_PASSWORD}
 ```
@@ -467,8 +470,9 @@ connections:
     type: http
     base_url: https://api.example.com/
     auth:
-      api_key: ${API_KEY}
-      header_name: X-API-Key  # Optional, defaults to X-API-Key
+      mode: api_key
+      header_name: X-API-Key                    # Optional, defaults to Authorization
+      value_template: "${API_KEY}"              # how to render the header value
 ```
 
 ### Custom Headers
@@ -482,6 +486,7 @@ connections:
       Content-Type: application/json
       X-Custom-Header: custom-value
     auth:
+      mode: bearer
       token: ${API_TOKEN}
 ```
 
@@ -491,11 +496,15 @@ Delta Lake tables via path or Unity Catalog.
 
 ### Path-Based Delta
 
+For Delta files on a filesystem path, use a `local` (or `azure_blob`) connection and set
+`format: delta` on the node's `read:` / `write:` — the `delta` connection type is for
+metastore-backed (Unity Catalog) tables only.
+
 ```yaml
 connections:
   delta_lake:
-    type: delta
-    path: /mnt/delta/tables
+    type: local
+    base_path: /mnt/delta/tables
 ```
 
 ### Catalog-Based Delta (Spark)

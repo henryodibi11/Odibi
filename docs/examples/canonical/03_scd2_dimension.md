@@ -59,18 +59,17 @@ pipelines:
           format: parquet
           path: customers
         
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 2
-            track_cols:
-              - name
-              - email
-              - tier
-              - city
-            unknown_member: true  # Creates SK=0 for orphan handling
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_cols:
+            - name
+            - email
+            - tier
+            - city
+          unknown_member: true  # Creates SK=0 for orphan handling
         write:
           connection: silver
           format: delta

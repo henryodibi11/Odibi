@@ -359,8 +359,10 @@ connections:
   warehouse:
     type: sql_server
     host: "${DB_HOST}"
+    database: dw
     auth:
       mode: sql_login
+      username: dw_writer
       password: "${DB_PASSWORD}"  # Auto-redacted in logs
 
 alerts:

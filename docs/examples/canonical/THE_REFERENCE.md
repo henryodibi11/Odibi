@@ -71,14 +71,13 @@ pipelines:
           path: customers.csv
           options:
             header: true
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 1
-            track_cols: [name, email, tier, city]
-            unknown_member: true
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 1
+          track_cols: [name, email, tier, city]
+          unknown_member: true
         write:
           connection: gold
           format: parquet
@@ -92,14 +91,13 @@ pipelines:
           path: products.csv
           options:
             header: true
-        pattern:
-          type: dimension
-          params:
-            natural_key: product_id
-            surrogate_key: product_sk
-            scd_type: 1
-            track_cols: [name, category, price]
-            unknown_member: true
+        transformer: dimension
+        params:
+          natural_key: product_id
+          surrogate_key: product_sk
+          scd_type: 1
+          track_cols: [name, category, price]
+          unknown_member: true
         write:
           connection: gold
           format: parquet
@@ -107,13 +105,12 @@ pipelines:
           mode: overwrite
 
       - name: dim_date
-        pattern:
-          type: date_dimension
-          params:
-            start_date: "2025-01-01"
-            end_date: "2025-12-31"
-            fiscal_year_start_month: 1
-            unknown_member: true
+        transformer: date_dimension
+        params:
+          start_date: "2025-01-01"
+          end_date: "2025-12-31"
+          fiscal_year_start_month: 1
+          unknown_member: true
         write:
           connection: gold
           format: parquet
@@ -150,28 +147,27 @@ pipelines:
           path: orders.csv
           options:
             header: true
-        pattern:
-          type: fact
-          params:
-            grain: [order_id, line_item_id]
-            dimensions:
-              - source_column: customer_id
-                dimension_table: dim_customer
-                dimension_key: customer_id
-                surrogate_key: customer_sk
-              - source_column: product_id
-                dimension_table: dim_product
-                dimension_key: product_id
-                surrogate_key: product_sk
-              - source_column: order_date
-                dimension_table: dim_date
-                dimension_key: full_date
-                surrogate_key: date_sk
-            orphan_handling: unknown
-            measures: [quantity, amount]
-            audit:
-              load_timestamp: true
-              source_system: "orders_csv"
+        transformer: fact
+        params:
+          grain: [order_id, line_item_id]
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+            - source_column: product_id
+              dimension_table: dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
+            - source_column: order_date
+              dimension_table: dim_date
+              dimension_key: full_date
+              surrogate_key: date_sk
+          orphan_handling: unknown
+          measures: [quantity, amount]
+          audit:
+            load_timestamp: true
+            source_system: "orders_csv"
         write:
           connection: gold
           format: parquet

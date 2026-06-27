@@ -225,39 +225,77 @@ defs = DagsterFactory(config).create_definitions()
 project: DataWarehouse
 owner: platform-team
 
+connections:
+  raw_db:
+    type: sql_server
+    host: src.database.windows.net
+    database: raw
+    auth:
+      mode: aad_msi
+  bronze:
+    type: local
+    base_path: ./data/bronze
+  silver:
+    type: local
+    base_path: ./data/silver
+
 pipelines:
   - pipeline: bronze_ingestion
     layer: bronze
     nodes:
       - name: ingest_customers
-        source:
+        read:
           connection: raw_db
+          format: sql
+          table: customers
+        write:
+          connection: bronze
+          format: parquet
           path: customers
 
       - name: ingest_orders
-        source:
+        read:
           connection: raw_db
+          format: sql
+          table: orders
+        write:
+          connection: bronze
+          format: parquet
           path: orders
 
   - pipeline: silver_transformation
     layer: silver
     nodes:
       - name: clean_customers
-        depends_on: []
-        source:
+        read:
           connection: bronze
+          format: parquet
           path: customers
 
       - name: clean_orders
-        depends_on: []
-        source:
+        read:
           connection: bronze
+          format: parquet
           path: orders
 
       - name: join_customer_orders
         depends_on:
           - clean_customers
           - clean_orders
+        transform:
+          steps:
+            - sql: "SELECT * FROM clean_customers c JOIN clean_orders o USING (customer_id)"
+        write:
+          connection: silver
+          format: parquet
+          path: customer_orders
+
+story:
+  connection: silver
+  path: _stories
+system:
+  connection: silver
+  path: _system
 ```
 
 ```python

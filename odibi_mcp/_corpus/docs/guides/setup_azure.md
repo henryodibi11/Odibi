@@ -52,8 +52,9 @@ connections:
     account_name: "odibistorage"
     container: "data"
     auth:
-      key_vault_name: "my-keyvault"
-      secret_name: "adls-account-key"  # The secret containing the Account Key
+      mode: key_vault
+      key_vault: "my-keyvault"
+      secret: "adls-account-key"  # The secret containing the Account Key
 ```
 
 #### Option C: Universal Key Vault (SAS Token)
@@ -66,8 +67,9 @@ connections:
     account_name: "odibistorage"
     container: "data"
     auth:
-      key_vault_name: "my-keyvault"
-      secret_name: "adls-sas-token"  # The secret containing the SAS Token
+      mode: key_vault
+      key_vault: "my-keyvault"
+      secret: "adls-sas-token"  # The secret containing the SAS Token
 ```
 
 ---
@@ -88,7 +90,8 @@ connections:
     host: "odibi-sql.database.windows.net"
     database: "analytics_db"
     port: 1433
-    auth: {}  # Empty auth dict signals "Use Default Driver Auth / Managed Identity"
+    auth:
+      mode: aad_msi  # Passwordless — uses the compute's Managed Identity
 ```
 
 **Setup:**
@@ -107,9 +110,9 @@ connections:
     database: "analytics_db"
     port: 1433
     auth:
+      mode: sql_login
       username: "sqladmin"
-      key_vault_name: "my-keyvault"
-      secret_name: "sql-password"  # The secret containing the password
+      password: "${SQL_PASSWORD}"  # Resolved from env / Key Vault-backed secret
 ```
 
 ---

@@ -64,8 +64,11 @@ connections:
 connections:
   azure_landing:
     type: azure_blob
-    connection_string: "${AZURE_STORAGE_CONNECTION_STRING}"
+    account_name: mystorageaccount
     container: landing
+    auth:
+      mode: connection_string
+      connection_string: "${AZURE_STORAGE_CONNECTION_STRING}"
 ```
 
 ## 2. ADLS Gen2 (Hierarchical Namespace)
@@ -76,9 +79,8 @@ For Delta Lake on Azure, use ADLS Gen2:
 connections:
   adls_bronze:
     type: azure_blob
-    account_name: mydatalake
+    account_name: mydatalake  # ADLS Gen2 account (hierarchical namespace enabled)
     container: bronze
-    is_adls_gen2: true  # Enable hierarchical namespace
     auth:
       mode: account_key
       account_key: "${AZURE_STORAGE_KEY}"
@@ -86,12 +88,18 @@ connections:
 
 ### Delta Lake on ADLS
 
+For Delta **files** on a path, use an `azure_blob` connection and set `format: delta`
+on the node's `read:` / `write:`. (The `delta` connection type is metastore-backed —
+`catalog` / `schema` / `table` — not a path.)
+
 ```yaml
 connections:
   delta_silver:
-    type: delta
-    base_path: abfss://silver@mydatalake.dfs.core.windows.net/
-    # Auth inherited from Spark session config
+    type: azure_blob
+    account_name: mydatalake
+    container: silver
+    auth:
+      mode: aad_msi  # passwordless — auth from the Spark/cluster identity
 ```
 
 ## 3. Azure SQL Database
@@ -157,15 +165,17 @@ connections:
       key_vault: kv-data
       secret: storage-account-key
 
-  # Bronze layer (Delta)
+  # Bronze layer (Delta, metastore-backed)
   bronze:
     type: delta
-    base_path: abfss://bronze@${STORAGE_ACCOUNT}.dfs.core.windows.net/
+    catalog: main
+    schema: bronze
 
-  # Silver layer (Delta)  
+  # Silver layer (Delta, metastore-backed)
   silver:
     type: delta
-    base_path: abfss://silver@${STORAGE_ACCOUNT}.dfs.core.windows.net/
+    catalog: main
+    schema: silver
 
   # Source database
   erp_sql:
@@ -195,6 +205,7 @@ pipelines:
           table: dbo.Customers
         write:
           connection: bronze
+          format: delta
           table: raw_customers
 
       # Ingest from files
@@ -205,6 +216,7 @@ pipelines:
           path: orders/*.csv
         write:
           connection: bronze
+          format: delta
           table: raw_orders
 ```
 

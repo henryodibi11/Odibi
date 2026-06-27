@@ -162,8 +162,8 @@ connections:
     account_name: mystorageaccount
     container: data
     auth:
-      mode: key                # key | sas | service_principal | msi
-      key: "${AZURE_STORAGE_KEY}"
+      mode: account_key        # account_key | sas | connection_string | key_vault | aad_msi
+      account_key: "${AZURE_STORAGE_KEY}"
 ```
 
 ### SQL Server / Azure SQL
@@ -173,9 +173,10 @@ connections:
     type: sql_server
     host: myserver.database.windows.net
     database: mydb
-    auth_mode: sql             # sql | aad_msi | aad_sp
-    username: "${SQL_USER}"
-    password: "${SQL_PASS}"
+    auth:
+      mode: sql_login          # sql_login | aad_password | aad_msi | connection_string
+      username: "${SQL_USER}"
+      password: "${SQL_PASS}"
 ```
 
 ### HTTP API

@@ -88,8 +88,8 @@ connections:
     container: datalake
     auth:
       mode: key_vault
-      key_vault_name: my-key-vault-name
-      secret_name: storage-key
+      key_vault: my-key-vault-name
+      secret: storage-key
 ```
 
 ---

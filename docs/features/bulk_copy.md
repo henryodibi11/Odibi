@@ -116,6 +116,13 @@ pipelines:
             schema_evolution:
               mode: evolve
               add_columns: true
+
+story:
+  connection: adls_silver
+  path: _stories
+system:
+  connection: adls_silver
+  path: _system
 ```
 
 ### Example 2: Merge with Bulk Copy
@@ -180,6 +187,13 @@ pipelines:
             audit_cols:
               created_col: created_ts
               updated_col: updated_ts
+
+story:
+  connection: adls_silver
+  path: _stories
+system:
+  connection: adls_silver
+  path: _system
 ```
 
 ### Example 3: Auto-Setup Mode

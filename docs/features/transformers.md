@@ -859,58 +859,68 @@ engine: spark
 connections:
   bronze:
     type: delta
-    path: "dbfs:/bronze"
+    catalog: main
+    schema: bronze
   silver:
     type: delta
-    path: "dbfs:/silver"
+    catalog: main
+    schema: silver
   gold:
     type: delta
-    path: "dbfs:/gold"
+    catalog: main
+    schema: gold
 
 pipelines:
   - pipeline: orders_to_gold
     nodes:
+      # Load the customer dimension for the join below
+      - name: customers
+        read:
+          connection: silver
+          format: delta
+          table: dim_customers
+
       # Clean raw data
       - name: clean_orders
-        source:
+        read:
           connection: bronze
-          path: orders
+          format: delta
+          table: orders
         transform:
           steps:
-            - transformer: "clean_text"
+            - function: "clean_text"
               params:
                 columns: ["customer_email"]
                 trim: true
                 case: "lower"
 
-            - transformer: "cast_columns"
+            - function: "cast_columns"
               params:
                 casts:
                   order_date: "timestamp"
                   total_amount: "double"
 
-            - transformer: "filter_rows"
+            - function: "filter_rows"
               params:
                 condition: "total_amount > 0"
 
       # Deduplicate and enrich
       - name: enriched_orders
-        source: clean_orders
         depends_on: [clean_orders, customers]
         transform:
           steps:
-            - transformer: "deduplicate"
+            - function: "deduplicate"
               params:
                 keys: ["order_id"]
                 order_by: "updated_at DESC"
 
-            - transformer: "join"
+            - function: "join"
               params:
                 right_dataset: "customers"
-                on: ["customer_id"]
+                "on": ["customer_id"]
                 how: "left"
 
-            - transformer: "derive_columns"
+            - function: "derive_columns"
               params:
                 derivations:
                   order_year: "YEAR(order_date)"
@@ -918,7 +928,7 @@ pipelines:
 
       # Final merge to gold
       - name: gold_orders
-        source: enriched_orders
+        depends_on: [enriched_orders]
         transformer: "merge"
         params:
           target: "gold.orders"
@@ -927,9 +937,19 @@ pipelines:
           audit_cols:
             created_col: "dw_created_at"
             updated_col: "dw_updated_at"
-        destination:
+        write:
           connection: gold
+          format: delta
           path: orders
+          mode: merge
+          merge_keys: ["order_id"]
+
+story:
+  connection: gold
+  path: _stories
+system:
+  connection: gold
+  path: _system
 ```
 
 ## Best Practices

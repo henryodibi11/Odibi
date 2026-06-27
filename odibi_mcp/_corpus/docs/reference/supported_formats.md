@@ -253,8 +253,8 @@ connections:
     container: bronze
     auth:
       mode: key_vault
-      key_vault_name: my-vault
-      secret_name: storage-key
+      key_vault: my-vault
+      secret: storage-key
 
 pipelines:
   - pipeline: multi_format

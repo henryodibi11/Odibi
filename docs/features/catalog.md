@@ -565,25 +565,38 @@ odibi system sync project.yaml --dry-run
 project: SalesAnalytics
 engine: spark
 
+story:
+  connection: catalog_storage
+  path: _stories
+
 system:
   connection: catalog_storage
   path: _odibi_catalog
 
 connections:
   catalog_storage:
-    type: adls
-    account: "${STORAGE_ACCOUNT}"
+    type: azure_blob
+    account_name: "${STORAGE_ACCOUNT}"
     container: metadata
+    auth:
+      mode: account_key
+      account_key: "${STORAGE_KEY}"
 
   bronze:
-    type: adls
-    account: "${STORAGE_ACCOUNT}"
+    type: azure_blob
+    account_name: "${STORAGE_ACCOUNT}"
     container: bronze
+    auth:
+      mode: account_key
+      account_key: "${STORAGE_KEY}"
 
   silver:
-    type: adls
-    account: "${STORAGE_ACCOUNT}"
+    type: azure_blob
+    account_name: "${STORAGE_ACCOUNT}"
     container: silver
+    auth:
+      mode: account_key
+      account_key: "${STORAGE_KEY}"
 
 pipelines:
   - pipeline: orders_bronze_to_silver
@@ -591,31 +604,32 @@ pipelines:
     layer: silver
     nodes:
       - name: read_raw_orders
-        type: read
-        connection: bronze
-        path: raw/orders
-        format: delta
+        read:
+          connection: bronze
+          path: raw/orders
+          format: delta
 
       - name: transform_orders
-        type: transform
-        input: read_raw_orders
-        transform: |
-          SELECT
-            order_id,
-            customer_id,
-            order_date,
-            total_amount
-          FROM {input}
-          WHERE order_date >= '2024-01-01'
+        depends_on: [read_raw_orders]
+        transform:
+          steps:
+            - sql: |
+                SELECT
+                  order_id,
+                  customer_id,
+                  order_date,
+                  total_amount
+                FROM df
+                WHERE order_date >= '2024-01-01'
 
       - name: write_orders
-        type: write
-        input: transform_orders
-        connection: silver
-        path: orders
-        format: delta
-        mode: merge
-        merge_keys: [order_id]
+        depends_on: [transform_orders]
+        write:
+          connection: silver
+          path: orders
+          format: delta
+          mode: merge
+          merge_keys: [order_id]
 ```
 
 ### Querying the Catalog

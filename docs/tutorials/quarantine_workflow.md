@@ -267,7 +267,7 @@ pipelines:
         validation:
           tests:
             - type: not_null
-              column: amount
+              columns: [amount]
               on_fail: quarantine
             - type: range
               column: amount

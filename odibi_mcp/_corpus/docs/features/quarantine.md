@@ -165,6 +165,13 @@ pipelines:
           path: customers
           format: delta
           mode: append
+
+story:
+  connection: silver
+  path: _stories
+system:
+  connection: silver
+  path: _system
 ```
 
 ## Querying Quarantine Data

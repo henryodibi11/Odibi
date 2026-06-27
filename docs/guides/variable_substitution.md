@@ -60,7 +60,10 @@ connections:
   storage:
     type: azure_blob
     account_name: ${env:AZURE_STORAGE_ACCOUNT}
-    account_key: ${env:AZURE_STORAGE_KEY}
+    container: bronze
+    auth:
+      mode: account_key
+      account_key: ${env:AZURE_STORAGE_KEY}
 ```
 
 Both `${VAR}` and `${env:VAR}` work identically.

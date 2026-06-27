@@ -143,6 +143,8 @@ connections:
 story:
   connection: warehouse
   path: stories
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_fact_orders
@@ -174,32 +176,31 @@ pipelines:
           path: orders.csv
           format: csv
 
-        pattern:
-          type: fact
-          params:
-            grain: [order_id]
-            dimensions:
-              - source_column: customer_id
-                dimension_table: dim_customer
-                dimension_key: customer_id
-                surrogate_key: customer_sk
-                scd2: true
-              - source_column: product_id
-                dimension_table: dim_product
-                dimension_key: product_id
-                surrogate_key: product_sk
-              - source_column: order_date
-                dimension_table: dim_date
-                dimension_key: full_date
-                surrogate_key: date_sk
-            orphan_handling: unknown
-            measures:
-              - quantity
-              - unit_price
-              - line_total: "quantity * unit_price"
-            audit:
-              load_timestamp: true
-              source_system: "pos"
+        transformer: fact
+        params:
+          grain: [order_id]
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+              scd2: true
+            - source_column: product_id
+              dimension_table: dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
+            - source_column: order_date
+              dimension_table: dim_date
+              dimension_key: full_date
+              surrogate_key: date_sk
+          orphan_handling: unknown
+          measures:
+            - quantity
+            - unit_price
+            - line_total: "quantity * unit_price"
+          audit:
+            load_timestamp: true
+            source_system: "pos"
 
         write:
           connection: warehouse
@@ -468,6 +469,8 @@ connections:
 story:
   connection: warehouse
   path: stories
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_fact_orders
@@ -501,43 +504,42 @@ pipelines:
           path: orders.csv
           format: csv
 
-        pattern:
-          type: fact
-          params:
-            # Define the grain (uniqueness)
-            grain: [order_id]
+        transformer: fact
+        params:
+          # Define the grain (uniqueness)
+          grain: [order_id]
 
-            # Define dimension lookups
-            dimensions:
-              - source_column: customer_id
-                dimension_table: dim_customer
-                dimension_key: customer_id
-                surrogate_key: customer_sk
-                scd2: true  # Filter to is_current = true
+          # Define dimension lookups
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+              scd2: true  # Filter to is_current = true
 
-              - source_column: product_id
-                dimension_table: dim_product
-                dimension_key: product_id
-                surrogate_key: product_sk
+            - source_column: product_id
+              dimension_table: dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
 
-              - source_column: order_date
-                dimension_table: dim_date
-                dimension_key: full_date
-                surrogate_key: date_sk
+            - source_column: order_date
+              dimension_table: dim_date
+              dimension_key: full_date
+              surrogate_key: date_sk
 
-            # Handle missing dimension values
-            orphan_handling: unknown
+          # Handle missing dimension values
+          orphan_handling: unknown
 
-            # Define measures
-            measures:
-              - quantity
-              - unit_price
-              - line_total: "quantity * unit_price"
+          # Define measures
+          measures:
+            - quantity
+            - unit_price
+            - line_total: "quantity * unit_price"
 
-            # Add audit columns
-            audit:
-              load_timestamp: true
-              source_system: "pos"
+          # Add audit columns
+          audit:
+            load_timestamp: true
+            source_system: "pos"
 
         write:
           connection: warehouse

@@ -240,15 +240,21 @@ project: my_exploration  # optional
 
 connections:
   my_sql:
-    type: azure_sql
-    connection_string: ${SQL_CONN}
+    type: sql_server
+    host: myserver.database.windows.net
+    database: analytics
+    auth:
+      mode: connection_string
+      connection_string: ${SQL_CONN}
   my_adls:
-    type: azure_adls
+    type: azure_blob
     account_name: mystorageaccount
     container: raw
+    auth:
+      mode: aad_msi
   local:
     type: local
-    path: ./data/samples
+    base_path: ./data/samples
 ```
 
 ### What Works in Exploration Mode

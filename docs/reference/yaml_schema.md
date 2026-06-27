@@ -88,6 +88,7 @@ pipelines:
 | **freshness_sla** | Optional[str] | No | - | Expected data freshness SLA. Format: number followed by unit — s (seconds), m (minutes), h (hours), or d (days). Examples: '6h', '1d', '30m'. |
 | **freshness_anchor** | Literal['run_completion', 'table_max_timestamp', 'watermark_state'] | No | `run_completion` | What defines freshness. Only 'run_completion' implemented initially. |
 | **nodes** | List[[NodeConfig](#nodeconfig)] | Yes | - | List of nodes in this pipeline |
+| **tags** | List[str] | No | `PydanticUndefined` | Free-form labels for the pipeline (documentation/grouping). |
 | **auto_cache_threshold** | Optional[int] | No | `3` | Auto-cache nodes with N or more downstream dependencies. Prevents redundant ADLS re-reads when a node is used by multiple downstream nodes. Default: 3. Set to null to disable auto-caching. Individual nodes can override with explicit cache: true/false. |
 
 ---
@@ -3124,6 +3125,42 @@ replace_values:
 | **mapping** | Dict[str, Optional[str]] | Yes | - | Map of old value to new value (use null for NULL) |
 
 ---
+#### `row_number` (RowNumberParams) {#rownumberparams}
+Assigns sequential row numbers, optionally partitioned and ordered.
+
+Design:
+- SQL-First: ROW_NUMBER() OVER (...) pushed to engine optimizer.
+- Zero-Copy: No data movement to Python.
+
+Configuration for row_number — assigns sequential integers to rows.
+
+Simpler alternative to ``window_calculation`` for the common case of
+numbering rows within optional partitions.
+
+Example — global row number:
+```yaml
+row_number:
+  output: row_num
+```
+
+Example — per-department, ordered by hire_date:
+```yaml
+row_number:
+  output: row_num
+  partition_by: [department]
+  order_by: [hire_date]
+```
+
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **output** | str | No | `row_num` | Name of the output column |
+| **partition_by** | Optional[List[str]] | No | - | Columns to partition by (optional) |
+| **order_by** | Optional[List[str]] | No | - | Columns to order by within each partition (optional) |
+
+---
 #### `sample` (SampleParams) {#sampleparams}
 Return a random sample of rows from the dataset.
 
@@ -3333,7 +3370,7 @@ join:
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **right_dataset** | str | Yes | - | Name of the node/dataset to join with |
-| **on** | str \| List[str] | Yes | - | Column(s) to join on |
+| **on** | str \| List[str] | No | - | Column(s) to join on. Not required for cross joins. |
 | **how** | Literal['inner', 'left', 'right', 'full', 'cross', 'anti', 'semi'] | No | `left` | Join type |
 | **prefix** | Optional[str] | No | - | Prefix for columns from right dataset to avoid collisions |
 
@@ -3804,6 +3841,44 @@ Definition of a single shift.
 | **end** | str | Yes | - | End time in HH:MM format (e.g., '14:00') |
 
 ---
+#### `apply_mapping` (ApplyMappingParams) {#applymappingparams}
+Replace values in a column by LEFT JOINing to an external mapping table.
+
+Design:
+- SQL-First: LEFT JOIN + COALESCE, pushed to engine optimizer.
+- Dedup-Safe: Uses ROW_NUMBER() to pick first match per key, preventing
+  row multiplication from duplicate mapping keys.
+- Engine-Agnostic: Works via context.sql() on DuckDB (Pandas) and Spark SQL.
+
+Configuration for lookup-based value replacement using an external mapping table.
+
+Unlike ``dict_based_mapping`` (inline dict), this joins to a named dataset
+in context — suitable for large reference tables loaded from connections.
+
+Example:
+```yaml
+apply_mapping:
+  column: status_code
+  mapping_source: ref_status_codes
+  source_key: code
+  source_value: description
+  output: status_description
+  default: "Unknown"
+```
+
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | str | Yes | - | Column in the main DataFrame to map |
+| **mapping_source** | str | Yes | - | Name of the mapping dataset registered in context |
+| **source_key** | str | Yes | - | Key column in the mapping table to join on |
+| **source_value** | str | Yes | - | Value column in the mapping table to pull from |
+| **output** | Optional[str] | No | - | Output column name (default: overwrite the source column) |
+| **default** | str \| int \| float \| bool | No | - | Default value for unmatched rows (default: NULL). Accepts str/int/float/bool. |
+
+---
 #### `deduplicate` (DeduplicateParams) {#deduplicateparams}
 Deduplicates data using Window functions.
 
@@ -3879,6 +3954,46 @@ explode_list_column:
 | --- | --- | --- | --- | --- |
 | **column** | str | Yes | - | Column containing the list/array to explode |
 | **outer** | bool | No | `False` | If True, keep rows with empty lists (explode_outer behavior). If False, drops them. |
+
+---
+#### `flatten_struct` (FlattenStructParams) {#flattenstructparams}
+Flattens a nested struct/dict column into top-level columns.
+
+Design:
+- Engine-specific: Struct access syntax differs per engine.
+- Pandas: pd.json_normalize with max_level for depth control.
+- Spark: Schema walking + SQL dot-path expressions.
+
+Configuration for flattening nested struct/dict columns.
+
+Recursive alternative to ``unpack_struct`` with depth control, custom
+prefix, and separator.
+
+Example — single level:
+```yaml
+flatten_struct:
+  column: metadata
+```
+
+Example — multi-level with prefix:
+```yaml
+flatten_struct:
+  column: metadata
+  prefix: meta_
+  depth: 2
+  separator: _
+```
+
+
+[Back to Catalog](#nodeconfig)
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **column** | str | Yes | - | Struct/dict column to flatten |
+| **prefix** | Optional[str] | No | - | Prefix for output columns (default: '{column}{separator}') |
+| **depth** | int | No | `1` | Max nesting depth to flatten (default: 1) |
+| **separator** | str | No | `_` | Separator between nested field names |
+| **drop_source** | bool | No | `True` | Drop the original struct column after flattening |
 
 ---
 #### `generate_numeric_key` (NumericKeyParams) {#numerickeyparams}
@@ -5262,7 +5377,8 @@ engine: pandas
 connections:
   gold:
     type: delta
-    path: /mnt/data/gold
+    catalog: main
+    schema: gold
 
 # Semantic layer at project level
 semantic:

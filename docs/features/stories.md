@@ -405,13 +405,24 @@ stories/
 project: DataPipeline
 engine: spark
 
+connections:
+  bronze:
+    type: local
+    base_path: ./data/bronze
+  silver:
+    type: local
+    base_path: ./data/silver
+
 story:
-  output_path: stories/
+  connection: silver
+  path: stories/
   max_sample_rows: 10
   retention_days: 30
   retention_count: 100
-  theme: corporate
-  include_samples: true
+
+system:
+  connection: silver
+  path: _system
 
 pipelines:
   - pipeline: process_orders
@@ -419,21 +430,26 @@ pipelines:
       - name: read_orders
         read:
           connection: bronze
+          format: parquet
           path: orders/
 
       - name: transform_orders
+        depends_on: [read_orders]
         transform:
-          operation: sql
-          query: |
-            SELECT order_id, customer_id, amount
-            FROM {read_orders}
-            WHERE amount > 0
+          steps:
+            - sql: |
+                SELECT order_id, customer_id, amount
+                FROM df
+                WHERE amount > 0
 
       - name: write_orders
+        depends_on: [transform_orders]
         write:
           connection: silver
+          format: delta
           path: orders/
           mode: merge
+          merge_keys: [order_id]
 ```
 
 ### Generated Story Output (JSON)

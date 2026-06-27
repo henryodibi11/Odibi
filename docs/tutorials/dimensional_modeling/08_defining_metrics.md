@@ -131,8 +131,8 @@ semantic:
 # Given connection:
 connections:
   gold:
-    type: delta
-    path: /mnt/data/gold
+    type: local
+    base_path: /mnt/data/gold
 
 # These all work:
 source: gold.fact_orders              # → /mnt/data/gold/fact_orders
@@ -140,14 +140,14 @@ source: gold.sales/store_a/metrics    # → /mnt/data/gold/sales/store_a/metrics
 source: gold.domain/v2/fact_sales     # → /mnt/data/gold/domain/v2/fact_sales
 ```
 
-For Unity Catalog connections with `catalog` + `schema_name`:
+For Unity Catalog connections with `catalog` + `schema`:
 
 ```yaml
 connections:
   gold:
     type: delta
     catalog: main
-    schema_name: gold_db
+    schema: gold_db
 
 source: gold.fact_orders    # → main.gold_db.fact_orders
 ```

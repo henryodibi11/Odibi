@@ -63,7 +63,7 @@ pipelines:
       - name: ingest_orders
         read:
           connection: source_db
-          format: jdbc
+          format: sql_server
           table: dbo.orders
           incremental:
             mode: stateful

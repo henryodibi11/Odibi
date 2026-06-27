@@ -23,14 +23,19 @@ engine: spark
 connections:
   staging:
     type: delta
-    path: /mnt/staging
+    catalog: main
+    schema: staging
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
   path: stories
+
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_star_schema
@@ -62,34 +67,33 @@ pipelines:
           connection: staging
           path: orders
           format: delta
-        
-        pattern:
-          type: fact
-          params:
-            grain: [order_id, line_item_id]
-            dimensions:
-              - source_column: customer_id
-                dimension_table: dim_customer  # References node name
-                dimension_key: customer_id
-                surrogate_key: customer_sk
-                scd2: true
-              - source_column: product_id
-                dimension_table: dim_product
-                dimension_key: product_id
-                surrogate_key: product_sk
-              - source_column: order_date
-                dimension_table: dim_date
-                dimension_key: full_date
-                surrogate_key: date_sk
-            orphan_handling: unknown
-            measures:
-              - quantity
-              - unit_price
-              - line_total: "quantity * unit_price"
-            audit:
-              load_timestamp: true
-              source_system: "pos"
-        
+
+        transformer: fact
+        params:
+          grain: [order_id, line_item_id]
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer  # References node name
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+              scd2: true
+            - source_column: product_id
+              dimension_table: dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
+            - source_column: order_date
+              dimension_table: dim_date
+              dimension_key: full_date
+              surrogate_key: date_sk
+          orphan_handling: unknown
+          measures:
+            - quantity
+            - unit_price
+            - line_total: "quantity * unit_price"
+          audit:
+            load_timestamp: true
+            source_system: "pos"
+
         write:
           connection: warehouse
           path: fact_orders
@@ -180,22 +184,21 @@ When `orphan_handling: quarantine` is set, fact table rows that fail dimension l
 ### Full Configuration Example
 
 ```yaml
-pattern:
-  type: fact
-  params:
-    dimensions:
-      - source_column: customer_id
-        dimension_table: dim_customer
-        dimension_key: customer_id
-        surrogate_key: customer_sk
-    orphan_handling: quarantine
-    quarantine:
-      connection: silver
-      path: fact_orders_orphans
-      add_columns:
-        _rejection_reason: true
-        _rejected_at: true
-        _source_dimension: true
+transformer: fact
+params:
+  dimensions:
+    - source_column: customer_id
+      dimension_table: dim_customer
+      dimension_key: customer_id
+      surrogate_key: customer_sk
+  orphan_handling: quarantine
+  quarantine:
+    connection: silver
+    path: fact_orders_orphans
+    add_columns:
+      _rejection_reason: true
+      _rejected_at: true
+      _source_dimension: true
 ```
 
 ### Quarantine Config Fields
@@ -275,37 +278,36 @@ nodes:
       connection: staging
       path: orders
       format: delta
-    
-    pattern:
-      type: fact
-      params:
-        grain: [order_id, line_item_id]
-        dimensions:
-          - source_column: customer_id
-            dimension_table: dim_customer
-            dimension_key: customer_id
-            surrogate_key: customer_sk
-            scd2: true
-          - source_column: product_id
-            dimension_table: dim_product
-            dimension_key: product_id
-            surrogate_key: product_sk
-        orphan_handling: quarantine
-        quarantine:
-          connection: silver
-          path: quarantine/fact_orders_orphans
-          add_columns:
-            _rejection_reason: true
-            _rejected_at: true
-            _source_dimension: true
-        measures:
-          - quantity
-          - unit_price
-          - line_total: "quantity * unit_price"
-        audit:
-          load_timestamp: true
-          source_system: "pos"
-    
+
+    transformer: fact
+    params:
+      grain: [order_id, line_item_id]
+      dimensions:
+        - source_column: customer_id
+          dimension_table: dim_customer
+          dimension_key: customer_id
+          surrogate_key: customer_sk
+          scd2: true
+        - source_column: product_id
+          dimension_table: dim_product
+          dimension_key: product_id
+          surrogate_key: product_sk
+      orphan_handling: quarantine
+      quarantine:
+        connection: silver
+        path: quarantine/fact_orders_orphans
+        add_columns:
+          _rejection_reason: true
+          _rejected_at: true
+          _source_dimension: true
+      measures:
+        - quantity
+        - unit_price
+        - line_total: "quantity * unit_price"
+      audit:
+        load_timestamp: true
+        source_system: "pos"
+
     write:
       connection: warehouse
       path: fact_orders
@@ -366,10 +368,12 @@ engine: spark
 connections:
   staging:
     type: delta
-    path: /mnt/staging
+    catalog: main
+    schema: staging
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
@@ -387,48 +391,50 @@ pipelines:
         read:
           connection: staging
           path: customers
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 2
-            track_cols: [name, email, region]
-            target: warehouse.dim_customer
-            unknown_member: true
+          format: delta
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_cols: [name, email, region]
+          target: warehouse.dim_customer
+          unknown_member: true
         write:
           connection: warehouse
           path: dim_customer
+          format: delta
           mode: overwrite
 
       - name: dim_product
         read:
           connection: staging
           path: products
-        pattern:
-          type: dimension
-          params:
-            natural_key: product_id
-            surrogate_key: product_sk
-            scd_type: 1
-            track_cols: [name, category, price]
-            target: warehouse.dim_product
-            unknown_member: true
+          format: delta
+        transformer: dimension
+        params:
+          natural_key: product_id
+          surrogate_key: product_sk
+          scd_type: 1
+          track_cols: [name, category, price]
+          target: warehouse.dim_product
+          unknown_member: true
         write:
           connection: warehouse
           path: dim_product
+          format: delta
           mode: overwrite
 
       - name: dim_date
-        pattern:
-          type: date_dimension
-          params:
-            start_date: "2020-01-01"
-            end_date: "2030-12-31"
-            unknown_member: true
+        transformer: date_dimension
+        params:
+          start_date: "2020-01-01"
+          end_date: "2030-12-31"
+          unknown_member: true
         write:
           connection: warehouse
           path: dim_date
+          format: delta
           mode: overwrite
 
   # Pipeline 2: Build fact table (depends on dimensions existing)
@@ -439,16 +445,19 @@ pipelines:
         read:
           connection: warehouse
           path: dim_customer
+          format: delta
 
       - name: dim_product
         read:
           connection: warehouse
           path: dim_product
+          format: delta
 
       - name: dim_date
         read:
           connection: warehouse
           path: dim_date
+          format: delta
 
       # Build fact table
       - name: fact_orders
@@ -456,37 +465,38 @@ pipelines:
         read:
           connection: staging
           path: orders
-        pattern:
-          type: fact
-          params:
-            grain: [order_id, line_item_id]
-            dimensions:
-              - source_column: customer_id
-                dimension_table: dim_customer
-                dimension_key: customer_id
-                surrogate_key: customer_sk
-                scd2: true
-              - source_column: product_id
-                dimension_table: dim_product
-                dimension_key: product_id
-                surrogate_key: product_sk
-              - source_column: order_date
-                dimension_table: dim_date
-                dimension_key: full_date
-                surrogate_key: date_sk
-            orphan_handling: unknown
-            measures:
-              - quantity
-              - unit_price
-              - discount_amount
-              - line_total: "quantity * unit_price"
-              - net_amount: "quantity * unit_price - discount_amount"
-            audit:
-              load_timestamp: true
-              source_system: "pos"
+          format: delta
+        transformer: fact
+        params:
+          grain: [order_id, line_item_id]
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+              scd2: true
+            - source_column: product_id
+              dimension_table: dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
+            - source_column: order_date
+              dimension_table: dim_date
+              dimension_key: full_date
+              surrogate_key: date_sk
+          orphan_handling: unknown
+          measures:
+            - quantity
+            - unit_price
+            - discount_amount
+            - line_total: "quantity * unit_price"
+            - net_amount: "quantity * unit_price - discount_amount"
+          audit:
+            load_timestamp: true
+            source_system: "pos"
         write:
           connection: warehouse
           path: fact_orders
+          format: delta
           mode: overwrite
 ```
 

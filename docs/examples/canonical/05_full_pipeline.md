@@ -72,7 +72,7 @@ pipelines:
       - name: ingest_orders
         read:
           connection: source_db
-          format: jdbc
+          format: sql_server
           table: dbo.orders
           incremental:
             mode: stateful
@@ -156,17 +156,16 @@ pipelines:
       - name: agg_daily_sales
         depends_on: [clean_orders]
 
-        pattern:
-          type: aggregation
-          params:
-            grain: [order_date, customer_id]
-            measures:
-              - name: total_amount
-                expr: "SUM(amount_usd)"
-              - name: order_count
-                expr: "COUNT(*)"
-              - name: avg_order_value
-                expr: "AVG(amount_usd)"
+        transformer: aggregation
+        params:
+          grain: [order_date, customer_id]
+          measures:
+            - name: total_amount
+              expr: "SUM(amount_usd)"
+            - name: order_count
+              expr: "COUNT(*)"
+            - name: avg_order_value
+              expr: "AVG(amount_usd)"
 
         write:
           connection: lake

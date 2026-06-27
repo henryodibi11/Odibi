@@ -68,6 +68,12 @@ connections:
     type: local
     base_path: ./data/raw
 
+story:
+  connection: data_lake
+  path: _stories
+system:
+  connection: data_lake
+
 pipelines:
   - pipeline: ingest_sales
     nodes:
@@ -75,6 +81,7 @@ pipelines:
         read:
           connection: data_lake
           path: sales.csv
+          format: csv
 
 # --- 2. Environment Overrides ---
 environments:
@@ -86,8 +93,8 @@ environments:
       max_attempts: 3
     connections:
       data_lake:
-        type: azure_adls
-        account: mycompanyprod
+        type: azure_blob
+        account_name: mycompanyprod
         container: sales-data
         auth:
           mode: aad_msi

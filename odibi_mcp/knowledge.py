@@ -64,7 +64,6 @@ system:
   path: _system
 pipelines:
   - pipeline: my_pipeline
-    pattern: dimension
     nodes:
       - name: source_node
         read:
@@ -728,8 +727,7 @@ pipelines:
 ## Node Options
 - `read:` connection, path, format (csv/parquet/delta/sql/xlsx), options, query (for sql)
 - `write:` connection, path, format, mode (overwrite/append/merge), partition_by, z_order_by
-- `transformer:` scd2, merge, deduplicate + `params:`
-- `pattern:` dimension, fact, aggregation + `params:`
+- `transformer:` scd2, merge, deduplicate AND patterns (dimension, fact, aggregation, date_dimension) + `params:`
 - `transform: { steps: [{ sql: "..." }, { function: x, params: {} }] }`
 - `validation: { rules: [{ type: not_null, columns: [id] }], on_failure: quarantine }`
 - `depends_on: [other_node]`, `tags: [daily]`, `enabled: true`, `cache: true`
@@ -880,7 +878,6 @@ system:
 
 pipelines:
   - pipeline: main_pipeline
-    pattern: dimension
     nodes:
       - name: process_data
         read:
@@ -1440,7 +1437,7 @@ pipelines:
             "confidence": ("high" if best_score >= 2 else "medium" if best_score == 1 else "low"),
             "matched_keywords": best[1]["matched"],
             "alternatives": alternatives,
-            "yaml_hint": f"pattern: {recommended['name']}",
+            "yaml_hint": f"transformer: {recommended['name']}",
         }
 
     def get_engine_differences(self) -> dict[str, Any]:
