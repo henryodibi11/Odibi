@@ -1,0 +1,85 @@
+project: late_arriving_data
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: late_data
+    nodes:
+      - name: messy_sensor_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "1m"
+                row_count: 1440            # 24 hours
+                seed: 42
+              entities:
+                count: 1
+                id_prefix: "source_"
+              columns:
+                - name: source_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: record_id
+                  data_type: int
+                  generator:
+                    type: sequential
+                    start: 1
+                    step: 1
+
+                - name: sensor_value
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 50
+                    min: 0
+                    max: 100
+                    volatility: 3.0
+                    mean_reversion: 0.1
+                    precision: 2
+
+                - name: quality_code
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [good, suspect, bad, missing]
+                    weights: [0.85, 0.08, 0.05, 0.02]
+
+                - name: source_system
+                  data_type: string
+                  generator: {type: constant, value: "historian_01"}
+
+                - name: batch_label
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [batch_a, batch_b, batch_c]
+                    weights: [0.5, 0.3, 0.2]
+
+              chaos:
+                outlier_rate: 0.05          # 5% — deliberately aggressive
+                outlier_factor: 5.0         # Extreme outliers
+                duplicate_rate: 0.03        # 3% — simulates network retransmission
+        write:
+          connection: output
+          format: parquet
+          path: bronze/late_arriving_data.parquet
+          mode: overwrite

@@ -1,0 +1,162 @@
+project: wastewater_treatment
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: wwtp
+    nodes:
+      - name: treatment_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "15m"
+                row_count: 672            # 7 days
+                seed: 42
+              entities:
+                names: [Influent, Primary, Aeration, Secondary, Effluent]
+              columns:
+                - name: stage_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Influent flow — diurnal variation via random walk
+                - name: flow_mgd
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 12.0
+                    min: 6.0
+                    max: 20.0
+                    volatility: 0.3
+                    mean_reversion: 0.05
+                    precision: 2
+                  entity_overrides:
+                    Primary:
+                      type: derived
+                      expression: "Influent.flow_mgd * 0.98"
+                    Aeration:
+                      type: derived
+                      expression: "Primary.flow_mgd * 0.95"
+                    Secondary:
+                      type: derived
+                      expression: "Aeration.flow_mgd * 0.97"
+                    Effluent:
+                      type: derived
+                      expression: "Secondary.flow_mgd * 0.99"
+
+                # BOD concentration — decreases through treatment
+                - name: bod_mg_l
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 180.0
+                    max: 280.0
+                    distribution: normal
+                    mean: 220.0
+                    std_dev: 25.0
+                  entity_overrides:
+                    Primary:
+                      type: derived
+                      expression: "Influent.bod_mg_l * 0.65"
+                    Aeration:
+                      type: derived
+                      expression: "Primary.bod_mg_l * 0.15"
+                    Secondary:
+                      type: derived
+                      expression: "Aeration.bod_mg_l * 0.60"
+                    Effluent:
+                      type: derived
+                      expression: "Secondary.bod_mg_l * 0.85"
+
+                # TSS — total suspended solids
+                - name: tss_mg_l
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 150.0
+                    max: 300.0
+                    distribution: normal
+                    mean: 200.0
+                    std_dev: 30.0
+                  entity_overrides:
+                    Primary:
+                      type: derived
+                      expression: "Influent.tss_mg_l * 0.50"
+                    Aeration:
+                      type: derived
+                      expression: "Primary.tss_mg_l * 0.30"
+                    Secondary:
+                      type: derived
+                      expression: "Aeration.tss_mg_l * 0.25"
+                    Effluent:
+                      type: derived
+                      expression: "Secondary.tss_mg_l * 0.80"
+
+                # DO — actively managed in aeration, residual downstream
+                - name: do_mg_l
+                  data_type: float
+                  generator:
+                    type: constant
+                    value: 0.0
+                  entity_overrides:
+                    Aeration:
+                      type: random_walk
+                      start: 2.0
+                      min: 0.5
+                      max: 4.0
+                      volatility: 0.1
+                      mean_reversion: 0.2
+                      precision: 2
+                    Secondary:
+                      type: derived
+                      expression: "Aeration.do_mg_l * 0.6"
+                    Effluent:
+                      type: derived
+                      expression: "Secondary.do_mg_l * 0.8"
+
+                # pH — relatively stable through treatment
+                - name: ph
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 6.8
+                    max: 7.5
+                    distribution: normal
+                    mean: 7.1
+                    std_dev: 0.15
+
+              # Storm event — surge flow for 6 hours
+              scheduled_events:
+                - type: forced_value
+                  entity: Influent
+                  column: flow_mgd
+                  value: 18.5
+                  start_time: "2026-03-04T02:00:00Z"
+                  end_time: "2026-03-04T08:00:00Z"
+
+              chaos:
+                outlier_rate: 0.003
+                outlier_factor: 2.0
+        write:
+          connection: output
+          format: parquet
+          path: bronze/wwtp_data.parquet
+          mode: overwrite

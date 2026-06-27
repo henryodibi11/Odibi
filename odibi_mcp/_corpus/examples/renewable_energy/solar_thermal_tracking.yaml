@@ -1,0 +1,104 @@
+# Solar Thermal Energy Storage - HTF Temperature Tracking Ambient
+#
+# Demonstrates mean_reversion_to parameter for realistic process simulation.
+# 
+# Scenario:
+# - Solar thermal plant with heat transfer fluid (HTF) loop
+# - Ambient temperature varies throughout the day (diurnal cycle)
+# - HTF temperature drifts toward ambient when not actively heated
+# - Solar irradiance drives heating, fighting against ambient losses
+#
+# This shows how mean_reversion_to enables realistic thermal dynamics:
+# the HTF doesn't revert to a fixed setpoint but follows changing ambient.
+
+entities:
+  - name: HTF_Loop
+    count: 1
+
+start_time: "2026-03-11T00:00:00Z"
+end_time: "2026-03-11T23:59:00Z"
+timestep_seconds: 600  # 10-minute intervals
+
+seed: 2026
+
+columns:
+  # Timestamp
+  - name: timestamp
+    generator:
+      type: timestamp
+
+  # Ambient temperature follows diurnal cycle
+  # Peak around noon (35°C), low at night (15°C)
+  - name: ambient_temp_c
+    generator:
+      type: derived
+      expression: "25.0 + 10.0 * sin((hour_of_day - 6) * 3.14159 / 12.0)"
+    
+  - name: hour_of_day
+    generator:
+      type: derived
+      expression: "int(timestamp[11:13])"  # Extract hour from ISO timestamp
+
+  # Solar irradiance (W/m²) - peaks at noon
+  - name: solar_irradiance_w_m2
+    generator:
+      type: random_walk
+      start: 500.0
+      min: 0.0
+      max: 1000.0
+      volatility: 50.0
+      mean_reversion: 0.1
+      # Could also make this derived from hour_of_day for more realistic diurnal pattern
+
+  # HTF inlet temperature - without active heating, drifts toward ambient
+  # With solar gain, heats up above ambient
+  # This is the KEY use case for mean_reversion_to
+  - name: htf_inlet_temp_c
+    generator:
+      type: random_walk
+      start: 300.0
+      min: 200.0
+      max: 400.0
+      volatility: 2.0
+      mean_reversion: 0.05  # Slowly drifts toward ambient (thermal losses)
+      mean_reversion_to: ambient_temp_c  # Reverts to DYNAMIC ambient, not static 300°C
+
+  # Solar heat gain rate (kW) - depends on irradiance
+  - name: solar_heat_gain_kw
+    generator:
+      type: derived
+      expression: "solar_irradiance_w_m2 * 100.0 / 1000.0"  # 100 m² collector area
+
+  # HTF outlet temperature - inlet + solar gain effect
+  - name: htf_outlet_temp_c
+    generator:
+      type: derived
+      expression: "htf_inlet_temp_c + (solar_heat_gain_kw / 50.0)"  # Simplified heat balance
+
+  # Temperature lift (outlet - inlet)
+  - name: temp_lift_c
+    generator:
+      type: derived
+      expression: "htf_outlet_temp_c - htf_inlet_temp_c"
+
+  # Thermal efficiency indicator
+  - name: thermal_efficiency_pct
+    generator:
+      type: derived
+      expression: "min(100.0, temp_lift_c / 50.0 * 100.0)"
+
+  # Heat loss to ambient (kW) - proportional to temperature difference
+  - name: heat_loss_to_ambient_kw
+    generator:
+      type: derived
+      expression: "max(0.0, (htf_inlet_temp_c - ambient_temp_c) * 0.5)"
+
+# This example demonstrates the power of mean_reversion_to:
+# - Without it, HTF would revert to 300°C (start value) regardless of ambient
+# - With it, HTF naturally cools toward ambient at night, heats during day
+# - Much more realistic thermal simulation for renewable energy systems
+#
+# Similar applications:
+# - Battery temperature tracking cabin/ambient temperature
+# - Wind turbine gearbox oil temperature following outdoor conditions
+# - Hydrogen electrolyzer stack temperature with cooling system

@@ -1,0 +1,127 @@
+project: schema_evolution
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: schema_test
+    nodes:
+      # ── Node 1: Simulate bronze data ──
+      - name: bronze_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "5m"
+                row_count: 288             # 24 hours
+                seed: 42
+              entities:
+                count: 1
+                id_prefix: "source_"
+              columns:
+                - name: source_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: measurement_a
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 50
+                    min: 0
+                    max: 100
+                    volatility: 2.0
+                    mean_reversion: 0.1
+                    precision: 2
+
+                - name: measurement_b
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 10
+                    max: 90
+                    distribution: normal
+                    mean: 50
+                    std_dev: 15
+
+                - name: status_code
+                  data_type: int
+                  generator:
+                    type: categorical
+                    values: [0, 1, 2, 3]
+                    weights: [0.80, 0.10, 0.07, 0.03]
+
+                - name: category
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [type_a, type_b, type_c]
+                    weights: [0.5, 0.3, 0.2]
+        write:
+          connection: output
+          format: parquet
+          path: bronze/schema_test.parquet
+          mode: overwrite
+
+      # ── Node 2: Transform bronze → silver ──
+      - name: silver_data
+        read:
+          connection: output
+          format: parquet
+          path: bronze/schema_test.parquet
+        transform:
+          steps:
+            - sql: >
+                SELECT
+                  source_id,
+                  timestamp,
+                  measurement_a AS sensor_reading,
+                  measurement_b AS reference_value,
+                  status_code,
+                  category,
+                  measurement_a - measurement_b AS delta,
+                  CASE
+                    WHEN status_code = 0 THEN 'ok'
+                    WHEN status_code = 1 THEN 'warn'
+                    WHEN status_code = 2 THEN 'error'
+                    ELSE 'critical'
+                  END AS status_label
+                FROM df
+        validation:
+          mode: warn
+          tests:
+            - type: not_null
+              columns: [sensor_reading, reference_value, delta]
+              on_fail: quarantine
+            - type: range
+              column: sensor_reading
+              min: 0
+              max: 100
+              on_fail: quarantine
+          quarantine:
+            connection: output
+            path: quarantine/schema_test
+            add_columns:
+              rejection_reason: true
+              rejected_at: true
+        write:
+          connection: output
+          format: parquet
+          path: silver/schema_test.parquet
+          mode: overwrite

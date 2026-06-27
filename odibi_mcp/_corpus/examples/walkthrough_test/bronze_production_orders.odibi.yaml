@@ -1,0 +1,55 @@
+# Generated from Bronze Walkthrough - BRZ_001
+# Source: B1_Row1 (SAP ERP - AFKO Production Orders)
+
+project: walkthrough_test
+
+connections:
+  sap_erp_prod:
+    type: sql_server
+    host: sapsql.example.com
+    database: SAPPR1
+    auth:
+      mode: connection_string
+      connection_string: ${SAP_ERP_CONN}
+  delta_lake:
+    type: local
+    base_path: ./data/lake
+
+story:
+  connection: delta_lake
+  path: _stories
+
+system:
+  connection: delta_lake
+
+pipelines:
+  - pipeline: bronze_production
+    tags: [daily, critical, production]
+    nodes:
+      - name: bronze_production_orders
+        description: "Land production orders from SAP as-is (Bronze = no transforms)"
+
+        read:
+          connection: sap_erp_prod
+          format: sql
+          table: SAPPR1.dbo.AFKO
+          # Incremental load belongs inside read:
+          incremental:
+            mode: rolling_window
+            column: AEDAT
+            lookback: 3
+            unit: day
+            fallback_column: ERDAT
+
+        write:
+          connection: delta_lake
+          format: delta
+          path: bronze/production/orders
+          mode: append  # Bronze always appends
+
+        validation:
+          tests:
+            - type: not_null
+              columns: [AUFNR]
+            - type: row_count
+              min: 1

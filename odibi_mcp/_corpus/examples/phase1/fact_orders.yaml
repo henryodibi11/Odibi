@@ -1,0 +1,51 @@
+pipelines:
+- pipeline: load_daily_orders
+  layer: gold
+  freshness_anchor: run_completion
+  nodes:
+  - name: fact_node
+    enabled: true
+    tags: []
+    depends_on: []
+    columns: {}
+    read:
+      connection: sales_db
+      format: sql
+      streaming: false
+      query: "\n            SELECT \n                order_id,\n                customer_id,\n\
+        \                product_id,\n                order_date,\n              \
+        \  quantity,\n                unit_price,\n                total_amount,\n\
+        \                status\n            FROM dbo.Orders\n            WHERE order_date\
+        \ >= CAST(GETDATE() AS DATE)\n        "
+      archive_options: {}
+      options:
+        query: "\n            SELECT \n                order_id,\n               \
+          \ customer_id,\n                product_id,\n                order_date,\n\
+          \                quantity,\n                unit_price,\n              \
+          \  total_amount,\n                status\n            FROM dbo.Orders\n\
+          \            WHERE order_date >= CAST(GETDATE() AS DATE)\n        "
+    write:
+      connection: warehouse
+      format: delta
+      path: gold/fact_orders
+      mode: upsert
+      partition_by: []
+      zorder_by: []
+      table_properties: {}
+      merge_schema: false
+      overwrite_schema: false
+      options:
+        keys:
+        - order_id
+      skip_if_unchanged: false
+    streaming: false
+    transformer: fact
+    params:
+      keys:
+      - order_id
+    pre_sql: []
+    post_sql: []
+    cache: false
+    on_error: fail_later
+    contracts: []
+    sensitive: false

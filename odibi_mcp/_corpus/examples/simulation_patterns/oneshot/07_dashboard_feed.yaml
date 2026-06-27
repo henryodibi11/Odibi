@@ -1,0 +1,75 @@
+project: dashboard_feed
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: daily_feed
+    nodes:
+      - name: kpi_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "15m"
+                row_count: 96             # 24 hours at 15-min intervals
+                seed: 42
+              entities:
+                names: [plant_north, plant_south, plant_east]
+              columns:
+                - name: plant_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: throughput_tons
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 120.0
+                    min: 80.0
+                    max: 160.0
+                    volatility: 2.0
+                    mean_reversion: 0.1
+                    precision: 1
+
+                - name: quality_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 92.0
+                    max: 99.5
+                    distribution: normal
+                    mean: 97.0
+                    std_dev: 1.5
+
+                - name: energy_kwh
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "throughput_tons * 8.5 + (random() - 0.5) * 20"
+
+                - name: downtime_min
+                  data_type: int
+                  generator: {type: range, min: 0, max: 15}
+
+        write:
+          connection: output
+          format: parquet
+          path: gold/plant_kpis
+          mode: overwrite

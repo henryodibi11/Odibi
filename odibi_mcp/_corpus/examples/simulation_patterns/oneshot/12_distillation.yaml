@@ -1,0 +1,179 @@
+project: distillation_column
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: distillation
+    nodes:
+      - name: column_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "5m"
+                row_count: 288            # 24 hours
+                seed: 42
+              entities:
+                names: [Column_01]
+              columns:
+                - name: column_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Feed conditions — these are the independent variables
+                - name: feed_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 75.0
+                    min: 65.0
+                    max: 85.0
+                    volatility: 0.5
+                    mean_reversion: 0.08
+                    precision: 1
+
+                - name: feed_flow_kg_hr
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 5000.0
+                    min: 4000.0
+                    max: 6000.0
+                    volatility: 20.0
+                    mean_reversion: 0.1
+                    precision: 0
+
+                - name: feed_composition
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 0.45
+                    min: 0.35
+                    max: 0.55
+                    volatility: 0.005
+                    mean_reversion: 0.05
+                    precision: 3
+
+                # Operating parameters
+                - name: reflux_ratio
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 2.5
+                    min: 1.5
+                    max: 4.0
+                    volatility: 0.05
+                    mean_reversion: 0.1
+                    precision: 2
+
+                - name: reboiler_duty_kw
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 800.0
+                    min: 600.0
+                    max: 1000.0
+                    volatility: 5.0
+                    mean_reversion: 0.1
+                    precision: 0
+
+                # Mid-column temp tracks feed temp (dynamic mean_reversion_to)
+                - name: tray_10_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 82.0
+                    min: 70.0
+                    max: 95.0
+                    volatility: 0.3
+                    mean_reversion: 0.15
+                    mean_reversion_to: feed_temp_c
+                    precision: 1
+
+                - name: overhead_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 65.0
+                    min: 55.0
+                    max: 75.0
+                    volatility: 0.2
+                    mean_reversion: 0.12
+                    precision: 1
+
+                - name: bottoms_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 105.0
+                    min: 95.0
+                    max: 115.0
+                    volatility: 0.3
+                    mean_reversion: 0.1
+                    precision: 1
+
+                # Overhead purity depends on reflux and feed composition
+                - name: overhead_purity
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      min(0.99, max(0.85,
+                      0.95 + (reflux_ratio - 2.5) * 0.02
+                      - (feed_composition - 0.45) * 0.1))
+
+                # Energy balance: condenser duty tracks reboiler
+                - name: condenser_duty_kw
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "reboiler_duty_kw * 0.85 + feed_flow_kg_hr * 0.02"
+
+                # Column pressure drop — indicates flooding
+                - name: column_dp_kpa
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 12.0
+                    min: 8.0
+                    max: 20.0
+                    volatility: 0.2
+                    mean_reversion: 0.1
+                    precision: 1
+
+                - name: flooding_risk
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "column_dp_kpa > 16.0"
+
+              # Feed composition upset at hour 12
+              scheduled_events:
+                - type: forced_value
+                  entity: Column_01
+                  column: feed_composition
+                  value: 0.55
+                  start_time: "2026-03-10T12:00:00Z"
+                  end_time: "2026-03-10T14:00:00Z"
+        write:
+          connection: output
+          format: parquet
+          path: bronze/distillation_data.parquet
+          mode: overwrite

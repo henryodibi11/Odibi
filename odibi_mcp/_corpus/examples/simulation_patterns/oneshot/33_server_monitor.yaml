@@ -1,0 +1,120 @@
+project: server_monitoring
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: server_metrics
+    nodes:
+      - name: metric_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "1m"
+                row_count: 1440            # 24 hours
+                seed: 42
+              entities:
+                count: 8
+                id_prefix: "srv_"
+              columns:
+                - name: server_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: ip_address
+                  data_type: string
+                  generator:
+                    type: ipv4
+                    subnet: "10.0.1.0/24"
+
+                - name: admin_email
+                  data_type: string
+                  generator:
+                    type: email
+                    domain: "ops.example.com"
+                    pattern: "{entity}_{index}"
+
+                - name: cpu_pct
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 30
+                    min: 0
+                    max: 100
+                    volatility: 3.0
+                    mean_reversion: 0.08
+                    precision: 1
+
+                # Memory leak — 0.3% per row, ~4.3% per hour
+                - name: memory_pct
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 40
+                    min: 0
+                    max: 100
+                    volatility: 1.0
+                    mean_reversion: 0.02
+                    trend: 0.003
+                    precision: 1
+
+                - name: disk_io_mbps
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 0
+                    max: 500
+                    distribution: normal
+                    mean: 80
+                    std_dev: 50
+
+                - name: network_mbps
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 100
+                    min: 0
+                    max: 1000
+                    volatility: 10
+                    mean_reversion: 0.1
+                    precision: 0
+
+                - name: error_count
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 0
+                    max: 5
+
+                - name: alert_level
+                  data_type: string
+                  generator:
+                    type: derived
+                    expression: "'critical' if cpu_pct > 90 or memory_pct > 90 else 'warning' if cpu_pct > 75 or memory_pct > 75 else 'normal'"
+
+              chaos:
+                outlier_rate: 0.005
+                outlier_factor: 2.0
+
+        write:
+          connection: output
+          format: parquet
+          path: bronze/server_monitoring.parquet
+          mode: overwrite

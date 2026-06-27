@@ -1,0 +1,119 @@
+project: packaging_spc
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: packaging
+    nodes:
+      - name: spc_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T06:00:00Z"
+                timestep: "1m"
+                row_count: 480            # 8-hour shift
+                seed: 42
+              entities:
+                names: [Line_01]
+              columns:
+                - name: line_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Fill weight clustered around 500g (SPC target)
+                - name: fill_weight_g
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 495.0
+                    max: 505.0
+                    distribution: normal
+                    mean: 500.0
+                    std_dev: 1.2
+
+                - name: seal_pressure_bar
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 3.0
+                    min: 2.0
+                    max: 4.5
+                    volatility: 0.1
+                    mean_reversion: 0.15
+                    precision: 2
+
+                # Label deviation from center
+                - name: label_position_mm
+                  data_type: float
+                  generator:
+                    type: range
+                    min: -1.0
+                    max: 1.0
+                    distribution: normal
+                    mean: 0.0
+                    std_dev: 0.3
+
+                - name: packages_per_min
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 55.0
+                    max: 65.0
+                    distribution: normal
+                    mean: 60.0
+                    std_dev: 2.0
+
+                # Reject if fill weight out of spec or label misaligned
+                - name: reject_flag
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "fill_weight_g < 497 or fill_weight_g > 503 or abs(label_position_mm) > 0.8"
+
+              chaos:
+                outlier_rate: 0.008       # ~4 outliers per shift
+                outlier_factor: 2.5
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        validation:
+          mode: warn
+          tests:
+            - type: range
+              column: fill_weight_g
+              min: 496.0
+              max: 504.0
+              on_fail: quarantine
+            - type: not_null
+              columns: [fill_weight_g, seal_pressure_bar]
+              on_fail: quarantine
+          quarantine:
+            connection: output
+            path: quarantine/packaging_rejects
+            add_columns:
+              rejection_reason: true
+              rejected_at: true
+
+        write:
+          connection: output
+          format: delta
+          path: bronze/packaging_spc.parquet
+          mode: append

@@ -1,0 +1,126 @@
+project: api_performance
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: api_metrics
+    nodes:
+      - name: api_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "1m"
+                row_count: 1440            # 24 hours
+                seed: 42
+              entities:
+                names: [api_users, api_orders, api_payments, api_inventory]
+              columns:
+                - name: endpoint
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: request_count
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 10
+                    max: 500
+                    distribution: normal
+                    mean: 150
+                    std_dev: 60
+
+                # Payment endpoint is slower (external gateway)
+                - name: latency_p50_ms
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 5
+                    max: 200
+                    distribution: normal
+                    mean: 45
+                    std_dev: 20
+                  entity_overrides:
+                    api_payments:
+                      type: range
+                      min: 20
+                      max: 500
+                      distribution: normal
+                      mean: 120
+                      std_dev: 40
+
+                # p99 typically 3-5x p50
+                - name: latency_p99_ms
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(latency_p50_ms * 3.0 + random() * 50, 1)"
+
+                - name: error_rate_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 0
+                    max: 5.0
+                    distribution: normal
+                    mean: 0.5
+                    std_dev: 0.5
+
+                - name: status_2xx
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "int(request_count * (1.0 - error_rate_pct / 100.0))"
+
+                # 70% of errors are client errors
+                - name: status_4xx
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "int(request_count * error_rate_pct / 100.0 * 0.7)"
+
+                # Remainder are server errors
+                - name: status_5xx
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "max(0, request_count - status_2xx - status_4xx)"
+
+                # Requests per second over 1-min window
+                - name: throughput_rps
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(request_count / 60.0, 2)"
+
+              # Deployment spike on orders endpoint
+              scheduled_events:
+                - type: forced_value
+                  entity: api_orders
+                  column: latency_p50_ms
+                  value: 180
+                  start_time: "2026-03-10T03:00:00Z"
+                  end_time: "2026-03-10T03:15:00Z"
+
+        write:
+          connection: output
+          format: parquet
+          path: bronze/api_performance.parquet
+          mode: overwrite

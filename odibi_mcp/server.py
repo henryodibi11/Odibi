@@ -14,6 +14,13 @@ import os
 import sys
 from pathlib import Path
 
+# MCP speaks JSON-RPC over STDOUT, so any log line written to stdout corrupts the
+# protocol stream. Install a stderr root handler up front: this makes odibi's later
+# logging.basicConfig(stream=sys.stdout) calls no-ops (basicConfig won't reconfigure
+# when the root logger already has handlers), keeping stdout clean — without touching
+# odibi's global logging used outside the MCP server.
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+
 # Ensure odibi is importable
 ODIBI_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ODIBI_ROOT))
@@ -317,6 +324,93 @@ Shows user what's possible, then call get_task_guidance for details.""",
                 "type": "object",
                 "properties": {},
                 "required": [],
+            },
+        ),
+        # ============ AGENT ENABLEMENT: onboarding, skills, docs, schema ============
+        Tool(
+            name="onboard",
+            description="""START HERE. Orient on Odibi: returns the assistant instructions,
+the list of loadable skills, and the canonical discover→author→validate→run→inspect
+workflow. Call this first, then load the 'odibi' skill with get_skill.""",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
+        Tool(
+            name="list_skills",
+            description="""List loadable Odibi skills (name + description). Skills are concise
+procedural guides (pipeline authoring, connections, validation, engine parity, databricks).
+Load one with get_skill when you reach that step.""",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
+        Tool(
+            name="get_skill",
+            description="""Load a skill's full guidance by name (see list_skills). Returns the
+procedural how-to so you don't have to improvise across Odibi's rich surface.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"name": {"type": "string", "description": "Skill name, e.g. 'pipeline-yaml-authoring'"}},
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="get_schema",
+            description="""Get the live JSON Schema for the Odibi config (generated from the
+Pydantic models, so always in sync). Authoritative list of valid keys/types/enums for
+authoring YAML — call before guessing a field name. Omit section for the full ProjectConfig,
+or pass one of: project, pipeline, node, read, write, transform, validation.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"section": {"type": "string", "description": "Optional sub-model name"}},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="search_docs",
+            description="""Search the full Odibi documentation for a keyword/phrase. Returns
+matching docs with line snippets. Use to find how-to/reference content across the rich docs.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"query": {"type": "string", "description": "Search term"}},
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="get_doc",
+            description="""Read a documentation file by relative path (e.g. 'docs/patterns/scd2.md',
+from search_docs/list_docs results). Returns the full markdown.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"doc_path": {"type": "string", "description": "Relative doc path"}},
+                "required": ["doc_path"],
+            },
+        ),
+        Tool(
+            name="list_docs",
+            description="""List available docs (priority docs + categories), or pass a category
+(patterns, tutorials, guides, features, reference, examples, context) to list its docs.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"category": {"type": "string", "description": "Optional category"}},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="list_examples",
+            description="""List runnable example pipeline YAMLs (optionally filtered by a substring
+of the path). Use get_example to fetch one. Agents author faster from a working example.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"pattern": {"type": "string", "description": "Optional path substring filter"}},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_example",
+            description="""Get a worked example pipeline (YAML + explanation) by pattern/name.
+See list_examples or list_patterns for available names.""",
+            inputSchema={
+                "type": "object",
+                "properties": {"pattern_name": {"type": "string", "description": "Example/pattern name"}},
+                "required": ["pattern_name"],
             },
         ),
         # ============ PHASE 1: CONSTRUCTION TOOLS ============
@@ -1723,9 +1817,25 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = knowledge.validate_yaml(arguments["yaml_content"])
         elif name == "diagnose_error":
             result = knowledge.diagnose_error(arguments["error_message"])
-        # REMOVED: get_example - AI can grep examples/
-        # elif name == "get_example":
-        #     result = knowledge.get_example(arguments["pattern_name"])
+        # ============ AGENT ENABLEMENT: onboarding, skills, docs, schema ============
+        elif name == "onboard":
+            result = knowledge.onboard()
+        elif name == "list_skills":
+            result = knowledge.list_skills()
+        elif name == "get_skill":
+            result = knowledge.get_skill(arguments["name"])
+        elif name == "get_schema":
+            result = knowledge.get_schema(arguments.get("section"))
+        elif name == "search_docs":
+            result = knowledge.search_docs(arguments["query"])
+        elif name == "get_doc":
+            result = knowledge.get_doc(arguments["doc_path"])
+        elif name == "list_docs":
+            result = knowledge.list_docs(arguments.get("category"))
+        elif name == "list_examples":
+            result = knowledge.list_examples(arguments.get("pattern"))
+        elif name == "get_example":
+            result = knowledge.get_example(arguments["pattern_name"])
         # REMOVED: suggest_pattern - covered by explain
         # elif name == "suggest_pattern":
         #     result = knowledge.suggest_pattern(arguments["use_case"])
