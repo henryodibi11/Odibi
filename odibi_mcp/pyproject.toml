@@ -16,6 +16,7 @@ rag = [
 
 [project.scripts]
 odibi-mcp = "odibi_mcp.server:run"
+odibi-mcp-http = "odibi_mcp.databricks_app:main"
 
 [build-system]
 requires = ["hatchling"]
