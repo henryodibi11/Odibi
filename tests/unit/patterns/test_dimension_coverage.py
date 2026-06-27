@@ -518,6 +518,9 @@ class TestSCD2:
                     "is_current": [False, True, True],
                 }
             )
+            # Real scd2 writes the full history to the target; the mock must too so
+            # _execute_scd2's re-read (which assigns/persists the SK) sees it.
+            rows.to_parquet(params.target, index=False)
             return ctx.with_df(rows)
 
         with patch("odibi.patterns.dimension.scd2", side_effect=fake_scd2):
@@ -569,6 +572,9 @@ class TestSCD2:
                     "is_current": [False, True, True],
                 }
             )
+            # Real scd2 writes the full history to the target; the mock must too so
+            # _execute_scd2's re-read (which fills + persists the SK) sees it.
+            rows.to_parquet(params.target, index=False)
             return ctx.with_df(rows)
 
         with patch("odibi.patterns.dimension.scd2", side_effect=fake_scd2):
