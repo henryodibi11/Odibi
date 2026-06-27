@@ -1,0 +1,109 @@
+project: smart_meter_network
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: meters
+    nodes:
+      - name: meter_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "15m"
+                row_count: 96             # 24 hours
+                seed: 42
+              entities:
+                count: 50
+                id_prefix: "meter_"
+              columns:
+                - name: meter_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Network address — /16 subnet accommodates large populations
+                - name: ip_address
+                  data_type: string
+                  generator:
+                    type: ipv4
+                    subnet: "10.100.0.0/16"
+
+                - name: consumption_kwh
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 0.5
+                    min: 0.0
+                    max: 5.0
+                    volatility: 0.2
+                    mean_reversion: 0.1
+                    precision: 3
+
+                # Voltage clustered around 240V (utility grid spec)
+                - name: voltage_v
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 228.0
+                    max: 252.0
+                    distribution: normal
+                    mean: 240.0
+                    std_dev: 3.0
+
+                - name: power_factor
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 0.85
+                    max: 1.0
+                    distribution: normal
+                    mean: 0.95
+                    std_dev: 0.03
+
+                - name: signal_strength_dbm
+                  data_type: float
+                  generator:
+                    type: range
+                    min: -90.0
+                    max: -30.0
+                    distribution: normal
+                    mean: -60.0
+                    std_dev: 10.0
+
+                - name: meter_status
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [active, warning, offline]
+                    weights: [0.95, 0.04, 0.01]
+
+              chaos:
+                outlier_rate: 0.01
+                outlier_factor: 3.0
+                duplicate_rate: 0.005     # AMI network retransmissions
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/smart_meters.parquet
+          mode: append

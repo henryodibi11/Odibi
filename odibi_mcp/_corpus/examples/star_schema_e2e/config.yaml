@@ -1,0 +1,181 @@
+project: star_schema_e2e
+description: |
+  Task 21 — End-to-end star schema integration test.
+  Builds dim_date, dim_customer (SCD1), dim_product (SCD2), and fact_orders
+  with FK lookups inside Unity Catalog. The companion script
+  `star_schema_e2e.py` is the executable test (Spark / Databricks Connect)
+  while this YAML is the canonical declarative description and validates
+  against `ProjectConfig`.
+engine: spark
+
+vars:
+  catalog: eaai_dev
+  schema: hardening_scratch
+
+connections:
+  source:
+    type: delta
+    catalog: ${vars.catalog}
+    schema: ${vars.schema}
+  warehouse:
+    type: delta
+    catalog: ${vars.catalog}
+    schema: ${vars.schema}
+  workspace_local:
+    type: local
+    base_path: ./_odibi_star_schema_e2e
+
+system:
+  connection: workspace_local
+  path: _odibi_system
+  environment: hardening
+
+story:
+  connection: workspace_local
+  path: stories
+  retention_days: 7
+
+pipelines:
+  - pipeline: star_schema_build
+    layer: gold
+    nodes:
+      - name: dim_date
+        transformer: date_dimension
+        params:
+          start_date: "2024-01-01"
+          end_date: "2024-12-31"
+          fiscal_year_start_month: 1
+          unknown_member: true
+        validation:
+          tests:
+            - type: not_null
+              columns: [date_sk]
+            - type: unique
+              columns: [date_sk]
+            - type: row_count
+              min: 367
+              max: 367
+          gate:
+            min_pass_rate: 1.0
+            on_fail: abort
+        write:
+          connection: warehouse
+          format: delta
+          table: dim_date
+          mode: overwrite
+
+      - name: dim_customer
+        depends_on: [dim_date]
+        read:
+          connection: source
+          format: delta
+          table: src_customer
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 1
+          track_cols: [name, email, segment, country]
+          target: ${vars.catalog}.${vars.schema}.dim_customer
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: stress_test
+        validation:
+          tests:
+            - type: not_null
+              columns: [customer_sk]
+            - type: unique
+              columns: [customer_sk]
+          gate:
+            min_pass_rate: 1.0
+            on_fail: abort
+        write:
+          connection: warehouse
+          format: delta
+          table: dim_customer
+          mode: overwrite
+
+      - name: dim_product
+        depends_on: [dim_date]
+        read:
+          connection: source
+          format: delta
+          table: src_product
+        transformer: dimension
+        params:
+          natural_key: product_id
+          surrogate_key: product_sk
+          scd_type: 2
+          track_cols: [price, category]
+          target: ${vars.catalog}.${vars.schema}.dim_product
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: stress_test
+        validation:
+          tests:
+            - type: not_null
+              columns: [product_sk]
+            - type: unique
+              columns: [product_sk]
+          gate:
+            min_pass_rate: 1.0
+            on_fail: abort
+        write:
+          connection: warehouse
+          format: delta
+          table: dim_product
+          mode: overwrite
+
+      - name: fact_orders
+        depends_on: [dim_date, dim_customer, dim_product]
+        read:
+          connection: source
+          format: delta
+          table: src_orders
+        transformer: fact
+        params:
+          grain: [order_id]
+          deduplicate: true
+          keys: [order_id]
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+            - source_column: product_id
+              dimension_table: dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
+              scd2: true
+            - source_column: order_date_sk
+              dimension_table: dim_date
+              dimension_key: date_sk
+              surrogate_key: date_sk
+          orphan_handling: unknown
+          measures:
+            - quantity
+            - unit_price
+            - extended_amount: "quantity * unit_price"
+          audit:
+            load_timestamp: true
+            source_system: stress_test
+        validation:
+          tests:
+            - type: not_null
+              columns: [order_id]
+            - type: unique
+              columns: [order_id]
+            - type: row_count
+              min: 9000
+          gate:
+            min_pass_rate: 0.95
+            on_fail: abort
+        write:
+          connection: warehouse
+          format: delta
+          table: fact_orders
+          mode: upsert
+          options:
+            keys: [order_id]

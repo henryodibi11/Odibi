@@ -1,0 +1,130 @@
+project: air_quality
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: aq_monitoring
+    nodes:
+      - name: aq_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "1h"
+                row_count: 168            # 7 days
+                seed: 42
+              entities:
+                names: [AQM_Downtown, AQM_Industrial, AQM_Suburban, AQM_Highway]
+              columns:
+                - name: station_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # PM2.5 with upward trend — accumulating pollution
+                - name: pm25_ug_m3
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 12.0
+                    min: 0.0
+                    max: 200.0
+                    volatility: 2.0
+                    mean_reversion: 0.05
+                    trend: 0.03
+                    precision: 1
+                  entity_overrides:
+                    AQM_Industrial:        # Worse air quality near factories
+                      type: random_walk
+                      start: 35.0
+                      min: 5.0
+                      max: 300.0
+                      volatility: 4.0
+                      mean_reversion: 0.03
+                      trend: 0.05
+                      precision: 1
+
+                # PM10 typically ~1.5-2x PM2.5
+                - name: pm10_ug_m3
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(pm25_ug_m3 * 1.8 + random() * 5, 1)"
+
+                - name: ozone_ppb
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 30.0
+                    min: 0.0
+                    max: 120.0
+                    volatility: 3.0
+                    mean_reversion: 0.08
+                    precision: 1
+
+                - name: co_ppm
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 0.1
+                    max: 4.0
+                    distribution: normal
+                    mean: 0.8
+                    std_dev: 0.5
+                  entity_overrides:
+                    AQM_Highway:            # Highway traffic — elevated CO
+                      type: range
+                      min: 0.5
+                      max: 8.0
+                      distribution: normal
+                      mean: 3.0
+                      std_dev: 1.0
+
+                - name: no2_ppb
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 5
+                    max: 60
+                    distribution: normal
+                    mean: 25
+                    std_dev: 10
+
+                # Simplified AQI — worst pollutant determines score
+                - name: aqi
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "int(max(pm25_ug_m3 * 2.0, ozone_ppb * 1.5, co_ppm * 25))"
+
+                # Health advisory mapped to EPA breakpoints
+                - name: health_advisory
+                  data_type: string
+                  generator:
+                    type: derived
+                    expression: "'hazardous' if aqi > 300 else 'very_unhealthy' if aqi > 200 else 'unhealthy' if aqi > 150 else 'unhealthy_sensitive' if aqi > 100 else 'moderate' if aqi > 50 else 'good'"
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/air_quality.parquet
+          mode: append

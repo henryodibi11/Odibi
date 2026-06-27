@@ -1,0 +1,98 @@
+project: integration_test
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: multi_system
+    nodes:
+      - name: system_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "10m"
+                row_count: 144            # 24 hours
+                seed: 42
+              entities:
+                names: [SystemA_Producer, SystemB_Processor, SystemC_Storage]
+              columns:
+                - name: system_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # System A: produces raw events
+                - name: events_produced
+                  data_type: int
+                  generator: {type: range, min: 50, max: 200}
+
+                - name: output_rate
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 100.0
+                    min: 40.0
+                    max: 180.0
+                    volatility: 3.0
+                    mean_reversion: 0.08
+
+                # System B: processes System A's output with conversion factor
+                - name: processed_count
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      SystemA_Producer.output_rate * 0.85
+                      if entity_id == 'SystemB_Processor'
+                      else 0
+
+                # System B: processing latency depends on load
+                - name: latency_ms
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      50 + (SystemA_Producer.output_rate * 0.3)
+                      if entity_id == 'SystemB_Processor'
+                      else 0
+
+                # System C: stores what System B processed
+                - name: records_stored
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      SystemB_Processor.processed_count * 0.98
+                      if entity_id == 'SystemC_Storage'
+                      else 0
+
+                # System C: storage utilization
+                - name: storage_utilization_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      min(100, prev('storage_utilization_pct', 10.0) + SystemC_Storage.records_stored * 0.001)
+                      if entity_id == 'SystemC_Storage'
+                      else 0
+        write:
+          connection: output
+          format: parquet
+          path: bronze/integration_test.parquet
+          mode: overwrite

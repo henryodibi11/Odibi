@@ -1,0 +1,157 @@
+# =============================================================================
+# Validation Pipeline Example — Bronze → Silver with Full Data Quality
+# =============================================================================
+# This is a complete, runnable odibi ProjectConfig.
+# Run with: odibi run config.yaml
+# See docs/tutorials/validation_pipeline.md for the full tutorial.
+
+project: customer_quality_example
+engine: pandas
+
+# ---------------------------------------------------------------------------
+# Connections
+# ---------------------------------------------------------------------------
+connections:
+  raw:
+    type: local
+    base_path: ./data
+  silver:
+    type: local
+    base_path: ./output/silver
+  quarantine_store:
+    type: local
+    base_path: ./output/quarantine
+
+# ---------------------------------------------------------------------------
+# Story & System (required by ProjectConfig)
+# ---------------------------------------------------------------------------
+story:
+  connection: silver
+  path: stories/
+
+system:
+  connection: silver
+  path: _odibi_system
+
+# ---------------------------------------------------------------------------
+# Pipelines
+# ---------------------------------------------------------------------------
+pipelines:
+  - pipeline: customer_quality
+    layer: silver
+
+    nodes:
+      - name: clean_customers
+        read:
+          connection: raw
+          path: bad_data.csv
+          format: csv
+
+        transform:
+          steps:
+            - function: clean_text
+              params:
+                columns: [name, email]
+                trim: true
+                case: lower
+
+        validation:
+          tests:
+            # --- Column-Level Tests (row-level quarantine) ---
+
+            # 1. NOT_NULL: Required fields must not be empty
+            - type: not_null
+              columns: [customer_id, name, email]
+              on_fail: quarantine
+
+            # 2. UNIQUE: Primary key must be unique
+            - type: unique
+              columns: [customer_id]
+              on_fail: quarantine
+
+            # 3. ACCEPTED_VALUES: Status must be in allowed set
+            - type: accepted_values
+              column: status
+              values: [active, inactive, pending]
+              on_fail: quarantine
+
+            # 4. RANGE: Age must be within realistic bounds
+            - type: range
+              column: age
+              min: 0
+              max: 150
+              on_fail: quarantine
+
+            # 5. REGEX_MATCH: Email must match email pattern
+            - type: regex_match
+              column: email
+              pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+              on_fail: quarantine
+
+            # --- Batch-Level Tests (fail or warn) ---
+
+            # 6. ROW_COUNT: Batch must have expected row count
+            - type: row_count
+              min: 1
+              max: 1000000
+
+            # 7. FRESHNESS: Data must be recent (within 720 hours / 30 days)
+            - type: freshness
+              column: updated_at
+              max_age: "720h"
+
+            # 8. VOLUME_DROP: Detect sudden drops vs history
+            - type: volume_drop
+              threshold: 0.5
+              lookback_days: 7
+              on_fail: warn
+
+            # --- Schema & Distribution Tests ---
+
+            # 9. SCHEMA: Validate expected columns exist
+            - type: schema
+              strict: false
+
+            # 10. DISTRIBUTION: Statistical monitoring
+            - type: distribution
+              column: age
+              metric: mean
+              threshold: ">18"
+              on_fail: warn
+
+            # 11. CUSTOM_SQL: Business rule — dates must be ordered
+            - type: custom_sql
+              name: valid_dates
+              condition: "created_at <= updated_at"
+              threshold: 0.01
+
+          # Quarantine config — where failed rows go
+          quarantine:
+            connection: quarantine_store
+            path: customers_quarantine
+            add_columns:
+              _rejection_reason: true
+              _rejected_at: true
+              _source_batch_id: true
+              _failed_tests: true
+            retention_days: 90
+            max_rows: 10000
+
+          # Quality gate — batch-level pass/fail
+          gate:
+            require_pass_rate: 0.95
+            on_fail: abort
+            thresholds:
+              - test: not_null
+                min_pass_rate: 0.99
+              - test: unique
+                min_pass_rate: 1.0
+            row_count:
+              min: 1
+              max: 1000000
+
+        write:
+          connection: silver
+          path: customers
+          format: parquet
+          mode: overwrite

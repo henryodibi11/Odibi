@@ -1,0 +1,123 @@
+project: cold_chain
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: cold_chain
+    nodes:
+      - name: cold_chain_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "5m"
+                row_count: 288            # 24 hours
+                seed: 42
+              entities:
+                names: [Truck_01, Truck_02, Warehouse_Zone_A, Warehouse_Zone_B]
+              columns:
+                - name: unit_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Cold chain target ~2°C
+                - name: temperature_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 2.0
+                    min: -5.0
+                    max: 15.0
+                    volatility: 0.3
+                    mean_reversion: 0.15
+                    precision: 1
+                  entity_overrides:
+                    Truck_01:             # Worse insulation
+                      type: random_walk
+                      start: 2.0
+                      min: -3.0
+                      max: 18.0
+                      volatility: 0.6
+                      mean_reversion: 0.15
+                      precision: 1
+
+                - name: humidity_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 80.0
+                    max: 95.0
+                    distribution: normal
+                    mean: 88.0
+                    std_dev: 3.0
+
+                # Doors open 5% of the time
+                - name: door_open
+                  data_type: boolean
+                  generator: {type: boolean, true_probability: 0.05}
+
+                # Food safety limit: >5°C is an excursion
+                - name: temp_excursion
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "temperature_c > 5.0"
+
+                # Alert routing — realistic emails per entity
+                - name: alert_recipient
+                  data_type: string
+                  generator:
+                    type: email
+                    domain: "coldfresh.example.com"
+                    pattern: "{entity}_{index}"
+
+                # Escalation levels from temperature
+                - name: alert_level
+                  data_type: string
+                  generator:
+                    type: derived
+                    expression: "'critical' if temperature_c > 8.0 else 'warning' if temperature_c > 5.0 else 'normal'"
+
+              # Truck_02 loading dock stop — doors forced open, temp spikes
+              scheduled_events:
+                - type: forced_value
+                  entity: Truck_02
+                  column: door_open
+                  value: true
+                  start_time: "2026-03-10T14:00:00Z"
+                  end_time: "2026-03-10T14:30:00Z"
+
+                # Condition-based: compressor boost when temp exceeds 5°C
+                - type: parameter_override
+                  column: temperature_c
+                  value: 2.0
+                  condition: "temperature_c > 5.0"
+                  cooldown: "2h"
+                  duration: "30m"
+
+              chaos:
+                outlier_rate: 0.005
+                outlier_factor: 2.0
+
+        write:
+          connection: output
+          format: parquet
+          path: bronze/cold_chain.parquet
+          mode: overwrite

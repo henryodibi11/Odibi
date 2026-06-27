@@ -1,0 +1,1120 @@
+{
+  "docs": [
+    {
+      "path": "docs/examples/canonical/01_hello_world.md",
+      "title": "Example 1: Hello World (CSV → Parquet)",
+      "section": "examples",
+      "summary": "title: \"Example 1: Hello World\""
+    },
+    {
+      "path": "docs/examples/canonical/02_incremental_sql.md",
+      "title": "Example 2: Incremental SQL Ingestion (Database → Raw with HWM)",
+      "section": "examples",
+      "summary": "title: \"Example 2: Incremental SQL\""
+    },
+    {
+      "path": "docs/examples/canonical/03_scd2_dimension.md",
+      "title": "Example 3: SCD2 Dimension (Track History)",
+      "section": "examples",
+      "summary": "title: \"Example 3: SCD2 Dimension\""
+    },
+    {
+      "path": "docs/examples/canonical/04_fact_table.md",
+      "title": "Example 4: Fact Table (Star Schema)",
+      "section": "examples",
+      "summary": "title: \"Example 4: Fact Table\""
+    },
+    {
+      "path": "docs/examples/canonical/05_full_pipeline.md",
+      "title": "Example 5: Full Pipeline (Validation + Quarantine + Alerting)",
+      "section": "examples",
+      "summary": "title: \"Example 5: Full Pipeline\""
+    },
+    {
+      "path": "docs/examples/canonical/README.md",
+      "title": "Canonical YAML Examples",
+      "section": "examples",
+      "summary": "Copy-paste ready configs for the 5 most common use cases."
+    },
+    {
+      "path": "docs/examples/canonical/runnable/03_scd2_demo/README.md",
+      "title": "SCD2 History Tracking Demo",
+      "section": "examples",
+      "summary": "This example demonstrates **Slowly Changing Dimension Type 2 (SCD2)** history tracking."
+    },
+    {
+      "path": "docs/examples/canonical/runnable/my_project/README.md",
+      "title": "my_project",
+      "section": "examples",
+      "summary": "A data engineering project built with [Odibi](https://github.com/henryodibi11/Odibi)."
+    },
+    {
+      "path": "docs/examples/canonical/runnable/README.md",
+      "title": "Runnable Canonical Examples",
+      "section": "examples",
+      "summary": "Ready-to-run versions of the canonical examples. Each config uses sample data from `../sample_data/`."
+    },
+    {
+      "path": "docs/examples/canonical/sample_data/README.md",
+      "title": "Sample Data for Canonical Examples",
+      "section": "examples",
+      "summary": "Copy these files to your project's `data/landing/` folder to run the examples."
+    },
+    {
+      "path": "docs/examples/canonical/THE_REFERENCE.md",
+      "title": "THE Reference Implementation",
+      "section": "examples",
+      "summary": "> **This is the canonical Odibi pipeline. Copy this. Learn from this. Start here.**"
+    },
+    {
+      "path": "docs/features/alerting.md",
+      "title": "Enhanced Alerting",
+      "section": "features",
+      "summary": "Real-time notifications for pipeline events with throttling, event-specific payloads, @mentions, and support for Slack, Teams, and generic webhooks."
+    },
+    {
+      "path": "docs/features/bulk_copy.md",
+      "title": "Bulk Copy for SQL Server",
+      "section": "features",
+      "summary": "High-performance data loading to SQL Server using ADLS staging and BULK INSERT, achieving 10-50x faster writes compared to standard JDBC."
+    },
+    {
+      "path": "docs/features/catalog.md",
+      "title": "System Catalog",
+      "section": "features",
+      "summary": "Centralized governance and metadata management for pipelines, execution history, schema evolution, and lineage tracking."
+    },
+    {
+      "path": "docs/features/cli.md",
+      "title": "Command-Line Interface",
+      "section": "features",
+      "summary": "The Odibi CLI provides a comprehensive set of commands for running pipelines, managing configurations, exploring lineage, and querying the System Catalog."
+    },
+    {
+      "path": "docs/features/configuration.md",
+      "title": "Configuration System",
+      "section": "features",
+      "summary": "YAML-based configuration for defining projects, pipelines, and nodes with built-in validation, environment variable support, and environment-specific overrides."
+    },
+    {
+      "path": "docs/features/connections.md",
+      "title": "Connections",
+      "section": "features",
+      "summary": "Unified connection system for accessing local filesystems, cloud storage, databases, and HTTP endpoints with pluggable authentication."
+    },
+    {
+      "path": "docs/features/cross-pipeline-dependencies.md",
+      "title": "Cross-Pipeline Dependencies",
+      "section": "features",
+      "summary": "**Last Updated:** 2025-12-03"
+    },
+    {
+      "path": "docs/features/cross_entity_references.md",
+      "title": "Cross-Entity References",
+      "section": "features",
+      "summary": "**Status:** ✅ IMPLEMENTED (v3.3+)"
+    },
+    {
+      "path": "docs/features/data_exploration.md",
+      "title": "Data Exploration",
+      "section": "features",
+      "summary": "Explore and understand your data sources — local files, object storage, and SQL databases — without writing a pipeline."
+    },
+    {
+      "path": "docs/features/diagnostics.md",
+      "title": "Diagnostics",
+      "section": "features",
+      "summary": "Tools for debugging, monitoring, and comparing pipeline runs with Delta Lake version analysis and data diff capabilities."
+    },
+    {
+      "path": "docs/features/engines.md",
+      "title": "Execution Engines",
+      "section": "features",
+      "summary": "Multi-engine architecture for flexible data processing across local development, high-performance workloads, and big data environments."
+    },
+    {
+      "path": "docs/features/lineage.md",
+      "title": "Cross-Pipeline Lineage",
+      "section": "features",
+      "summary": "Track table-level lineage relationships across pipelines for impact analysis and data governance."
+    },
+    {
+      "path": "docs/features/observability.md",
+      "title": "Observability Tables",
+      "section": "features",
+      "summary": "Auto-populating observability tables for leadership dashboards with zero manual effort."
+    },
+    {
+      "path": "docs/features/orchestration.md",
+      "title": "Orchestration",
+      "section": "features",
+      "summary": "Generate production-ready workflow definitions for Apache Airflow and Dagster from your Odibi pipelines."
+    },
+    {
+      "path": "docs/features/patterns.md",
+      "title": "Loading Patterns",
+      "section": "features",
+      "summary": "Pre-built execution patterns for common data warehouse loading scenarios including Dimension, Fact, SCD2, Merge, Aggregation, and Date Dimension operations."
+    },
+    {
+      "path": "docs/features/pipelines.md",
+      "title": "Pipelines",
+      "section": "features",
+      "summary": "Orchestrate complex data workflows with dependency-aware execution, parallel processing, and intelligent error handling."
+    },
+    {
+      "path": "docs/features/plugins.md",
+      "title": "Plugins & Extensibility",
+      "section": "features",
+      "summary": "Extend Odibi with custom connections, transforms, and engines through a flexible plugin system."
+    },
+    {
+      "path": "docs/features/quality_gates.md",
+      "title": "Quality Gates",
+      "section": "features",
+      "summary": "Batch-level quality validation that evaluates the entire dataset before writing."
+    },
+    {
+      "path": "docs/features/quarantine.md",
+      "title": "Quarantine Tables",
+      "section": "features",
+      "summary": "Route failed validation rows to a dedicated quarantine table with rejection metadata for later analysis and reprocessing."
+    },
+    {
+      "path": "docs/features/recipes.md",
+      "title": "Recipes",
+      "section": "features",
+      "summary": "!!! tip \"TL;DR\""
+    },
+    {
+      "path": "docs/features/scheduled_events.md",
+      "title": "Scheduled Events",
+      "section": "features",
+      "summary": "**Status:** ✅ IMPLEMENTED (v3.3+)"
+    },
+    {
+      "path": "docs/features/schema_tracking.md",
+      "title": "Schema Version Tracking",
+      "section": "features",
+      "summary": "Track schema changes over time with automatic versioning, change detection, and CLI tools."
+    },
+    {
+      "path": "docs/features/simulation.md",
+      "title": "Simulation",
+      "section": "features",
+      "summary": "Generate synthetic data directly in your pipelines without external dependencies."
+    },
+    {
+      "path": "docs/features/state.md",
+      "title": "State Management",
+      "section": "features",
+      "summary": "Odibi tracks pipeline execution state, high-water marks (HWM), and run history for resumable, incremental processing."
+    },
+    {
+      "path": "docs/features/stateful_simulation.md",
+      "title": "Stateful Simulation Functions",
+      "section": "features",
+      "summary": "**New in v3.3**: `prev()`, `ema()`, `pid()`, and `delay()` for time-dependent process simulation"
+    },
+    {
+      "path": "docs/features/stories.md",
+      "title": "Execution Stories",
+      "section": "features",
+      "summary": "Auto-generated pipeline execution documentation with rich metadata, sample data, and multiple output formats."
+    },
+    {
+      "path": "docs/features/transformers.md",
+      "title": "Transformers",
+      "section": "features",
+      "summary": "Declarative data transformations with SQL-first semantics, multi-engine support (Pandas/Spark/Polars), and extensible custom transforms."
+    },
+    {
+      "path": "docs/features/ui.md",
+      "title": "Web UI",
+      "section": "features",
+      "summary": "Odibi includes a web dashboard for viewing pipeline status, browsing story reports, and inspecting configuration."
+    },
+    {
+      "path": "docs/features/validation_performance.md",
+      "title": "Validation Performance Optimization Guide",
+      "section": "features",
+      "summary": "This document details the performance optimizations made to odibi's contracts and validation system."
+    },
+    {
+      "path": "docs/golden_path.md",
+      "title": "Golden Path: From Zero to Production",
+      "section": "docs",
+      "summary": "Get a working Odibi pipeline in under 10 minutes. One path. No choices."
+    },
+    {
+      "path": "docs/guides/ai-agent-guide.md",
+      "title": "AI Agent Guide for Odibi",
+      "section": "guides",
+      "summary": "**For:** AI Assistants (Amp, Cline, Continue, Claude)"
+    },
+    {
+      "path": "docs/guides/ai-assistant-setup.md",
+      "title": "AI Assistant Setup Guide",
+      "section": "guides",
+      "summary": "This guide explains how to set up AI coding assistants (Continue, Cline, Amp) to work with odibi using MCP (Model Context Protocol) servers."
+    },
+    {
+      "path": "docs/guides/api_data_sources.md",
+      "title": "Fetching Data from APIs",
+      "section": "guides",
+      "summary": "This guide covers how to pull data from REST APIs into your Odibi pipelines. Whether you're pulling from public APIs like openFDA or internal company APIs, this guide will get you started."
+    },
+    {
+      "path": "docs/guides/api_ingestion_fixed.md",
+      "title": "Fetching Data from APIs (Corrected Guide)",
+      "section": "guides",
+      "summary": "This guide covers how to pull data from REST APIs into your Odibi pipelines. All examples have been validated against the actual Odibi codebase."
+    },
+    {
+      "path": "docs/guides/avoiding_the_builder_trap.md",
+      "title": "Avoiding the Builder Trap",
+      "section": "guides",
+      "summary": "**A Guide for Odibi Maintainers and Contributors**"
+    },
+    {
+      "path": "docs/guides/best_practices.md",
+      "title": "Odibi Best Practices Guide",
+      "section": "guides",
+      "summary": "**Version:** 3.4.3"
+    },
+    {
+      "path": "docs/guides/catalog_sync.md",
+      "title": "Catalog Sync Guide",
+      "section": "guides",
+      "summary": "Sync your system catalog to SQL Server for dashboards, cross-environment visibility, and easy SQL queries."
+    },
+    {
+      "path": "docs/guides/chemical_engineering_simulation_guide.md",
+      "title": "Chemical Engineering Simulation Guide",
+      "section": "guides",
+      "summary": "!!! note \"This guide has moved\""
+    },
+    {
+      "path": "docs/guides/cli_master_guide.md",
+      "title": "Odibi CLI: Zero to Hero",
+      "section": "guides",
+      "summary": "> **Ultimate Cheatsheet & Reference (v3.4.3)**"
+    },
+    {
+      "path": "docs/guides/custom_functions.md",
+      "title": "Custom Transform Functions Reference",
+      "section": "guides",
+      "summary": "This is the complete reference for writing custom Python transform functions in Odibi."
+    },
+    {
+      "path": "docs/guides/decision_guide.md",
+      "title": "Decision Guide",
+      "section": "guides",
+      "summary": "title: Decision Guide"
+    },
+    {
+      "path": "docs/guides/dimensional_modeling_guide.md",
+      "title": "Dimensional Modeling Guide for ODIBI",
+      "section": "guides",
+      "summary": "A practical reference for building data warehouses with ODIBI."
+    },
+    {
+      "path": "docs/guides/dogfooding.md",
+      "title": "🐶 Dogfooding Guide",
+      "section": "guides",
+      "summary": "**\"Eat your own dog food.\"**"
+    },
+    {
+      "path": "docs/guides/environments.md",
+      "title": "Managing Environments",
+      "section": "guides",
+      "summary": "Odibi allows you to define pipeline configurations that adapt to different contexts (e.g., Local Development, Testing, Production). You can override infrastructure settings per environment, or even ha"
+    },
+    {
+      "path": "docs/guides/explanation_feature.md",
+      "title": "Explanation Feature Guide",
+      "section": "guides",
+      "summary": "The `explanation` field allows you to document **business logic, data mappings, and transformation rationale** directly in your pipeline definitions. This documentation is rendered in **Data Story** H"
+    },
+    {
+      "path": "docs/guides/faq.md",
+      "title": "Frequently Asked Questions (FAQ)",
+      "section": "guides",
+      "summary": "> Quick answers to common questions. Organized by topic."
+    },
+    {
+      "path": "docs/guides/how_to_read_a_story.md",
+      "title": "How to Read a Data Story",
+      "section": "guides",
+      "summary": "> Every Odibi pipeline run generates an HTML \"Data Story\" — a comprehensive audit report. This guide teaches you how to interpret it."
+    },
+    {
+      "path": "docs/guides/installation.md",
+      "title": "Installation Guide",
+      "section": "guides",
+      "summary": "This guide covers all installation options for odibi, from minimal setups to full-featured installations."
+    },
+    {
+      "path": "docs/guides/mcp_guide.md",
+      "title": "Odibi MCP Server Guide",
+      "section": "guides",
+      "summary": "The **odibi-knowledge** MCP (Model Context Protocol) server exposes 15 knowledge tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines."
+    },
+    {
+      "path": "docs/guides/mcp_recipes.md",
+      "title": "Odibi MCP Recipes for AI Assistants",
+      "section": "guides",
+      "summary": "This guide teaches AI assistants how to combine odibi MCP tools to help developers build, debug, and maintain data pipelines."
+    },
+    {
+      "path": "docs/guides/mcp_system_prompt.md",
+      "title": "System Prompt for AI Agents Using Odibi MCP",
+      "section": "guides",
+      "summary": "**For:** Setting up AI assistants (Amp, Cline, Continue)"
+    },
+    {
+      "path": "docs/guides/medallion_architecture.md",
+      "title": "Medallion Architecture Guide",
+      "section": "guides",
+      "summary": "A beginner-friendly guide to understanding Bronze, Silver, and Gold data layers."
+    },
+    {
+      "path": "docs/guides/MIGRATION_GUIDE.md",
+      "title": "Odibi V3 Migration Guide",
+      "section": "guides",
+      "summary": "**Change:** PII status now inherits from upstream nodes. If a column is marked as `pii: true` in a source node, it will remain PII in all downstream nodes unless explicitly declassified."
+    },
+    {
+      "path": "docs/guides/odibi_for_renewable_energy.md",
+      "title": "Odibi for Renewable Energy & Process Manufacturing",
+      "section": "guides",
+      "summary": "**Author:** Strategic Analysis"
+    },
+    {
+      "path": "docs/guides/performance_tuning.md",
+      "title": "Performance Tuning Guide",
+      "section": "guides",
+      "summary": "title: Performance Tuning Guide"
+    },
+    {
+      "path": "docs/guides/planning_walkthroughs.md",
+      "title": "Data Engineering Planning Walkthroughs",
+      "section": "guides",
+      "summary": "> \"30 minutes of planning saves 3 hours of debugging.\""
+    },
+    {
+      "path": "docs/guides/process_simulation_guide.md",
+      "title": "Process Simulation Guide",
+      "section": "guides",
+      "summary": "**Complete guide to simulating chemical processes and control systems with Odibi.**"
+    },
+    {
+      "path": "docs/guides/production_deployment.md",
+      "title": "🏭 Production Deployment",
+      "section": "guides",
+      "summary": "title: Production Deployment"
+    },
+    {
+      "path": "docs/guides/python_api_guide.md",
+      "title": "🐍 Odibi Python API: Zero to Hero",
+      "section": "guides",
+      "summary": "> **Ultimate Cheatsheet & Reference (v3.4.3)**"
+    },
+    {
+      "path": "docs/guides/recipes.md",
+      "title": "Odibi Cookbook: Recipes for Common Patterns",
+      "section": "guides",
+      "summary": "This guide provides copy-pasteable solutions for real-world Data Engineering problems."
+    },
+    {
+      "path": "docs/guides/seborg_textbook_mapping.md",
+      "title": "Seborg Textbook → Odibi Simulation Mapping",
+      "section": "guides",
+      "summary": "**From Theory to Realistic Plant Data: A Beginner's Guide**"
+    },
+    {
+      "path": "docs/guides/secrets.md",
+      "title": "Managing Secrets",
+      "section": "guides",
+      "summary": "Odibi provides a unified way to handle secrets (API keys, database passwords, storage tokens) across local development and production environments. It supports `.env` files for local use and native **"
+    },
+    {
+      "path": "docs/guides/setup_azure.md",
+      "title": "Azure Integration Setup Guide (v3.4.3)",
+      "section": "guides",
+      "summary": "This guide covers authenticating and connecting Odibi to Azure services (ADLS Gen2, Azure SQL, Key Vault) using the latest **v3.4.3** standards."
+    },
+    {
+      "path": "docs/guides/simulation.md",
+      "title": "Synthetic Data Generation (Simulation)",
+      "section": "guides",
+      "summary": "Generate realistic data directly in your pipelines — no external tools, no real data needed."
+    },
+    {
+      "path": "docs/guides/testing.md",
+      "title": "Testing Guide",
+      "section": "guides",
+      "summary": "Test your Odibi pipelines with built-in utilities for assertions, fixtures, and deterministic data."
+    },
+    {
+      "path": "docs/guides/the_definitive_guide.md",
+      "title": "The Definitive Guide to Odibi",
+      "section": "guides",
+      "summary": "title: The Definitive Guide"
+    },
+    {
+      "path": "docs/guides/thermodynamics.md",
+      "title": "Thermodynamics Transformers Guide",
+      "section": "guides",
+      "summary": "This guide provides complete documentation for odibi's thermodynamics transformers, which enable engineering calculations for steam, refrigerants, and humid air directly in your data pipelines."
+    },
+    {
+      "path": "docs/guides/unit_conversion.md",
+      "title": "Unit Conversion Guide",
+      "section": "guides",
+      "summary": "Odibi includes **Pint** as a core dependency, giving you access to 1000+ unit definitions for seamless unit conversion in your data pipelines. No extra installation required."
+    },
+    {
+      "path": "docs/guides/unity_catalog.md",
+      "title": "Unity Catalog Setup Guide",
+      "section": "guides",
+      "summary": "title: Unity Catalog Setup Guide"
+    },
+    {
+      "path": "docs/guides/variable_substitution.md",
+      "title": "Variable Substitution in YAML",
+      "section": "guides",
+      "summary": "Odibi supports powerful variable substitution in YAML configurations. This allows you to:"
+    },
+    {
+      "path": "docs/guides/writing_transformations.md",
+      "title": "Writing Transformation Functions in Odibi",
+      "section": "guides",
+      "summary": "title: Writing Transformations"
+    },
+    {
+      "path": "docs/guides/wsl_setup.md",
+      "title": "🐧 WSL Setup Guide",
+      "section": "guides",
+      "summary": "If you are on Windows, **Windows Subsystem for Linux (WSL 2)** is the only supported way to develop with Odibi (especially for Spark compatibility)."
+    },
+    {
+      "path": "docs/ODIBI_DEEP_CONTEXT.md",
+      "title": "Odibi Deep Context",
+      "section": "docs",
+      "summary": "> **What is Odibi?** A Python data pipeline framework for building enterprise data warehouses. It orchestrates nodes (read → transform → validate → write) with dependency resolution, supports Pandas/S"
+    },
+    {
+      "path": "docs/patterns/aggregation.md",
+      "title": "Aggregation Pattern",
+      "section": "patterns",
+      "summary": "The `aggregation` pattern provides declarative aggregation with configurable grain, measures, and incremental merge strategies."
+    },
+    {
+      "path": "docs/patterns/anti_patterns.md",
+      "title": "❌ Anti-Patterns: What NOT to Do",
+      "section": "patterns",
+      "summary": "This guide documents common mistakes when building data pipelines. For each anti-pattern, we show what NOT to do, why it's bad, and the correct approach."
+    },
+    {
+      "path": "docs/patterns/append_only_raw.md",
+      "title": "Pattern: Append-Only Raw Layer (Landing → Raw)",
+      "section": "patterns",
+      "summary": "**Status:** Core Pattern"
+    },
+    {
+      "path": "docs/patterns/date_dimension.md",
+      "title": "Date Dimension Pattern",
+      "section": "patterns",
+      "summary": "The `date_dimension` pattern generates a complete date dimension table with pre-calculated attributes useful for BI/reporting."
+    },
+    {
+      "path": "docs/patterns/dimension.md",
+      "title": "Dimension Pattern",
+      "section": "patterns",
+      "summary": "title: Dimension Pattern"
+    },
+    {
+      "path": "docs/patterns/fact.md",
+      "title": "Fact Pattern",
+      "section": "patterns",
+      "summary": "title: Fact Pattern"
+    },
+    {
+      "path": "docs/patterns/incremental_stateful.md",
+      "title": "Stateful Incremental Loading",
+      "section": "patterns",
+      "summary": "title: Stateful Incremental Loading"
+    },
+    {
+      "path": "docs/patterns/legacy_hwm_manual.md",
+      "title": "[Legacy] Manual High Water Mark (HWM)",
+      "section": "patterns",
+      "summary": "> **⚠️ Deprecated Pattern**"
+    },
+    {
+      "path": "docs/patterns/manufacturing.md",
+      "title": "Manufacturing Phase Analysis Pattern",
+      "section": "patterns",
+      "summary": "Manufacturing processes generate **time-series sensor data** at high frequency (every second or minute). Raw data looks like this:"
+    },
+    {
+      "path": "docs/patterns/merge_upsert.md",
+      "title": "Pattern: Merge/Upsert (Raw → Silver)",
+      "section": "patterns",
+      "summary": "title: Merge/Upsert Pattern"
+    },
+    {
+      "path": "docs/patterns/README.md",
+      "title": "Odibi Data Patterns",
+      "section": "patterns",
+      "summary": "This directory contains documentation for common data pipeline patterns used in Odibi. Each pattern solves a specific problem and includes step-by-step examples."
+    },
+    {
+      "path": "docs/patterns/scd2.md",
+      "title": "SCD Type 2 (Slowly Changing Dimensions)",
+      "section": "patterns",
+      "summary": "title: SCD Type 2 Pattern"
+    },
+    {
+      "path": "docs/patterns/skip_if_unchanged.md",
+      "title": "Skip If Unchanged Pattern",
+      "section": "patterns",
+      "summary": "> **Use Case:** Avoid redundant writes for snapshot tables that may not change between pipeline runs."
+    },
+    {
+      "path": "docs/patterns/smart_read.md",
+      "title": "Smart Read (Rolling Window)",
+      "section": "patterns",
+      "summary": "The \"Smart Read\" feature simplifies incremental data loading by automatically generating the correct SQL query based on time windows."
+    },
+    {
+      "path": "docs/patterns/sql_server_merge.md",
+      "title": "Pattern: SQL Server Merge/Upsert",
+      "section": "patterns",
+      "summary": "**Status:** Core Pattern (Phase 4 Complete)"
+    },
+    {
+      "path": "docs/patterns/windowed_reprocess.md",
+      "title": "Pattern: Windowed Reprocess (Silver → Gold Aggregates)",
+      "section": "patterns",
+      "summary": "**Status:** Core Pattern"
+    },
+    {
+      "path": "docs/reference/api/cli.md",
+      "title": "CLI API",
+      "section": "reference",
+      "summary": "::: odibi.cli.main"
+    },
+    {
+      "path": "docs/reference/api/config.md",
+      "title": "Configuration API",
+      "section": "reference",
+      "summary": "::: odibi.config"
+    },
+    {
+      "path": "docs/reference/api/connections.md",
+      "title": "Connections API",
+      "section": "reference",
+      "summary": "::: odibi.connections.base"
+    },
+    {
+      "path": "docs/reference/api/engine.md",
+      "title": "Engine API",
+      "section": "reference",
+      "summary": "::: odibi.engine.base"
+    },
+    {
+      "path": "docs/reference/api/patterns.md",
+      "title": "Patterns API",
+      "section": "reference",
+      "summary": "::: odibi.patterns.base"
+    },
+    {
+      "path": "docs/reference/api/pipeline.md",
+      "title": "Pipeline API",
+      "section": "reference",
+      "summary": "::: odibi.pipeline"
+    },
+    {
+      "path": "docs/reference/api/validation.md",
+      "title": "Validation API",
+      "section": "reference",
+      "summary": "::: odibi.validation.engine"
+    },
+    {
+      "path": "docs/reference/cheatsheet.md",
+      "title": "Odibi Cheatsheet",
+      "section": "reference",
+      "summary": "| Command | Description |"
+    },
+    {
+      "path": "docs/reference/configuration.md",
+      "title": "ODIBI Configuration System Explained",
+      "section": "reference",
+      "summary": "**Last Updated:** 2025-11-21"
+    },
+    {
+      "path": "docs/reference/developer_cheatsheet.md",
+      "title": "Odibi Developer Cheatsheet",
+      "section": "reference",
+      "summary": "**The internal map. Where things live, how they connect, and where to look when something breaks.**"
+    },
+    {
+      "path": "docs/reference/ENGINE_PARITY.md",
+      "title": "Engine Parity Table",
+      "section": "reference",
+      "summary": "> **Issue:** [#229](https://github.com/invenergy/odibi/issues/229)"
+    },
+    {
+      "path": "docs/reference/glossary.md",
+      "title": "Quick Glossary",
+      "section": "reference",
+      "summary": "Standard terminology used across Odibi documentation."
+    },
+    {
+      "path": "docs/reference/PARITY_TABLE.md",
+      "title": "Engine Parity Table",
+      "section": "reference",
+      "summary": "Comparison of Pandas, Spark, and Polars engine capabilities as of v3.4.3."
+    },
+    {
+      "path": "docs/reference/power_user_cheatsheet.md",
+      "title": "Odibi Power User Cheatsheet",
+      "section": "reference",
+      "summary": "**Fill this out before you write a single line of YAML. When every blank is filled, the config writes itself.**"
+    },
+    {
+      "path": "docs/reference/simulation_generators.md",
+      "title": "Simulation Generators Reference",
+      "section": "reference",
+      "summary": "Quick reference for all 13 simulation generator types."
+    },
+    {
+      "path": "docs/reference/supported_formats.md",
+      "title": "Supported File Formats",
+      "section": "reference",
+      "summary": "ODIBI's PandasEngine supports multiple file formats with both local and cloud storage (ADLS, S3, etc.)."
+    },
+    {
+      "path": "docs/reference/templates.md",
+      "title": "Template Generator",
+      "section": "reference",
+      "summary": "Generate YAML templates and documentation directly from Pydantic models. Templates are always in sync with the code—no manual maintenance required."
+    },
+    {
+      "path": "docs/reference/yaml_schema.md",
+      "title": "Odibi Configuration Reference",
+      "section": "reference",
+      "summary": "This manual details the YAML configuration schema for Odibi projects."
+    },
+    {
+      "path": "docs/simulation/advanced_features.md",
+      "title": "Advanced Features",
+      "section": "simulation",
+      "summary": "**Cross-entity references, entity overrides, scheduled events, and chaos engineering - the tools that turn simple simulations into realistic multi-system scenarios.**"
+    },
+    {
+      "path": "docs/simulation/content_playbook.md",
+      "title": "Content Playbook - Internal",
+      "section": "simulation",
+      "summary": "title: \"Content Playbook (Internal)\""
+    },
+    {
+      "path": "docs/simulation/core_concepts.md",
+      "title": "Core Concepts: Scope, Entities, and Columns",
+      "section": "simulation",
+      "summary": "Every simulation is built from three concepts. Understand these and you can generate any dataset."
+    },
+    {
+      "path": "docs/simulation/equipment_reference.md",
+      "title": "Manufacturing Equipment Reference",
+      "section": "simulation",
+      "summary": "**Look up your equipment → get the pattern, equation, and starting parameters.**"
+    },
+    {
+      "path": "docs/simulation/generators.md",
+      "title": "Simulation Generators Reference",
+      "section": "simulation",
+      "summary": "Comprehensive reference for all 13 simulation generator types. Each generator produces"
+    },
+    {
+      "path": "docs/simulation/getting_started.md",
+      "title": "Getting Started with Simulation",
+      "section": "simulation",
+      "summary": "title: \"Getting Started: Your First Simulation\""
+    },
+    {
+      "path": "docs/simulation/incremental.md",
+      "title": "Incremental (Continuous) Simulation",
+      "section": "simulation",
+      "summary": "**Generate new data on every pipeline run, picking up exactly where the last run left off - using the same High Water Mark (HWM) system as all other Odibi read sources.**"
+    },
+    {
+      "path": "docs/simulation/index.md",
+      "title": "Simulation",
+      "section": "simulation",
+      "summary": "**Generate realistic synthetic data for any domain - manufacturing, operations, IoT, process control, business - directly in your pipeline YAML. No code needed.**"
+    },
+    {
+      "path": "docs/simulation/patterns/business_it.md",
+      "title": "Business & IT (31–35)",
+      "section": "simulation",
+      "summary": "title: \"Business & IT (31-35)\""
+    },
+    {
+      "path": "docs/simulation/patterns/data_engineering.md",
+      "title": "Data Engineering Meta-Patterns (36–38)",
+      "section": "simulation",
+      "summary": "title: \"Data Engineering Meta-Patterns (36-38)\""
+    },
+    {
+      "path": "docs/simulation/patterns/energy_utilities.md",
+      "title": "Energy & Utilities (16–20)",
+      "section": "simulation",
+      "summary": "title: \"Energy & Utilities (16-20)\""
+    },
+    {
+      "path": "docs/simulation/patterns/environmental.md",
+      "title": "Environmental & Agriculture (26–28)",
+      "section": "simulation",
+      "summary": "title: \"Environmental & Agriculture (26-28)\""
+    },
+    {
+      "path": "docs/simulation/patterns/foundations.md",
+      "title": "Foundational Patterns (1–8)",
+      "section": "simulation",
+      "summary": "title: \"Foundational Patterns (1-8)\""
+    },
+    {
+      "path": "docs/simulation/patterns/healthcare.md",
+      "title": "Healthcare & Life Sciences (29–30)",
+      "section": "simulation",
+      "summary": "title: \"Healthcare & Life Sciences (29-30)\""
+    },
+    {
+      "path": "docs/simulation/patterns/index.md",
+      "title": "Patterns & Recipes",
+      "section": "simulation",
+      "summary": "title: \"Patterns & Recipes\""
+    },
+    {
+      "path": "docs/simulation/patterns/manufacturing.md",
+      "title": "Manufacturing & Operations (21–25)",
+      "section": "simulation",
+      "summary": "title: \"Manufacturing & Operations (21-25)\""
+    },
+    {
+      "path": "docs/simulation/patterns/process_engineering.md",
+      "title": "Process & Chemical Engineering (9–15)",
+      "section": "simulation",
+      "summary": "title: \"Process & Chemical Engineering (9-15)\""
+    },
+    {
+      "path": "docs/simulation/patterns.md",
+      "title": "Patterns & Recipes",
+      "section": "simulation",
+      "summary": "title: \"Patterns & Recipes\""
+    },
+    {
+      "path": "docs/simulation/positioning.md",
+      "title": "Why Odibi Simulation",
+      "section": "simulation",
+      "summary": "title: \"Why Odibi Simulation\""
+    },
+    {
+      "path": "docs/simulation/process_simulation.md",
+      "title": "Process Control & Chemical Engineering Simulation",
+      "section": "simulation",
+      "summary": "!!! info \"Not a chemical engineer? You're still in the right place\""
+    },
+    {
+      "path": "docs/simulation/simulation_playbook.md",
+      "title": "Simulation Execution Playbook",
+      "section": "simulation",
+      "summary": "**Zero-thinking system for building process simulations in Odibi.**"
+    },
+    {
+      "path": "docs/simulation/stateful_functions.md",
+      "title": "Stateful Functions Reference",
+      "section": "simulation",
+      "summary": "**Complete reference for `prev()`, `ema()`, `pid()`, and `delay()` - the four stateful functions available in `derived` generator expressions.**"
+    },
+    {
+      "path": "docs/skills/01_think_plan_critique.md",
+      "title": "Skill 01 — Think → Plan → Critique",
+      "section": "skills",
+      "summary": "> **Layer:** Reasoning"
+    },
+    {
+      "path": "docs/skills/02_odibi_first_lookup.md",
+      "title": "Skill 02 — Odibi-First Lookup",
+      "section": "skills",
+      "summary": "> **Layer:** Reasoning"
+    },
+    {
+      "path": "docs/skills/03_write_a_transformer.md",
+      "title": "Skill 03 — Write a Transformer",
+      "section": "skills",
+      "summary": "> **Layer:** Building"
+    },
+    {
+      "path": "docs/skills/04_write_a_pattern.md",
+      "title": "Skill 04 — Write a Pattern",
+      "section": "skills",
+      "summary": "> **Layer:** Building"
+    },
+    {
+      "path": "docs/skills/05_pipeline_yaml_authoring.md",
+      "title": "Skill 05 — Pipeline YAML Authoring",
+      "section": "skills",
+      "summary": "> **Layer:** Building"
+    },
+    {
+      "path": "docs/skills/06_add_a_connection.md",
+      "title": "Skill 06 — Add a Connection",
+      "section": "skills",
+      "summary": "> **Layer:** Building"
+    },
+    {
+      "path": "docs/skills/07_testing.md",
+      "title": "Skill 07 — Testing",
+      "section": "skills",
+      "summary": "> **Layer:** Quality"
+    },
+    {
+      "path": "docs/skills/08_validation_workflow.md",
+      "title": "Skill 08 — Validation Workflow",
+      "section": "skills",
+      "summary": "> **Layer:** Quality"
+    },
+    {
+      "path": "docs/skills/09_code_review_standards.md",
+      "title": "Skill 09 — Code Review Standards",
+      "section": "skills",
+      "summary": "> **Layer:** Quality"
+    },
+    {
+      "path": "docs/skills/10_task_document_template.md",
+      "title": "Skill 10 — Task Document Template",
+      "section": "skills",
+      "summary": "> **Layer:** Meta"
+    },
+    {
+      "path": "docs/skills/11_lessons_learned_protocol.md",
+      "title": "Skill 11 — Lessons Learned Protocol",
+      "section": "skills",
+      "summary": "> **Layer:** Meta"
+    },
+    {
+      "path": "docs/skills/12_databricks_notebook_protocol.md",
+      "title": "Skill 12 — Databricks Notebook Protocol",
+      "section": "skills",
+      "summary": "> **Layer:** Building"
+    },
+    {
+      "path": "docs/skills/13_testing_standards.md",
+      "title": "Skill 13 — Testing Standards",
+      "section": "skills",
+      "summary": "> **Layer:** Standards"
+    },
+    {
+      "path": "docs/skills/14_code_standards.md",
+      "title": "Skill 14 — Code Standards",
+      "section": "skills",
+      "summary": "> **Layer:** Standards"
+    },
+    {
+      "path": "docs/skills/15_engine_parity_standards.md",
+      "title": "Skill 15 — Engine Parity Standards",
+      "section": "skills",
+      "summary": "> **Layer:** Standards"
+    },
+    {
+      "path": "docs/skills/README.md",
+      "title": "Odibi Skills — Agent Instruction Set",
+      "section": "skills",
+      "summary": "> **Purpose:** Teach AI agents (Amp, Cursor, Copilot, Cline, Databricks AI) how to work on the odibi codebase correctly and efficiently."
+    },
+    {
+      "path": "docs/troubleshooting.md",
+      "title": "Troubleshooting Guide",
+      "section": "docs",
+      "summary": "Quick reference for diagnosing and fixing common Odibi issues."
+    },
+    {
+      "path": "docs/tutorials/azure_connections.md",
+      "title": "Azure Connections Tutorial",
+      "section": "tutorials",
+      "summary": "title: Azure Connections Tutorial"
+    },
+    {
+      "path": "docs/tutorials/bronze_layer.md",
+      "title": "Bronze Layer Tutorial",
+      "section": "tutorials",
+      "summary": "title: Bronze Layer Tutorial"
+    },
+    {
+      "path": "docs/tutorials/delete_detection.md",
+      "title": "Tutorial: Delete Detection",
+      "section": "tutorials",
+      "summary": "> **\"Records are deleted in our source, but our Silver tables still show them.\"**"
+    },
+    {
+      "path": "docs/tutorials/delta_troubleshooting.md",
+      "title": "Delta Lake Troubleshooting Guide",
+      "section": "tutorials",
+      "summary": "Common Delta Lake errors you'll hit while building odibi pipelines, with the symptoms, root causes, fixes, and prevention strategies. Each entry has been verified against real Delta tables on Databric"
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/01_introduction.md",
+      "title": "Introduction to Dimensional Modeling",
+      "section": "tutorials",
+      "summary": "Welcome to the Odibi dimensional modeling tutorial series. This comprehensive guide will teach you how to build a complete data warehouse using dimensional modeling techniques, from scratch."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/02_dimension_pattern.md",
+      "title": "Dimension Pattern Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to use Odibi's `dimension` pattern to build dimension tables with automatic surrogate key generation and SCD (Slowly Changing Dimension) support."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/03_date_dimension_pattern.md",
+      "title": "Date Dimension Pattern Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to use Odibi's `date_dimension` pattern to generate a complete date dimension table with pre-calculated attributes for reporting and analytics."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/04_fact_pattern.md",
+      "title": "Fact Pattern Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to use Odibi's `fact` pattern to build fact tables with automatic surrogate key lookups, orphan handling, grain validation, and measure calculations."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/05_aggregation_pattern.md",
+      "title": "Aggregation Pattern Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to use Odibi's `aggregation` pattern to build pre-aggregated tables for faster reporting and dashboards."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/06_full_star_schema.md",
+      "title": "Full Star Schema Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll build a complete star schema from start to finish, combining all the patterns from previous tutorials into a single, cohesive data warehouse."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/07_semantic_layer_intro.md",
+      "title": "Semantic Layer Introduction",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn what a semantic layer is, why it's valuable, and how it sits on top of your star schema to provide a business-friendly query interface."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/08_defining_metrics.md",
+      "title": "Defining Metrics Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to define metrics in the Odibi semantic layer, from simple aggregations to complex filtered and derived metrics."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/09_defining_dimensions.md",
+      "title": "Defining Dimensions Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to define semantic layer dimensions for grouping and filtering metrics. Dimensions are the \"BY\" part of queries like `\"revenue BY region\"`."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/10_querying_metrics.md",
+      "title": "Querying Metrics Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to execute queries against the semantic layer using both the unified `Project` API and the `SemanticQuery` interface."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/11_materializing_metrics.md",
+      "title": "Materializing Metrics Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to pre-compute and persist metrics using the `Materializer` class. Materialization creates pre-aggregated tables for fast dashboard performance."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/12_semantic_full_example.md",
+      "title": "Semantic Layer Full Example",
+      "section": "tutorials",
+      "summary": "This tutorial brings together everything you've learned about the semantic layer into a complete, end-to-end example."
+    },
+    {
+      "path": "docs/tutorials/dimensional_modeling/13_fk_validation.md",
+      "title": "FK Validation Tutorial",
+      "section": "tutorials",
+      "summary": "In this tutorial, you'll learn how to validate foreign key relationships between fact and dimension tables to ensure data quality."
+    },
+    {
+      "path": "docs/tutorials/getting_started.md",
+      "title": "Getting Started with Odibi",
+      "section": "tutorials",
+      "summary": "title: Getting Started (Your First Project)"
+    },
+    {
+      "path": "docs/tutorials/git_and_azure_devops.md",
+      "title": "Git & Azure DevOps — Complete Guide for Data Engineers",
+      "section": "tutorials",
+      "summary": "> Written for someone who knows nothing about Git. Every concept is explained before the command."
+    },
+    {
+      "path": "docs/tutorials/gold_layer.md",
+      "title": "Gold Layer Tutorial",
+      "section": "tutorials",
+      "summary": "title: Gold Layer Tutorial"
+    },
+    {
+      "path": "docs/tutorials/quarantine_workflow.md",
+      "title": "Quarantine & Orphan Handling Tutorial",
+      "section": "tutorials",
+      "summary": "> **GitHub Issue:** #222"
+    },
+    {
+      "path": "docs/tutorials/silver_layer.md",
+      "title": "Silver Layer Tutorial",
+      "section": "tutorials",
+      "summary": "title: Silver Layer Tutorial"
+    },
+    {
+      "path": "docs/tutorials/spark_engine.md",
+      "title": "Getting Started with Spark Engine",
+      "section": "tutorials",
+      "summary": "title: Spark Engine Tutorial"
+    },
+    {
+      "path": "docs/tutorials/testing_and_pytest.md",
+      "title": "Testing & Pytest — A Comprehensive Guide Using Odibi",
+      "section": "tutorials",
+      "summary": "> **Purpose:** Learn everything about pytest and Python testing using Odibi as the working codebase."
+    },
+    {
+      "path": "docs/tutorials/validation_pipeline.md",
+      "title": "Tutorial: Building a Validation Pipeline",
+      "section": "tutorials",
+      "summary": "> **Level:** Intermediate"
+    },
+    {
+      "path": "docs/validation/contracts.md",
+      "title": "Contracts",
+      "section": "validation",
+      "summary": "Pre-transform data quality checks that **fail fast** before any transformation runs."
+    },
+    {
+      "path": "docs/validation/fk.md",
+      "title": "FK Validation",
+      "section": "validation",
+      "summary": "The FK Validation module declares and validates referential integrity between fact and dimension tables."
+    },
+    {
+      "path": "docs/validation/README.md",
+      "title": "Data Validation",
+      "section": "validation",
+      "summary": "Odibi provides a comprehensive validation framework to ensure data quality at every stage of your pipeline."
+    },
+    {
+      "path": "docs/validation/tests.md",
+      "title": "Validation Tests",
+      "section": "validation",
+      "summary": "Row-level data quality checks that run **after** transformation."
+    }
+  ]
+}

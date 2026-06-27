@@ -1,0 +1,95 @@
+project: heat_exchanger_monitoring
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: hx_monitoring
+    nodes:
+      - name: hx_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-01-01T00:00:00Z"
+                timestep: "1h"
+                row_count: 720            # 30 days
+                seed: 42
+              entities:
+                names: [HX_01, HX_02, HX_03]
+              columns:
+                - name: equipment_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Design efficiency — the target we're degrading from
+                - name: design_efficiency_pct
+                  data_type: float
+                  generator: {type: constant, value: 95.0}
+
+                # Actual efficiency — random walk with negative trend (fouling)
+                # No mean_reversion: fouling is one-way degradation, not oscillation
+                - name: actual_efficiency_pct
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 94.0
+                    min: 60.0
+                    max: 95.0
+                    volatility: 0.2
+                    trend: -0.01           # Gradual fouling
+                    precision: 1
+
+                # Derived: energy loss from degradation
+                - name: energy_loss_kw
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "max(0, (design_efficiency_pct - actual_efficiency_pct) * 2.5)"
+
+                # Derived: maintenance flag
+                - name: needs_cleaning
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "actual_efficiency_pct < 80.0"
+
+              # CIP cleaning cycles using recurrence
+              scheduled_events:
+                - type: parameter_override
+                  entity: HX_01
+                  column: actual_efficiency_pct
+                  value: 94.0
+                  start_time: "2026-01-15T08:00:00Z"
+                  recurrence: "15d"
+                  duration: "4h"
+                - type: parameter_override
+                  entity: HX_02
+                  column: actual_efficiency_pct
+                  value: 94.0
+                  start_time: "2026-01-16T08:00:00Z"
+                  recurrence: "15d"
+                  duration: "4h"
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/heat_exchangers.parquet
+          mode: append

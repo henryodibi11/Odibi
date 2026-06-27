@@ -1,0 +1,53 @@
+project: stress_test
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: stress
+    nodes:
+      - name: scale_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-01-01T00:00:00Z"
+                timestep: "1s"
+                row_count: 10000
+                seed: 42
+              entities:
+                count: 10
+                id_prefix: "device_"
+              columns:
+                - name: device_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+                - name: value
+                  data_type: float
+                  generator: {type: range, min: 0, max: 100}
+                - name: status
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [ok, warn, error]
+                    weights: [0.90, 0.08, 0.02]
+        write:
+          connection: output
+          format: parquet
+          path: bronze/stress_test.parquet
+          mode: overwrite

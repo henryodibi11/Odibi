@@ -1,0 +1,266 @@
+# Odibi Cheatsheet
+
+## CLI Commands
+
+| Command | Description |
+| :--- | :--- |
+| `odibi run odibi.yaml` | Run the pipeline. |
+| `odibi run odibi.yaml --dry-run` | Validate connections without moving data. |
+| `odibi validate odibi.yaml` | Validate YAML schema, pipeline logic, and transformer params. |
+| `odibi doctor` | Check environment and config health. |
+| `odibi story last` | Open the latest run report. |
+| `odibi secrets init odibi.yaml` | Create .env template for secrets. |
+| `odibi graph odibi.yaml` | Visualize pipeline dependencies. |
+| `odibi init my_project --template hello` | Scaffold a new project from a template. |
+| `odibi templates list` | List all template types (connections, patterns, configs). |
+| `odibi templates show azure_blob` | Show YAML template with all options. |
+| `odibi templates transformer scd2` | Show transformer params and example. |
+| `odibi templates schema` | Generate JSON schema for VS Code autocomplete. |
+
+---
+
+## `odibi.yaml` Structure
+
+```yaml
+version: "1.0.0"
+project: My Project
+engine: pandas          # or 'spark'
+
+connections:
+  raw_data:
+    type: local
+    base_path: ./data
+
+story:
+  connection: raw_data
+  path: stories/
+
+pipelines:
+  - pipeline: main_etl
+    nodes:
+      # 1. Read
+      - name: load_csv
+        read:
+          connection: raw_data
+          path: input.csv
+          format: csv
+
+      # 2. Transform (SQL)
+      - name: clean_data
+        depends_on: [load_csv]
+        transform:
+          steps:
+            - "SELECT * FROM load_csv WHERE id IS NOT NULL"
+
+      # 3. Transform (Python)
+      - name: advanced_clean
+        depends_on: [clean_data]
+        transform:
+          steps:
+            - function: my_custom_func  # registered Python function
+              params:
+                threshold: 10
+
+      # 4. Write
+      - name: save_parquet
+        depends_on: [advanced_clean]
+        write:
+          connection: raw_data
+          path: output.parquet
+          format: parquet
+          mode: overwrite
+```
+
+---
+
+## Python Transformation
+
+```python
+from odibi import transform
+
+@transform
+def my_custom_func(df, threshold=10):
+    """Docstrings are required!"""
+    return df[df['val'] > threshold]
+```
+
+---
+
+## Cross-Pipeline Dependencies
+
+Reference outputs from other pipelines using `$pipeline.node` syntax:
+
+```yaml
+nodes:
+  - name: enriched_data
+    inputs:
+      # Cross-pipeline reference
+      events: $read_bronze.shift_events
+
+      # Explicit read config
+      calendar:
+        connection: prod
+        path: "bronze/calendar"
+        format: delta
+    transform:
+      steps:
+        - operation: join
+          left: events
+          right: calendar
+          on: [date_id]
+```
+
+| Syntax | Example | Description |
+| :--- | :--- | :--- |
+| `$pipeline.node` | `$read_bronze.orders` | Reference node output from another pipeline |
+
+**Requirements:**
+- Referenced pipeline must have run first
+- Referenced node must have a `write` block
+- Cannot use both `read` and `inputs` in same node
+
+---
+
+## Node Documentation (Explanation)
+
+Document business logic for stakeholders directly in YAML:
+
+```yaml
+nodes:
+  - name: fact_sales
+    # Inline explanation (for short docs)
+    explanation: |
+      ## Sales Fact
+      Joins orders with dimension tables.
+      **Business Rule:** Orphan orders get `unknown_member_sk = -1`
+
+  - name: dim_customer
+    # External file (for longer docs, keeps YAML clean)
+    explanation_file: docs/dim_customer.md  # Relative to this YAML
+```
+
+Explanations render in **Data Story** HTML reports with full Markdown support (tables, code blocks, headers).
+
+| Field | Description |
+| :--- | :--- |
+| `explanation` | Inline Markdown documentation |
+| `explanation_file` | Path to external .md file (mutually exclusive with `explanation`) |
+
+See: [Explanation Feature Guide](../guides/explanation_feature.md)
+
+---
+
+## SQL Templates
+
+| Variable | Value |
+| :--- | :--- |
+| `${source}` | The path of the source file (if reading). |
+| `${SELF}` | The name of the current node. |
+
+---
+
+## Variable Substitution
+
+| Syntax | Purpose | Example |
+| :--- | :--- | :--- |
+| `${VAR}` | Environment variable | `${DB_PASSWORD}` |
+| `${env:VAR}` | Environment variable (explicit) | `${env:API_KEY}` |
+| `${vars.name}` | Custom variable from `vars:` block | `${vars.env}` |
+| `${date:expr}` | Dynamic date | `${date:today}`, `${date:-7d}` |
+| `${date:expr:fmt}` | Date with format | `${date:today:%Y%m%d}` |
+
+**Date expressions:** `today`, `yesterday`, `now`, `start_of_month`, `end_of_month`, `-7d`, `+30d`, `-1m`, `-1y`
+
+---
+
+## API Fetching
+
+```yaml
+read:
+  connection: my_api
+  format: api
+  path: /v1/data
+  options:
+    method: GET              # GET (default), POST, PUT, PATCH, DELETE
+    params:                  # URL params (GET) or merged into body (POST)
+      limit: 100
+    request_body:            # JSON body for POST/PUT/PATCH
+      filters: {...}
+    pagination:
+      type: offset_limit     # offset_limit | page_number | cursor | link_header
+      start_offset: 0        # Use 1 for 1-indexed APIs
+    response:
+      items_path: results
+      add_fields:
+        _fetched_at: "${date:now}"
+```
+
+---
+
+## Transformer Quick Reference
+
+### SQL Core (Column & Row Operations)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `filter_rows` | Filter rows with SQL WHERE | `condition` |
+| `derive_columns` | Add calculated columns | `derivations: {col: expr}` |
+| `cast_columns` | Change column types | `casts: {col: type}` |
+| `clean_text` | Trim, lowercase, remove chars | `columns, lowercase, strip` |
+| `select_columns` | Keep only listed columns | `columns: [...]` |
+| `drop_columns` | Remove columns | `columns: [...]` |
+| `rename_columns` | Rename columns | `mapping: {old: new}` |
+| `fill_nulls` | Replace nulls | `fills: {col: value}` |
+| `case_when` | Conditional logic | `conditions: [{when, then}]` |
+| `sort` | Order rows | `order_by: "<column> [ASC\|DESC]"` — multiple columns can be comma-separated |
+| `limit` | Take first N rows | `n: 100` |
+| `distinct` | Remove duplicates | `columns: [...]` (optional) |
+
+### Date/Time Operations
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `extract_date_parts` | Extract year, month, day | `column, parts: [year, month]` |
+| `date_add` | Add interval to date | `column, interval, unit` (unit options: `day`, `hour`, `month`, `year`) |
+| `date_trunc` | Truncate to period | `column, unit` (unit options: `day`, `month`, `year`, `hour`, `minute`, `second`) |
+| `date_diff` | Days between dates | `start_col, end_col` |
+| `convert_timezone` | Convert timezones | `column, from_tz, to_tz` (IANA timezone format, e.g., `America/New_York`, `UTC`) |
+
+### Relational (Joins & Aggregations)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `join` | Join datasets | `right_dataset, on, how` |
+| `union` | Stack datasets | `datasets: [...]` |
+| `aggregate` | Group and aggregate | `group_by, aggregations` |
+| `pivot` | Rows to columns | `index, columns, values` |
+| `unpivot` | Columns to rows | `id_vars, value_vars` |
+
+### Advanced (Complex Transformations)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `deduplicate` | Keep first/last per key | `keys, order_by` |
+| `hash_columns` | Generate hash | `columns, output_column` |
+| `window_calculation` | Window functions | `partition_by, order_by, expr` |
+| `explode_list_column` | Flatten arrays | `column, outer: true` |
+| `dict_based_mapping` | Value mapping | `column, mapping: {}` |
+| `regex_replace` | Regex substitution | `column, pattern, replacement` |
+| `parse_json` | Extract from JSON | `column, schema` |
+| `generate_surrogate_key` | UUID keys | `columns, output_column` |
+| `sessionize` | Session detection | `timestamp_col, gap_minutes` — integer, inactivity threshold in minutes after which a new session starts |
+
+### Patterns (SCD, Merge, Delete Detection)
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `scd2` | SCD Type 2 history | `target, keys, track_cols, effective_time_col` (required) |
+| `merge` | Upsert/append/delete | `target, keys, strategy` — options: `upsert`, `append_only`, `delete_match` |
+| `detect_deletes` | Find deleted records | `target, keys` |
+
+### Validation
+
+| Transformer | Description | Key Params |
+| :--- | :--- | :--- |
+| `cross_check` | Compare datasets | `inputs: [a, b], type` — options: `row_count_diff`, `schema_match` |
+| `validate_and_flag` | Flag bad records | `rules: [{col, condition}]` |

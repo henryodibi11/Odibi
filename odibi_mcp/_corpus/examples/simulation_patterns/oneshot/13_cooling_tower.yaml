@@ -1,0 +1,155 @@
+project: cooling_tower
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: cooling
+    nodes:
+      - name: tower_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "1m"
+                row_count: 1440          # 24 hours
+                seed: 42
+              entities:
+                names: [CT_01, CT_02]
+              columns:
+                - name: tower_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Ambient temp — slow diurnal drift
+                - name: ambient_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 30.0
+                    min: 20.0
+                    max: 40.0
+                    volatility: 0.2
+                    mean_reversion: 0.02
+                    precision: 1
+
+                # Cold water out — tracks ambient (thermodynamic limit)
+                - name: supply_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 28.0
+                    min: 22.0
+                    max: 35.0
+                    volatility: 0.4
+                    mean_reversion: 0.1
+                    mean_reversion_to: ambient_temp_c
+                    precision: 1
+
+                # Hot water return from process
+                - name: return_temp_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 38.0
+                    min: 30.0
+                    max: 45.0
+                    volatility: 0.5
+                    mean_reversion: 0.08
+                    precision: 1
+                  entity_overrides:
+                    CT_02:                 # Heavier process load
+                      type: random_walk
+                      start: 42.0
+                      min: 33.0
+                      max: 48.0
+                      volatility: 0.5
+                      mean_reversion: 0.08
+                      precision: 1
+
+                # Raw approach temperature (noisy)
+                - name: raw_approach_c
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "supply_temp_c - ambient_temp_c"
+
+                # EMA-smoothed approach for trending
+                - name: smooth_approach_c
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "ema('raw_approach_c', alpha=0.1, default=raw_approach_c)"
+
+                # Cooling range
+                - name: range_c
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "return_temp_c - supply_temp_c"
+
+                - name: fan_speed_pct
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 60.0
+                    min: 0.0
+                    max: 100.0
+                    volatility: 2.0
+                    mean_reversion: 0.15
+                    precision: 0
+
+                # Makeup water — evaporation drives it
+                - name: makeup_water_gpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "range_c * 0.5 + fan_speed_pct * 0.1"
+
+                - name: cycles_of_concentration
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 4.0
+                    min: 2.0
+                    max: 8.0
+                    volatility: 0.05
+                    mean_reversion: 0.1
+                    precision: 1
+
+                # Blowdown — safe_div avoids division by zero
+                - name: blowdown_gpm
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "safe_div(makeup_water_gpm, cycles_of_concentration - 1, 0)"
+
+                # Cooling efficiency
+                - name: efficiency_pct
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      min(100, max(0,
+                      safe_div(range_c, max(return_temp_c - ambient_temp_c, 0.1), 0) * 100))
+        write:
+          connection: output
+          format: parquet
+          path: bronze/cooling_tower.parquet
+          mode: overwrite

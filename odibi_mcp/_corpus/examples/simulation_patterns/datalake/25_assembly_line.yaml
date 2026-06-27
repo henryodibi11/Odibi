@@ -1,0 +1,110 @@
+project: assembly_line
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: assembly
+    nodes:
+      - name: station_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T06:00:00Z"
+                timestep: "5m"
+                row_count: 96             # 8-hour shift
+                seed: 42
+              entities:
+                names: [Station_1_Weld, Station_2_Paint, Station_3_Assembly, Station_4_QC]
+              columns:
+                - name: station_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Parts entering the station
+                # Station_1 gets raw material; downstream stations pull from upstream
+                - name: parts_in
+                  data_type: int
+                  generator:
+                    type: range
+                    min: 8
+                    max: 15
+                  entity_overrides:
+                    Station_2_Paint:
+                      type: derived
+                      expression: "Station_1_Weld.parts_out"
+                    Station_3_Assembly:
+                      type: derived
+                      expression: "Station_2_Paint.parts_out"
+                    Station_4_QC:
+                      type: derived
+                      expression: "Station_3_Assembly.parts_out"
+
+                # Cycle time — paint station is the bottleneck
+                - name: cycle_time_sec
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 45.0
+                    max: 75.0
+                    distribution: normal
+                    mean: 55.0
+                    std_dev: 5.0
+                  entity_overrides:
+                    Station_2_Paint:       # Bottleneck — slower cycle
+                      type: range
+                      min: 50.0
+                      max: 90.0
+                      distribution: normal
+                      mean: 70.0
+                      std_dev: 8.0
+
+                # Some scrap at each station
+                - name: parts_out
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "max(0, parts_in - int(random() * 2))"
+
+                # Running total of output per station
+                - name: cumulative_output
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "prev('cumulative_output', 0) + parts_out"
+
+                # Scrap rate from actual in/out
+                - name: scrap_rate
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "safe_div(parts_in - parts_out, parts_in, 0)"
+
+              chaos:
+                outlier_rate: 0.003
+                outlier_factor: 1.5
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/assembly_line.parquet
+          mode: append

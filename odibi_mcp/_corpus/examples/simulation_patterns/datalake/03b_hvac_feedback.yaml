@@ -1,0 +1,184 @@
+project: building_sensors_hvac
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: bms_hvac
+    nodes:
+      - name: sensor_readings
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                end_time: "2026-03-11T00:00:00Z"    # 24 hours
+                timestep: "5m"
+                seed: 42
+              entities:
+                count: 20
+                id_prefix: "sensor_"
+              columns:
+                - name: sensor_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Floor assignment (same as Pattern 3)
+                - name: floor
+                  data_type: string
+                  generator: {type: constant, value: "Floor_1"}
+                  entity_overrides:
+                    sensor_01: {type: constant, value: "Floor_1"}
+                    sensor_02: {type: constant, value: "Floor_1"}
+                    sensor_03: {type: constant, value: "Floor_1"}
+                    sensor_04: {type: constant, value: "Floor_1"}
+                    sensor_05: {type: constant, value: "Floor_1"}
+                    sensor_06: {type: constant, value: "Floor_2"}
+                    sensor_07: {type: constant, value: "Floor_2"}
+                    sensor_08: {type: constant, value: "Floor_2"}
+                    sensor_09: {type: constant, value: "Floor_2"}
+                    sensor_10: {type: constant, value: "Floor_2"}
+                    sensor_11: {type: constant, value: "Floor_3"}
+                    sensor_12: {type: constant, value: "Floor_3"}
+                    sensor_13: {type: constant, value: "Floor_3"}
+                    sensor_14: {type: constant, value: "Floor_3"}
+                    sensor_15: {type: constant, value: "Floor_3"}
+                    sensor_16: {type: constant, value: "Floor_4"}
+                    sensor_17: {type: constant, value: "Floor_4"}
+                    sensor_18: {type: constant, value: "Floor_4"}
+                    sensor_19: {type: constant, value: "Floor_4"}
+                    sensor_20: {type: constant, value: "Floor_4"}
+
+                # Temperature (same as Pattern 3)
+                - name: temperature_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 22.0
+                    min: 16.0
+                    max: 30.0
+                    volatility: 0.3
+                    mean_reversion: 0.15
+                    precision: 1
+
+                # Humidity (same as Pattern 3)
+                - name: humidity_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 30.0
+                    max: 70.0
+                    distribution: normal
+                    mean: 45.0
+                    std_dev: 8.0
+                  null_rate: 0.02
+                  entity_overrides:
+                    sensor_04: {type: constant, value: null}
+                    sensor_12: {type: constant, value: null}
+                    sensor_18: {type: constant, value: null}
+
+                # === THE FEEDBACK CHAIN ===
+
+                # Step 1: Occupancy follows a daily office rhythm
+                - name: occupancy
+                  data_type: int
+                  generator:
+                    type: daily_profile
+                    min: 0
+                    max: 25
+                    precision: 0
+                    noise: 1.5
+                    volatility: 3.0
+                    profile:
+                      "00:00": 1
+                      "06:00": 3
+                      "08:00": 19
+                      "10:00": 22
+                      "12:00": 15
+                      "13:00": 22
+                      "17:00": 14
+                      "19:00": 4
+                      "22:00": 2
+
+                # Step 2: Raw CO2 — what CO2 would be from people alone
+                - name: co2_raw_ppm
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "None if occupancy is None else round(450 + occupancy * 25 + random() * 20, 0)"
+
+                # Step 3: HVAC fan speed — responds to raw CO2
+                # 20% minimum (always-on), ramps to 100% at high CO2
+                - name: hvac_fan_pct
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "None if co2_raw_ppm is None else min(100, max(20, round((co2_raw_ppm - 450) / 5.5, 0)))"
+
+                # Step 4: Actual CO2 after HVAC dilution
+                - name: co2_ppm
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "None if co2_raw_ppm is None or hvac_fan_pct is None else max(420, round(co2_raw_ppm - (hvac_fan_pct * 0.8) + random() * 10, 0))"
+
+              # sensor_15 battery died — ALL readings go NULL
+              scheduled_events:
+                - type: forced_value
+                  entity: sensor_15
+                  column: temperature_c
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: humidity_pct
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: occupancy
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: co2_raw_ppm
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: hvac_fan_pct
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: co2_ppm
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+
+              chaos:
+                outlier_rate: 0.005
+                outlier_factor: 2.5
+                duplicate_rate: 0.003
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/building_sensors_hvac.parquet
+          mode: append

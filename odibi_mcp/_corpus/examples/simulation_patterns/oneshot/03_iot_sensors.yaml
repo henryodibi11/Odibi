@@ -1,0 +1,156 @@
+project: building_sensors
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: bms
+    nodes:
+      - name: sensor_readings
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                end_time: "2026-03-11T00:00:00Z"    # 24 hours
+                timestep: "5m"
+                seed: 42
+              entities:
+                count: 20
+                id_prefix: "sensor_"
+              columns:
+                - name: sensor_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Floor — sensors are physically installed on one floor
+                - name: floor
+                  data_type: string
+                  generator: {type: constant, value: "Floor_1"}
+                  entity_overrides:
+                    sensor_01: {type: constant, value: "Floor_1"}
+                    sensor_02: {type: constant, value: "Floor_1"}
+                    sensor_03: {type: constant, value: "Floor_1"}
+                    sensor_04: {type: constant, value: "Floor_1"}
+                    sensor_05: {type: constant, value: "Floor_1"}
+                    sensor_06: {type: constant, value: "Floor_2"}
+                    sensor_07: {type: constant, value: "Floor_2"}
+                    sensor_08: {type: constant, value: "Floor_2"}
+                    sensor_09: {type: constant, value: "Floor_2"}
+                    sensor_10: {type: constant, value: "Floor_2"}
+                    sensor_11: {type: constant, value: "Floor_3"}
+                    sensor_12: {type: constant, value: "Floor_3"}
+                    sensor_13: {type: constant, value: "Floor_3"}
+                    sensor_14: {type: constant, value: "Floor_3"}
+                    sensor_15: {type: constant, value: "Floor_3"}
+                    sensor_16: {type: constant, value: "Floor_4"}
+                    sensor_17: {type: constant, value: "Floor_4"}
+                    sensor_18: {type: constant, value: "Floor_4"}
+                    sensor_19: {type: constant, value: "Floor_4"}
+                    sensor_20: {type: constant, value: "Floor_4"}
+
+                # Temperature with mean reversion — HVAC keeps it controlled
+                - name: temperature_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 22.0
+                    min: 16.0
+                    max: 30.0
+                    volatility: 0.3
+                    mean_reversion: 0.15     # HVAC pulls back to setpoint
+                    precision: 1
+
+                # Humidity — 3 sensors lack this capability (older hardware)
+                - name: humidity_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 30.0
+                    max: 70.0
+                    distribution: normal
+                    mean: 45.0
+                    std_dev: 8.0
+                  null_rate: 0.02            # 2% random dropout (signal glitches)
+                  entity_overrides:
+                    sensor_04: {type: constant, value: null}
+                    sensor_12: {type: constant, value: null}
+                    sensor_18: {type: constant, value: null}
+
+                # Occupancy — follows a realistic daily office rhythm
+                - name: occupancy
+                  data_type: int
+                  generator:
+                    type: daily_profile
+                    min: 0
+                    max: 25
+                    precision: 0
+                    noise: 1.5
+                    volatility: 3.0
+                    profile:
+                      "00:00": 1       # Overnight — security guard only
+                      "06:00": 3       # Early arrivals
+                      "08:00": 19      # Morning ramp-up
+                      "10:00": 22      # Mid-morning peak
+                      "12:00": 15      # Lunch — people leave the floor
+                      "13:00": 22      # Afternoon return
+                      "17:00": 14      # Evening departure begins
+                      "19:00": 4       # Late workers
+                      "22:00": 2       # Cleaning crew
+
+                # CO2 — derived from occupancy (not independent)
+                # Each person adds ~25 ppm above the 450 ppm baseline (ASHRAE)
+                - name: co2_ppm
+                  data_type: int
+                  generator:
+                    type: derived
+                    expression: "None if occupancy is None else round(450 + occupancy * 25 + random() * 20, 0)"
+
+              # sensor_15 battery died — no data after 14:00
+              # When a sensor dies, ALL readings go NULL — not just some
+              scheduled_events:
+                - type: forced_value
+                  entity: sensor_15
+                  column: temperature_c
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: humidity_pct
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: occupancy
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+                - type: forced_value
+                  entity: sensor_15
+                  column: co2_ppm
+                  value: null
+                  start_time: "2026-03-10T14:00:00Z"
+
+              chaos:
+                outlier_rate: 0.005
+                outlier_factor: 2.5
+                duplicate_rate: 0.003
+        write:
+          connection: output
+          format: parquet
+          path: bronze/building_sensors.parquet
+          mode: overwrite

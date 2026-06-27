@@ -1,0 +1,64 @@
+# =============================================================================
+# Delete Detection Example — Snapshot Diff Mode
+# =============================================================================
+# Detects customers deleted between daily full extracts.
+# Run with: odibi run config.yaml
+# See docs/tutorials/delete_detection.md for the full tutorial.
+
+project: customer_delete_detection
+engine: pandas
+
+# ---------------------------------------------------------------------------
+# Connections
+# ---------------------------------------------------------------------------
+connections:
+  raw:
+    type: local
+    base_path: ./data
+  silver:
+    type: local
+    base_path: ./output/silver
+
+# ---------------------------------------------------------------------------
+# Story & System (required by ProjectConfig)
+# ---------------------------------------------------------------------------
+story:
+  connection: silver
+  path: stories/
+
+system:
+  connection: silver
+  path: _odibi_system
+
+# ---------------------------------------------------------------------------
+# Pipelines
+# ---------------------------------------------------------------------------
+pipelines:
+  - pipeline: customer_deletes
+    layer: silver
+
+    nodes:
+      - name: detect_customer_deletes
+        read:
+          connection: raw
+          path: day2_customers.csv
+          format: csv
+
+        transform:
+          steps:
+            - function: detect_deletes
+              params:
+                mode: snapshot_diff
+                keys: [customer_id]
+                connection: silver
+                path: customers
+                soft_delete_col: _is_deleted
+                on_first_run: skip
+                max_delete_percent: 50.0
+                on_threshold_breach: warn
+
+        write:
+          connection: silver
+          path: customers
+          format: delta
+          mode: overwrite

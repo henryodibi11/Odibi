@@ -1,0 +1,56 @@
+# League of Legends Champions - Tests dict_to_list feature (Issue #56)
+# API returns: {"data": {"Aatrox": {...}, "Ahri": {...}}}
+# With dict_to_list: true, we extract dict values as rows
+
+project: lol_champions_test
+
+connections:
+  api:
+    type: http
+    base_url: https://ddragon.leagueoflegends.com
+  lake:
+    type: local
+    base_path: ./data/lol
+
+story:
+  connection: lake
+  path: _stories
+
+system:
+  connection: lake
+  path: _system
+
+pipelines:
+  - pipeline: fetch_champions
+    nodes:
+      - name: champions
+        description: Fetch and normalize champion data from Data Dragon API
+        explanation_file: docs/champions_explanation.md
+        read:
+          connection: api
+          format: api
+          path: /cdn/16.3.1/data/en_US/champion.json
+          options:
+            response:
+              items_path: data
+              dict_to_list: true  # <-- The new feature!
+
+        transform:
+          steps:
+            - sql: |
+                SELECT
+                  _key as champion_key,
+                  id,
+                  name,
+                  title,
+                  tags,
+                  partype,
+                  blurb
+                FROM df
+                ORDER BY name
+
+        write:
+          connection: lake
+          format: parquet
+          path: champions
+          mode: overwrite

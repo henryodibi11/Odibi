@@ -132,7 +132,11 @@ pm.run("pipeline_name")""",
     }
 
     def __init__(self, odibi_root: Path | None = None):
-        self.odibi_root = odibi_root or ODIBI_ROOT
+        from odibi_mcp.corpus import corpus_root
+
+        # Resolve docs/examples/.assistant from the repo (repo mode) or the packaged
+        # snapshot (pip mode) so the doc/skill/example tools work in both.
+        self.odibi_root = odibi_root or corpus_root()
         self.index_dir = self.odibi_root / ".odibi" / "index"
         self._embedder = None
         self._vector_store = None
@@ -391,6 +395,129 @@ pm.run("pipeline_name")""",
                 continue
 
         return results[:20]  # Limit results
+
+    # =========================================================================
+    # Skills (progressive disclosure) + onboarding
+    # =========================================================================
+
+    def _skills_dir(self) -> Path:
+        return self.odibi_root / ".assistant" / "skills"
+
+    @staticmethod
+    def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
+        """Split a SKILL.md into (frontmatter dict, body). Minimal YAML — name/description."""
+        meta: dict[str, str] = {}
+        body = text
+        if text.startswith("---"):
+            end = text.find("\n---", 3)
+            if end != -1:
+                fm = text[3:end].strip()
+                body = text[end + 4 :].lstrip("\n")
+                for line in fm.splitlines():
+                    if ":" in line:
+                        k, _, v = line.partition(":")
+                        meta[k.strip()] = v.strip().strip('"').strip("'")
+        return meta, body
+
+    def onboard(self) -> dict[str, Any]:
+        """Entry point: orient an agent on Odibi (instructions + skill index + workflow).
+
+        Call this first. Returns the assistant instructions, the list of loadable
+        skills, and the canonical workflow so the agent knows where to go next.
+        """
+        # Repo mode uses the canonical dotfile; the packaged snapshot ships a
+        # non-dot mirror (setuptools won't package a leading-dot filename).
+        instructions = ""
+        for fname in (".assistant_instructions.md", "instructions.md"):
+            p = self.odibi_root / ".assistant" / fname
+            if p.exists():
+                instructions = p.read_text(encoding="utf-8")
+                break
+        if not instructions:
+            # Defensive fallback so onboarding still works.
+            instructions = self.get_skill("odibi").get("content", "")
+        return {
+            "instructions": instructions,
+            "skills": self.list_skills(),
+            "workflow": [
+                "discover: onboard / bootstrap_context",
+                "profile: context-workbench tools, or profile_source / map_environment",
+                "author: get_schema + list_transformers/list_patterns + apply_pattern_template + get_example",
+                "validate: validate_yaml (fix did-you-mean errors)",
+                "run: test_pipeline",
+                "inspect: node_sample, story",
+            ],
+            "next": "Load the 'odibi' skill (get_skill('odibi')) for the full map, then the step-specific skill.",
+        }
+
+    def list_skills(self) -> list[dict[str, Any]]:
+        """List loadable agent skills (name + description) from .assistant/skills."""
+        skills_dir = self._skills_dir()
+        result: list[dict[str, Any]] = []
+        if not skills_dir.is_dir():
+            return result
+        for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+            meta, _ = self._parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+            result.append(
+                {
+                    "name": meta.get("name", skill_md.parent.name),
+                    "description": meta.get("description", ""),
+                }
+            )
+        return result
+
+    def get_skill(self, name: str) -> dict[str, Any]:
+        """Return a skill's full body so the agent can load its guidance."""
+        skill_md = self._skills_dir() / name / "SKILL.md"
+        if not skill_md.exists():
+            return {
+                "error": f"Skill not found: {name}",
+                "available": [s["name"] for s in self.list_skills()],
+            }
+        meta, body = self._parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+        return {"name": meta.get("name", name), "description": meta.get("description", ""), "content": body}
+
+    def list_examples(self, pattern: str | None = None) -> list[dict[str, Any]]:
+        """List runnable example pipeline YAMLs (optionally filtered by substring)."""
+        examples_dir = self.odibi_root / "examples"
+        result: list[dict[str, Any]] = []
+        if not examples_dir.is_dir():
+            return result
+        for ext in ("*.yaml", "*.yml"):
+            for f in sorted(examples_dir.rglob(ext)):
+                rel = str(f.relative_to(examples_dir)).replace("\\", "/")
+                if pattern and pattern.lower() not in rel.lower():
+                    continue
+                result.append({"name": rel, "path": f"examples/{rel}"})
+        return result
+
+    def get_schema(self, section: str | None = None) -> dict[str, Any]:
+        """Return the live JSON Schema for the Odibi config (or a named sub-model).
+
+        Generated from the Pydantic models, so it is always in sync with the code —
+        the authoritative list of valid keys/types/enums for authoring YAML.
+        """
+        from odibi import config as cfg
+
+        models = {
+            "project": cfg.ProjectConfig,
+            "pipeline": cfg.PipelineConfig,
+            "node": cfg.NodeConfig,
+            "read": cfg.ReadConfig,
+            "write": cfg.WriteConfig,
+            "transform": cfg.TransformConfig,
+            "validation": cfg.ValidationConfig,
+        }
+        if section is None:
+            return {
+                "sections": sorted(models.keys()),
+                "hint": "Call get_schema(section='read') for a specific model's JSON Schema.",
+                "project": cfg.ProjectConfig.model_json_schema(),
+            }
+        model = models.get(section)
+        if model is None:
+            return {"error": f"Unknown section: {section}", "available": sorted(models.keys())}
+        return {"section": section, "schema": model.model_json_schema()}
 
     # =========================================================================
     # Structured Tools (Deterministic)

@@ -1,0 +1,92 @@
+# Improvement Target Pipeline
+# Purpose: Controlled improvement testing - contains ONE intentional imperfection
+#
+# LOCATION: examples/ (NOT in .odibi/learning_harness/)
+# STATUS: Valid, executable, passes all validations
+#
+# =============================================================================
+# INTENTIONAL IMPERFECTION (for controlled improvement testing):
+#
+#   The `deduplicate` transformer in `dedupe_trips` node is missing the
+#   `order_by` parameter. This means duplicate resolution is NON-DETERMINISTIC.
+#
+#   Without `order_by`, the system will keep an arbitrary row when duplicates
+#   exist on the key columns, which could produce different results on
+#   different runs or engines.
+#
+#   EXPECTED IMPROVEMENT:
+#     Add `order_by: "pickup_datetime"` (or similar timestamp field)
+#     to ensure deterministic deduplication.
+#
+# =============================================================================
+
+project: improvement_target_demo
+
+connections:
+  bound_sources:
+    type: local
+    base_path: "${BOUND_SOURCE_ROOT}"
+  artifacts:
+    type: local
+    base_path: "${ARTIFACTS_ROOT}"
+
+story:
+  connection: artifacts
+  path: stories/improvement_target
+
+system:
+  connection: artifacts
+  path: _system
+
+pipelines:
+  - pipeline: taxi_dedup_pipeline
+    description: "Process taxi trips with deduplication"
+    nodes:
+      # Load NYC taxi trip data
+      - name: load_trips
+        read:
+          connection: bound_sources
+          format: csv
+          path: nyc_taxi/csv/clean/data.csv
+        write:
+          connection: artifacts
+          format: parquet
+          path: improvement_target/staging/raw_trips
+          mode: overwrite
+
+      # Deduplicate trips by trip_id
+      # IMPERFECTION: Missing order_by for deterministic deduplication
+      - name: dedupe_trips
+        depends_on:
+          - load_trips
+        transformer: deduplicate
+        params:
+          keys: ["trip_id", "vendor_id"]
+          order_by: "pickup_datetime"
+          # NOTE: Added order_by for deterministic deduplication
+        write:
+          connection: artifacts
+          format: parquet
+          path: improvement_target/staging/deduped_trips
+          mode: overwrite
+
+      # Aggregate by vendor - simple aggregation
+      - name: vendor_summary
+        depends_on:
+          - dedupe_trips
+        transform:
+          steps:
+            - sql: |
+                SELECT
+                  vendor_id,
+                  COUNT(*) as trip_count,
+                  SUM(fare_amount) as total_fares,
+                  AVG(trip_distance) as avg_distance
+                FROM df
+                GROUP BY vendor_id
+                ORDER BY vendor_id
+        write:
+          connection: artifacts
+          format: parquet
+          path: improvement_target/output/vendor_summary
+          mode: overwrite

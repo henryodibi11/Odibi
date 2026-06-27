@@ -1,0 +1,122 @@
+project: supply_chain
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: shipments
+    nodes:
+      - name: shipment_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-10T00:00:00Z"
+                timestep: "1h"
+                row_count: 72             # 3 days
+                seed: 42
+              entities:
+                names: [Leg_Origin, Leg_Transit, Leg_Destination]
+              columns:
+                - name: leg_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                - name: shipment_id
+                  data_type: string
+                  generator:
+                    type: uuid
+                    version: 4
+
+                # Houston → Memphis → NYC via entity overrides
+                - name: location
+                  data_type: string
+                  generator:
+                    type: geo
+                    bbox: [30.0, -95.5, 30.5, -95.0]
+                    format: "tuple"
+                  entity_overrides:
+                    Leg_Transit:
+                      type: geo
+                      bbox: [35.0, -90.0, 35.5, -89.5]
+                      format: "tuple"
+                    Leg_Destination:
+                      type: geo
+                      bbox: [40.5, -74.5, 41.0, -74.0]
+                      format: "tuple"
+
+                - name: status
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [in_transit, at_warehouse, loading, customs_hold]
+                    weights: [0.60, 0.20, 0.12, 0.08]
+
+                - name: weight_kg
+                  data_type: float
+                  generator: {type: constant, value: 2500.0}
+
+                # Cold chain — target 2°C
+                - name: temperature_c
+                  data_type: float
+                  generator:
+                    type: random_walk
+                    start: 2.0
+                    min: -5.0
+                    max: 15.0
+                    volatility: 0.5
+                    mean_reversion: 0.15
+                    precision: 1
+
+                - name: humidity_pct
+                  data_type: float
+                  generator:
+                    type: range
+                    min: 60
+                    max: 90
+                    distribution: normal
+                    mean: 75
+                    std_dev: 5
+
+                # ETA countdown with jitter
+                - name: eta_hours
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(max(0, prev('eta_hours', 72) - 1.0 + random() * 0.3 - 0.15), 1)"
+
+                # Cold chain excursion detection
+                - name: temp_excursion
+                  data_type: boolean
+                  generator:
+                    type: derived
+                    expression: "temperature_c > 5.0 or temperature_c < -2.0"
+
+              chaos:
+                outlier_rate: 0.01
+                outlier_factor: 2.0
+
+          incremental:
+            mode: stateful
+            column: timestamp
+
+        write:
+          connection: output
+          format: delta
+          path: bronze/supply_chain.parquet
+          mode: append

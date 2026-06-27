@@ -1,0 +1,50 @@
+# Dimension Pattern Tutorial - Runnable Example
+# Based on docs/tutorials/dimensional_modeling/02_dimension_pattern.md
+project: dimension_tutorial
+
+connections:
+  source:
+    type: local
+    base_path: ./data
+  warehouse:
+    type: local
+    base_path: ./warehouse
+
+story:
+  connection: warehouse
+  path: stories
+
+system:
+  connection: warehouse
+  path: _system
+
+pipelines:
+  - pipeline: build_dim_customer
+    description: "Build customer dimension with SCD2 history tracking"
+    nodes:
+      - name: dim_customer
+        description: "Customer dimension with surrogate keys and SCD2"
+        read:
+          connection: source
+          path: customers.csv
+          format: csv
+        
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols:
+              - name
+              - email
+              - region
+              - city
+              - state
+            unknown_member: true
+        
+        write:
+          connection: warehouse
+          path: dim_customer
+          format: delta
+          mode: overwrite

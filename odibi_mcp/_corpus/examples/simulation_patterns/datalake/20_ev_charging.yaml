@@ -1,0 +1,100 @@
+project: ev_charging
+engine: pandas
+
+connections:
+  output:
+    type: local
+    base_path: ./data
+
+story:
+  connection: output
+  path: stories/
+
+system:
+  connection: output
+
+pipelines:
+  - pipeline: charging
+    nodes:
+      - name: charging_data
+        read:
+          connection: null
+          format: simulation
+          options:
+            simulation:
+              scope:
+                start_time: "2026-03-01T00:00:00Z"
+                timestep: "10m"
+                row_count: 144            # 24 hours
+                seed: 42
+              entities:
+                names: [Station_A_Fast, Station_A_Slow, Station_B_Fast, Station_B_Slow]
+              columns:
+                - name: station_id
+                  data_type: string
+                  generator: {type: constant, value: "{entity_id}"}
+                - name: timestamp
+                  data_type: timestamp
+                  generator: {type: timestamp}
+
+                # Deterministic session IDs — same seed = same UUIDs
+                - name: session_id
+                  data_type: string
+                  generator:
+                    type: uuid
+                    version: 5
+
+                # User contact email tied to entity name
+                - name: user_email
+                  data_type: string
+                  generator:
+                    type: email
+                    domain: "evcharge.example.com"
+                    pattern: "{entity}_{index}"
+
+                # Charger type derived from entity name
+                - name: charger_type
+                  data_type: string
+                  generator:
+                    type: derived
+                    expression: "'DC_Fast' if 'Fast' in entity_id else 'AC_Level2'"
+
+                # Power: DC Fast ~150kW, AC Level 2 ~22kW
+                - name: power_kw
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: >
+                      150.0 + random() * 10
+                      if 'Fast' in entity_id
+                      else 22.0 + random() * 3
+
+                # Energy delivered per 10-min interval
+                - name: energy_delivered_kwh
+                  data_type: float
+                  generator:
+                    type: derived
+                    expression: "round(power_kw * 10.0 / 60.0, 2)"
+
+                # Session active 60% of the time
+                - name: session_active
+                  data_type: boolean
+                  generator:
+                    type: boolean
+                    true_probability: 0.6
+
+                - name: payment_status
+                  data_type: string
+                  generator:
+                    type: categorical
+                    values: [completed, pending, failed]
+                    weights: [0.92, 0.06, 0.02]
+
+          incremental:
+            mode: stateful
+            column: timestamp
+        write:
+          connection: output
+          format: delta
+          path: bronze/ev_charging.parquet
+          mode: append

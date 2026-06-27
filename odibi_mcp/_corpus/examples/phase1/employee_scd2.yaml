@@ -1,0 +1,50 @@
+pipelines:
+- pipeline: track_employee_history
+  layer: silver
+  freshness_anchor: run_completion
+  nodes:
+  - name: scd2_node
+    enabled: true
+    tags: []
+    depends_on: []
+    columns: {}
+    read:
+      connection: hr_db
+      format: sql
+      table: dbo.Employee
+      streaming: false
+      archive_options: {}
+      options: {}
+    write:
+      connection: warehouse
+      format: delta
+      path: silver/dim_employee
+      mode: append
+      partition_by: []
+      zorder_by: []
+      table_properties: {}
+      merge_schema: false
+      overwrite_schema: false
+      options: {}
+      skip_if_unchanged: false
+    streaming: false
+    transformer: scd2
+    params:
+      keys:
+      - employee_id
+      target: silver/dim_employee
+      tracked_columns:
+      - first_name
+      - last_name
+      - email
+      - department
+      - job_title
+      - salary
+      - manager_id
+      - hire_date
+    pre_sql: []
+    post_sql: []
+    cache: false
+    on_error: fail_later
+    contracts: []
+    sensitive: false
