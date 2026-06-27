@@ -153,8 +153,8 @@ connections:
     base_url: "https://api.example.com"
     auth:
       mode: api_key
-      api_key: "${MY_API_KEY}"      # Use environment variable
-      header_name: "X-API-Key"       # Default is X-API-Key
+      header_name: "X-API-Key"                 # Default is Authorization
+      value_template: "${MY_API_KEY}"          # Use environment variable
 ```
 
 #### Bearer Token

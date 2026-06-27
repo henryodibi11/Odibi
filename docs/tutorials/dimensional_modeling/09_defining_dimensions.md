@@ -77,20 +77,29 @@ connections:
     type: local
     base_path: /mnt/data/gold
 
+story:
+  connection: gold
+  path: _stories
+system:
+  connection: gold
+
 pipelines:
   - pipeline: build_warehouse
     nodes:
       - name: dim_customer
         write:
           connection: gold
+          format: parquet
           table: dim_customer
       - name: dim_product
         write:
           connection: gold
+          format: parquet
           table: dim_product
       - name: fact_orders
         write:
           connection: gold
+          format: parquet
           table: fact_orders
 
 semantic:

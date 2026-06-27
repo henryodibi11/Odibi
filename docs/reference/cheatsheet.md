@@ -35,6 +35,9 @@ story:
   connection: raw_data
   path: stories/
 
+system:
+  connection: raw_data
+
 pipelines:
   - pipeline: main_etl
     nodes:

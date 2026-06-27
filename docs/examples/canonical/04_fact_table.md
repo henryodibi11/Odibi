@@ -59,31 +59,30 @@ pipelines:
           format: parquet
           path: sales_events
         
-        pattern:
-          type: fact
-          params:
-            grain:
-              - order_id
-              - line_item_id
+        transformer: fact
+        params:
+          grain:
+            - order_id
+            - line_item_id
+          
+          dimensions:
+            - source_column: customer_id
+              dimension_table: gold.dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
             
-            dimensions:
-              - source_column: customer_id
-                dimension_table: gold.dim_customer
-                dimension_key: customer_id
-                surrogate_key: customer_sk
-              
-              - source_column: product_id
-                dimension_table: gold.dim_product
-                dimension_key: product_id
-                surrogate_key: product_sk
-              
-              - source_column: order_date
-                dimension_table: gold.dim_date
-                dimension_key: date_key
-                surrogate_key: date_sk
+            - source_column: product_id
+              dimension_table: gold.dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
             
-            orphan_handling: unknown  # Map to SK=0
-            # Options: 'unknown' | 'quarantine' | 'fail'
+            - source_column: order_date
+              dimension_table: gold.dim_date
+              dimension_key: date_key
+              surrogate_key: date_sk
+          
+          orphan_handling: unknown  # Map to SK=0
+          # Options: 'unknown' | 'quarantine' | 'fail'
         
         write:
           connection: gold

@@ -69,6 +69,11 @@ connections:
   local:
     type: local
     base_path: ./data
+story:
+  connection: local
+  path: stories/
+system:
+  connection: local
 pipelines:
   - pipeline: bronze_to_silver
     nodes:
@@ -457,7 +462,8 @@ connections:
 story:
   connection: outputs
   path: stories/
-  enabled: true
+system:
+  connection: outputs
 pipelines:
   - pipeline: example
     nodes:
@@ -472,7 +478,7 @@ pipelines:
         depends_on: [load_data]
         transform:
           steps:
-            - "SELECT * FROM load_data WHERE amount > 0"
+            - sql: "SELECT * FROM load_data WHERE amount > 0"
 
       - name: save_data
         depends_on: [clean_data]

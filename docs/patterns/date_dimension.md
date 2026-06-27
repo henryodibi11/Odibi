@@ -13,24 +13,27 @@ engine: spark
 connections:
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
   path: stories
+
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_date_dimension
     nodes:
       - name: dim_date
         # No read block - pattern generates data
-        pattern:
-          type: date_dimension
-          params:
-            start_date: "2020-01-01"
-            end_date: "2030-12-31"
-            fiscal_year_start_month: 7  # July fiscal year
-            unknown_member: true
+        transformer: date_dimension
+        params:
+          start_date: "2020-01-01"
+          end_date: "2030-12-31"
+          fiscal_year_start_month: 7  # July fiscal year
+          unknown_member: true
         write:
           connection: warehouse
           path: dim_date
@@ -96,15 +99,15 @@ Configure fiscal year start month for companies with non-calendar fiscal years:
 ```yaml
 nodes:
   - name: dim_date
-    pattern:
-      type: date_dimension
-      params:
-        start_date: "2020-01-01"
-        end_date: "2030-12-31"
-        fiscal_year_start_month: 7  # July 1st = FY start
+    transformer: date_dimension
+    params:
+      start_date: "2020-01-01"
+      end_date: "2030-12-31"
+      fiscal_year_start_month: 7  # July 1st = FY start
     write:
       connection: warehouse
       path: dim_date
+      format: delta
       mode: overwrite
 ```
 
@@ -148,7 +151,8 @@ engine: spark
 connections:
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
@@ -164,13 +168,12 @@ pipelines:
     nodes:
       - name: dim_date
         description: "Standard date dimension with fiscal calendar"
-        pattern:
-          type: date_dimension
-          params:
-            start_date: "2015-01-01"
-            end_date: "2035-12-31"
-            fiscal_year_start_month: 10  # October fiscal year (retail)
-            unknown_member: true
+        transformer: date_dimension
+        params:
+          start_date: "2015-01-01"
+          end_date: "2035-12-31"
+          fiscal_year_start_month: 10  # October fiscal year (retail)
+          unknown_member: true
         write:
           connection: warehouse
           path: dim_date
@@ -223,18 +226,17 @@ fiscal_year_start_month: 1  # Default
 ```yaml
 nodes:
   - name: dim_date
-    pattern:
-      type: date_dimension
-      params:
-        # Required
-        start_date: "2015-01-01"
-        end_date: "2035-12-31"
-        
-        # Fiscal calendar
-        fiscal_year_start_month: 7      # July fiscal year
-        
-        # Unknown member
-        unknown_member: true            # Add SK=0 row for orphans
+    transformer: date_dimension
+    params:
+      # Required
+      start_date: "2015-01-01"
+      end_date: "2035-12-31"
+
+      # Fiscal calendar
+      fiscal_year_start_month: 7      # July fiscal year
+
+      # Unknown member
+      unknown_member: true            # Add SK=0 row for orphans
     write:
       connection: warehouse
       path: dim_date
@@ -249,13 +251,12 @@ To customize output columns, add a SQL step after generation:
 ```yaml
 nodes:
   - name: dim_date_raw
-    pattern:
-      type: date_dimension
-      params:
-        start_date: "2020-01-01"
-        end_date: "2030-12-31"
-        fiscal_year_start_month: 10
-        unknown_member: true
+    transformer: date_dimension
+    params:
+      start_date: "2020-01-01"
+      end_date: "2030-12-31"
+      fiscal_year_start_month: 10
+      unknown_member: true
 
   - name: dim_date
     depends_on: [dim_date_raw]
@@ -279,6 +280,7 @@ nodes:
     write:
       connection: warehouse
       path: dim_date
+      format: delta
 ```
 
 ---

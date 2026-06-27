@@ -226,7 +226,7 @@ A common real-world setup: read from SQL Server, write to UC.
 connections:
   erp_source:
     type: sql_server
-    server: erp-server.database.windows.net
+    host: erp-server.database.windows.net
     database: production
     auth:
       mode: aad_msi

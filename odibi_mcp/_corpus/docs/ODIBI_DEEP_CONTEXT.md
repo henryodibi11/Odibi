@@ -1062,8 +1062,10 @@ connections:
   database:
     type: sql_server
     host: ${env:DB_HOST}        # Explicit env: prefix (same behavior)
+    database: ${env:DB_NAME}
     auth:
       mode: sql_login
+      username: ${DB_USER}
       password: ${DB_PASSWORD}    # From environment
 ```
 

@@ -14,7 +14,7 @@ The `dimension` pattern builds complete dimension tables with automatic surrogat
 
 ## Integration with Odibi YAML
 
-Patterns are used via the `pattern:` block in a node config. The pattern type goes in `pattern: type:` and configuration goes in `pattern: params:`.
+Patterns are applied like transformers: set `transformer:` to the pattern name on a node and supply its configuration in the sibling `params:` block.
 
 ```yaml
 project: my_warehouse
@@ -23,14 +23,19 @@ engine: spark
 connections:
   staging:
     type: delta
-    path: /mnt/staging
+    catalog: main
+    schema: staging
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
   path: stories
+
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_dimensions
@@ -40,21 +45,20 @@ pipelines:
           connection: staging
           path: customers
           format: delta
-        
+
         # Use dimension pattern
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 2
-            track_cols: [name, email, address]
-            target: warehouse.dim_customer
-            unknown_member: true
-            audit:
-              load_timestamp: true
-              source_system: "crm"
-        
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_cols: [name, email, address]
+          target: warehouse.dim_customer
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: "crm"
+
         write:
           connection: warehouse
           path: dim_customer
@@ -114,16 +118,17 @@ nodes:
     read:
       connection: staging
       path: countries
-    pattern:
-      type: dimension
-      params:
-        natural_key: country_code
-        surrogate_key: country_sk
-        scd_type: 0
-        target: warehouse.dim_country
+      format: delta
+    transformer: dimension
+    params:
+      natural_key: country_code
+      surrogate_key: country_sk
+      scd_type: 0
+      target: warehouse.dim_country
     write:
       connection: warehouse
       path: dim_country
+      format: delta
       mode: overwrite
 ```
 
@@ -141,19 +146,20 @@ nodes:
     read:
       connection: staging
       path: customers
-    pattern:
-      type: dimension
-      params:
-        natural_key: customer_id
-        surrogate_key: customer_sk
-        scd_type: 1
-        track_cols: [name, email, address]
-        target: warehouse.dim_customer
-        audit:
-          load_timestamp: true
+      format: delta
+    transformer: dimension
+    params:
+      natural_key: customer_id
+      surrogate_key: customer_sk
+      scd_type: 1
+      track_cols: [name, email, address]
+      target: warehouse.dim_customer
+      audit:
+        load_timestamp: true
     write:
       connection: warehouse
       path: dim_customer
+      format: delta
       mode: overwrite
 ```
 
@@ -171,24 +177,25 @@ nodes:
     read:
       connection: staging
       path: customers
-    pattern:
-      type: dimension
-      params:
-        natural_key: customer_id
-        surrogate_key: customer_sk
-        scd_type: 2
-        track_cols: [name, email, address, city, state]
-        target: warehouse.dim_customer
-        valid_from_col: valid_from     # Optional, default: valid_from
-        valid_to_col: valid_to         # Optional, default: valid_to
-        is_current_col: is_current     # Optional, default: is_current
-        unknown_member: true
-        audit:
-          load_timestamp: true
-          source_system: "crm"
+      format: delta
+    transformer: dimension
+    params:
+      natural_key: customer_id
+      surrogate_key: customer_sk
+      scd_type: 2
+      track_cols: [name, email, address, city, state]
+      target: warehouse.dim_customer
+      valid_from_col: valid_from     # Optional, default: valid_from
+      valid_to_col: valid_to         # Optional, default: valid_to
+      is_current_col: is_current     # Optional, default: is_current
+      unknown_member: true
+      audit:
+        load_timestamp: true
+        source_system: "crm"
     write:
       connection: warehouse
       path: dim_customer
+      format: delta
       mode: overwrite
 ```
 
@@ -222,10 +229,12 @@ engine: spark
 connections:
   staging:
     type: delta
-    path: /mnt/staging
+    catalog: main
+    schema: staging
   warehouse:
     type: delta
-    path: /mnt/warehouse
+    catalog: main
+    schema: warehouse
 
 story:
   connection: warehouse
@@ -244,25 +253,24 @@ pipelines:
           connection: staging
           path: customers
           format: delta
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 2
-            track_cols:
-              - name
-              - email
-              - phone
-              - address_line_1
-              - city
-              - state
-              - postal_code
-            target: warehouse.dim_customer
-            unknown_member: true
-            audit:
-              load_timestamp: true
-              source_system: "salesforce"
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_cols:
+            - name
+            - email
+            - phone
+            - address_line_1
+            - city
+            - state
+            - postal_code
+          target: warehouse.dim_customer
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: "salesforce"
         write:
           connection: warehouse
           path: dim_customer
@@ -275,15 +283,14 @@ pipelines:
           connection: staging
           path: products
           format: delta
-        pattern:
-          type: dimension
-          params:
-            natural_key: product_id
-            surrogate_key: product_sk
-            scd_type: 1
-            track_cols: [name, category, price, status]
-            target: warehouse.dim_product
-            unknown_member: true
+        transformer: dimension
+        params:
+          natural_key: product_id
+          surrogate_key: product_sk
+          scd_type: 1
+          track_cols: [name, category, price, status]
+          target: warehouse.dim_product
+          unknown_member: true
         write:
           connection: warehouse
           path: dim_product
@@ -292,13 +299,12 @@ pipelines:
 
       # Date dimension (generated, no source read needed)
       - name: dim_date
-        pattern:
-          type: date_dimension
-          params:
-            start_date: "2020-01-01"
-            end_date: "2030-12-31"
-            fiscal_year_start_month: 7
-            unknown_member: true
+        transformer: date_dimension
+        params:
+          start_date: "2020-01-01"
+          end_date: "2030-12-31"
+          fiscal_year_start_month: 7
+          unknown_member: true
         write:
           connection: warehouse
           path: dim_date

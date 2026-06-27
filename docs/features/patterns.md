@@ -292,24 +292,30 @@ pipelines:
           options:
             header: true
 
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 1
-            track_cols:
-              - name
-              - email
-              - tier
-              - city
-            unknown_member: true
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 1
+          track_cols:
+            - name
+            - email
+            - tier
+            - city
+          unknown_member: true
 
         write:
           connection: gold
           format: parquet
           path: dim_customer.parquet
           mode: overwrite
+
+story:
+  connection: gold
+  path: _stories
+system:
+  connection: gold
+  path: _system
 ```
 
 ### Fact: Sales Fact with Dimension Lookups
@@ -452,9 +458,13 @@ project: CustomerDW
 engine: spark
 
 connections:
+  bronze:
+    type: local
+    base_path: ./data/bronze
   gold:
     type: delta
-    path: /mnt/gold
+    catalog: main
+    schema: gold
 
 pipelines:
   - pipeline: load_customer_dim
@@ -462,17 +472,24 @@ pipelines:
       - name: customer_scd2
         read:
           connection: bronze
+          format: parquet
           path: customers
 
-        pattern:
-          type: scd2
-          params:
-            target: "gold/customers"
-            keys: ["customer_id"]
-            track_cols: ["address", "city", "state", "tier"]
-            valid_from_col: "valid_from"
-            valid_to_col: "valid_to"
-            is_current_col: "is_active"
+        transformer: scd2
+        params:
+          target: "gold/customers"
+          keys: ["customer_id"]
+          track_cols: ["address", "city", "state", "tier"]
+          valid_from_col: "valid_from"
+          valid_to_col: "valid_to"
+          is_current_col: "is_active"
+
+story:
+  connection: gold
+  path: _stories
+system:
+  connection: gold
+  path: _system
 ```
 
 ### Merge: Incremental Customer Updates

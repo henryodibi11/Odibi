@@ -57,6 +57,8 @@ connections:
 story:
   connection: warehouse
   path: stories
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_dim_customer_scd0
@@ -67,13 +69,12 @@ pipelines:
           path: customers.csv
           format: csv
 
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 0
-            unknown_member: true
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 0
+          unknown_member: true
 
         write:
           connection: warehouse
@@ -153,6 +154,8 @@ connections:
 story:
   connection: warehouse
   path: stories
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_dim_customer_scd1
@@ -163,22 +166,21 @@ pipelines:
           path: customers_updated.csv
           format: csv
 
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 1
-            track_cols:
-              - name
-              - email
-              - region
-              - city
-              - state
-            target: warehouse.dim_customer
-            unknown_member: true
-            audit:
-              load_timestamp: true
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 1
+          track_cols:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          unknown_member: true
+          audit:
+            load_timestamp: true
 
         write:
           connection: warehouse
@@ -262,6 +264,8 @@ connections:
 story:
   connection: warehouse
   path: stories
+system:
+  connection: warehouse
 
 pipelines:
   - pipeline: build_dim_customer_scd2
@@ -272,26 +276,25 @@ pipelines:
           path: customers_updated.csv
           format: csv
 
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 2
-            track_cols:
-              - name
-              - email
-              - region
-              - city
-              - state
-            target: warehouse.dim_customer
-            valid_from_col: valid_from
-            valid_to_col: valid_to
-            is_current_col: is_current
-            unknown_member: true
-            audit:
-              load_timestamp: true
-              source_system: "crm"
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_cols:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          valid_from_col: valid_from
+          valid_to_col: valid_to
+          is_current_col: is_current
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: "crm"
 
         write:
           connection: warehouse
@@ -397,6 +400,8 @@ connections:
 story:
   connection: warehouse
   path: stories
+system:
+  connection: warehouse
 
 pipelines:
   # Initial load with SCD2
@@ -410,26 +415,25 @@ pipelines:
           path: customers.csv
           format: csv
 
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 2
-            track_cols:
-              - name
-              - email
-              - region
-              - city
-              - state
-            target: warehouse.dim_customer
-            valid_from_col: valid_from
-            valid_to_col: valid_to
-            is_current_col: is_current
-            unknown_member: true
-            audit:
-              load_timestamp: true
-              source_system: "crm"
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_cols:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          valid_from_col: valid_from
+          valid_to_col: valid_to
+          is_current_col: is_current
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: "crm"
 
         write:
           connection: warehouse
@@ -448,26 +452,25 @@ pipelines:
           path: customers_updated.csv
           format: csv
 
-        pattern:
-          type: dimension
-          params:
-            natural_key: customer_id
-            surrogate_key: customer_sk
-            scd_type: 2
-            track_cols:
-              - name
-              - email
-              - region
-              - city
-              - state
-            target: warehouse.dim_customer
-            valid_from_col: valid_from
-            valid_to_col: valid_to
-            is_current_col: is_current
-            unknown_member: true
-            audit:
-              load_timestamp: true
-              source_system: "crm"
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 2
+          track_cols:
+            - name
+            - email
+            - region
+            - city
+            - state
+          target: warehouse.dim_customer
+          valid_from_col: valid_from
+          valid_to_col: valid_to
+          is_current_col: is_current
+          unknown_member: true
+          audit:
+            load_timestamp: true
+            source_system: "crm"
 
         write:
           connection: warehouse

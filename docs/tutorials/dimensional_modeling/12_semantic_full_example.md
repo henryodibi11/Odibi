@@ -26,17 +26,23 @@ connections:
     type: local
     base_path: /mnt/data/gold
 
+story:
+  connection: gold
+  path: _stories
+system:
+  connection: gold
+
 pipelines:
   - pipeline: build_warehouse
     nodes:
       - name: fact_orders
-        write: { connection: gold, table: fact_orders }
+        write: { connection: gold, format: parquet, table: fact_orders }
       - name: dim_customer
-        write: { connection: gold, table: dim_customer }
+        write: { connection: gold, format: parquet, table: dim_customer }
       - name: dim_product
-        write: { connection: gold, table: dim_product }
+        write: { connection: gold, format: parquet, table: dim_product }
       - name: dim_date
-        write: { connection: gold, table: dim_date }
+        write: { connection: gold, format: parquet, table: dim_date }
 
 # Semantic layer at project level
 semantic:

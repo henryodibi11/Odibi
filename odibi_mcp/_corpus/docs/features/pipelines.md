@@ -79,10 +79,10 @@ engine: spark  # or 'pandas' or 'polars'
 connections:
   bronze:
     type: local
-    path: ./data/bronze
+    base_path: ./data/bronze
   silver:
     type: local
-    path: ./data/silver
+    base_path: ./data/silver
 
 pipelines:
   - pipeline: bronze_to_silver
@@ -108,6 +108,13 @@ pipelines:
           path: orders_clean.parquet
           format: parquet
           mode: overwrite
+
+story:
+  connection: bronze
+  path: _stories
+system:
+  connection: bronze
+  path: _system
 ```
 
 ### Pipeline Config Options
@@ -363,12 +370,16 @@ engine: spark
 
 connections:
   raw:
-    type: azure_adls
-    account: ${AZURE_STORAGE_ACCOUNT}
+    type: azure_blob
+    account_name: ${AZURE_STORAGE_ACCOUNT}
     container: raw
+    auth:
+      mode: account_key
+      account_key: ${AZURE_STORAGE_KEY}
   silver:
     type: delta
-    path: abfss://silver@${AZURE_STORAGE_ACCOUNT}.dfs.core.windows.net/
+    catalog: main
+    schema: silver
 
 alerts:
   - type: slack
@@ -391,13 +402,18 @@ pipelines:
 
       - name: validate_transactions
         depends_on: [ingest_transactions]
+        transform:
+          steps:
+            - sql: "SELECT * FROM ingest_transactions"
         validation:
           tests:
             - type: not_null
               columns: [transaction_id, amount]
-            - type: positive
-              columns: [amount]
-          on_fail: quarantine
+              on_fail: quarantine
+            - type: range
+              column: amount
+              min: 0
+              on_fail: quarantine
           quarantine:
             connection: silver
             path: quarantine/transactions
@@ -420,6 +436,13 @@ pipelines:
           format: delta
           mode: merge
           merge_keys: [store_id, transaction_date]
+
+story:
+  connection: silver
+  path: _stories
+system:
+  connection: silver
+  path: _system
 ```
 
 ```python

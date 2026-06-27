@@ -344,7 +344,8 @@ engine: pandas
 connections:
   gold:
     type: delta
-    path: /mnt/data/gold
+    catalog: main
+    schema: gold
 
 # Semantic layer at project level
 semantic:

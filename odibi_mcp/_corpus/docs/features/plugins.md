@@ -367,9 +367,12 @@ engine: spark
 
 connections:
   source:
-    type: azure_adls
+    type: azure_blob
     account_name: mystorageaccount
     container: raw
+    auth:
+      mode: account_key
+      account_key: ${AZURE_STORAGE_KEY}
 
   cache:
     type: redis
@@ -380,12 +383,14 @@ pipelines:
   - pipeline: process_customers
     nodes:
       - name: load_customers
-        source: source
-        path: customers/
+        read:
+          connection: source
+          format: parquet
+          path: customers/
 
       - name: enrich
-        input: load_customers
-        transform: enrich_with_lookup
+        depends_on: [load_customers]
+        transformer: enrich_with_lookup
         params:
           lookup_table: reference/regions
           key_column: region_code
@@ -394,12 +399,19 @@ pipelines:
             - country
 
       - name: dedupe
-        input: enrich
-        transform: deduplicate
+        depends_on: [enrich]
+        transformer: deduplicate
         params:
           key_columns:
             - customer_id
           order_by: updated_at desc
+
+story:
+  connection: source
+  path: _stories
+system:
+  connection: source
+  path: _system
 ```
 
 ## Best Practices

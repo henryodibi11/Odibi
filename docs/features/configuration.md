@@ -71,7 +71,7 @@ pipelines:
     nodes:
       - name: "load_customers"
         read: { connection: "bronze", format: "csv", path: "customers.csv" }
-        write: { connection: "silver", table: "customers" }
+        write: { connection: "silver", format: "delta", table: "customers" }
 ```
 
 ### Retry Configuration

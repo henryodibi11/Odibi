@@ -338,15 +338,19 @@ If you hardcode paths, you need to edit the YAML for every environment. This lea
 connections:
   landing:
     type: azure_blob
-    account: ${STORAGE_ACCOUNT}  # From environment
+    account_name: ${STORAGE_ACCOUNT}  # From environment
     container: raw
-    credential: ${STORAGE_KEY}   # Secret from Key Vault
+    auth:
+      mode: account_key
+      account_key: ${STORAGE_KEY}     # Secret from Key Vault
 
   bronze:
     type: azure_blob
-    account: ${STORAGE_ACCOUNT}
+    account_name: ${STORAGE_ACCOUNT}
     container: bronze
-    credential: ${STORAGE_KEY}
+    auth:
+      mode: account_key
+      account_key: ${STORAGE_KEY}
 
 pipelines:
   - pipeline: "load_sales"
@@ -355,11 +359,13 @@ pipelines:
         read:
           # ✅ Use connection name + relative path
           connection: landing
+          format: parquet
           path: sales/2024/
 
         write:
           # ✅ Portable across environments
           connection: bronze
+          format: delta
           path: sales
 ```
 

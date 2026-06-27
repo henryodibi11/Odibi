@@ -297,10 +297,14 @@ You can inject secrets or environment-specific paths using `${VAR_NAME}`.
 
 ```yaml
 connections:
-  snowflake:
+  warehouse:
     type: "sql_server"
     host: "${DB_HOST}"
-    password: "${DB_PASSWORD}" # Redacted in logs automatically
+    database: "analytics"
+    auth:
+      mode: sql_login
+      username: "${DB_USER}"
+      password: "${DB_PASSWORD}" # Redacted in logs automatically
 ```
 
 #### YAML Anchors & Aliases

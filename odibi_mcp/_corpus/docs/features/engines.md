@@ -220,7 +220,7 @@ engine: pandas
 connections:
   bronze:
     type: local
-    path: ./data/bronze
+    base_path: ./data/bronze
 
 pipelines:
   - pipeline: process_orders
@@ -230,6 +230,13 @@ pipelines:
           connection: bronze
           format: csv
           path: orders.csv
+
+story:
+  connection: bronze
+  path: _stories
+system:
+  connection: bronze
+  path: _system
 ```
 
 ```yaml
@@ -239,9 +246,12 @@ engine: spark
 
 connections:
   bronze:
-    type: azure_adls
-    storage_account: "${STORAGE_ACCOUNT}"
+    type: azure_blob
+    account_name: "${STORAGE_ACCOUNT}"
     container: bronze
+    auth:
+      mode: account_key
+      account_key: "${STORAGE_KEY}"
 
 pipelines:
   - pipeline: process_orders
@@ -251,6 +261,13 @@ pipelines:
           connection: bronze
           format: delta
           path: orders
+
+story:
+  connection: bronze
+  path: _stories
+system:
+  connection: bronze
+  path: _system
 ```
 
 ### Using Different Connections
@@ -261,19 +278,27 @@ engine: spark
 
 connections:
   raw_data:
-    type: azure_adls
-    storage_account: rawstorage
+    type: azure_blob
+    account_name: rawstorage
     container: raw
+    auth:
+      mode: account_key
+      account_key: "${RAW_STORAGE_KEY}"
 
   processed:
-    type: azure_adls
-    storage_account: procstorage
+    type: azure_blob
+    account_name: procstorage
     container: silver
+    auth:
+      mode: account_key
+      account_key: "${PROC_STORAGE_KEY}"
 
   sql_source:
-    type: azure_sql
+    type: sql_server
     host: myserver.database.windows.net
     database: mydb
+    auth:
+      mode: aad_msi
 
 pipelines:
   - pipeline: ingest_sql
@@ -285,10 +310,18 @@ pipelines:
           table: dbo.customers
 
       - name: write_delta
+        depends_on: [read_sql]
         write:
           connection: processed
           format: delta
           path: customers
+
+story:
+  connection: processed
+  path: _stories
+system:
+  connection: processed
+  path: _system
 ```
 
 ### Lazy vs Eager Execution

@@ -452,6 +452,10 @@ ORDER BY count DESC
 project: SalesAnalytics
 engine: spark
 
+story:
+  connection: catalog_storage
+  path: _stories
+
 system:
   connection: catalog_storage
   path: _odibi_system
@@ -464,19 +468,28 @@ system:
 
 connections:
   catalog_storage:
-    type: azure_adls
-    account: "${STORAGE_ACCOUNT}"
+    type: azure_blob
+    account_name: "${STORAGE_ACCOUNT}"
     container: metadata
+    auth:
+      mode: account_key
+      account_key: "${STORAGE_KEY}"
 
   bronze:
-    type: azure_adls
-    account: "${STORAGE_ACCOUNT}"
+    type: azure_blob
+    account_name: "${STORAGE_ACCOUNT}"
     container: bronze
+    auth:
+      mode: account_key
+      account_key: "${STORAGE_KEY}"
 
   silver:
-    type: azure_adls
-    account: "${STORAGE_ACCOUNT}"
+    type: azure_blob
+    account_name: "${STORAGE_ACCOUNT}"
     container: silver
+    auth:
+      mode: account_key
+      account_key: "${STORAGE_KEY}"
 
 pipelines:
   - pipeline: orders_silver
@@ -486,26 +499,27 @@ pipelines:
     freshness_sla: "6h"
     nodes:
       - name: read_orders
-        type: read
-        connection: bronze
-        path: raw/orders
-        format: delta
+        read:
+          connection: bronze
+          path: raw/orders
+          format: delta
 
       - name: transform
-        type: transform
-        input: read_orders
-        transform: |
-          SELECT * FROM {input}
-          WHERE order_date >= '2024-01-01'
+        depends_on: [read_orders]
+        transform:
+          steps:
+            - sql: |
+                SELECT * FROM df
+                WHERE order_date >= '2024-01-01'
 
       - name: write_orders
-        type: write
-        input: transform
-        connection: silver
-        path: orders
-        format: delta
-        mode: merge
-        merge_keys: [order_id]
+        depends_on: [transform]
+        write:
+          connection: silver
+          path: orders
+          format: delta
+          mode: merge
+          merge_keys: [order_id]
 ```
 
 After running this pipeline:
