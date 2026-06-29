@@ -214,3 +214,10 @@ examples/temp/
 github_logs/
 tests/mcp/
 # MCP tests require openai package
+
+# Context-workbench session state (should never be committed)
+.cw_session_state.json
+.cw_session_health.json
+.agent_memory.db
+# Stray pip-redirect artifacts (e.g. `pip install "x>=3.0"` → file named =3.0)
+=*.*

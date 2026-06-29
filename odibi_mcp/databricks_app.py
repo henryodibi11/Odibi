@@ -25,3 +25,26 @@ http_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def main() -> None:
+    """Serve the HTTP app with uvicorn.
+
+    Entry point for the `odibi-mcp-http` console script and
+    `python -m odibi_mcp.databricks_app`. Host/port via ODIBI_MCP_HOST / PORT.
+    NOTE: the Databricks Apps deploy uses app.yaml (uvicorn) directly; this is
+    for local/manual runs.
+    """
+    import os
+
+    import uvicorn
+
+    uvicorn.run(
+        http_app,
+        host=os.environ.get("ODIBI_MCP_HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", os.environ.get("ODIBI_MCP_PORT", "8000"))),
+    )
+
+
+if __name__ == "__main__":
+    main()

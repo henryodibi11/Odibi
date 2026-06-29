@@ -526,51 +526,52 @@ class OdibiDispatcher:
         from odibi_mcp.tools.guidance import list_task_types
         return list_task_types()
     
-    # Onboarding
+    # Onboarding — delegate to the OdibiKnowledge singleton's methods.
+    # (get_knowledge() returns the instance; call its methods — it does NOT take an action arg.)
     def _onboard(self) -> dict[str, Any]:
         """Get onboarding information."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("onboard")
-    
+        return get_knowledge().onboard()
+
     def _get_schema(self, component: str | None = None) -> dict[str, Any]:
         """Get config schema."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("schema", component=component)
-    
+        return get_knowledge().get_schema(component)
+
     def _search_docs(self, query: str) -> dict[str, Any]:
         """Search documentation."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("search", query=query)
-    
+        return {"results": get_knowledge().search_docs(query)}
+
     def _get_doc(self, doc_path: str) -> dict[str, Any]:
         """Get documentation file."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("doc", doc_path=doc_path)
-    
+        return get_knowledge().get_doc(doc_path)
+
     def _list_docs(self, category: str | None = None) -> dict[str, Any]:
         """List documentation files."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("list_docs", category=category)
-    
+        return {"docs": get_knowledge().list_docs(category)}
+
     def _list_examples(self, pattern: str | None = None) -> dict[str, Any]:
         """List example pipelines."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("list_examples", pattern=pattern)
-    
+        return {"examples": get_knowledge().list_examples(pattern)}
+
     def _get_example(self, pattern_name: str) -> dict[str, Any]:
         """Get example pipeline."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("example", pattern_name=pattern_name)
-    
+        return get_knowledge().get_example(pattern_name)
+
     def _list_skills(self) -> dict[str, Any]:
         """List available skills."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("list_skills")
-    
+        return {"skills": get_knowledge().list_skills()}
+
     def _get_skill(self, name: str) -> dict[str, Any]:
         """Get skill content."""
         from odibi_mcp.knowledge import get_knowledge
-        return get_knowledge("skill", name=name)
+        return get_knowledge().get_skill(name)
     
     # Download
     def _download_sql(self, pipeline: str) -> dict[str, Any]:

@@ -108,13 +108,25 @@ print("✅ All imports successful")
 ### Stdio Mode (for MCP clients)
 
 ```bash
-python -m odibi_mcp.server
+python -m odibi_mcp                       # or: odibi-mcp
+# equivalently: fastmcp run odibi_mcp.mcp_server:mcp
 ```
 
-### HTTP Mode (for Databricks Apps)
+### Notebook Mode (Databricks Free Edition — no Apps needed)
+
+```python
+import sys; sys.path.insert(0, "/Workspace/Users/<you>/Odibi/odibi_mcp")
+from odibi_mcp.bootstrap import init
+odibi, odibi_help = init()
+odibi_help()                              # discover actions
+odibi("onboard")                          # orient
+odibi("search_docs", query="simulation")  # find capabilities
+```
+
+### HTTP Mode (Databricks Apps — paid workspace)
 
 ```bash
-python -m odibi_mcp.databricks_app
+python -m odibi_mcp.databricks_app        # or: odibi-mcp-http
 ```
 
 ## Troubleshooting

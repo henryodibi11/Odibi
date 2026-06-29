@@ -188,7 +188,6 @@ target-version = "py39"
 "odibi_mcp/contracts/envelope.py" = ["E402"]
 "odibi_mcp/test_all_tools.py" = ["E402", "F841"]
 "run_mcp.py" = ["E402"]
-"tests/unit/mcp/test_server_audit.py" = ["E402", "F841"]
 # These files use pytest.importorskip() before imports (polars/CoolProp optional)
 "tests/unit/engine/test_polars_engine_coverage.py" = ["E402"]
 "tests/unit/transformers/test_manufacturing_coverage.py" = ["E402"]

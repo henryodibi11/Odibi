@@ -27,7 +27,23 @@ def test_dispatcher_basic():
     result = dispatcher.dispatch("nonexistent")
     assert "error" in result
     print(f"✅ Error handled: {result['error'][:50]}...")
-    
+
+    # Test 4: actually DISPATCH discovery actions (not just list them) — these
+    # delegate to OdibiKnowledge and were silently broken before.
+    print("\nTest 4: Dispatch discovery actions")
+    for action, kwargs in [
+        ("onboard", {}),
+        ("list_skills", {}),
+        ("search_docs", {"query": "simulation"}),
+        ("list_examples", {"pattern": "simulation"}),
+        ("get_schema", {"component": "read"}),
+    ]:
+        r = dispatcher.dispatch(action, **kwargs)
+        assert isinstance(r, dict) and set(r.keys()) - {"error", "tip", "available"}, (
+            f"{action} returned an error: {r}"
+        )
+        print(f"✅ {action} dispatched")
+
     print("\n🎉 All tests passed!")
 
 if __name__ == "__main__":

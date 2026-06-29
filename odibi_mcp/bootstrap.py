@@ -1,24 +1,29 @@
-"""Bootstrap helper for Odibi MCP — notebook ergonomics.
+"""Bootstrap helper for Odibi MCP — notebook ergonomics (Databricks Free Edition).
+
+This is the path that works WITHOUT Databricks Apps: import it in a notebook and
+drive Odibi through the same dispatcher the MCP server uses.
 
 Usage:
     import sys
-    sys.path.insert(0, "/Workspace/Users/henryodibi@outlook.com/Odibi/odibi_mcp")
+    # Point at the repo ROOT (the folder that CONTAINS the odibi_mcp package),
+    # so `from odibi_mcp...` imports resolve:
+    sys.path.insert(0, "/Workspace/Users/<you>/Odibi")
     from odibi_mcp.bootstrap import init
     odibi, odibi_help = init()
-    
+
     # Now use like:
-    result = odibi_help()  # Full catalog
-    result = odibi_help(category="Discovery")  # Filtered
-    result = odibi_help(action="profile_source")  # Action details
-    result = odibi("list_workflows")  # Execute action
-    result = odibi("profile_source", source_path="/path/to/data.csv")  # With kwargs
+    odibi_help()                               # Full catalog
+    odibi_help(category="Discovery")           # Filtered
+    odibi_help(action="profile_source")        # Action details
+    odibi("onboard")                           # Orient
+    odibi("search_docs", query="simulation")   # Discover capabilities
+    odibi("profile_source", connection=None, path="/path/to/data.csv")
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
-from dispatcher import OdibiDispatcher
+from odibi_mcp.dispatcher import OdibiDispatcher
 
 
 def init() -> tuple[callable, callable]:

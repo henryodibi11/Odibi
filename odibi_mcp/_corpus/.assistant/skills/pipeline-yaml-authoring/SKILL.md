@@ -133,6 +133,31 @@ and known patterns enforce their required params with a clear error listing what
 | misspelled key (e.g. `base_pth`) | fix it | strict models hard-error with a suggestion |
 | `transformer:` with empty `params` | provide params or drop transformer | validator rejects |
 
+## Generating test data — the simulation engine
+
+To test a pipeline without creating real source tables, a node can **generate** data
+instead of reading it: set the read `format: simulation` (no connection needed) and
+describe the data under `options.simulation`:
+
+```yaml
+- name: gen_sensors
+  read:
+    connection: null
+    format: simulation
+    options:
+      simulation:
+        scope: { start_time: "2024-01-01T00:00:00Z", timestep: "1m", row_count: 100, seed: 42 }
+        entities: { count: 3, id_prefix: "SENSOR-" }
+        columns:
+          - { name: temp_c, data_type: float, generator: { type: range, min: 10, max: 90 } }
+```
+
+Discover the full generator catalog and ready-made specs via the MCP:
+`search_docs(query="simulation")`, `list_examples(pattern="simulation")`,
+`get_doc("docs/simulation/...")`, and `get_schema("read")` (which lists `simulation`
+as a valid `format`). Generators include range, random_walk, daily_profile, categorical,
+sequential, timestamp, uuid, and derived.
+
 ## Authoring Loop
 
 1. `get_schema` → the exact contract for the section you're writing.

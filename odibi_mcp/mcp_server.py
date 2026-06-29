@@ -109,3 +109,18 @@ def odibi_help(category: str | None = None, action: str | None = None) -> str:
             "error": f"Error getting help: {str(e)}",
             "tip": "Try odibi_help() with no arguments for the full catalog"
         })
+
+
+def main() -> None:
+    """Run the MCP server over stdio (default transport).
+
+    Entry point for `python -m odibi_mcp`, the `odibi-mcp` console script, and
+    `python -m odibi_mcp.mcp_server`.
+    """
+    # show_banner=False keeps startup output off the wire (stdout is the JSON-RPC
+    # channel for stdio transport; FastMCP's banner already goes to stderr).
+    mcp.run(show_banner=False)
+
+
+if __name__ == "__main__":
+    main()
