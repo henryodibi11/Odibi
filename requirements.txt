@@ -1,0 +1,15 @@
+# MCP server framework
+fastmcp>=3.0
+
+# Core dependencies for odibi_mcp (extracted from [mcp] extras in pyproject.toml)
+python-dotenv>=1.0.0
+fsspec>=2023.1.0
+
+# Web framework (uvicorn is provided by Databricks Apps)
+# uvicorn - already provided by Databricks Apps environment
+
+# Core odibi dependencies needed by local code
+# (Add any other dependencies from pyproject.toml [project.dependencies] that odibi_mcp imports)
+pydantic>=2.0.0,<3.0.0
+pyyaml>=6.0,<7.0
+pandas>=2.0.0,<3.0.0

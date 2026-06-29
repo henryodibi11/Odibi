@@ -1,0 +1,11 @@
+command:
+  - uvicorn
+  - odibi_mcp.databricks_app:http_app
+  - --host
+  - "0.0.0.0"
+  - --port
+  - "8000"
+
+env:
+  - name: PYTHONIOENCODING
+    value: "utf-8"
