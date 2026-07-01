@@ -4,9 +4,8 @@ Tests the UC-specific code paths: table name resolution, _table_exists,
 _ensure_table, _spark_read_table, _spark_write_append, _merge_target_ref.
 """
 
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from odibi.config import SystemConfig
 from odibi.connections.unity_catalog import UnityCatalogConnection

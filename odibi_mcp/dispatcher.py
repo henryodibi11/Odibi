@@ -6,7 +6,6 @@ into a single dispatch surface. Based on the proven context_workbench architectu
 
 from __future__ import annotations
 
-import json
 from typing import Any, Callable
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
@@ -373,7 +372,7 @@ class OdibiDispatcher:
                     "action": action,
                     "signature": str(sig),
                     "description": "Documentation coming soon",
-                    "tip": f"Action exists but detailed docs not yet written. Try calling it to see what it returns."
+                    "tip": "Action exists but detailed docs not yet written. Try calling it to see what it returns."
                 }
             return {
                 "error": f"Unknown action: {action}",

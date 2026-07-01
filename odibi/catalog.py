@@ -295,7 +295,9 @@ class CatalogManager:
         For UC mode returns the fully qualified table name.
         For file-path mode returns ``delta.`path```.
         """
-        path = self.tables[table_key]
+        path = self.tables.get(table_key)
+        if path is None:
+            return f"delta.`{table_key}`"
         if self._is_uc:
             return path
         return f"delta.`{path}`"
