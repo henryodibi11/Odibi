@@ -8,23 +8,51 @@ Usage:
 """
 from __future__ import annotations
 
-from starlette.middleware.cors import CORSMiddleware
+import sys
 
-# Import the existing MCP instance from mcp_server.py
-from odibi_mcp.mcp_server import mcp
+# Minimal version to isolate the failure
+print("[INIT] databricks_app module loading...", file=sys.stderr, flush=True)
 
-# Create stateless HTTP app (required by Databricks Apps)
-http_app = mcp.http_app(stateless_http=True)
-
-# Add CORS middleware for Databricks workspace access
-# Allow all origins since the app is already behind Databricks auth
-http_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+try:
+    print("[INIT] Step 1: Importing CORS...", file=sys.stderr, flush=True)
+    from starlette.middleware.cors import CORSMiddleware
+    print("[INIT] Step 1: OK", file=sys.stderr, flush=True)
+    
+    print("[INIT] Step 2: Importing mcp_server...", file=sys.stderr, flush=True)
+    from mcp_server import mcp  # No package prefix - files are at /workspace/ directly
+    print(f"[INIT] Step 2: OK - mcp={mcp}", file=sys.stderr, flush=True)
+    
+    print("[INIT] Step 3: Creating HTTP app...", file=sys.stderr, flush=True)
+    http_app = mcp.http_app(stateless_http=True)
+    print(f"[INIT] Step 3: OK - app={http_app}", file=sys.stderr, flush=True)
+    
+    print("[INIT] Step 4: Adding CORS middleware...", file=sys.stderr, flush=True)
+    http_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    print("[INIT] Step 4: OK - Initialization complete!", file=sys.stderr, flush=True)
+    
+except Exception as e:
+    print(f"[INIT] EXCEPTION: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    
+    # Create a minimal error app
+    from starlette.applications import Starlette
+    from starlette.responses import PlainTextResponse
+    from starlette.routing import Route
+    
+    error_msg = f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+    
+    async def error_handler(request):
+        return PlainTextResponse(error_msg, status_code=500)
+    
+    http_app = Starlette(routes=[Route("/", error_handler), Route("/{path:path}", error_handler)])
+    print(f"[INIT] Created fallback error app", file=sys.stderr, flush=True)
 
 
 def main() -> None:

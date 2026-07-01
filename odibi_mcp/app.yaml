@@ -8,7 +8,7 @@
 
 command:
   - uvicorn
-  - odibi_mcp.databricks_app:http_app
+  - databricks_app:http_app
   - --host
   - "0.0.0.0"
   - --port

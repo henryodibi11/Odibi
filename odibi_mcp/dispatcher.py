@@ -413,224 +413,224 @@ class OdibiDispatcher:
     # Workflows
     def _run_workflow(self, workflow_name: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute a named workflow."""
-        from odibi_mcp.tools.workflows import run_workflow
+        from tools.workflows import run_workflow
         return run_workflow(workflow_name, params or {})
     
     def _resume_workflow(self, resume_token: str, inputs: dict[str, Any] | None = None) -> dict[str, Any]:
         """Continue paused workflow."""
-        from odibi_mcp.tools.workflows import resume_workflow
+        from tools.workflows import resume_workflow
         return resume_workflow(resume_token, inputs or {})
     
     def _list_workflows(self) -> dict[str, Any]:
         """List available workflows."""
-        from odibi_mcp.tools.workflows import list_workflows
+        from tools.workflows import list_workflows
         return list_workflows()
     
     def _get_workflow(self, workflow_name: str) -> dict[str, Any]:
         """Get workflow definition."""
-        from odibi_mcp.tools.workflows import get_workflow
+        from tools.workflows import get_workflow
         return get_workflow(workflow_name)
     
     # Discovery
     def _map_environment(self, connection: str | None = None) -> dict[str, Any]:
         """List connections and environment info."""
-        from odibi_mcp.tools.smart import map_environment
+        from tools.smart import map_environment
         return map_environment(connection)
     
     def _profile_source(self, connection: str, path: str, max_rows: int = 100) -> dict[str, Any]:
         """Profile a data source."""
-        from odibi_mcp.tools.smart import profile_source
+        from tools.smart import profile_source
         return profile_source(connection, path, max_rows)
     
     def _profile_folder(self, connection: str, folder_path: str) -> dict[str, Any]:
         """List files in a folder."""
-        from odibi_mcp.tools.smart import profile_folder
+        from tools.smart import profile_folder
         return profile_folder(connection, folder_path)
     
     # Inspection
     def _story_read(self, pipeline: str, run_id: str | None = None) -> dict[str, Any]:
         """Read pipeline execution story."""
-        from odibi_mcp.tools.story import story_read
+        from tools.story import story_read
         return story_read(pipeline, run_id)
     
     def _node_sample(self, pipeline: str, node: str, limit: int = 10) -> dict[str, Any]:
         """Sample node output."""
-        from odibi_mcp.tools.story import node_sample
+        from tools.story import node_sample
         return node_sample(pipeline, node, limit)
     
     def _node_failed_rows(self, pipeline: str, node: str, limit: int = 10) -> dict[str, Any]:
         """Fetch quarantined rows."""
-        from odibi_mcp.tools.story import node_failed_rows
+        from tools.story import node_failed_rows
         return node_failed_rows(pipeline, node, limit)
     
     def _lineage_graph(self, pipeline: str) -> dict[str, Any]:
         """Generate lineage graph."""
-        from odibi_mcp.tools.story import lineage_graph
+        from tools.story import lineage_graph
         return lineage_graph(pipeline)
     
     # Construction
     def _list_transformers(self, category: str | None = None) -> dict[str, Any]:
         """List available transformers."""
-        from odibi_mcp.tools.construction import list_transformers
+        from tools.construction import list_transformers
         return list_transformers(category)
     
     def _list_patterns(self) -> dict[str, Any]:
         """List pipeline patterns."""
-        from odibi_mcp.tools.construction import list_patterns
+        from tools.construction import list_patterns
         return list_patterns()
     
     def _apply_pattern_template(self, pattern: str, table_name: str, connection: str, source_path: str) -> dict[str, Any]:
         """Generate YAML from pattern."""
-        from odibi_mcp.tools.construction import apply_pattern_template
+        from tools.construction import apply_pattern_template
         return apply_pattern_template(pattern, table_name, connection, source_path)
     
     def _suggest_pipeline(self, source_path: str, connection: str, intent: str) -> dict[str, Any]:
         """Suggest pipeline based on data."""
-        from odibi_mcp.tools.phase3_smart import suggest_pipeline
+        from tools.phase3_smart import suggest_pipeline
         return suggest_pipeline(source_path, connection, intent)
     
     def _create_ingestion_pipeline(self, source_path: str, connection: str, target_table: str) -> dict[str, Any]:
         """Create ingestion pipeline."""
-        from odibi_mcp.tools.phase3_smart import create_ingestion_pipeline
+        from tools.phase3_smart import create_ingestion_pipeline
         return create_ingestion_pipeline(source_path, connection, target_table)
     
     # Validation
     def _validate_yaml(self, yaml_content: str) -> dict[str, Any]:
         """Validate YAML structure."""
-        from odibi_mcp.tools.yaml_builder import validate_odibi_config
+        from tools.yaml_builder import validate_odibi_config
         return validate_odibi_config(yaml_content)
     
     def _validate_pipeline(self, pipeline: str) -> dict[str, Any]:
         """Validate pipeline config."""
-        from odibi_mcp.tools.validation import validate_pipeline
+        from tools.validation import validate_pipeline
         return validate_pipeline(pipeline)
     
     def _test_pipeline(self, pipeline: str, sample_size: int = 100) -> dict[str, Any]:
         """Test pipeline with data."""
-        from odibi_mcp.tools.execution import test_pipeline
+        from tools.execution import test_pipeline
         return test_pipeline(pipeline, sample_size)
     
     def _diagnose(self, pipeline: str, error_context: str | None = None) -> dict[str, Any]:
         """Diagnose pipeline issues."""
-        from odibi_mcp.tools.diagnose import diagnose
+        from tools.diagnose import diagnose
         return diagnose(pipeline, error_context)
     
     # Task Guidance
     def _get_task_guidance(self, task_type: str) -> dict[str, Any]:
         """Get structured task guidance."""
-        from odibi_mcp.tools.guidance import get_task_guidance
+        from tools.guidance import get_task_guidance
         return get_task_guidance(task_type)
     
     def _list_task_types(self) -> dict[str, Any]:
         """List available task types."""
-        from odibi_mcp.tools.guidance import list_task_types
+        from tools.guidance import list_task_types
         return list_task_types()
     
     # Onboarding — delegate to the OdibiKnowledge singleton's methods.
     # (get_knowledge() returns the instance; call its methods — it does NOT take an action arg.)
     def _onboard(self) -> dict[str, Any]:
         """Get onboarding information."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return get_knowledge().onboard()
 
     def _get_schema(self, component: str | None = None) -> dict[str, Any]:
         """Get config schema."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return get_knowledge().get_schema(component)
 
     def _search_docs(self, query: str) -> dict[str, Any]:
         """Search documentation."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return {"results": get_knowledge().search_docs(query)}
 
     def _get_doc(self, doc_path: str) -> dict[str, Any]:
         """Get documentation file."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return get_knowledge().get_doc(doc_path)
 
     def _list_docs(self, category: str | None = None) -> dict[str, Any]:
         """List documentation files."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return {"docs": get_knowledge().list_docs(category)}
 
     def _list_examples(self, pattern: str | None = None) -> dict[str, Any]:
         """List example pipelines."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return {"examples": get_knowledge().list_examples(pattern)}
 
     def _get_example(self, pattern_name: str) -> dict[str, Any]:
         """Get example pipeline."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return get_knowledge().get_example(pattern_name)
 
     def _list_skills(self) -> dict[str, Any]:
         """List available skills."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return {"skills": get_knowledge().list_skills()}
 
     def _get_skill(self, name: str) -> dict[str, Any]:
         """Get skill content."""
-        from odibi_mcp.knowledge import get_knowledge
+        from knowledge import get_knowledge
         return get_knowledge().get_skill(name)
     
     # Download
     def _download_sql(self, pipeline: str) -> dict[str, Any]:
         """Export pipeline as SQL."""
-        from odibi_mcp.tools.smart import download_sql
+        from tools.smart import download_sql
         return download_sql(pipeline)
     
     def _download_table(self, pipeline: str, node: str, format: str = "csv") -> dict[str, Any]:
         """Export node output as table."""
-        from odibi_mcp.tools.smart import download_table
+        from tools.smart import download_table
         return download_table(pipeline, node, format)
     
     def _download_file(self, pipeline: str, destination: str) -> dict[str, Any]:
         """Write pipeline YAML to file."""
-        from odibi_mcp.tools.smart import download_file
+        from tools.smart import download_file
         return download_file(pipeline, destination)
     
     # Session Builder
     def _create_pipeline(self, name: str, engine: str = "pandas") -> dict[str, Any]:
         """Create pipeline session."""
-        from odibi_mcp.tools.builder import create_pipeline
+        from tools.builder import create_pipeline
         return create_pipeline(name, engine)
     
     def _add_node(self, node_name: str, transformer: str, params: dict[str, Any]) -> dict[str, Any]:
         """Add node to pipeline session."""
-        from odibi_mcp.tools.builder import add_node
+        from tools.builder import add_node
         return add_node(node_name, transformer, params)
     
     def _configure_read(self, connection: str, path: str, format: str | None = None, options: dict[str, Any] | None = None) -> dict[str, Any]:
         """Configure read block."""
-        from odibi_mcp.tools.builder import configure_read
+        from tools.builder import configure_read
         return configure_read(connection, path, format, options)
     
     def _configure_write(self, connection: str, path: str, mode: str = "overwrite", options: dict[str, Any] | None = None) -> dict[str, Any]:
         """Configure write block."""
-        from odibi_mcp.tools.builder import configure_write
+        from tools.builder import configure_write
         return configure_write(connection, path, mode, options)
     
     def _configure_transform(self, node_name: str, params: dict[str, Any]) -> dict[str, Any]:
         """Update node configuration."""
-        from odibi_mcp.tools.builder import configure_transform
+        from tools.builder import configure_transform
         return configure_transform(node_name, params)
     
     def _get_pipeline_state(self) -> dict[str, Any]:
         """Get current pipeline session state."""
-        from odibi_mcp.tools.builder import get_pipeline_state
+        from tools.builder import get_pipeline_state
         return get_pipeline_state()
     
     def _render_pipeline_yaml(self) -> dict[str, Any]:
         """Render pipeline YAML from session."""
-        from odibi_mcp.tools.builder import render_pipeline_yaml
+        from tools.builder import render_pipeline_yaml
         return render_pipeline_yaml()
     
     def _list_sessions(self) -> dict[str, Any]:
         """List active sessions."""
-        from odibi_mcp.tools.builder import list_sessions
+        from tools.builder import list_sessions
         return list_sessions()
     
     def _discard_pipeline(self) -> dict[str, Any]:
         """Discard current pipeline session."""
-        from odibi_mcp.tools.builder import discard_pipeline
+        from tools.builder import discard_pipeline
         return discard_pipeline()

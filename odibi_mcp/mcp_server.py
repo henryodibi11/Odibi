@@ -10,7 +10,7 @@ import json
 from typing import Any
 
 from fastmcp import FastMCP
-from odibi_mcp.dispatcher import OdibiDispatcher
+from dispatcher import OdibiDispatcher  # No package prefix - files are at /workspace/ directly
 
 # Create FastMCP server instance
 mcp = FastMCP("odibi-knowledge")
