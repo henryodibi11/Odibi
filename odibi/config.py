@@ -83,6 +83,7 @@ class ConnectionType(str, Enum):
     DELTA = "delta"
     SQL_SERVER = "sql_server"
     HTTP = "http"
+    UNITY_CATALOG = "unity_catalog"
 
 
 class WriteMode(str, Enum):
@@ -5485,13 +5486,21 @@ class SystemConfig(StrictModel):
     Configuration for the Odibi System Catalog (The Brain).
 
     Stores metadata, state, and pattern configurations. The primary connection
-    must be a storage connection (blob/local) that supports Delta tables.
+    must be a storage connection (blob/local/unity_catalog) that supports Delta tables.
 
     Example:
     ```yaml
     system:
       connection: adls_bronze        # Primary - must be blob/local storage
       path: _odibi_system
+      environment: dev
+    ```
+
+    With Unity Catalog (Databricks Serverless / Free Edition):
+    ```yaml
+    system:
+      connection: uc_metadata        # unity_catalog connection type
+      path: meta_                    # Used as table name prefix
       environment: dev
     ```
 
@@ -5517,8 +5526,9 @@ class SystemConfig(StrictModel):
 
     connection: str = Field(
         description=(
-            "Connection for primary system tables. Must be blob storage (azure_blob) "
-            "or local filesystem - NOT SQL Server. Delta tables require storage backends."
+            "Connection for primary system tables. Must be blob storage (azure_blob), "
+            "local filesystem, or unity_catalog - NOT SQL Server. "
+            "Delta tables require storage or UC backends."
         )
     )
     path: str = Field(default="_odibi_system", description="Path relative to connection root")

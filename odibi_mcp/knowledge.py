@@ -589,6 +589,7 @@ pm.run("pipeline_name")""",
             "delta": "Delta Lake tables",
             "sql_server": "Microsoft SQL Server",
             "azure_sql": "Azure SQL Database",
+            "unity_catalog": "Unity Catalog managed tables (Databricks Serverless/Free Edition)",
         }
 
         result = []
@@ -665,6 +666,7 @@ pm.run("pipeline_name")""",
                 "delta": "Delta Lake connection for reading/writing Delta tables.",
                 "sql_server": "Microsoft SQL Server connection.",
                 "azure_sql": "Azure SQL Database connection.",
+                "unity_catalog": "Unity Catalog managed tables connection for Databricks Serverless and Free Edition. No filesystem access needed — UC metastore handles storage. Config keys: catalog (required), schema (default: 'default'), create_schema (optional, default: true). See odibi/connections/unity_catalog.py.",
             }
             result["found"] = True
             result["matches"].append(

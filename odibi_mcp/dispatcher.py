@@ -528,50 +528,55 @@ class OdibiDispatcher:
     
     # Onboarding — delegate to the OdibiKnowledge singleton's methods.
     # (get_knowledge() returns the instance; call its methods — it does NOT take an action arg.)
+    @staticmethod
+    def _import_knowledge():
+        """Import get_knowledge from the knowledge module.
+
+        Works both as a package import (``odibi_mcp.knowledge``) for tests/pip
+        installs and as a bare import (``knowledge``) for flat Databricks
+        workspace deployments.
+        """
+        try:
+            from odibi_mcp.knowledge import get_knowledge
+        except ImportError:
+            from knowledge import get_knowledge
+        return get_knowledge
+
     def _onboard(self) -> dict[str, Any]:
         """Get onboarding information."""
-        from knowledge import get_knowledge
-        return get_knowledge().onboard()
+        return self._import_knowledge()().onboard()
 
     def _get_schema(self, component: str | None = None) -> dict[str, Any]:
         """Get config schema."""
-        from knowledge import get_knowledge
-        return get_knowledge().get_schema(component)
+        return self._import_knowledge()().get_schema(component)
 
     def _search_docs(self, query: str) -> dict[str, Any]:
         """Search documentation."""
-        from knowledge import get_knowledge
-        return {"results": get_knowledge().search_docs(query)}
+        return {"results": self._import_knowledge()().search_docs(query)}
 
     def _get_doc(self, doc_path: str) -> dict[str, Any]:
         """Get documentation file."""
-        from knowledge import get_knowledge
-        return get_knowledge().get_doc(doc_path)
+        return self._import_knowledge()().get_doc(doc_path)
 
     def _list_docs(self, category: str | None = None) -> dict[str, Any]:
         """List documentation files."""
-        from knowledge import get_knowledge
-        return {"docs": get_knowledge().list_docs(category)}
+        return {"docs": self._import_knowledge()().list_docs(category)}
 
     def _list_examples(self, pattern: str | None = None) -> dict[str, Any]:
         """List example pipelines."""
-        from knowledge import get_knowledge
-        return {"examples": get_knowledge().list_examples(pattern)}
+        return {"examples": self._import_knowledge()().list_examples(pattern)}
 
     def _get_example(self, pattern_name: str) -> dict[str, Any]:
         """Get example pipeline."""
-        from knowledge import get_knowledge
-        return get_knowledge().get_example(pattern_name)
+        return self._import_knowledge()().get_example(pattern_name)
 
     def _list_skills(self) -> dict[str, Any]:
         """List available skills."""
-        from knowledge import get_knowledge
-        return {"skills": get_knowledge().list_skills()}
+        return {"skills": self._import_knowledge()().list_skills()}
 
     def _get_skill(self, name: str) -> dict[str, Any]:
         """Get skill content."""
-        from knowledge import get_knowledge
-        return get_knowledge().get_skill(name)
+        return self._import_knowledge()().get_skill(name)
     
     # Download
     def _download_sql(self, pipeline: str) -> dict[str, Any]:

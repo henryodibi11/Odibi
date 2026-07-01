@@ -431,6 +431,43 @@ def create_postgres_connection(name: str, config: Dict[str, Any]) -> Any:
         raise
 
 
+def create_unity_catalog_connection(name: str, config: Dict[str, Any]) -> Any:
+    """Factory for Unity Catalog Connection."""
+    ctx = get_logging_context()
+    ctx.log_connection(connection_type="unity_catalog", connection_name=name, action="create")
+
+    from odibi.connections.unity_catalog import UnityCatalogConnection
+
+    catalog = config.get("catalog")
+    if not catalog:
+        ctx.error(
+            f"Connection '{name}' missing 'catalog'",
+            connection_name=name,
+            config_keys=list(config.keys()),
+        )
+        raise ValueError(
+            f"Connection '{name}' missing 'catalog'. Got keys: {list(config.keys())}"
+        )
+
+    schema = config.get("schema", "default")
+    create_schema = config.get("create_schema", True)
+
+    connection = UnityCatalogConnection(
+        catalog=catalog,
+        schema=schema,
+        create_schema=create_schema,
+    )
+
+    ctx.log_connection(
+        connection_type="unity_catalog",
+        connection_name=name,
+        action="created",
+        catalog=catalog,
+        schema=schema,
+    )
+    return connection
+
+
 def register_builtins():
     """Register all built-in connection factories."""
     register_connection_factory("local", create_local_connection)
@@ -450,3 +487,6 @@ def register_builtins():
     # PostgreSQL
     register_connection_factory("postgres", create_postgres_connection)
     register_connection_factory("postgresql", create_postgres_connection)
+
+    # Unity Catalog
+    register_connection_factory("unity_catalog", create_unity_catalog_connection)

@@ -174,28 +174,22 @@ class CatalogManager:
         self.connection = connection
         self._project: Optional[str] = None
 
-        # Table Paths
-        self.tables = {
-            "meta_tables": f"{self.base_path}/meta_tables",
-            "meta_runs": f"{self.base_path}/meta_runs",
-            "meta_patterns": f"{self.base_path}/meta_patterns",
-            "meta_metrics": f"{self.base_path}/meta_metrics",
-            "meta_state": f"{self.base_path}/meta_state",
-            "meta_pipelines": f"{self.base_path}/meta_pipelines",
-            "meta_nodes": f"{self.base_path}/meta_nodes",
-            "meta_schemas": f"{self.base_path}/meta_schemas",
-            "meta_lineage": f"{self.base_path}/meta_lineage",
-            "meta_outputs": f"{self.base_path}/meta_outputs",
-            # Leverage Summary Tables (Observability)
-            "meta_pipeline_runs": f"{self.base_path}/meta_pipeline_runs",
-            "meta_node_runs": f"{self.base_path}/meta_node_runs",
-            "meta_failures": f"{self.base_path}/meta_failures",
-            "meta_observability_errors": f"{self.base_path}/meta_observability_errors",
-            "meta_derived_applied_runs": f"{self.base_path}/meta_derived_applied_runs",
-            "meta_daily_stats": f"{self.base_path}/meta_daily_stats",
-            "meta_pipeline_health": f"{self.base_path}/meta_pipeline_health",
-            "meta_sla_status": f"{self.base_path}/meta_sla_status",
-        }
+        # Detect Unity Catalog mode
+        self._is_uc = self._detect_uc_mode()
+
+        # Table Paths (or fully qualified UC table names)
+        table_names = [
+            "meta_tables", "meta_runs", "meta_patterns", "meta_metrics",
+            "meta_state", "meta_pipelines", "meta_nodes", "meta_schemas",
+            "meta_lineage", "meta_outputs",
+            "meta_pipeline_runs", "meta_node_runs", "meta_failures",
+            "meta_observability_errors", "meta_derived_applied_runs",
+            "meta_daily_stats", "meta_pipeline_health", "meta_sla_status",
+        ]
+        if self._is_uc:
+            self.tables = {t: self.connection.get_path(t) for t in table_names}
+        else:
+            self.tables = {t: f"{self.base_path}/{t}" for t in table_names}
 
         # Cache for meta table reads (invalidated on write operations)
         self._pipelines_cache: Optional[Dict[str, Dict[str, Any]]] = None
@@ -215,6 +209,20 @@ class CatalogManager:
     def is_pandas_mode(self) -> bool:
         """Check if running in Pandas mode."""
         return self.engine is not None and self.engine.name == "pandas"
+
+    def _detect_uc_mode(self) -> bool:
+        """Check if connection is a UnityCatalogConnection."""
+        if self.connection is None:
+            return False
+        conn_type = getattr(self.connection, "__class__", None)
+        if conn_type is None:
+            return False
+        return conn_type.__name__ == "UnityCatalogConnection"
+
+    @property
+    def is_unity_catalog_mode(self) -> bool:
+        """Check if running in Unity Catalog mode (managed tables)."""
+        return self._is_uc
 
     @property
     def is_sql_server_mode(self) -> bool:
@@ -258,6 +266,39 @@ class CatalogManager:
             self._pipelines_cache = None
             self._nodes_cache = None
             self._outputs_cache = None
+
+    def _spark_read_table(self, table_key: str):
+        """Read a system table via Spark, handling UC vs file-path mode.
+
+        Args:
+            table_key: Key into self.tables (e.g. "meta_pipelines").
+
+        Returns:
+            Spark DataFrame.
+        """
+        path = self.tables[table_key]
+        if self._is_uc:
+            return self.spark.table(path)
+        return self.spark.read.format("delta").load(path)
+
+    def _spark_write_append(self, df, table_key: str) -> None:
+        """Append a Spark DataFrame to a system table, handling UC vs file-path mode."""
+        path = self.tables[table_key]
+        if self._is_uc:
+            df.write.format("delta").mode("append").saveAsTable(path)
+        else:
+            df.write.format("delta").mode("append").save(path)
+
+    def _merge_target_ref(self, table_key: str) -> str:
+        """Return the MERGE INTO target reference for a system table.
+
+        For UC mode returns the fully qualified table name.
+        For file-path mode returns ``delta.`path```.
+        """
+        path = self.tables[table_key]
+        if self._is_uc:
+            return path
+        return f"delta.`{path}`"
 
     def _retry_with_backoff(self, func, max_retries: int = 5, base_delay: float = 1.0):
         """Retry a function with exponential backoff and jitter for concurrent writes.
@@ -319,7 +360,7 @@ class CatalogManager:
 
             try:
                 if self.spark:
-                    df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                    df = self._spark_read_table("meta_pipelines")
                     rows = df.collect()
                     for row in rows:
                         row_dict = row.asDict()
@@ -351,7 +392,7 @@ class CatalogManager:
 
             try:
                 if self.spark:
-                    df = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                    df = self._spark_read_table("meta_nodes")
                     rows = df.select("pipeline_name", "node_name", "version_hash").collect()
                     for row in rows:
                         p_name = row["pipeline_name"]
@@ -442,7 +483,13 @@ class CatalogManager:
         if not self._table_exists(path):
             logger.info(f"Creating system table: {name} at {path}")
 
-            if self.spark:
+            if self._is_uc and self.spark:
+                # Unity Catalog: saveAsTable creates a managed table
+                writer = self.spark.createDataFrame([], schema).write.format("delta")
+                if partition_cols:
+                    writer = writer.partitionBy(*partition_cols)
+                writer.saveAsTable(path)
+            elif self.spark:
                 # Create empty DataFrame with schema
                 writer = self.spark.createDataFrame([], schema).write.format("delta")
                 if partition_cols:
@@ -663,6 +710,12 @@ class CatalogManager:
             logger.warning(f"Schema migration check failed for {name}: {e}")
 
     def _table_exists(self, path: str) -> bool:
+        if self._is_uc and self.spark:
+            try:
+                return self.spark.catalog.tableExists(path)
+            except Exception:
+                return False
+
         if self.spark:
             try:
                 # Use limit(1) not limit(0) - limit(0) can succeed from metadata alone
@@ -1159,10 +1212,10 @@ class CatalogManager:
                 view_name = "_odibi_meta_pipelines_batch_upsert"
                 df.createOrReplaceTempView(view_name)
 
-                target_path = self.tables["meta_pipelines"]
+                target_ref = self._merge_target_ref("meta_pipelines")
 
                 merge_sql = f"""
-                    MERGE INTO delta.`{target_path}` AS target
+                    MERGE INTO {target_ref} AS target
                     USING {view_name} AS source
                     ON target.pipeline_name = source.pipeline_name
                     WHEN MATCHED THEN UPDATE SET
@@ -1256,10 +1309,10 @@ class CatalogManager:
                 view_name = "_odibi_meta_nodes_batch_upsert"
                 df.createOrReplaceTempView(view_name)
 
-                target_path = self.tables["meta_nodes"]
+                target_ref = self._merge_target_ref("meta_nodes")
 
                 merge_sql = f"""
-                    MERGE INTO delta.`{target_path}` AS target
+                    MERGE INTO {target_ref} AS target
                     USING {view_name} AS source
                     ON target.pipeline_name = source.pipeline_name
                        AND target.node_name = source.node_name
@@ -1366,10 +1419,10 @@ class CatalogManager:
                 view_name = "_odibi_meta_outputs_batch_upsert"
                 df.createOrReplaceTempView(view_name)
 
-                target_path = self.tables["meta_outputs"]
+                target_ref = self._merge_target_ref("meta_outputs")
 
                 merge_sql = f"""
-                    MERGE INTO delta.`{target_path}` AS target
+                    MERGE INTO {target_ref} AS target
                     USING {view_name} AS source
                     ON target.pipeline_name = source.pipeline_name
                        AND target.node_name = source.node_name
@@ -1449,7 +1502,7 @@ class CatalogManager:
 
             try:
                 if self.spark:
-                    df = self.spark.read.format("delta").load(self.tables["meta_outputs"])
+                    df = self._spark_read_table("meta_outputs")
                     rows = df.collect()
                     for row in rows:
                         row_dict = row.asDict()
@@ -1814,7 +1867,7 @@ class CatalogManager:
                     "date", F.to_date(F.col("timestamp"))
                 )
 
-                df.write.format("delta").mode("append").save(self.tables["meta_runs"])
+                self._spark_write_append(df, "meta_runs")
             elif self.engine:
                 from datetime import datetime, timezone
 
@@ -1954,7 +2007,7 @@ class CatalogManager:
                     "date", F.to_date(F.col("timestamp"))
                 )
 
-                df.write.format("delta").mode("append").save(self.tables["meta_runs"])
+                self._spark_write_append(df, "meta_runs")
                 logger.debug(f"Batch logged {len(records)} run records to meta_runs")
 
             elif self.engine:
@@ -2086,7 +2139,7 @@ class CatalogManager:
                 )
 
                 df = self.spark.createDataFrame([row], schema)
-                df.write.format("delta").mode("append").save(self.tables["meta_pipeline_runs"])
+                self._spark_write_append(df, "meta_pipeline_runs")
                 logger.debug(f"Logged pipeline run {pipeline_run['run_id']}")
 
             elif self.engine:
@@ -2311,7 +2364,7 @@ class CatalogManager:
                 ]
 
                 df = self.spark.createDataFrame(rows, schema)
-                df.write.format("delta").mode("append").save(self.tables["meta_node_runs"])
+                self._spark_write_append(df, "meta_node_runs")
                 logger.debug(f"Batch logged {len(node_results)} node runs")
 
             elif self.engine:
@@ -2496,7 +2549,7 @@ class CatalogManager:
                 )
 
                 df = self.spark.createDataFrame([row], schema)
-                df.write.format("delta").mode("append").save(self.tables["meta_failures"])
+                self._spark_write_append(df, "meta_failures")
                 logger.debug(f"Logged failure {failure_id} for node {node_name}")
 
             elif self.engine:
@@ -2610,7 +2663,7 @@ class CatalogManager:
         from pyspark.sql import functions as F
 
         try:
-            df = self.spark.read.format("delta").load(self.tables["meta_pipeline_runs"])
+            df = self._spark_read_table("meta_pipeline_runs")
             if pipeline_name:
                 df = df.filter(F.col("pipeline_name") == pipeline_name)
             if since:
@@ -2691,7 +2744,7 @@ class CatalogManager:
         from pyspark.sql import functions as F
 
         try:
-            df = self.spark.read.format("delta").load(self.tables["meta_pipeline_runs"])
+            df = self._spark_read_table("meta_pipeline_runs")
             df = df.filter(F.col("run_id") == run_id)
             rows = df.collect()
             if rows:
@@ -2791,7 +2844,7 @@ class CatalogManager:
                 df = self.spark.createDataFrame(rows, schema)
 
                 # Append to meta_patterns
-                df.write.format("delta").mode("append").save(self.tables["meta_patterns"])
+                self._spark_write_append(df, "meta_patterns")
 
             elif self.engine:
                 import pandas as pd
@@ -2858,10 +2911,10 @@ class CatalogManager:
                 view_name = f"_odibi_meta_tables_upsert_{abs(hash(table_name))}"
                 df.createOrReplaceTempView(view_name)
 
-                target_path = self.tables["meta_tables"]
+                target_ref = self._merge_target_ref("meta_tables")
 
                 merge_sql = f"""
-                    MERGE INTO delta.`{target_path}` AS target
+                    MERGE INTO {target_ref} AS target
                     USING {view_name} AS source
                     ON target.project = source.project
                        AND target.table_name = source.table_name
@@ -2922,7 +2975,7 @@ class CatalogManager:
             try:
                 from pyspark.sql import functions as F
 
-                df = self.spark.read.format("delta").load(self.tables["meta_tables"])
+                df = self._spark_read_table("meta_tables")
                 # Filter
                 row = df.filter(F.col("table_name") == table_name).select("path").first()
 
@@ -2966,7 +3019,7 @@ class CatalogManager:
             try:
                 from pyspark.sql import functions as F
 
-                df = self.spark.read.format("delta").load(self.tables["meta_runs"])
+                df = self._spark_read_table("meta_runs")
 
                 # Filter by node and success status
                 stats = (
@@ -3026,7 +3079,7 @@ class CatalogManager:
             try:
                 from pyspark.sql import functions as F
 
-                df = self.spark.read.format("delta").load(self.tables["meta_runs"])
+                df = self._spark_read_table("meta_runs")
 
                 stats = (
                     df.filter(
@@ -3133,7 +3186,7 @@ class CatalogManager:
             try:
                 from pyspark.sql import functions as F
 
-                df = self.spark.read.format("delta").load(self.tables["meta_schemas"])
+                df = self._spark_read_table("meta_schemas")
                 row = (
                     df.filter(F.col("table_path") == table_path)
                     .orderBy(F.col("schema_version").desc())
@@ -3239,7 +3292,7 @@ class CatalogManager:
 
             if self.spark:
                 df = self.spark.createDataFrame([record], schema=self._get_schema_meta_schemas())
-                df.write.format("delta").mode("append").save(self.tables["meta_schemas"])
+                self._spark_write_append(df, "meta_schemas")
 
             elif self.engine:
                 import pandas as pd
@@ -3294,7 +3347,7 @@ class CatalogManager:
             if self.spark:
                 from pyspark.sql import functions as F
 
-                df = self.spark.read.format("delta").load(self.tables["meta_schemas"])
+                df = self._spark_read_table("meta_schemas")
                 rows = (
                     df.filter(F.col("table_path") == table_path)
                     .orderBy(F.col("schema_version").desc())
@@ -3368,10 +3421,10 @@ class CatalogManager:
                 df = self.spark.createDataFrame([record], schema=self._get_schema_meta_lineage())
                 df.createOrReplaceTempView(view_name)
 
-                target_path = self.tables["meta_lineage"]
+                target_ref = self._merge_target_ref("meta_lineage")
 
                 merge_sql = f"""
-                    MERGE INTO delta.`{target_path}` AS target
+                    MERGE INTO {target_ref} AS target
                     USING {view_name} AS source
                     ON target.source_table = source.source_table
                        AND target.target_table = source.target_table
@@ -3453,10 +3506,10 @@ class CatalogManager:
                 view_name = "_odibi_meta_lineage_batch_upsert"
                 df.createOrReplaceTempView(view_name)
 
-                target_path = self.tables["meta_lineage"]
+                target_ref = self._merge_target_ref("meta_lineage")
 
                 merge_sql = f"""
-                    MERGE INTO delta.`{target_path}` AS target
+                    MERGE INTO {target_ref} AS target
                     USING {view_name} AS source
                     ON target.source_table = source.source_table
                        AND target.target_table = source.target_table
@@ -3551,10 +3604,10 @@ class CatalogManager:
                 view_name = "_odibi_meta_tables_batch_upsert"
                 df.createOrReplaceTempView(view_name)
 
-                target_path = self.tables["meta_tables"]
+                target_ref = self._merge_target_ref("meta_tables")
 
                 merge_sql = f"""
-                    MERGE INTO delta.`{target_path}` AS target
+                    MERGE INTO {target_ref} AS target
                     USING {view_name} AS source
                     ON target.project = source.project
                        AND target.table_name = source.table_name
@@ -3631,7 +3684,7 @@ class CatalogManager:
                 if self.spark:
                     from pyspark.sql import functions as F
 
-                    df = self.spark.read.format("delta").load(self.tables["meta_lineage"])
+                    df = self._spark_read_table("meta_lineage")
                     sources = df.filter(F.col("target_table") == current).collect()
                     for row in sources:
                         record = row.asDict()
@@ -3688,7 +3741,7 @@ class CatalogManager:
                 if self.spark:
                     from pyspark.sql import functions as F
 
-                    df = self.spark.read.format("delta").load(self.tables["meta_lineage"])
+                    df = self._spark_read_table("meta_lineage")
                     targets = df.filter(F.col("source_table") == current).collect()
                     for row in targets:
                         record = row.asDict()
@@ -3782,21 +3835,22 @@ class CatalogManager:
 
     def _optimize_spark(self, table: str, path: str, retention_hours: int) -> Dict[str, Any]:
         """OPTIMIZE + ZORDER + VACUUM a single table via Spark SQL."""
+        target_ref = self._merge_target_ref(table)
         zorder_col = self._ZORDER_COLUMNS.get(table)
         applied_zorder = None
         if zorder_col:
             try:
-                self.spark.sql(f"OPTIMIZE delta.`{path}` ZORDER BY ({zorder_col})")
+                self.spark.sql(f"OPTIMIZE {target_ref} ZORDER BY ({zorder_col})")
                 applied_zorder = zorder_col
             except Exception as e:
                 logger.debug(
                     f"ZORDER BY ({zorder_col}) failed for {table}, "
                     f"falling back to plain OPTIMIZE: {e}"
                 )
-                self.spark.sql(f"OPTIMIZE delta.`{path}`")
+                self.spark.sql(f"OPTIMIZE {target_ref}")
         else:
-            self.spark.sql(f"OPTIMIZE delta.`{path}`")
-        self.spark.sql(f"VACUUM delta.`{path}` RETAIN {retention_hours} HOURS")
+            self.spark.sql(f"OPTIMIZE {target_ref}")
+        self.spark.sql(f"VACUUM {target_ref} RETAIN {retention_hours} HOURS")
         return {"success": True, "engine": "spark", "zorder": applied_zorder}
 
     def _optimize_deltars(self, table: str, path: str, retention_hours: int) -> Dict[str, Any]:
@@ -3853,7 +3907,7 @@ class CatalogManager:
                 schema = self._get_schema_meta_metrics()
 
                 df = self.spark.createDataFrame(rows, schema)
-                df.write.format("delta").mode("append").save(self.tables["meta_metrics"])
+                self._spark_write_append(df, "meta_metrics")
 
             elif self.engine:
                 import pandas as pd
@@ -3904,24 +3958,28 @@ class CatalogManager:
                 from pyspark.sql import functions as F
 
                 # Delete from meta_pipelines
-                df = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                df = self._spark_read_table("meta_pipelines")
                 df.cache()
                 initial_count = df.count()
                 df_filtered = df.filter(F.col("pipeline_name") != pipeline_name)
-                df_filtered.write.format("delta").mode("overwrite").save(
-                    self.tables["meta_pipelines"]
-                )
+                path = self.tables["meta_pipelines"]
+                if self._is_uc:
+                    df_filtered.write.format("delta").mode("overwrite").saveAsTable(path)
+                else:
+                    df_filtered.write.format("delta").mode("overwrite").save(path)
                 deleted_count += initial_count - df_filtered.count()
                 df.unpersist()
 
                 # Delete associated nodes from meta_nodes
-                df_nodes = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                df_nodes = self._spark_read_table("meta_nodes")
                 df_nodes.cache()
                 nodes_initial = df_nodes.count()
                 df_nodes_filtered = df_nodes.filter(F.col("pipeline_name") != pipeline_name)
-                df_nodes_filtered.write.format("delta").mode("overwrite").save(
-                    self.tables["meta_nodes"]
-                )
+                path = self.tables["meta_nodes"]
+                if self._is_uc:
+                    df_nodes_filtered.write.format("delta").mode("overwrite").saveAsTable(path)
+                else:
+                    df_nodes_filtered.write.format("delta").mode("overwrite").save(path)
                 deleted_count += nodes_initial - df_nodes_filtered.count()
                 df_nodes.unpersist()
 
@@ -3982,13 +4040,16 @@ class CatalogManager:
                 from pyspark.sql import functions as F
 
                 # Delete from meta_nodes
-                df = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                df = self._spark_read_table("meta_nodes")
                 df.cache()
                 initial_count = df.count()
                 df_filtered = df.filter(
                     ~((F.col("pipeline_name") == pipeline_name) & (F.col("node_name") == node_name))
                 )
-                df_filtered.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
+                if self._is_uc:
+                    df_filtered.write.format("delta").mode("overwrite").saveAsTable(self.tables["meta_nodes"])
+                else:
+                    df_filtered.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
                 deleted_count = initial_count - df_filtered.count()
                 df.unpersist()
 
@@ -4057,7 +4118,7 @@ class CatalogManager:
                 from pyspark.sql import functions as F
 
                 # Cleanup orphan pipelines
-                df_pipelines = self.spark.read.format("delta").load(self.tables["meta_pipelines"])
+                df_pipelines = self._spark_read_table("meta_pipelines")
                 df_pipelines.cache()
                 initial_pipelines = df_pipelines.count()
                 df_pipelines_filtered = df_pipelines.filter(
@@ -4070,7 +4131,7 @@ class CatalogManager:
                 df_pipelines.unpersist()
 
                 # Cleanup orphan nodes
-                df_nodes = self.spark.read.format("delta").load(self.tables["meta_nodes"])
+                df_nodes = self._spark_read_table("meta_nodes")
                 df_nodes.cache()
                 initial_nodes = df_nodes.count()
 
@@ -4165,10 +4226,13 @@ class CatalogManager:
             if self.spark:
                 from pyspark.sql import functions as F
 
-                df = self.spark.read.format("delta").load(self.tables["meta_state"])
+                df = self._spark_read_table("meta_state")
                 initial_count = df.count()
                 df = df.filter(F.col("key") != key)
-                df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
+                if self._is_uc:
+                    df.write.format("delta").mode("overwrite").saveAsTable(self.tables["meta_state"])
+                else:
+                    df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
                 return df.count() < initial_count
 
             elif self.engine:
@@ -4211,13 +4275,16 @@ class CatalogManager:
             if self.spark:
                 from pyspark.sql import functions as F
 
-                df = self.spark.read.format("delta").load(self.tables["meta_state"])
+                df = self._spark_read_table("meta_state")
                 initial_count = df.count()
 
                 # Convert wildcard pattern to SQL LIKE pattern
                 like_pattern = key_pattern.replace("*", "%")
                 df = df.filter(~F.col("key").like(like_pattern))
-                df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
+                if self._is_uc:
+                    df.write.format("delta").mode("overwrite").saveAsTable(self.tables["meta_state"])
+                else:
+                    df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
 
                 return initial_count - df.count()
 

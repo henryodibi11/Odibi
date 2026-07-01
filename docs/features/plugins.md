@@ -148,6 +148,7 @@ The connection factory system allows registering custom connection types.
 | `delta` | Delta Lake tables |
 | `sql_server` / `azure_sql` | SQL Server / Azure SQL |
 | `postgres` / `postgresql` | PostgreSQL |
+| `unity_catalog` | Databricks Unity Catalog managed tables |
 
 ### Custom Factory Pattern
 
