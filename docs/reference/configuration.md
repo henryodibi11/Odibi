@@ -1044,7 +1044,7 @@ logging:
 # CONNECTIONS (required, at least one)
 connections:
   <connection_name>:          # Your choice of name
-    type: local|azure_blob|delta|sql_server|http
+    type: local|azure_blob|delta|sql_server|http|unity_catalog
     validation_mode: lazy|eager   # optional, defaults to 'lazy'
     <type-specific-config>
 

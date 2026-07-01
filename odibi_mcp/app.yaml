@@ -1,0 +1,21 @@
+# Databricks App configuration for Odibi MCP server
+#
+# Deploy with:
+#   databricks apps deploy mcp-odibi --source-code-path /Workspace/Users/henryodibi@outlook.com/Odibi/odibi_mcp
+#
+# The MCP server will be available at:
+#   https://<workspace-url>/ml/apps/mcp-odibi/
+
+command:
+  - uvicorn
+  - databricks_app:http_app
+  - --host
+  - "0.0.0.0"
+  - --port
+  - "8000"
+
+env:
+  - name: PYTHONIOENCODING
+    value: "utf-8"
+  - name: PYTHONPATH
+    value: "/workspace:$PYTHONPATH"

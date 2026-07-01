@@ -2,6 +2,17 @@
 
 A Model Context Protocol (MCP) interface for AI assistants to interact with the Odibi data engineering framework.
 
+## Installation
+
+See [INSTALL.md](INSTALL.md) for detailed installation instructions.
+
+**Quick start:**
+```bash
+pip install odibi-mcp
+```
+
+This automatically installs the main `odibi` package and all required dependencies.
+
 ## Overview
 
 The MCP Server provides AI assistants with:
@@ -80,8 +91,16 @@ The "Lazy Bronze" workflow for auto-generating pipelines:
 
 ## Running the Server
 
+### Stdio Mode (for MCP clients)
+
 ```bash
 python -m odibi_mcp.server
+```
+
+### HTTP Mode (for Databricks Apps)
+
+```bash
+python -m odibi_mcp.databricks_app
 ```
 
 Or with environment config:
@@ -92,3 +111,13 @@ ODIBI_CONFIG=path/to/project.yaml python -m odibi_mcp.server
 ## Configuration
 
 See `mcp_config.example.yaml` for configuration options.
+
+## Verify Installation
+
+After installing, verify all dependencies are available:
+
+```bash
+python verify_install.py
+```
+
+This checks that the MCP gateway can import from both `odibi_mcp` and `odibi` packages.

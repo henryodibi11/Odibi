@@ -1,143 +1,76 @@
-"""Databricks App entry point for the Odibi MCP server.
+"""HTTP app wrapper for Databricks App deployment.
 
-Serves the existing MCP server over Streamable HTTP at /mcp for Genie Code.
+Exposes the Odibi MCP server over HTTP/SSE transport
+for use by Genie Code and other Databricks agents.
 
-Usage (local testing):
-    uvicorn odibi_mcp.databricks_app:app --host 0.0.0.0 --port 8000
-    # Then connect: Genie Code Settings → MCP → Custom → http://localhost:8000/mcp
-
-Usage (Databricks App):
-    Set ``odibi_mcp.databricks_app:app`` as the ASGI entry point.
-    Genie Code connects at https://<app-url>/mcp
-
-Requirements:
-    pip install odibi[mcp]   # mcp>=1.0.0 pulls in starlette, uvicorn
+Usage:
+    uvicorn odibi_mcp.databricks_app:http_app --host 0.0.0.0 --port 8000
 """
-
 from __future__ import annotations
 
-import contextlib
-import logging
-import os
 import sys
-from pathlib import Path
 
-# --- Bootstrap (same as server.py) ---
-logging.basicConfig(level=logging.INFO, stream=sys.stderr)
-logger = logging.getLogger(__name__)
+# Minimal version to isolate the failure
+print("[INIT] databricks_app module loading...", file=sys.stderr, flush=True)
 
-ODIBI_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(ODIBI_ROOT))
-sys.path.insert(0, str(ODIBI_ROOT / "_archive"))
-
-# Load .env if present
 try:
-    from dotenv import load_dotenv
-
-    for env_path in [
-        Path.cwd() / ".env",
-        Path(os.environ.get("ODIBI_CONFIG", "")).parent / ".env"
-        if os.environ.get("ODIBI_CONFIG")
-        else None,
-        ODIBI_ROOT / ".env",
-    ]:
-        if env_path and env_path.exists():
-            load_dotenv(env_path, override=True)
-            break
-except ImportError:
-    pass
-
-# --- Build the FastMCP wrapper ---
-from mcp.server.fastmcp import FastMCP
-from starlette.applications import Starlette
-from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
-from starlette.routing import Mount, Route
-
-# Create a FastMCP instance in stateless mode (Databricks requirement)
-mcp = FastMCP(
-    "odibi-knowledge",
-    stateless_http=True,
-    json_response=True,
-)
-
-# Re-register all tools and resources from the existing server by importing
-# the tool functions and wiring them into the FastMCP instance.
-# Rather than duplicating 2000 lines of tool definitions, we mount the
-# existing low-level Server's handlers directly.
-from odibi_mcp.server import server as _low_level_server
-
-# Patch the FastMCP's internal server with our fully-configured one.
-# FastMCP wraps mcp.server.Server — we replace its _mcp_server with ours
-# so all the @server.list_tools, @server.call_tool handlers are preserved.
-mcp._mcp_server = _low_level_server
-
-
-# --- Health endpoint ---
-async def health(request):
-    return JSONResponse({"status": "ok", "server": "odibi-mcp"})
+    print("[INIT] Step 1: Importing CORS...", file=sys.stderr, flush=True)
+    from starlette.middleware.cors import CORSMiddleware
+    print("[INIT] Step 1: OK", file=sys.stderr, flush=True)
+    
+    print("[INIT] Step 2: Importing mcp_server...", file=sys.stderr, flush=True)
+    from mcp_server import mcp  # No package prefix - files are at /workspace/ directly
+    print(f"[INIT] Step 2: OK - mcp={mcp}", file=sys.stderr, flush=True)
+    
+    print("[INIT] Step 3: Creating HTTP app...", file=sys.stderr, flush=True)
+    http_app = mcp.http_app(stateless_http=True)
+    print(f"[INIT] Step 3: OK - app={http_app}", file=sys.stderr, flush=True)
+    
+    print("[INIT] Step 4: Adding CORS middleware...", file=sys.stderr, flush=True)
+    http_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    print("[INIT] Step 4: OK - Initialization complete!", file=sys.stderr, flush=True)
+    
+except Exception as e:
+    print(f"[INIT] EXCEPTION: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    
+    # Create a minimal error app
+    from starlette.applications import Starlette
+    from starlette.responses import PlainTextResponse
+    from starlette.routing import Route
+    
+    error_msg = f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+    
+    async def error_handler(request):
+        return PlainTextResponse(error_msg, status_code=500)
+    
+    http_app = Starlette(routes=[Route("/", error_handler), Route("/{path:path}", error_handler)])
+    print("[INIT] Created fallback error app", file=sys.stderr, flush=True)
 
 
-# --- Lifespan: initialize project context + session manager ---
-@contextlib.asynccontextmanager
-async def lifespan(app: Starlette):
-    from odibi_mcp.context import initialize_from_env
+def main() -> None:
+    """Serve the HTTP app with uvicorn.
 
-    ctx = initialize_from_env()
-    if ctx:
-        logger.info(f"Loaded project: {ctx.project_name} from {ctx.config_path}")
-    else:
-        logger.warning("No project config found - facade tools will return empty results")
-
-    async with mcp.session_manager.run():
-        yield
-
-
-# --- Assemble the ASGI app ---
-# Databricks expects MCP at /mcp. FastMCP's streamable_http_app() serves
-# at settings.streamable_http_path ("/mcp" by default), so mounting at "/"
-# gives us /mcp automatically.
-app = Starlette(
-    routes=[
-        Route("/health", health, methods=["GET"]),
-        Mount("/", app=mcp.streamable_http_app()),
-    ],
-    lifespan=lifespan,
-)
-
-# CORS — Databricks workspace needs to reach this server
-app = CORSMiddleware(
-    app,
-    allow_origins=[
-        os.environ.get("DATABRICKS_HOST", ""),
-        "https://*.cloud.databricks.com",
-        "https://*.azuredatabricks.net",
-        "http://localhost:8000",
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
-    expose_headers=["Mcp-Session-Id"],
-)
-
-
-def main():
-    """Run locally for testing."""
-    import argparse
+    Entry point for the `odibi-mcp-http` console script and
+    `python -m odibi_mcp.databricks_app`. Host/port via ODIBI_MCP_HOST / PORT.
+    NOTE: the Databricks Apps deploy uses app.yaml (uvicorn) directly; this is
+    for local/manual runs.
+    """
+    import os
 
     import uvicorn
 
-    parser = argparse.ArgumentParser(description="Odibi MCP Server (HTTP for Databricks)")
-    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8000)))
-    parser.add_argument("--host", type=str, default="0.0.0.0")
-    args = parser.parse_args()
-
-    logger.info(f"Starting Odibi MCP HTTP server on {args.host}:{args.port}")
-    logger.info(f"MCP endpoint: http://{args.host}:{args.port}/mcp")
-    logger.info(f"Health check: http://{args.host}:{args.port}/health")
     uvicorn.run(
-        "odibi_mcp.databricks_app:app",
-        host=args.host,
-        port=args.port,
+        http_app,
+        host=os.environ.get("ODIBI_MCP_HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", os.environ.get("ODIBI_MCP_PORT", "8000"))),
     )
 
 

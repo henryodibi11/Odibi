@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odibi"
-version = "3.11.0"
+version = "3.12.0"
 description = "A declarative data engineering framework - Explicit over implicit, Stories over magic"
 authors = [
     {name = "Henry Odibi", email = "odibiengineering@gmail.com"}
@@ -92,7 +92,7 @@ thermodynamics = [
     "psychrolib>=2.5.0",  # Optional fallback for psychrometrics
 ]
 mcp = [
-    "mcp>=1.0.0",
+    "fastmcp>=3.0",
     "python-dotenv>=1.0.0",
     "fsspec>=2023.1.0",
 ]
@@ -181,6 +181,7 @@ target-version = ['py39', 'py310', 'py311']
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+exclude = ["odibi_mcp/test_mcp_server_validation.py"]
 
 [tool.ruff.lint.per-file-ignores]
 # These files require env vars or sys.path manipulation before imports
@@ -188,7 +189,7 @@ target-version = "py39"
 "odibi_mcp/contracts/envelope.py" = ["E402"]
 "odibi_mcp/test_all_tools.py" = ["E402", "F841"]
 "run_mcp.py" = ["E402"]
-"tests/unit/mcp/test_server_audit.py" = ["E402", "F841"]
+"odibi_mcp/_corpus/docs/examples/*.ipynb" = ["E402"]
 # These files use pytest.importorskip() before imports (polars/CoolProp optional)
 "tests/unit/engine/test_polars_engine_coverage.py" = ["E402"]
 "tests/unit/transformers/test_manufacturing_coverage.py" = ["E402"]

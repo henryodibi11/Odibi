@@ -11,7 +11,7 @@ This 2,200+ line document covers:
 - All 6 patterns (Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension)
 - 52+ transformers with examples
 - Validation, quarantine, quality gates
-- Connections (Local, ADLS, Azure SQL, HTTP, DBFS)
+- Connections (Local, ADLS, Azure SQL, HTTP, DBFS, Unity Catalog)
 - Delta Lake features (partitioning, Z-ordering, VACUUM, schema evolution)
 - System Catalog, OpenLineage, FK validation
 - SQL Server writer, incremental loading modes
@@ -156,8 +156,12 @@ This ensures all conditional branches are exercised in CI.
   - `tests/unit/tools/test_adf_profiler_coverage.py` (70 tests) — all AdfProfiler methods with mocked requests/credentials
 - `utils/setup_helpers.py` — **94% covered** (22 tests). KeyVaultFetchResult, fetch_keyvault_secret (success/ImportError/exception), fetch_keyvault_secrets_parallel (kv/non-kv connections, verbose), configure_connections_parallel (prefetch on/off, cache injection, errors), validate_databricks_environment. Remaining: Spark active session check, IPython dbutils check.
   - `tests/unit/utils/test_setup_helpers_coverage.py` (22 tests)
-- `connections/factory.py` — **81% covered** (25 tests). All factory functions: create_local/http/azure_blob/delta/sql_server/postgres connections. Auth auto-detection for all modes. Missing host/account/database validation errors. register_builtins.
+- `connections/factory.py` — **81% covered** (25+5 tests). All factory functions: create_local/http/azure_blob/delta/sql_server/postgres/unity_catalog connections. Auth auto-detection for all modes. Missing host/account/database validation errors. register_builtins.
   - `tests/unit/connections/test_connection_factory_coverage.py` (25 tests)
+- `connections/unity_catalog.py` — **~95% covered** (27 tests). UnityCatalogConnection: get_path, validate (schema creation, no-spark, exceptions), discover_catalog (tables, pattern, limit, no-spark, errors), list_tables, get_freshness (history, empty, errors), pandas_storage_options, BaseConnection subclass. Factory: basic, defaults, missing catalog. register_builtins includes UC.
+  - `tests/unit/connections/test_unity_catalog_coverage.py` (27 tests)
+- `catalog.py` UC mode — (22 tests). UC detection (_is_uc, is_unity_catalog_mode), table name resolution (18 UC-qualified names), _table_exists (catalog.tableExists), _ensure_table (saveAsTable), _spark_read_table (spark.table), _spark_write_append (saveAsTable), _merge_target_ref (table name vs delta.\`path\`), bootstrap (creates all 18 tables, skips existing).
+  - `tests/unit/test_catalog_uc_mode.py` (22 tests)
 - `patterns/date_dimension.py` — **57% covered** (17 tests). _calc_fiscal_year, _calc_fiscal_quarter, _generate_pandas, _add_unknown_member Pandas, _get_row_count, execute Pandas path with/without unknown_member. Remaining: Spark paths.
   - `tests/unit/patterns/test_date_dimension_coverage.py` (17 tests)
 - CLI small commands — **35 tests** covering cli/templates.py (list/show/transformer/schema/dispatch), cli/validate.py (valid/invalid/exception), cli/ui.py (import error, parser), cli/export.py (airflow/dagster/errors), cli/run.py (success/failure/exception), cli/deploy.py (success/no catalog/exception).
@@ -459,6 +463,23 @@ finally:
     else:
         sys.modules.pop("fsspec", None)
 ```
+
+### Unity Catalog Connection: Mocking SparkSession in Tests
+`UnityCatalogConnection.validate()`, `discover_catalog()`, and `get_freshness()` import `SparkSession` locally inside the method body (`from pyspark.sql import SparkSession`). You **cannot** patch `odibi.connections.unity_catalog.SparkSession` because the attribute doesn't exist at module level. Instead, use `sys.modules` patching:
+```python
+mock_ss = MagicMock()
+mock_ss.getActiveSession.return_value = mock_spark
+with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+    conn.discover_catalog()
+```
+
+### CatalogManager UC Mode: Helper Methods
+CatalogManager now has three UC-aware helpers that ALL Spark read/write/MERGE calls must go through:
+- `_spark_read_table(table_key)` — `spark.table()` for UC, `spark.read.format("delta").load()` for file paths
+- `_spark_write_append(df, table_key)` — `saveAsTable()` for UC, `.save()` for file paths
+- `_merge_target_ref(table_key)` — returns table name for UC, `delta.\`path\`` for file paths
+
+When adding new Spark operations to `catalog.py`, use these helpers instead of raw Spark calls. For overwrite-mode writes, add `if self._is_uc: ... saveAsTable() else: ... save()` inline.
 
 ### Pre-Existing Test Failures (Not Regressions)
 Most documented failures have been resolved:

@@ -31,7 +31,7 @@ odibi templates list --format json
 ```
 
 **Categories:**
-- `connections` - 7 types: local, azure_blob, azure_adls, delta, sql_server, azure_sql, http
+- `connections` - 8 types: local, azure_blob, azure_adls, delta, sql_server, azure_sql, http, unity_catalog
 - `patterns` - 6 types: dimension, fact, scd2, merge, aggregation, date_dimension
 - `configs` - 10 types: project, pipeline, node, read, write, transform, validation, incremental, quarantine, gate
 

@@ -303,15 +303,23 @@ pm.run("pipeline_name")""",
             doc_path: Relative path like "docs/patterns/scd2.md"
         """
         path = self.odibi_root / doc_path
-        if not path.exists():
+        if not path.is_file():
             # Try common prefixes
             for prefix in ["docs/", "docs/patterns/", "docs/guides/", "docs/features/"]:
                 alt = self.odibi_root / prefix / doc_path
-                if alt.exists():
+                if alt.is_file():
                     path = alt
                     break
 
-        if path.exists():
+        if path.is_dir():
+            # A directory was passed (e.g. "docs/simulation") — point the caller at
+            # list_docs/search_docs instead of trying to read a folder.
+            return {
+                "error": f"'{doc_path}' is a directory, not a doc. "
+                "Use list_docs(category=...) or search_docs(query=...) to find a file."
+            }
+
+        if path.is_file():
             return {
                 "path": str(path.relative_to(self.odibi_root)),
                 "content": path.read_text(encoding="utf-8"),
@@ -581,6 +589,7 @@ pm.run("pipeline_name")""",
             "delta": "Delta Lake tables",
             "sql_server": "Microsoft SQL Server",
             "azure_sql": "Azure SQL Database",
+            "unity_catalog": "Unity Catalog managed tables (Databricks Serverless/Free Edition)",
         }
 
         result = []
@@ -657,6 +666,7 @@ pm.run("pipeline_name")""",
                 "delta": "Delta Lake connection for reading/writing Delta tables.",
                 "sql_server": "Microsoft SQL Server connection.",
                 "azure_sql": "Azure SQL Database connection.",
+                "unity_catalog": "Unity Catalog managed tables connection for Databricks Serverless and Free Edition. No filesystem access needed — UC metastore handles storage. Config keys: catalog (required), schema (default: 'default'), create_schema (optional, default: true). See odibi/connections/unity_catalog.py.",
             }
             result["found"] = True
             result["matches"].append(

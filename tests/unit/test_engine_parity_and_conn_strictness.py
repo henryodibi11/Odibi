@@ -132,6 +132,7 @@ def test_all_known_connection_types_have_discriminator_tags():
         "delta",
         "sql_server",
         "http",
+        "unity_catalog",
     }
 
 

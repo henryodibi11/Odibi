@@ -1,0 +1,17 @@
+# Odibi MCP Server Dependencies
+
+# MCP Framework
+fastmcp>=3.0
+
+# HTTP Server (required for Databricks Apps)
+uvicorn>=0.30.0
+starlette>=0.37.0
+
+# Databricks SDK
+databricks-sdk>=0.23.0
+
+# Odibi from PyPI (includes all dependencies)
+odibi>=3.11.0
+
+# Explicitly ensure pint is installed (the critical missing dependency)
+pint>=0.23,<1.0.0
