@@ -119,9 +119,7 @@ class UnityCatalogConnection(BaseConnection):
         result = self.discover_catalog()
         return [d["name"] for d in result.get("datasets", [])]
 
-    def get_freshness(
-        self, dataset: str, timestamp_column: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def get_freshness(self, dataset: str, timestamp_column: Optional[str] = None) -> Dict[str, Any]:
         """Get freshness of a UC table."""
         try:
             from pyspark.sql import SparkSession

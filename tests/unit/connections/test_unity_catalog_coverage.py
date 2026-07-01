@@ -49,7 +49,9 @@ class TestUnityCatalogConnection:
         conn = UnityCatalogConnection(catalog="main", schema="s")
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = None
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             conn.validate()  # should not raise
 
     def test_validate_creates_schema(self):
@@ -57,16 +59,14 @@ class TestUnityCatalogConnection:
         mock_spark = MagicMock()
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = mock_spark
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             conn.validate()
-            mock_spark.sql.assert_called_once_with(
-                "CREATE SCHEMA IF NOT EXISTS ws.logs"
-            )
+            mock_spark.sql.assert_called_once_with("CREATE SCHEMA IF NOT EXISTS ws.logs")
 
     def test_validate_create_schema_false(self):
-        conn = UnityCatalogConnection(
-            catalog="ws", schema="logs", create_schema=False
-        )
+        conn = UnityCatalogConnection(catalog="ws", schema="logs", create_schema=False)
         conn.validate()  # should return immediately, no Spark import
 
     def test_validate_exception_swallowed(self):
@@ -75,7 +75,9 @@ class TestUnityCatalogConnection:
         mock_spark.sql.side_effect = Exception("permission denied")
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = mock_spark
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             conn.validate()  # should not raise
 
     def test_validate_import_error_swallowed(self):
@@ -83,6 +85,7 @@ class TestUnityCatalogConnection:
         conn = UnityCatalogConnection(catalog="ws", schema="logs")
         # Remove pyspark from modules so import fails
         import sys
+
         orig = sys.modules.get("pyspark")
         orig_sql = sys.modules.get("pyspark.sql")
         sys.modules["pyspark"] = None
@@ -103,7 +106,9 @@ class TestUnityCatalogConnection:
         conn = UnityCatalogConnection(catalog="ws", schema="s")
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = None
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.discover_catalog()
             assert result["datasets"] == []
             assert "error" in result
@@ -119,7 +124,9 @@ class TestUnityCatalogConnection:
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = mock_spark
 
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.discover_catalog()
             assert len(result["datasets"]) == 2
             assert result["datasets"][0]["name"] == "meta_tables"
@@ -136,7 +143,9 @@ class TestUnityCatalogConnection:
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = mock_spark
 
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.discover_catalog(pattern="meta")
             assert len(result["datasets"]) == 1
 
@@ -152,7 +161,9 @@ class TestUnityCatalogConnection:
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = mock_spark
 
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.discover_catalog(limit=2)
             assert len(result["datasets"]) == 2
 
@@ -160,7 +171,9 @@ class TestUnityCatalogConnection:
         conn = UnityCatalogConnection(catalog="ws", schema="logs")
         mock_ss = MagicMock()
         mock_ss.getActiveSession.side_effect = Exception("fail")
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.discover_catalog()
             assert result["datasets"] == []
             assert "error" in result
@@ -176,16 +189,16 @@ class TestUnityCatalogConnection:
 
     def test_list_tables_empty(self):
         conn = UnityCatalogConnection(catalog="ws", schema="logs")
-        with patch.object(
-            conn, "discover_catalog", return_value={"datasets": []}
-        ):
+        with patch.object(conn, "discover_catalog", return_value={"datasets": []}):
             assert conn.list_tables() == []
 
     def test_get_freshness_no_spark(self):
         conn = UnityCatalogConnection(catalog="ws", schema="logs")
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = None
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.get_freshness("meta_tables")
             assert "error" in result
 
@@ -201,13 +214,13 @@ class TestUnityCatalogConnection:
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = mock_spark
 
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.get_freshness("meta_tables")
             assert result["last_modified"] == "2026-07-01T10:00:00"
             assert result["operation"] == "MERGE"
-            mock_spark.sql.assert_called_with(
-                "DESCRIBE HISTORY ws.logs.meta_tables LIMIT 1"
-            )
+            mock_spark.sql.assert_called_with("DESCRIBE HISTORY ws.logs.meta_tables LIMIT 1")
 
     def test_get_freshness_empty_history(self):
         conn = UnityCatalogConnection(catalog="ws", schema="logs")
@@ -216,7 +229,9 @@ class TestUnityCatalogConnection:
         mock_ss = MagicMock()
         mock_ss.getActiveSession.return_value = mock_spark
 
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.get_freshness("meta_tables")
             assert result["last_modified"] is None
 
@@ -224,7 +239,9 @@ class TestUnityCatalogConnection:
         conn = UnityCatalogConnection(catalog="ws", schema="logs")
         mock_ss = MagicMock()
         mock_ss.getActiveSession.side_effect = Exception("boom")
-        with patch.dict("sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}):
+        with patch.dict(
+            "sys.modules", {"pyspark": MagicMock(), "pyspark.sql": MagicMock(SparkSession=mock_ss)}
+        ):
             result = conn.get_freshness("meta_tables")
             assert "error" in result
 
@@ -255,9 +272,7 @@ class TestCreateUnityCatalogFactory:
         assert result.schema == "default"
 
     def test_create_schema_flag(self):
-        result = create_unity_catalog_connection(
-            "uc3", {"catalog": "main", "create_schema": False}
-        )
+        result = create_unity_catalog_connection("uc3", {"catalog": "main", "create_schema": False})
         assert result.create_schema is False
 
     def test_missing_catalog_raises(self):
@@ -276,13 +291,9 @@ class TestCreateUnityCatalogFactory:
 
 class TestRegisterBuiltinsIncludesUC:
     def test_unity_catalog_registered(self):
-        with patch(
-            "odibi.connections.factory.register_connection_factory"
-        ) as mock_reg:
+        with patch("odibi.connections.factory.register_connection_factory") as mock_reg:
             from odibi.connections.factory import register_builtins
 
             register_builtins()
-            registered_types = [
-                call.args[0] for call in mock_reg.call_args_list
-            ]
+            registered_types = [call.args[0] for call in mock_reg.call_args_list]
             assert "unity_catalog" in registered_types

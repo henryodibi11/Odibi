@@ -445,9 +445,7 @@ def create_unity_catalog_connection(name: str, config: Dict[str, Any]) -> Any:
             connection_name=name,
             config_keys=list(config.keys()),
         )
-        raise ValueError(
-            f"Connection '{name}' missing 'catalog'. Got keys: {list(config.keys())}"
-        )
+        raise ValueError(f"Connection '{name}' missing 'catalog'. Got keys: {list(config.keys())}")
 
     schema = config.get("schema", "default")
     create_schema = config.get("create_schema", True)

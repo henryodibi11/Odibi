@@ -100,9 +100,7 @@ class TestUCTableExists:
         cm = _make_catalog_manager(uc=True, spark=mock_spark)
 
         assert cm._table_exists("workspace.odibi_logs.meta_tables") is True
-        mock_spark.catalog.tableExists.assert_called_once_with(
-            "workspace.odibi_logs.meta_tables"
-        )
+        mock_spark.catalog.tableExists.assert_called_once_with("workspace.odibi_logs.meta_tables")
 
     def test_uc_table_not_exists(self):
         mock_spark = MagicMock()
@@ -143,9 +141,7 @@ class TestUCEnsureTable:
 
         # Should call saveAsTable, not save
         writer = mock_spark.createDataFrame.return_value.write.format.return_value
-        writer.saveAsTable.assert_called_once_with(
-            "workspace.odibi_logs.meta_tables"
-        )
+        writer.saveAsTable.assert_called_once_with("workspace.odibi_logs.meta_tables")
 
     def test_uc_with_partition_cols(self):
         mock_spark = MagicMock()
@@ -153,9 +149,7 @@ class TestUCEnsureTable:
         cm = _make_catalog_manager(uc=True, spark=mock_spark)
 
         schema = cm._get_schema_meta_runs()
-        cm._ensure_table(
-            "meta_runs", schema, partition_cols=["pipeline_name", "date"]
-        )
+        cm._ensure_table("meta_runs", schema, partition_cols=["pipeline_name", "date"])
 
         writer = mock_spark.createDataFrame.return_value.write.format.return_value
         writer.partitionBy.assert_called_once_with("pipeline_name", "date")
@@ -183,9 +177,7 @@ class TestSparkReadTable:
         cm = _make_catalog_manager(uc=True, spark=mock_spark)
 
         cm._spark_read_table("meta_pipelines")
-        mock_spark.table.assert_called_once_with(
-            "workspace.odibi_logs.meta_pipelines"
-        )
+        mock_spark.table.assert_called_once_with("workspace.odibi_logs.meta_pipelines")
 
     def test_non_uc_uses_delta_load(self):
         mock_spark = MagicMock()

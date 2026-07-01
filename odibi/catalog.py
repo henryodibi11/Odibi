@@ -179,12 +179,24 @@ class CatalogManager:
 
         # Table Paths (or fully qualified UC table names)
         table_names = [
-            "meta_tables", "meta_runs", "meta_patterns", "meta_metrics",
-            "meta_state", "meta_pipelines", "meta_nodes", "meta_schemas",
-            "meta_lineage", "meta_outputs",
-            "meta_pipeline_runs", "meta_node_runs", "meta_failures",
-            "meta_observability_errors", "meta_derived_applied_runs",
-            "meta_daily_stats", "meta_pipeline_health", "meta_sla_status",
+            "meta_tables",
+            "meta_runs",
+            "meta_patterns",
+            "meta_metrics",
+            "meta_state",
+            "meta_pipelines",
+            "meta_nodes",
+            "meta_schemas",
+            "meta_lineage",
+            "meta_outputs",
+            "meta_pipeline_runs",
+            "meta_node_runs",
+            "meta_failures",
+            "meta_observability_errors",
+            "meta_derived_applied_runs",
+            "meta_daily_stats",
+            "meta_pipeline_health",
+            "meta_sla_status",
         ]
         if self._is_uc:
             self.tables = {t: self.connection.get_path(t) for t in table_names}
@@ -4049,9 +4061,13 @@ class CatalogManager:
                     ~((F.col("pipeline_name") == pipeline_name) & (F.col("node_name") == node_name))
                 )
                 if self._is_uc:
-                    df_filtered.write.format("delta").mode("overwrite").saveAsTable(self.tables["meta_nodes"])
+                    df_filtered.write.format("delta").mode("overwrite").saveAsTable(
+                        self.tables["meta_nodes"]
+                    )
                 else:
-                    df_filtered.write.format("delta").mode("overwrite").save(self.tables["meta_nodes"])
+                    df_filtered.write.format("delta").mode("overwrite").save(
+                        self.tables["meta_nodes"]
+                    )
                 deleted_count = initial_count - df_filtered.count()
                 df.unpersist()
 
@@ -4232,7 +4248,9 @@ class CatalogManager:
                 initial_count = df.count()
                 df = df.filter(F.col("key") != key)
                 if self._is_uc:
-                    df.write.format("delta").mode("overwrite").saveAsTable(self.tables["meta_state"])
+                    df.write.format("delta").mode("overwrite").saveAsTable(
+                        self.tables["meta_state"]
+                    )
                 else:
                     df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
                 return df.count() < initial_count
@@ -4284,7 +4302,9 @@ class CatalogManager:
                 like_pattern = key_pattern.replace("*", "%")
                 df = df.filter(~F.col("key").like(like_pattern))
                 if self._is_uc:
-                    df.write.format("delta").mode("overwrite").saveAsTable(self.tables["meta_state"])
+                    df.write.format("delta").mode("overwrite").saveAsTable(
+                        self.tables["meta_state"]
+                    )
                 else:
                     df.write.format("delta").mode("overwrite").save(self.tables["meta_state"])
 
