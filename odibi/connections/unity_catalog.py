@@ -24,6 +24,7 @@ class UnityCatalogConnection(BaseConnection):
         schema: UC schema/database name (e.g. ``"odibi_logs"``).
         create_schema: If True, issue ``CREATE SCHEMA IF NOT EXISTS``
             on first validate() call.
+        name: Optional connection name (set by the factory).
     """
 
     def __init__(
@@ -31,10 +32,13 @@ class UnityCatalogConnection(BaseConnection):
         catalog: str,
         schema: str = "default",
         create_schema: bool = True,
+        name: str = "",
+        **kwargs: Any,
     ):
         self.catalog = catalog
         self.schema = schema
         self.create_schema = create_schema
+        self.name = name
 
     def get_path(self, table: str) -> str:
         """Return the fully qualified UC table name.
@@ -54,11 +58,14 @@ class UnityCatalogConnection(BaseConnection):
 
         When running inside Databricks with an active SparkSession,
         this will issue ``CREATE SCHEMA IF NOT EXISTS`` if
-        ``create_schema`` was set to True.
+        *create_schema* was set to ``True``.
 
         Does not raise on failure — schema creation may require
         elevated permissions; downstream writes will surface the
         real error.
+
+        This method also serves as the schema-creation entry point
+        (there is no separate ``ensure_schema`` method).
         """
         if not self.create_schema:
             return
