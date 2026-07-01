@@ -8,6 +8,7 @@ from odibi.connections.local import LocalConnection
 from odibi.connections.local_dbfs import LocalDBFS
 from odibi.connections.postgres import PostgreSQLConnection
 from odibi.connections.sql_utils import SQL_FORMATS, is_sql_format
+from odibi.connections.unity_catalog import UnityCatalogConnection
 
 __all__ = [
     "BaseConnection",
@@ -16,6 +17,7 @@ __all__ = [
     "AzureSQL",
     "PostgreSQLConnection",
     "LocalDBFS",
+    "UnityCatalogConnection",
     "ApiFetcher",
     "FetchResult",
     "create_api_fetcher",
