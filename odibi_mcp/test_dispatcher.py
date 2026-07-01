@@ -1,7 +1,6 @@
 """Integration test for OdibiDispatcher."""
 
 from odibi_mcp.dispatcher import OdibiDispatcher
-import json
 
 
 def test_dispatcher_basic():

@@ -52,7 +52,7 @@ except Exception as e:
         return PlainTextResponse(error_msg, status_code=500)
     
     http_app = Starlette(routes=[Route("/", error_handler), Route("/{path:path}", error_handler)])
-    print(f"[INIT] Created fallback error app", file=sys.stderr, flush=True)
+    print("[INIT] Created fallback error app", file=sys.stderr, flush=True)
 
 
 def main() -> None:

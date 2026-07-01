@@ -17,27 +17,27 @@ def test_imports() -> List[Tuple[str, bool, str]]:
     
     # Test MCP core
     try:
-        from odibi_mcp.dispatcher import OdibiDispatcher
+        from odibi_mcp.dispatcher import OdibiDispatcher  # noqa: F401
         results.append(("odibi_mcp.dispatcher", True, "OdibiDispatcher available"))
     except ImportError as e:
         results.append(("odibi_mcp.dispatcher", False, str(e)))
     
     # Test workflow engine
     try:
-        from odibi_mcp.tools.workflows import WorkflowEngine
+        from odibi_mcp.tools.workflows import WorkflowEngine  # noqa: F401
         results.append(("odibi_mcp.tools.workflows", True, "WorkflowEngine available"))
     except ImportError as e:
         results.append(("odibi_mcp.tools.workflows", False, str(e)))
     
     # Test Odibi core dependencies
     try:
-        from odibi.config import PipelineConfig
+        from odibi.config import PipelineConfig  # noqa: F401
         results.append(("odibi.config", True, "PipelineConfig available"))
     except ImportError as e:
         results.append(("odibi.config", False, str(e)))
     
     try:
-        from odibi.registry import FunctionRegistry
+        from odibi.registry import FunctionRegistry  # noqa: F401
         results.append(("odibi.registry", True, "FunctionRegistry available"))
     except ImportError as e:
         results.append(("odibi.registry", False, str(e)))
@@ -46,19 +46,19 @@ def test_imports() -> List[Tuple[str, bool, str]]:
     try:
         import pint
         results.append(("pint", True, f"version {pint.__version__}"))
-    except ImportError as e:
+    except ImportError:
         results.append(("pint", False, "Required by odibi.transformers.units"))
     
     try:
         import pydantic
         results.append(("pydantic", True, f"version {pydantic.__version__}"))
-    except ImportError as e:
+    except ImportError:
         results.append(("pydantic", False, "Required by odibi.config"))
     
     try:
         import pandas
         results.append(("pandas", True, f"version {pandas.__version__}"))
-    except ImportError as e:
+    except ImportError:
         results.append(("pandas", False, "Required by odibi core"))
     
     return results
