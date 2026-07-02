@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Document Template** (Skill 10) — multi-phase project planning template
 - **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
+## [3.13.2] - 2026-07-02
+
+### Fixed
+
+- **`SparkEngine` failed on Databricks serverless with `INVALID_CONNECT_URL`.** When no session was passed, the engine went straight to building a new one (via `configure_spark_with_delta_pip`, which assumes local Spark) instead of adopting the SparkSession already running in the notebook — on serverless that spins up a Spark Connect client with no `sc://` URL and crashes. It now calls `SparkSession.getActiveSession()` first and reuses the live session when one exists (Databricks serverless/classic, Jupyter+Spark, existing Connect client), only building a fresh session when there genuinely is none. Zero config; the explicit `spark_session=` argument still takes precedence.
+
 ## [3.13.1] - 2026-07-02
 
 ### Fixed
