@@ -7,13 +7,65 @@ from typing import Any, Dict, List
 from pathlib import Path
 
 
-def suggest_pipeline(profile: Dict[str, Any]) -> Dict[str, Any]:
+def _pattern_from_intent(intent: str):
+    """Map a free-text intent to a known pattern, or None if unclear.
+
+    Checks more specific phrases first so "slowly changing dimension" resolves to
+    scd2 rather than dimension.
+    """
+    text = (intent or "").lower()
+    checks = [
+        ("scd2", ("scd2", "slowly changing", "history", "track changes")),
+        ("fact", ("fact", "transaction", "event", "measure")),
+        ("dimension", ("dimension", "reference", "lookup", "master data")),
+        ("bronze", ("bronze", "ingest", "raw", "landing")),
+    ]
+    for pattern, keywords in checks:
+        if any(k in text for k in keywords):
+            return pattern
+    return None
+
+
+def suggest_pipeline(source_path: str, connection: str, intent: str) -> Dict[str, Any]:
+    """Profile a source and auto-suggest the best pipeline pattern.
+
+    Profiles the source internally, then recommends a pattern + ready-to-use
+    params, biased by the stated intent.
+
+    Args:
+        source_path: Path or table to profile (e.g. "schema.table" or "data/x.csv")
+        connection: Connection name to read through
+        intent: Free-text use case (e.g. "dimension", "fact table", "scd2 history")
+
+    Returns:
+        {suggested_pattern, confidence, reason, ready_for.apply_pattern_template, next_step}
+    """
+    from tools.smart import profile_source
+
+    profile = profile_source(connection, source_path)
+    if not isinstance(profile, dict):
+        return {
+            "error": {
+                "code": "PROFILE_FAILED",
+                "message": "profile_source did not return a profile dict",
+            }
+        }
+    if profile.get("error"):
+        return profile  # propagate profiling error unchanged
+    # Ensure the suggestion's ready_for params carry the real source coordinates
+    profile.setdefault("connection", connection)
+    profile.setdefault("path", source_path)
+    return _suggest_from_profile(profile, intent)
+
+
+def _suggest_from_profile(profile: Dict[str, Any], intent: str = "") -> Dict[str, Any]:
     """Auto-suggest pattern based on profiled data characteristics.
 
     Analyzes profile_source results and recommends the best pattern + params.
 
     Args:
         profile: Output from profile_source (ProfileSourceResponse as dict)
+        intent: Optional free-text use case that biases pattern selection
 
     Returns:
         {
@@ -85,6 +137,16 @@ def suggest_pipeline(profile: Dict[str, Any]) -> Dict[str, Any]:
         pattern = "dimension"
         confidence = 0.5
         reason = "Default to dimension pattern (reference data)"
+
+    # Intent override: an explicit stated use case wins over the heuristic
+    intent_pattern = _pattern_from_intent(intent)
+    if intent_pattern and intent_pattern != pattern:
+        pattern = intent_pattern
+        confidence = max(confidence, 0.85)
+        reason = f"Intent '{intent}' specifies '{pattern}' pattern (overrides heuristic)"
+    elif intent_pattern:
+        confidence = max(confidence, 0.9)
+        reason = f"{reason} (confirmed by intent '{intent}')"
 
     # Build ready_for params
     source_conn = profile.get("connection", "source")

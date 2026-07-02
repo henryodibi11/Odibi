@@ -594,47 +594,47 @@ class OdibiDispatcher:
         return download_file(pipeline, destination)
     
     # Session Builder
-    def _create_pipeline(self, name: str, engine: str = "pandas") -> dict[str, Any]:
-        """Create pipeline session."""
+    def _create_pipeline(self, pipeline_name: str, layer: str = "gold") -> dict[str, Any]:
+        """Create a pipeline builder session. Returns a session_id for subsequent calls."""
         from tools.builder import create_pipeline
-        return create_pipeline(name, engine)
+        return create_pipeline(pipeline_name, layer)
     
-    def _add_node(self, node_name: str, transformer: str, params: dict[str, Any]) -> dict[str, Any]:
-        """Add node to pipeline session."""
+    def _add_node(self, session_id: str, node_name: str, depends_on: list[str] | None = None) -> dict[str, Any]:
+        """Add a node to the pipeline session."""
         from tools.builder import add_node
-        return add_node(node_name, transformer, params)
+        return add_node(session_id, node_name, depends_on)
     
-    def _configure_read(self, connection: str, path: str, format: str | None = None, options: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Configure read block."""
+    def _configure_read(self, session_id: str, node_name: str, connection: str, format: str, table: str | None = None, path: str | None = None, query: str | None = None, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Configure a node's read block."""
         from tools.builder import configure_read
-        return configure_read(connection, path, format, options)
+        return configure_read(session_id, node_name, connection, format, table=table, path=path, query=query, options=options)
     
-    def _configure_write(self, connection: str, path: str, mode: str = "overwrite", options: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Configure write block."""
+    def _configure_write(self, session_id: str, node_name: str, connection: str, format: str, path: str | None = None, table: str | None = None, mode: str = "overwrite", keys: list[str] | None = None, partition_by: list[str] | None = None, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Configure a node's write block."""
         from tools.builder import configure_write
-        return configure_write(connection, path, mode, options)
+        return configure_write(session_id, node_name, connection, format, path=path, table=table, mode=mode, keys=keys, partition_by=partition_by, options=options)
     
-    def _configure_transform(self, node_name: str, params: dict[str, Any]) -> dict[str, Any]:
-        """Update node configuration."""
+    def _configure_transform(self, session_id: str, node_name: str, steps: list[dict[str, Any]]) -> dict[str, Any]:
+        """Configure a node's transform steps."""
         from tools.builder import configure_transform
-        return configure_transform(node_name, params)
+        return configure_transform(session_id, node_name, steps)
     
-    def _get_pipeline_state(self) -> dict[str, Any]:
-        """Get current pipeline session state."""
+    def _get_pipeline_state(self, session_id: str) -> dict[str, Any]:
+        """Get current pipeline builder session state."""
         from tools.builder import get_pipeline_state
-        return get_pipeline_state()
+        return get_pipeline_state(session_id)
     
-    def _render_pipeline_yaml(self) -> dict[str, Any]:
-        """Render pipeline YAML from session."""
+    def _render_pipeline_yaml(self, session_id: str) -> dict[str, Any]:
+        """Validate and render the session's pipeline YAML."""
         from tools.builder import render_pipeline_yaml
-        return render_pipeline_yaml()
+        return render_pipeline_yaml(session_id)
     
     def _list_sessions(self) -> dict[str, Any]:
         """List active sessions."""
         from tools.builder import list_sessions
         return list_sessions()
     
-    def _discard_pipeline(self) -> dict[str, Any]:
-        """Discard current pipeline session."""
+    def _discard_pipeline(self, session_id: str) -> dict[str, Any]:
+        """Discard a builder session without rendering."""
         from tools.builder import discard_pipeline
-        return discard_pipeline()
+        return discard_pipeline(session_id)
