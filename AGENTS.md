@@ -64,10 +64,20 @@ python scripts/run_test_campaign.py # End-to-end pattern validation
 
 **Do NOT flag Spark engine coverage as a problem.** The 4% coverage is misleading:
 - Spark is tested via mock-based tests in `tests/integration/test_patterns_spark_mock.py`
-- Spark is validated in production on Databricks
+- Spark is **formally validated on Databricks Serverless** (Spark 4.1.0) — see `SPARK_VALIDATION.md`
 - CI skips real Spark tests (no JVM available)
 
 The test strategy is: **mock logic in CI, validate behavior in Databricks prod.**
+
+**Spark Validation (July 2026):** 22/23 tests passing on Databricks Serverless (Spark 4.1.0). Validated:
+- Spark Engine read/write (Delta roundtrip, append, SQL pushdown)
+- CatalogManager UC mode (detection, bootstrap, _spark_read_table, _merge_target_ref)
+- SCD2 Delta MERGE patterns
+- Delta MERGE upsert
+- Validation engine on Spark DataFrames (NOT_NULL, UNIQUE, RANGE, ROW_COUNT)
+- Pattern SQL (aggregation, dimension SK, fact lookups)
+- Unity Catalog connection (validate, discover_catalog, get_freshness, list_tables)
+- 1 test setup issue (_spark_write_append schema mismatch — test data error, not a framework bug)
 
 **Spark branch testing via mocks:** For modules with dual Spark/Pandas paths (e.g., `catalog.py`),
 use `unittest.mock.MagicMock` for `SparkSession` to cover Spark branches without a JVM.
