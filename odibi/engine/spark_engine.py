@@ -105,8 +105,20 @@ class SparkEngine(Engine):
 
         start_time = time.time()
 
+        _reused_active = False
         if spark_session:
             self.spark = spark_session
+        elif SparkSession.getActiveSession() is not None:
+            # Reuse the SparkSession already running in this process. Every
+            # notebook context has one — Databricks serverless and classic
+            # clusters, Jupyter+Spark, an existing Spark Connect client. Building
+            # a fresh session here instead would spin up a local Spark or a new
+            # Connect client with no sc:// URL, which is the INVALID_CONNECT_URL
+            # failure on serverless (and configure_spark_with_delta_pip assumes
+            # local Spark). Only build below when there is genuinely no session.
+            self.spark = SparkSession.getActiveSession()
+            _reused_active = True
+            ctx.debug("Reusing active SparkSession (no new session created)")
         else:
             # Configure Delta Lake support
             try:
@@ -177,7 +189,7 @@ class SparkEngine(Engine):
             app_name=app_name,
             spark_version=self.spark.version,
             connections_configured=len(self.connections),
-            using_existing_session=spark_session is not None,
+            using_existing_session=spark_session is not None or _reused_active,
         )
 
     def _configure_all_connections(self) -> None:
