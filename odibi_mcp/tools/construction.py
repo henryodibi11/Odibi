@@ -226,7 +226,20 @@ def list_patterns() -> Dict[str, Any]:
             }
         )
 
-    return {"patterns": result, "count": len(result)}
+    return {
+        "patterns": result,
+        "count": len(result),
+        "notes": {
+            "simulation_is_not_a_pattern": (
+                "`simulation` is a read FORMAT, not a pattern in this list. To generate "
+                "synthetic data, set `format: simulation` on a read node (with an "
+                "`options.simulation` block) — do NOT look for a 'simulation' entry here "
+                "or pass it to apply_pattern_template. See the simulation pattern library "
+                "via get_doc('simulation/patterns/foundations.md') (Pattern 1: Build "
+                "Before Sources Exist) for the canonical bronze→silver→gold example."
+            ),
+        },
+    }
 
 
 def apply_pattern_template(

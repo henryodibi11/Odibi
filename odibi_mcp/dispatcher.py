@@ -279,15 +279,15 @@ class OdibiDispatcher:
                 {"name": "download_file", "signature": "pipeline, destination", "description": "Write pipeline YAML to file"},
             ],
             "Session Builder": [
-                {"name": "create_pipeline", "signature": "name, engine='pandas'", "description": "Start new pipeline session"},
-                {"name": "add_node", "signature": "node_name, transformer, params", "description": "Add transform node to session"},
-                {"name": "configure_read", "signature": "connection, path, format=None, options=None", "description": "Set source config"},
-                {"name": "configure_write", "signature": "connection, path, mode='overwrite', options=None", "description": "Set target config"},
-                {"name": "configure_transform", "signature": "node_name, params", "description": "Update node config"},
-                {"name": "get_pipeline_state", "signature": "", "description": "Current session state (nodes, read, write)"},
-                {"name": "render_pipeline_yaml", "signature": "", "description": "Generate YAML from session state"},
+                {"name": "create_pipeline", "signature": "pipeline_name, layer='gold'", "description": "Start new pipeline session; returns session_id"},
+                {"name": "add_node", "signature": "session_id, node_name, depends_on=None", "description": "Add a node (depends_on nodes must already exist)"},
+                {"name": "configure_read", "signature": "session_id, node_name, connection, format, table=None, path=None, query=None, options=None", "description": "Set a node's read block"},
+                {"name": "configure_write", "signature": "session_id, node_name, connection, format, path=None, table=None, mode='overwrite', keys=None, partition_by=None, options=None", "description": "Set a node's write block"},
+                {"name": "configure_transform", "signature": "session_id, node_name, steps", "description": "Set a node's transform steps"},
+                {"name": "get_pipeline_state", "signature": "session_id", "description": "Current session state (nodes, read, write)"},
+                {"name": "render_pipeline_yaml", "signature": "session_id", "description": "Validate and render YAML from session state"},
                 {"name": "list_sessions", "signature": "", "description": "List active pipeline builder sessions"},
-                {"name": "discard_pipeline", "signature": "", "description": "Clear session, start fresh"},
+                {"name": "discard_pipeline", "signature": "session_id", "description": "Discard session without rendering"},
             ],
         }
         
