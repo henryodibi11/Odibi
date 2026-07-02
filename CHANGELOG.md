@@ -66,6 +66,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Document Template** (Skill 10) — multi-phase project planning template
 - **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
+## [3.13.0] - 2026-07-02
+
+### Fixed
+
+- **MCP session builder was broken at runtime.** The dispatcher wrappers for the 9 session-builder tools (`create_pipeline`, `add_node`, `configure_read`, `configure_write`, `configure_transform`, `get_pipeline_state`, `render_pipeline_yaml`, `list_sessions`, `discard_pipeline`) called `tools/builder.py` with mismatched arguments after the builder moved to a session-based model. Rewired every wrapper to match the builder signatures exactly, threading `session_id`. The full `create_pipeline → add_node → configure_* → render_pipeline_yaml` flow now works end to end. (#319)
+
+### Changed
+
+- **`suggest_pipeline` now takes `(source_path, connection, intent)`** and profiles the source internally, with the stated intent biasing the recommended pattern. Previously the underlying function took a pre-computed `profile` and the dispatcher passed the wrong arguments (crashed). The existing heuristic is preserved as `_suggest_from_profile`. (#319)
+- Removed the superseded `docs/mcp/` facade bundle (SPEC v4.1 + implementation plan + AI prompt + checklist + examples) — a self-contained design for a read-only facade that was never built. (#319)
+
+### Docs
+
+- Corrected all agent-facing MCP builder / `suggest_pipeline` signatures across the guides and regenerated the served agent corpus. (#319)
+- Updated the Spark validation report (22/23) and refreshed `AGENTS.md`. (#318)
+
 ## [3.9.0] - 2026-04-20
 
 ### Added
