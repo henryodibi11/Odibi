@@ -454,6 +454,14 @@ pm.run("pipeline_name")""",
                 "run: test_pipeline",
                 "inspect: node_sample, story",
             ],
+            "key_facts": [
+                "`simulation` is a read FORMAT, not a pattern. To generate synthetic "
+                "data, set `format: simulation` on a read node with an "
+                "`options.simulation` block — it will NOT appear in list_patterns(). "
+                "For the canonical bronze→silver→gold simulation pipeline, see "
+                "get_doc('simulation/patterns/foundations.md') (Pattern 1: Build "
+                "Before Sources Exist).",
+            ],
             "next": "Load the 'odibi' skill (get_skill('odibi')) for the full map, then the step-specific skill.",
         }
 

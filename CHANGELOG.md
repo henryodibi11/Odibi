@@ -66,6 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Document Template** (Skill 10) — multi-phase project planning template
 - **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
+## [3.13.1] - 2026-07-02
+
+### Fixed
+
+- **`odibi_help("Session Builder")` showed the old, pre-session API.** The in-code help table still listed `create_pipeline(name, engine='pandas')`, `add_node(node_name, transformer, params)`, and read/write signatures with no `session_id` — the last place still describing the pre-3.13.0 single-step builder after the docs were corrected. Updated every session-builder signature to match the actual dispatcher wrappers (`session_id`-threaded). This was the tool that misled agents into calling the old API.
+
+### Changed
+
+- **`list_patterns()` and `onboard()` now disambiguate `simulation`.** `simulation` is a read *format*, not a warehouse pattern, but agents repeatedly searched `list_patterns()` for it and, not finding it, fell back to reading a JSON file instead of generating data. `list_patterns()` returns a `notes.simulation_is_not_a_pattern` field and `onboard()` returns a `key_facts` entry, both pointing to `get_doc('simulation/patterns/foundations.md')` (Pattern 1: Build Before Sources Exist) and explaining that synthetic data comes from `format: simulation` with an `options.simulation` block.
+
 ## [3.13.0] - 2026-07-02
 
 ### Fixed
