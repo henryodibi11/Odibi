@@ -162,22 +162,21 @@ write:
 2. apply_pattern_template(...) → Get valid YAML immediately
 ```
 
-### With Discovery (3 calls)
+### With Discovery (2 calls)
 ```
-1. profile_source(connection, table) → Get schema/stats
-2. suggest_pipeline(profile) → Auto-select pattern
-3. apply_pattern_template(ready_for params) → Get YAML
+1. suggest_pipeline(source_path, connection, intent) → profiles internally + auto-selects pattern
+2. apply_pattern_template(ready_for params) → Get YAML
 ```
 
 ### Complex Multi-Node (8+ calls)
 ```
-1. create_pipeline(name)
-2. add_node(...)
-3. configure_read(...)
-4. configure_write(...)
-5. configure_transform(...)
+1. create_pipeline(pipeline_name, layer)   → returns session_id
+2. add_node(session_id, node_name, depends_on=None)
+3. configure_read(session_id, node_name, connection, format, ...)
+4. configure_write(session_id, node_name, connection, format, ...)
+5. configure_transform(session_id, node_name, steps)
 6. (repeat for more nodes)
-7. render_pipeline_yaml()
+7. render_pipeline_yaml(session_id)
 ```
 
 ---

@@ -177,13 +177,13 @@ You: "Build a pipeline that:
       4. Aggregates by month"
 
 AI (uses Phase 2 builder):
-1. Calls create_pipeline("order_processing")
-2. Calls add_node("load_orders")
-3. Calls configure_read/write for node 1
-4. Calls add_node("clean_orders", depends_on=["load_orders"])
-5. Calls configure_transform with deduplicate
+1. Calls create_pipeline("order_processing", layer) → gets session_id
+2. Calls add_node(session_id, "load_orders")
+3. Calls configure_read/write(session_id, "load_orders", ...) for node 1
+4. Calls add_node(session_id, "clean_orders", depends_on=["load_orders"])
+5. Calls configure_transform(session_id, "clean_orders", steps) with deduplicate
 ... (6 more calls)
-8. Calls render_pipeline_yaml()
+8. Calls render_pipeline_yaml(session_id)
 9. Returns complete 4-node DAG ✅
 ```
 
@@ -192,11 +192,10 @@ AI (uses Phase 2 builder):
 You: "I have a SQL table dbo.Employee with 50k rows"
 
 AI:
-1. Calls profile_source("db", "dbo.Employee")
-2. Calls suggest_pipeline(profile)
-3. AI: "I suggest 'dimension' pattern (75% confidence)"
-4. Calls apply_pattern_template with suggested params
-5. Returns YAML ✅
+1. Calls suggest_pipeline("dbo.Employee", "db", "dimension")  # profiles internally + suggests
+2. AI: "I suggest 'dimension' pattern (75% confidence)"
+3. Calls apply_pattern_template with suggested params
+4. Returns YAML ✅
 ```
 
 ### Example 4: Bulk Ingestion

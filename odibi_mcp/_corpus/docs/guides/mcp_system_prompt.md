@@ -140,10 +140,8 @@ AI: Here's the YAML:
 User: "I have a SQL table dbo.Employee, not sure what to do"
 
 AI:
-1. profile_source("db", "dbo.Employee")
-   → Gets schema, row count, candidate keys
-
-2. suggest_pipeline(profile)
+1. suggest_pipeline("dbo.Employee", "db", "dimension")
+   → Profiles the source internally (schema, row count, candidate keys)
    → Suggests: "dimension" (75% confidence)
    → Provides ready_for params
 

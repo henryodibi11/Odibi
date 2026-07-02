@@ -101,23 +101,22 @@ list_patterns()
 → Done!
 ```
 
-### Workflow 2: Smart Suggestion (3 calls)
+### Workflow 2: Smart Suggestion (2 calls)
 ```
-profile_source(connection, table)
-→ suggest_pipeline(profile)  
+suggest_pipeline(source_path, connection, intent)   # profiles the source internally, then suggests a pattern
 → apply_pattern_template(ready_for params)
 → Done!
 ```
 
 ### Workflow 3: Complex Multi-Node (8+ calls)
 ```
-create_pipeline(name)
-→ add_node("bronze")
-→ configure_read(...)
-→ configure_write(...)
-→ add_node("silver", depends_on=["bronze"])
-→ configure_*
-→ render_pipeline_yaml()
+create_pipeline(pipeline_name, layer)                # returns session_id
+→ add_node(session_id, "bronze")
+→ configure_read(session_id, "bronze", connection, format, ...)
+→ configure_write(session_id, "bronze", connection, format, ...)
+→ add_node(session_id, "silver", depends_on=["bronze"])
+→ configure_* (session_id, "silver", ...)
+→ render_pipeline_yaml(session_id)
 → Done!
 ```
 

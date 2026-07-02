@@ -55,7 +55,7 @@ Successfully redesigned and implemented the complete Odibi MCP server per `docs/
 
 | Tool | Purpose | Tests | Status |
 |------|---------|-------|--------|
-| `suggest_pipeline` | Auto-select pattern from profile | 4 | ✅ Validated |
+| `suggest_pipeline` | Profile a source + auto-select pattern (source_path, connection, intent) | 4 | ✅ Validated |
 | `create_ingestion_pipeline` | Bulk multi-table ingestion | 4 | ✅ Validated |
 
 **Use Case:** Fast onboarding workflows  
@@ -249,16 +249,13 @@ result = render_pipeline_yaml(sid)
 # → 2-node DAG with dependency ✅
 ```
 
-### Smart Workflow (Phase 3 - 3 calls)
+### Smart Workflow (Phase 3 - 2 calls)
 ```python
-# 1. Profile (existing tool)
-profile = profile_source("crm", "dbo.Customer")
-
-# 2. Get suggestion
-suggestion = suggest_pipeline(profile)
+# 1. Get suggestion (profiles the source internally)
+suggestion = suggest_pipeline("dbo.Customer", "crm", "dimension")
 # → pattern="dimension", confidence=0.75, ready_for params
 
-# 3. Generate
+# 2. Generate
 result = apply_pattern_template(**suggestion["ready_for"]["apply_pattern_template"])
 
 # → Valid YAML with auto-selected pattern ✅

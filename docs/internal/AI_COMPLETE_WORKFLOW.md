@@ -41,7 +41,7 @@ profile_source("raw_adls", "sales/2024/orders.csv")
 **Step 3: Suggest Pattern**
 ```python
 # AI calls:
-suggest_pipeline(profile)
+suggest_pipeline(source_path, connection, intent)  # profiles the source internally
 
 # Returns:
 # - Pattern: "fact" (transactional data)
@@ -155,20 +155,20 @@ result = render_pipeline_yaml(session_id)
 
 ### Pattern Selection
 - ✅ `list_patterns()` - See 6 available patterns
-- ✅ `suggest_pipeline(profile)` - Auto-select best pattern
+- ✅ `suggest_pipeline(source_path, connection, intent)` - Profiles internally + auto-selects best pattern
 
 ### Pipeline Generation
 - ✅ `apply_pattern_template(...)` - Generate simple pipeline (1 call)
 - ✅ `create_ingestion_pipeline(...)` - Bulk multi-table load (1 call)
 
 ### Complex Building (Multi-Node)
-- ✅ `create_pipeline(name)` - Start session
-- ✅ `add_node(name, depends_on)` - Add nodes
-- ✅ `configure_read(...)` - Set input
-- ✅ `configure_write(...)` - Set output
-- ✅ `configure_transform(steps)` - Add transformations
-- ✅ `get_pipeline_state()` - Inspect current state
-- ✅ `render_pipeline_yaml()` - Finalize to YAML
+- ✅ `create_pipeline(pipeline_name, layer)` - Start session (returns session_id)
+- ✅ `add_node(session_id, node_name, depends_on=None)` - Add nodes
+- ✅ `configure_read(session_id, node_name, connection, format, ...)` - Set input
+- ✅ `configure_write(session_id, node_name, connection, format, ...)` - Set output
+- ✅ `configure_transform(session_id, node_name, steps)` - Add transformations
+- ✅ `get_pipeline_state(session_id)` - Inspect current state
+- ✅ `render_pipeline_yaml(session_id)` - Finalize to YAML
 
 ### Validation
 - ✅ `validate_pipeline(yaml)` - Check for errors
@@ -200,12 +200,12 @@ Format: CSV, utf-8, comma-delimited
 [Calls list_transformers(search="dedup")]
 Available: distinct, deduplicate
 
-[Calls create_pipeline("sales_pipeline")]
-[Calls add_node("bronze_orders")]
-[Calls configure_read with ADLS source]
-[Calls configure_transform with distinct step]
-[Calls configure_write with Bronze target]
-[Calls render_pipeline_yaml]
+[Calls create_pipeline("sales_pipeline", layer) → session_id]
+[Calls add_node(session_id, "bronze_orders")]
+[Calls configure_read(session_id, "bronze_orders", ...) with ADLS source]
+[Calls configure_transform(session_id, "bronze_orders", steps) with distinct step]
+[Calls configure_write(session_id, "bronze_orders", ...) with Bronze target]
+[Calls render_pipeline_yaml(session_id)]
 
 Here's your pipeline YAML:
 
