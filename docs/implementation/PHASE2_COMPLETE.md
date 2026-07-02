@@ -168,7 +168,7 @@ discard_pipeline(sid)
 ## Next Steps (Optional Phase 3)
 
 - Smart chaining (`ready_for` from discovery to construction)
-- `suggest_pipeline` (auto-pattern selection from profile)
+- `suggest_pipeline(source_path, connection, intent)` (profiles internally + auto-selects pattern)
 - Multi-table bulk ingestion templates
 - Advanced error suggestions with fuzzy matching
 
