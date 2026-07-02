@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`SparkEngine` failed on Databricks serverless with `INVALID_CONNECT_URL`.** When no session was passed, the engine went straight to building a new one (via `configure_spark_with_delta_pip`, which assumes local Spark) instead of adopting the SparkSession already running in the notebook — on serverless that spins up a Spark Connect client with no `sc://` URL and crashes. It now calls `SparkSession.getActiveSession()` first and reuses the live session when one exists (Databricks serverless/classic, Jupyter+Spark, existing Connect client), only building a fresh session when there genuinely is none. Zero config; the explicit `spark_session=` argument still takes precedence.
 - **`odibi_help("Session Builder")` showed the old, pre-session API.** The in-code help table still listed `create_pipeline(name, engine='pandas')`, `add_node(node_name, transformer, params)`, and read/write signatures with no `session_id` — the last place still describing the pre-3.13.0 single-step builder after the docs were corrected. Updated every session-builder signature to match the actual dispatcher wrappers (`session_id`-threaded). This was the tool that misled agents into calling the old API.
 
 ### Changed
