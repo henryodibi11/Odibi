@@ -212,7 +212,7 @@ class TestExplainCommand:
         assert result == 0
         captured = capsys.readouterr()
         assert "Connection: local" in captured.out
-        assert "Example YAML:" in captured.out
+        assert "Parameters:" in captured.out
 
     def test_explain_unknown(self, capsys):
         """Explain unknown name returns error."""
