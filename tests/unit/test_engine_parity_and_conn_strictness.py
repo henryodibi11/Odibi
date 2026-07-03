@@ -127,6 +127,28 @@ def test_unity_catalog_schema_defaults():
     assert conn.create_schema is True
 
 
+def test_every_connection_type_resolves_to_a_dedicated_model():
+    # Would have caught the unity_catalog bug: a type in the ConnectionType enum
+    # (and registered as a factory) but missing from the ConnectionConfig union.
+    # Every enum value must map to its own model in the union.
+    from odibi.config import connection_config_type_map
+
+    type_map = connection_config_type_map()
+    for ct in ConnectionType:
+        assert ct.value in type_map, (
+            f"ConnectionType '{ct.value}' has no model in the ConnectionConfig union"
+        )
+
+
+def test_introspect_connection_alias_derives_from_union():
+    # The doc/template generators must derive from the union, not a hardcoded
+    # mirror — otherwise adding a connection type silently breaks alias collapse.
+    from odibi.config import connection_config_members
+    from odibi.introspect import TYPE_ALIASES
+
+    assert TYPE_ALIASES["ConnectionConfig"] == [m.__name__ for m in connection_config_members()]
+
+
 def test_auth_block_typo_is_rejected():
     with pytest.raises(ValidationError) as ei:
         TA.validate_python(

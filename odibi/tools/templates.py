@@ -569,26 +569,21 @@ _generator = TemplateGenerator()
 
 
 def _get_connection_models() -> Dict[str, Type[BaseModel]]:
-    """Get all connection config models."""
-    from odibi.config import (
-        AzureBlobConnectionConfig,
-        DeltaConnectionConfig,
-        HttpConnectionConfig,
-        LocalConnectionConfig,
-        SQLServerConnectionConfig,
-        UnityCatalogConnectionConfig,
-    )
+    """Get all connection config models, keyed by connection ``type``.
 
-    return {
-        "local": LocalConnectionConfig,
-        "azure_blob": AzureBlobConnectionConfig,
-        "azure_adls": AzureBlobConnectionConfig,
-        "delta": DeltaConnectionConfig,
-        "unity_catalog": UnityCatalogConnectionConfig,
-        "sql_server": SQLServerConnectionConfig,
-        "azure_sql": SQLServerConnectionConfig,
-        "http": HttpConnectionConfig,
-    }
+    The canonical ``type -> model`` mapping is derived from the ConnectionConfig
+    union (single source of truth), so a new connection type is picked up
+    automatically. Only the factory-level aliases that reuse an existing model
+    (``azure_adls``, ``azure_sql``) are added explicitly.
+    """
+    from odibi.config import connection_config_type_map
+
+    result: Dict[str, Type[BaseModel]] = dict(connection_config_type_map())
+    if "azure_blob" in result:
+        result["azure_adls"] = result["azure_blob"]
+    if "sql_server" in result:
+        result["azure_sql"] = result["sql_server"]
+    return result
 
 
 def _get_pattern_info() -> Dict[str, Dict[str, Any]]:

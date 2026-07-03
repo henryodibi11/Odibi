@@ -3,7 +3,7 @@
 import re
 import warnings
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, get_args, get_origin
 
 try:
     from typing import Annotated
@@ -1038,6 +1038,39 @@ ConnectionConfig = Annotated[
     ],
     Discriminator(_connection_discriminator),
 ]
+
+
+def connection_config_members() -> List[type]:
+    """Model classes in the ``ConnectionConfig`` union, in declaration order.
+
+    Single source of truth for the set of connection config types. Derive lists
+    from this (see ``odibi.introspect`` and ``odibi.tools.templates``) instead of
+    hardcoding the class names, so adding a connection type only requires editing
+    the union above — not three files that must be kept in lockstep.
+    """
+    union = get_args(ConnectionConfig)[0]  # unwrap Annotated[Union[...], Discriminator]
+    members: List[type] = []
+    for arg in get_args(union):
+        inner = get_args(arg)[0] if get_origin(arg) is Annotated else arg
+        members.append(inner)
+    return members
+
+
+def connection_config_type_map() -> Dict[str, type]:
+    """Map each concrete connection ``type`` value to its config model.
+
+    Derived from the ``ConnectionConfig`` union. Excludes ``CustomConnectionConfig``
+    (the open-ended plugin fallback, whose ``type`` is a free ``str`` with no fixed
+    value). Factory-level aliases that reuse a model (e.g. ``azure_adls``) are added
+    by the consumer, not here — they are a registration concern, not union members.
+    """
+    result: Dict[str, type] = {}
+    for model in connection_config_members():
+        field = model.model_fields.get("type")
+        default = getattr(field, "default", None) if field is not None else None
+        if isinstance(default, ConnectionType):
+            result[default.value] = model
+    return result
 
 
 # ============================================
