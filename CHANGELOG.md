@@ -76,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`type: unity_catalog` is now usable from YAML.** The type was registered as a connection factory and a member of the `ConnectionType` enum, but had no model in the `ConnectionConfig` discriminated union — so validation routed it to a non-existent tag and rejected it. Added `UnityCatalogConnectionConfig` (`catalog`, `schema`, `create_schema`) and wired it into the union, so `type: unity_catalog` now validates and builds a `UnityCatalogConnection` (managed-table mode) directly. Also fixed the same `schema`/`schema_name` alias drop in `create_unity_catalog_connection` that affected `delta` in 3.13.4.
 
+### Changed
+
+- **Connection-type lists are now derived from the `ConnectionConfig` union (single source of truth).** The union membership had been duplicated in three files that must stay in lockstep — the union itself, `introspect.TYPE_ALIASES` (an exact-set-match mirror), and `templates._get_connection_models()` — which is why adding `unity_catalog` silently broke doc generation. New `config.connection_config_members()` / `connection_config_type_map()` are derived by reflection; the doc/template generators consume them. Adding a connection type now requires editing only the union. Guard tests assert every `ConnectionType` resolves to a dedicated model and that the introspect alias list matches the union.
+
 ## [3.13.4] - 2026-07-02
 
 ### Fixed
