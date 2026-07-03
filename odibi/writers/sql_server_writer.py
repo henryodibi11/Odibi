@@ -18,6 +18,7 @@ from odibi.config import (
     SqlServerSchemaEvolutionMode,
 )
 from odibi.utils.logging_context import get_logging_context
+from odibi.utils.spark_cache import safe_cache, safe_unpersist
 
 # Type mapping for schema inference
 POLARS_TO_SQL_TYPE_MAP: Dict[str, str] = {
@@ -418,11 +419,11 @@ class SqlServerMergeWriter:
             )
 
             # Cache target hashes to avoid multiple JDBC reads during join
-            target_df = target_df.cache()
+            target_df = safe_cache(target_df)
 
             # Check if target is empty using limit(1) instead of count() - much faster
             if target_df.limit(1).count() == 0:
-                target_df.unpersist()
+                safe_unpersist(target_df)
                 return source_df
 
             # Rename hash column in target to avoid collision
@@ -447,7 +448,7 @@ class SqlServerMergeWriter:
 
             # Unpersist target hashes after join is planned
             # Note: actual unpersist happens after the action triggers
-            target_df.unpersist()
+            safe_unpersist(target_df)
 
             return changed
 

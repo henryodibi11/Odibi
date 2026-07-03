@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Document Template** (Skill 10) — multi-phase project planning template
 - **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
+## [3.13.6] - 2026-07-03
+
+### Fixed
+
+- **Pipeline execution failed on Databricks serverless with `[NOT_SUPPORTED_WITH_SERVERLESS] PERSIST TABLE is not supported`.** The Spark engine, catalog, validation, quarantine, and SQL-Server writer used `DataFrame.persist()`/`.cache()` to avoid recomputation — but serverless blocks caching. Since caching is a performance optimization that never changes results, these calls now route through new `odibi.utils.spark_cache` helpers (`safe_cache` / `safe_persist` / `safe_unpersist`) that attempt the operation and, on the first failure, sticky-disable caching for the process and continue uncached. On clusters that support caching, behavior is unchanged; on serverless, pipelines run without caching (serverless disk-caches Delta/Parquet reads automatically, so the cost is small). Completes end-to-end serverless support for `PipelineManager.from_yaml()`.
+
 ## [3.13.5] - 2026-07-02
 
 ### Fixed
