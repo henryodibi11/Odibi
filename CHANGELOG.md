@@ -5,11 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.13.7] — 2026-07-03
+## [3.13.8] — 2026-07-03
 
 ### Fixed
 
 - **Unity Catalog write routing** — `SparkEngine.write()` now detects when `path` is used with a Unity Catalog connection and automatically promotes the resolved dotted table name (e.g. `workspace.sim_demo.my_table`) to a `saveAsTable()` call instead of `.save()`. Previously this caused `IllegalArgumentException: Path must be absolute` on Databricks Serverless because Delta interpreted the dotted name as a relative filesystem path. Volume paths (starting with `/`) are correctly left as file-based writes.
+- **Serverless caching log noise** — The serverless-safe caching fallback now logs only the first line of the exception message instead of the full Py4J/Spark Connect JVM stacktrace.
 
 ### Added
 
