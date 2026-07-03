@@ -13,6 +13,24 @@ from odibi.registry import FunctionRegistry
 from odibi.transformers import register_standard_library
 
 
+def _connection_config_class(type_name: str) -> type | None:
+    """Return the Pydantic config class for a connection type name."""
+    from odibi import config as cfg
+
+    _map: dict[str, type] = {
+        "local": cfg.LocalConnectionConfig,
+        "azure_blob": cfg.AzureBlobConnectionConfig,
+        "azure_adls": cfg.AzureBlobConnectionConfig,
+        "delta": cfg.DeltaConnectionConfig,
+        "unity_catalog": cfg.UnityCatalogConnectionConfig,
+        "sql_server": cfg.SQLServerConnectionConfig,
+        "azure_sql": cfg.SQLServerConnectionConfig,
+        "http": cfg.HttpConnectionConfig,
+        "custom": cfg.CustomConnectionConfig,
+    }
+    return _map.get(type_name)
+
+
 def _ensure_initialized():
     """Ensure transformers and connections are registered."""
     if not FunctionRegistry.list_functions():
@@ -100,31 +118,19 @@ def list_connections_command(args) -> int:
     connections = list(_CONNECTION_FACTORIES.keys())
     connections.sort()
 
-    connection_docs = {
-        "local": "Local filesystem (CSV, Parquet, JSON, etc.)",
-        "http": "HTTP/REST API endpoints",
-        "azure_blob": "Azure Blob Storage",
-        "azure_adls": "Azure Data Lake Storage Gen2",
-        "delta": "Delta Lake tables",
-        "sql_server": "Microsoft SQL Server",
-        "azure_sql": "Azure SQL Database",
-    }
-
     if args.format == "json":
         result = []
         for name in connections:
-            result.append(
-                {
-                    "name": name,
-                    "description": connection_docs.get(name, "No description"),
-                }
-            )
+            cfg_cls = _connection_config_class(name)
+            doc = _get_first_line(cfg_cls.__doc__) if cfg_cls else "No description"
+            result.append({"name": name, "description": doc})
         print(json.dumps(result, indent=2))
     else:
         print(f"Available Connection Types ({len(connections)}):")
         print("=" * 60)
         for name in connections:
-            doc = connection_docs.get(name, "No description")
+            cfg_cls = _connection_config_class(name)
+            doc = _get_first_line(cfg_cls.__doc__) if cfg_cls else "No description"
             print(f"  {name:<20} {doc}")
 
     return 0
@@ -188,71 +194,33 @@ def explain_command(args) -> int:
                 print(f"      {param['name']}: <value>")
 
     # Check connections
-    connection_docs = {
-        "local": {
-            "description": "Local filesystem connection for reading/writing files.",
-            "params": ["path (required)", "format (csv, parquet, json, etc.)"],
-        },
-        "http": {
-            "description": "HTTP/REST API connection for fetching data.",
-            "params": ["base_url (required)", "headers (optional)", "auth (optional)"],
-        },
-        "azure_blob": {
-            "description": "Azure Blob Storage connection.",
-            "params": ["account_name (required)", "container (required)", "credential (required)"],
-        },
-        "azure_adls": {
-            "description": "Azure Data Lake Storage Gen2 connection.",
-            "params": ["account_name (required)", "container (required)", "credential (required)"],
-        },
-        "delta": {
-            "description": "Delta Lake connection for reading/writing Delta tables.",
-            "params": ["path (required)"],
-        },
-        "sql_server": {
-            "description": "Microsoft SQL Server connection.",
-            "params": [
-                "server (required)",
-                "database (required)",
-                "auth_mode (sql/windows/managed_identity)",
-            ],
-        },
-        "azure_sql": {
-            "description": "Azure SQL Database connection (same as sql_server).",
-            "params": [
-                "server (required)",
-                "database (required)",
-                "auth_mode (sql/managed_identity)",
-            ],
-        },
-    }
-
     if name in _CONNECTION_FACTORIES:
         if found:
             print("\n" + "-" * 60 + "\n")
         found = True
-        conn_info = connection_docs.get(name, {"description": "No documentation", "params": []})
+        cfg_cls = _connection_config_class(name)
         print(f"Connection: {name}")
         print("=" * 60)
         print()
-        print(conn_info["description"])
-        print()
-        print("Parameters:")
-        for p in conn_info.get("params", []):
-            print(f"  - {p}")
-        print()
-        print("Example YAML:")
-        print("  connections:")
-        print("    my_connection:")
-        print(f"      type: {name}")
-        if name == "local":
-            print("      path: ./data")
-        elif name in ("azure_blob", "azure_adls"):
-            print("      account_name: myaccount")
-            print("      container: mycontainer")
-        elif name in ("sql_server", "azure_sql"):
-            print("      server: myserver.database.windows.net")
-            print("      database: mydb")
+        if cfg_cls:
+            doc = inspect.getdoc(cfg_cls) or "No documentation"
+            print(doc)
+            print()
+            print("Parameters:")
+            for fname, f in cfg_cls.model_fields.items():
+                if fname in ("type", "validation_mode"):
+                    continue
+                label = f.alias or fname
+                req = "required" if f.is_required() else "optional"
+                desc = f" — {f.description}" if f.description else ""
+                default = ""
+                if not f.is_required() and f.default is not None:
+                    default = f" (default: {f.default})"
+                print(f"  - {label} ({req}){desc}{default}")
+        else:
+            print("No Pydantic model found for this connection type.")
+            print()
+            print("Use `odibi templates show {name}` for YAML examples.")
 
     # Check recipes
     from odibi.recipes import get_recipe_registry

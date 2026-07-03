@@ -22,6 +22,7 @@ Odibi's connection system provides:
 | `postgres` | PostgreSQL database |
 | `http` | HTTP/REST API endpoints |
 | `delta` | Delta Lake tables (path-based or catalog) |
+| `unity_catalog` | Databricks Unity Catalog managed tables |
 
 ## Configuration
 
@@ -517,6 +518,40 @@ connections:
     schema: analytics
 ```
 
+### Unity Catalog (Databricks Serverless)
+
+For Databricks environments where filesystem writes are restricted (Serverless, Free Edition),
+use the `unity_catalog` connection type. Tables are managed by UC's metastore — no direct
+filesystem access is required from Spark.
+
+```yaml
+connections:
+  uc_metadata:
+    type: unity_catalog
+    catalog: workspace
+    schema: odibi_logs
+    create_schema: true    # optional, default true — creates schema on first use
+
+system:
+  connection: uc_metadata
+  environment: dev
+
+story:
+  connection: uc_stories
+  path: ""
+
+  # Stories write HTML/JSON files — use a UC Volume for filesystem access:
+  uc_stories:
+    type: local
+    base_path: /Volumes/workspace/odibi_logs/stories
+```
+
+**How it works:**
+- `get_path("meta_tables")` → `workspace.odibi_logs.meta_tables`
+- CatalogManager uses `saveAsTable()` and `spark.table()` instead of file-path writes
+- MERGE operations reference table names directly instead of `delta.\`path\``
+- `validate()` issues `CREATE SCHEMA IF NOT EXISTS` via the active SparkSession
+
 ## Environment Variables
 
 Use `${VAR}` syntax to inject secrets from environment variables:
@@ -592,6 +627,7 @@ Built-in connections are registered via `register_builtins()`:
 | `azure_sql` | `AzureSQL` |
 | `postgres` | `PostgreSQLConnection` |
 | `postgresql` | `PostgreSQLConnection` |
+| `unity_catalog` | `UnityCatalogConnection` |
 
 ## Complete Examples
 

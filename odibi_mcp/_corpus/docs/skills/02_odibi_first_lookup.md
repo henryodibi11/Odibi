@@ -8,7 +8,7 @@
 
 ## Purpose
 
-Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection types, and dozens of utility functions. Agents frequently reinvent functionality that already exists. This skill is a lookup table — find what you need before writing new code.
+Odibi has 54 transformers, 6 patterns, 11 validation test types, 6 connection types, and dozens of utility functions. Agents frequently reinvent functionality that already exists. This skill is a lookup table — find what you need before writing new code.
 
 ---
 
@@ -126,7 +126,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 
 ---
 
-## Connections (5 types in `odibi/connections/`)
+## Connections (6 types in `odibi/connections/`)
 
 | Need | Type | Config Key |
 |------|------|------------|
@@ -135,6 +135,7 @@ Odibi has 54 transformers, 6 patterns, 11 validation test types, 5 connection ty
 | Azure SQL / SQL Server | `sql_server` | `host`, `database`, `auth_mode` |
 | PostgreSQL | `postgres` | `host`, `database`, `user` |
 | HTTP API | `http` | `base_url`, `headers` |
+| Unity Catalog (Databricks) | `unity_catalog` | `catalog`, `schema`, `create_schema` |
 
 ---
 
@@ -210,6 +211,7 @@ Need to connect to data?
 ├── SQL Server/Azure SQL? → sql_server connection
 ├── PostgreSQL? → postgres connection
 ├── REST API? → http connection + api_fetcher
+├── Databricks Serverless/Free Edition? → unity_catalog connection
 └── New source? → Write a connection (Skill 06)
 ```
 

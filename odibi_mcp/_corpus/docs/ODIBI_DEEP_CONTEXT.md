@@ -1049,7 +1049,36 @@ Supports: `dbfs:/`, `/dbfs/`, and mounted paths.
 
 ---
 
-### 6.7 Variable Substitution
+### 6.7 Unity Catalog Connection
+
+**Class:** `UnityCatalogConnection` in `odibi/connections/unity_catalog.py`
+
+For Databricks Serverless and Free Edition environments where `/tmp`, `/Workspace`, and DBFS are restricted:
+
+```yaml
+connections:
+  uc_metadata:
+    type: unity_catalog
+    catalog: workspace        # Required. UC catalog name.
+    schema: odibi_logs        # Optional. Default: "default"
+    create_schema: true       # Optional. Auto-create schema if missing.
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `catalog` | str | Yes | - | Unity Catalog catalog name |
+| `schema` | str | No | `default` | Schema within the catalog |
+| `create_schema` | bool | No | `true` | Auto-create schema via Spark SQL |
+
+**Key points:**
+- UC managed tables need no filesystem access — the UC metastore handles storage.
+- System catalog tables become UC tables (e.g., `workspace.odibi_logs.meta_tables`).
+- Path resolution: `catalog.schema.table_name`.
+- For pipeline stories, use a `local` connection with UC Volumes: `base_path: /Volumes/catalog/schema/volume/`.
+
+---
+
+### 6.8 Variable Substitution
 
 Odibi YAML supports powerful variable substitution for secrets, reusable values, and dynamic dates.
 
@@ -2073,6 +2102,7 @@ odibi list connections --format json
 odibi explain fill_nulls      # Explain a transformer
 odibi explain dimension       # Explain a pattern
 odibi explain azure_sql       # Explain a connection type
+odibi explain unity_catalog   # Explain Unity Catalog connection
 ```
 
 **AI Workflow Example:**
