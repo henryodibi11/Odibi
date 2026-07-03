@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from odibi.config import IncrementalConfig, IncrementalMode, NodeConfig, RetryConfig, WriteMode
 from odibi.connections.sql_utils import is_sql_format
 from odibi.context import Context, EngineContext, _get_unique_view_name
+from odibi.utils.spark_cache import safe_cache, safe_persist, safe_unpersist
 from odibi.enums import EngineType
 from odibi.exceptions import ExecutionContext, NodeExecutionError, TransformError, ValidationError
 from odibi.registry import FunctionRegistry
@@ -323,7 +324,7 @@ class NodeExecutor:
                     if result_df is not None:
                         # Cache Spark DataFrame in memory if cache=true
                         if config.cache and hasattr(result_df, "cache"):
-                            result_df = result_df.cache()
+                            result_df = safe_cache(result_df)
                             ctx.debug(f"Cached Spark DataFrame for node '{config.name}'")
 
                         pii_meta = self._calculate_pii(config)
@@ -455,7 +456,7 @@ class NodeExecutor:
                 for df in self._persisted_dfs:
                     try:
                         if hasattr(df, "unpersist"):
-                            df.unpersist()
+                            safe_unpersist(df)
                     except Exception:
                         pass  # Best effort cleanup
                 self._persisted_dfs.clear()
@@ -716,7 +717,7 @@ class NodeExecutor:
                 and not getattr(df, "isStreaming", False)
                 and not read_config.streaming
             ):
-                df = df.persist()
+                df = safe_persist(df)
                 self._persisted_dfs.append(df)
 
             row_count = self._count_rows(df) if df is not None else 0
@@ -959,7 +960,7 @@ class NodeExecutor:
 
             # Persist Spark DataFrames to avoid recomputation on multiple count/action calls
             if df is not None and hasattr(df, "persist") and not getattr(df, "isStreaming", False):
-                df = df.persist()
+                df = safe_persist(df)
                 self._persisted_dfs.append(df)
 
             dataframes[name] = df

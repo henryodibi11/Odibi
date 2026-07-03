@@ -138,6 +138,7 @@ except ImportError:
 
 
 from odibi.config import SystemConfig
+from odibi.utils.spark_cache import safe_cache, safe_unpersist
 
 logger = logging.getLogger(__name__)
 
@@ -3983,7 +3984,7 @@ class CatalogManager:
 
                 # Delete from meta_pipelines
                 df = self._spark_read_table("meta_pipelines")
-                df.cache()
+                safe_cache(df)
                 initial_count = df.count()
                 df_filtered = df.filter(F.col("pipeline_name") != pipeline_name)
                 path = self.tables["meta_pipelines"]
@@ -3992,11 +3993,11 @@ class CatalogManager:
                 else:
                     df_filtered.write.format("delta").mode("overwrite").save(path)
                 deleted_count += initial_count - df_filtered.count()
-                df.unpersist()
+                safe_unpersist(df)
 
                 # Delete associated nodes from meta_nodes
                 df_nodes = self._spark_read_table("meta_nodes")
-                df_nodes.cache()
+                safe_cache(df_nodes)
                 nodes_initial = df_nodes.count()
                 df_nodes_filtered = df_nodes.filter(F.col("pipeline_name") != pipeline_name)
                 path = self.tables["meta_nodes"]
@@ -4005,7 +4006,7 @@ class CatalogManager:
                 else:
                     df_nodes_filtered.write.format("delta").mode("overwrite").save(path)
                 deleted_count += nodes_initial - df_nodes_filtered.count()
-                df_nodes.unpersist()
+                safe_unpersist(df_nodes)
 
             elif self.engine:
                 # Delete from meta_pipelines
@@ -4065,7 +4066,7 @@ class CatalogManager:
 
                 # Delete from meta_nodes
                 df = self._spark_read_table("meta_nodes")
-                df.cache()
+                safe_cache(df)
                 initial_count = df.count()
                 df_filtered = df.filter(
                     ~((F.col("pipeline_name") == pipeline_name) & (F.col("node_name") == node_name))
@@ -4079,7 +4080,7 @@ class CatalogManager:
                         self.tables["meta_nodes"]
                     )
                 deleted_count = initial_count - df_filtered.count()
-                df.unpersist()
+                safe_unpersist(df)
 
             elif self.engine:
                 df = self._read_local_table(self.tables["meta_nodes"])
@@ -4147,7 +4148,7 @@ class CatalogManager:
 
                 # Cleanup orphan pipelines
                 df_pipelines = self._spark_read_table("meta_pipelines")
-                df_pipelines.cache()
+                safe_cache(df_pipelines)
                 initial_pipelines = df_pipelines.count()
                 df_pipelines_filtered = df_pipelines.filter(
                     F.col("pipeline_name").isin(list(current_pipelines))
@@ -4156,11 +4157,11 @@ class CatalogManager:
                     self.tables["meta_pipelines"]
                 )
                 results["meta_pipelines"] = initial_pipelines - df_pipelines_filtered.count()
-                df_pipelines.unpersist()
+                safe_unpersist(df_pipelines)
 
                 # Cleanup orphan nodes
                 df_nodes = self._spark_read_table("meta_nodes")
-                df_nodes.cache()
+                safe_cache(df_nodes)
                 initial_nodes = df_nodes.count()
 
                 # Filter: keep only nodes that belong to current pipelines and exist in config
@@ -4183,7 +4184,7 @@ class CatalogManager:
                     self.tables["meta_nodes"]
                 )
                 results["meta_nodes"] = initial_nodes - df_nodes_filtered.count()
-                df_nodes.unpersist()
+                safe_unpersist(df_nodes)
 
             elif self.engine:
                 # Cleanup orphan pipelines

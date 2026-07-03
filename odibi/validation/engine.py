@@ -18,6 +18,7 @@ from odibi.config import (
     ValidationConfig,
 )
 from odibi.utils.logging_context import get_logging_context
+from odibi.utils.spark_cache import safe_cache, safe_unpersist
 from odibi.validation.regex_compat import anchor_match
 
 
@@ -376,7 +377,7 @@ class Validator:
 
         df_work = df
         if cache_df:
-            df_work = df.cache()
+            df_work = safe_cache(df)
             ctx.debug("DataFrame cached for validation")
 
         row_count = df_work.count()
@@ -455,7 +456,7 @@ class Validator:
                                 failures.append(res)
                                 if fail_fast:
                                     if cache_df:
-                                        df_work.unpersist()
+                                        safe_unpersist(df_work)
                                     return failures
                 continue
 
@@ -570,7 +571,7 @@ class Validator:
                         break
 
         if cache_df:
-            df_work.unpersist()
+            safe_unpersist(df_work)
 
         return failures
 

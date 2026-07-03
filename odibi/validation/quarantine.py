@@ -25,6 +25,7 @@ from odibi.config import (
     TestConfig,
     TestType,
 )
+from odibi.utils.spark_cache import safe_cache, safe_unpersist
 from odibi.validation.regex_compat import anchor_match
 
 logger = logging.getLogger(__name__)
@@ -327,13 +328,13 @@ def split_valid_invalid(
         for mask in test_masks.values():
             combined_valid_mask = combined_valid_mask & mask
 
-        df_cached = df.cache()
+        df_cached = safe_cache(df)
 
         valid_df = df_cached.filter(combined_valid_mask)
         invalid_df = df_cached.filter(~combined_valid_mask)
 
-        valid_df = valid_df.cache()
-        invalid_df = invalid_df.cache()
+        valid_df = safe_cache(valid_df)
+        invalid_df = safe_cache(invalid_df)
 
         rows_valid = valid_df.count()
         rows_quarantined = invalid_df.count()
@@ -345,7 +346,7 @@ def split_valid_invalid(
             fail_count = total - pass_count
             test_results[name] = {"pass_count": pass_count, "fail_count": fail_count}
 
-        df_cached.unpersist()
+        safe_unpersist(df_cached)
 
     elif is_polars:
         import polars as pl
