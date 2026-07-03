@@ -83,6 +83,11 @@ def test_onboard_payload():
         "gate",
         "quarantine",
         "privacy",
+        "write_metadata",
+        "lineage",
+        "docs",
+        "retry",
+        "logging",
         "story",
         "system",
         "incremental",
@@ -104,6 +109,8 @@ def test_get_schema_default_returns_project_and_sections():
     assert "categories" in res
     assert "read" in res["sections"]
     assert "connections" in res["categories"]
+    assert "api" in res["categories"]
+    assert "project_sub" in res["categories"]
 
 
 def test_get_schema_connections_returns_all_types():
@@ -114,6 +121,16 @@ def test_get_schema_connections_returns_all_types():
     assert set(res["schemas"].keys()) == expected
     for name, schema in res["schemas"].items():
         assert schema.get("title"), f"connection {name} has no title"
+
+
+def test_get_schema_api_returns_all_sub_models():
+    res = KB.get_schema("api")
+    assert res["section"] == "api"
+    assert "schemas" in res
+    expected = {"pagination", "response", "retry", "rate_limit", "options"}
+    assert set(res["schemas"].keys()) == expected
+    for name, schema in res["schemas"].items():
+        assert schema.get("title"), f"api sub-model {name} has no title"
 
 
 # --- docs + examples -------------------------------------------------------

@@ -532,6 +532,12 @@ pm.run("pipeline_name")""",
             "gate": cfg.GateConfig,
             "quarantine": cfg.QuarantineConfig,
             "privacy": cfg.PrivacyConfig,
+            # project-level sub-configs
+            "write_metadata": cfg.WriteMetadataConfig,
+            "lineage": cfg.LineageConfig,
+            "docs": cfg.DocsConfig,
+            "retry": cfg.RetryConfig,
+            "logging": cfg.LoggingConfig,
             # advanced
             "story": cfg.StoryConfig,
             "system": cfg.SystemConfig,
@@ -553,6 +559,15 @@ pm.run("pipeline_name")""",
             "custom": cfg.CustomConnectionConfig,
         }
 
+        # -- HTTP API sub-models (returned as a group) -----------------------------
+        api_models: dict[str, type] = {
+            "pagination": cfg.ApiPaginationConfig,
+            "response": cfg.ApiResponseConfig,
+            "retry": cfg.ApiRetryConfig,
+            "rate_limit": cfg.ApiRateLimitConfig,
+            "options": cfg.ApiOptionsConfig,
+        }
+
         # -- section=None → discovery index ----------------------------------------
         if section is None:
             return {
@@ -568,6 +583,13 @@ pm.run("pipeline_name")""",
                     ],
                     "connections": sorted(connection_models.keys()),
                     "quality": ["gate", "quarantine", "privacy"],
+                    "project_sub": [
+                        "write_metadata",
+                        "lineage",
+                        "docs",
+                        "retry",
+                        "logging",
+                    ],
                     "advanced": [
                         "story",
                         "system",
@@ -577,11 +599,13 @@ pm.run("pipeline_name")""",
                         "simulation",
                         "delete_detection",
                     ],
+                    "api": sorted(api_models.keys()),
                 },
                 "sections": sorted(models.keys()),
                 "hint": (
                     "Call get_schema(section='read') for a specific model's JSON Schema. "
-                    "Call get_schema(section='connections') for all connection type schemas."
+                    "Call get_schema(section='connections') for all connection type schemas. "
+                    "Call get_schema(section='api') for HTTP API sub-model schemas."
                 ),
                 "project": cfg.ProjectConfig.model_json_schema(),
             }
@@ -596,10 +620,20 @@ pm.run("pipeline_name")""",
                 },
             }
 
+        # -- api group -------------------------------------------------------------
+        if section == "api":
+            return {
+                "section": "api",
+                "hint": "Sub-models used inside HttpConnectionConfig for API ingestion.",
+                "schemas": {
+                    name: model.model_json_schema() for name, model in sorted(api_models.items())
+                },
+            }
+
         # -- single section --------------------------------------------------------
         model = models.get(section)
         if model is None:
-            available = sorted(models.keys()) + ["connections"]
+            available = sorted(models.keys()) + ["api", "connections"]
             return {"error": f"Unknown section: {section}", "available": available}
         return {"section": section, "schema": model.model_json_schema()}
 
