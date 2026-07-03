@@ -1319,6 +1319,20 @@ class SparkEngine(Engine):
                     )
                     raise
 
+        # Unity Catalog: when path is used with a UC connection, get_path()
+        # returns a dotted table name (e.g. "workspace.sim_demo.my_table").
+        # This must go through saveAsTable(), not .save(), so promote it to
+        # a table write.  Volume paths (starting with "/") are real filesystem
+        # locations and should stay as path-based writes.
+        if not table and path:
+            from odibi.connections.unity_catalog import UnityCatalogConnection
+
+            if isinstance(connection, UnityCatalogConnection):
+                resolved = connection.get_path(path)
+                if not resolved.startswith("/"):
+                    table = resolved
+                    path = None
+
         # Get output location
         if table:
             # Managed/External Table (Catalog)
