@@ -652,7 +652,7 @@ class CatalogManager:
         """
         try:
             if self.spark:
-                existing_df = self.spark.read.format("delta").load(path)
+                existing_df = self._spark_read_table(name)
                 existing_fields = {f.name: f.dataType for f in existing_df.schema.fields}
                 expected_fields = {f.name: f.dataType for f in expected_schema.fields}
 
@@ -684,9 +684,15 @@ class CatalogManager:
                                         field.name, F.to_json(F.col(field.name))
                                     )
 
-                    migrated_df.write.format("delta").mode("overwrite").option(
-                        "overwriteSchema", "true"
-                    ).save(path)
+                    writer = (
+                        migrated_df.write.format("delta")
+                        .mode("overwrite")
+                        .option("overwriteSchema", "true")
+                    )
+                    if self._is_uc:
+                        writer.saveAsTable(path)
+                    else:
+                        writer.save(path)
                     logger.info(f"Schema migration completed for {name}")
 
             elif self.engine and self.engine.name == "pandas":
@@ -732,7 +738,8 @@ class CatalogManager:
                     logger.info(f"Schema migration completed for {name}")
 
         except Exception as e:
-            logger.warning(f"Schema migration check failed for {name}: {e}")
+            short_msg = str(e).split("\n", 1)[0]
+            logger.warning(f"Schema migration check failed for {name}: {short_msg}")
 
     def _table_exists(self, path: str) -> bool:
         if self._is_uc and self.spark:
@@ -757,7 +764,8 @@ class CatalogManager:
                 ):
                     return False
 
-                logger.warning(f"Error checking if table exists at {path}: {e}")
+                short_msg = str(e).split("\n", 1)[0]
+                logger.warning(f"Error checking if table exists at {path}: {short_msg}")
                 return False
         elif self.engine:
             import os
