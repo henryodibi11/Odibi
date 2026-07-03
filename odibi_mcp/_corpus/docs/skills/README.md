@@ -44,7 +44,7 @@
 - **Transforms:** 54 registered in `FunctionRegistry` via `odibi/transformers/__init__.py`
 - **Patterns:** 6 warehouse patterns in `odibi/patterns/`
 - **Validation:** 11 test types in `odibi/validation/engine.py`
-- **Connections:** 5 types in `odibi/connections/`
+- **Connections:** 6 types in `odibi/connections/`
 - **Tests:** `tests/unit/` — run in batches, never the full suite at once
 - **Coverage:** 80% (34,363 stmts) — do not regress
 

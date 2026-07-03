@@ -48,11 +48,14 @@ def _safe_call(df: Any, method: str, args: tuple, kwargs: dict) -> Any:
         return getattr(df, method)(*args, **kwargs)
     except Exception as exc:  # noqa: BLE001 - caching must never break a run
         _caching_disabled = True
+        # Use only the first line of the exception to avoid dumping full JVM
+        # stacktraces from Py4J / Spark Connect into the user-visible log.
+        short_msg = str(exc).split("\n", 1)[0]
         logger.info(
             "DataFrame caching unavailable (%s: %s) — continuing without cache; "
             "results are unaffected.",
             type(exc).__name__,
-            exc,
+            short_msg,
         )
         return df
 

@@ -641,6 +641,9 @@ class TestMigrateSchemaIfNeeded:
 
         expected_schema = StructType([StructField("tags", StringType(), True)])
 
+        # _migrate_schema_if_needed uses _spark_read_table(name) which looks up
+        # self.tables[name], so register the test key.
+        cm.tables["meta_test"] = "/path/meta_test"
         cm._migrate_schema_if_needed("meta_test", "/path/meta_test", expected_schema)
 
         existing_df.withColumn.assert_called_once()
@@ -664,6 +667,7 @@ class TestMigrateSchemaIfNeeded:
 
         expected_schema = StructType([StructField("name", StringType(), True)])
 
+        cm.tables["meta_test"] = "/path/meta_test"
         cm._migrate_schema_if_needed("meta_test", "/path/meta_test", expected_schema)
 
         existing_df.withColumn.assert_not_called()

@@ -5,14 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.13.7] — 2026-07-03
+## [3.13.8] — 2026-07-03
 
 ### Fixed
 
 - **Unity Catalog write routing** — `SparkEngine.write()` now detects when `path` is used with a Unity Catalog connection and automatically promotes the resolved dotted table name (e.g. `workspace.sim_demo.my_table`) to a `saveAsTable()` call instead of `.save()`. Previously this caused `IllegalArgumentException: Path must be absolute` on Databricks Serverless because Delta interpreted the dotted name as a relative filesystem path. Volume paths (starting with `/`) are correctly left as file-based writes.
+- **Catalog schema migration** — Uses UC-aware read/write helpers for schema migration operations.
+- **Serverless caching log noise** — The serverless-safe caching fallback now logs only the first line of the exception message instead of the full Py4J/Spark Connect JVM stacktrace.
 
 ### Added
 
+- **`get_schema()` expanded to all config models** — MCP `get_schema()` now covers 22 single-model sections + 2 group sections (connections × 7, api × 5) = 34 total JSON Schemas. Agents can call `get_schema(section='connections')` for all connection types or `get_schema(section='api')` for HTTP API sub-models. Discovery index (`section=None`) organizes sections by category: core, connections, quality, project_sub, advanced, api.
+- **Pydantic-driven connection docs** — `list_connections()`, `explain()` (MCP), and CLI `odibi list connections` / `odibi explain <connection>` now pull descriptions and field metadata directly from Pydantic model docstrings and `model_fields` instead of hardcoded dicts. Adding a new connection type only requires the Pydantic model — all help surfaces update automatically.
+- **Schema tip nudges** — Builder and validator responses include `schema_tip` hints pointing agents to `get_schema()` for exact field references.
 - **UC write routing tests** — 8 new tests in `tests/unit/engine/test_uc_write_routing.py` covering bare name promotion, FQN passthrough, Volume path preservation, non-UC connection fallback, and explicit table kwarg behavior.
 
 ## [Unreleased]

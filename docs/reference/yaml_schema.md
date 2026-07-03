@@ -43,7 +43,7 @@ alerts:
 | --- | --- | --- | --- | --- |
 | **project** | str | Yes | - | Project name |
 | **engine** | EngineType | No | `EngineType.PANDAS` | Execution engine |
-| **connections** | Dict[str, [ConnectionConfig](#connections)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig), [CustomConnectionConfig](#customconnectionconfig) |
+| **connections** | Dict[str, [ConnectionConfig](#connections)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [UnityCatalogConnectionConfig](#unitycatalogconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig), [CustomConnectionConfig](#customconnectionconfig) |
 | **pipelines** | List[[PipelineConfig](#pipelineconfig)] | Yes | - | Pipeline definitions (at least one required) |
 | **story** | [StoryConfig](#storyconfig) | Yes | - | Story generation configuration (mandatory) |
 | **system** | [SystemConfig](#systemconfig) | Yes | - | System Catalog configuration (mandatory) |
@@ -431,13 +431,21 @@ Metadata for a column in the data dictionary.
 Configuration for the Odibi System Catalog (The Brain).
 
 Stores metadata, state, and pattern configurations. The primary connection
-must be a storage connection (blob/local) that supports Delta tables.
+must be a storage connection (blob/local/unity_catalog) that supports Delta tables.
 
 Example:
 ```yaml
 system:
   connection: adls_bronze        # Primary - must be blob/local storage
   path: _odibi_system
+  environment: dev
+```
+
+With Unity Catalog (Databricks Serverless / Free Edition):
+```yaml
+system:
+  connection: uc_metadata        # unity_catalog connection type
+  path: meta_                    # Used as table name prefix
   environment: dev
 ```
 
@@ -463,7 +471,7 @@ system:
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **connection** | str | Yes | - | Connection for primary system tables. Must be blob storage (azure_blob) or local filesystem - NOT SQL Server. Delta tables require storage backends. |
+| **connection** | str | Yes | - | Connection for primary system tables. Must be blob storage (azure_blob), local filesystem, or unity_catalog - NOT SQL Server. Delta tables require storage or UC backends. |
 | **path** | str | No | `_odibi_system` | Path relative to connection root |
 | **environment** | Optional[str] | No | - | Environment tag (e.g., 'dev', 'qat', 'prod'). Written to all system table records for cross-environment querying. |
 | **schema_name** | Optional[str] | No | - | Deprecated. Use sync_to.schema_name for SQL Server targets. |

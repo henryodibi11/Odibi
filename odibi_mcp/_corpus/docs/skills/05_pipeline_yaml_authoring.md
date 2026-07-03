@@ -21,7 +21,7 @@ engine: pandas                 # Optional. pandas | spark | polars (default: pan
 
 connections:                   # Required. Named connection configs.
   my_source:
-    type: local                # local | azure_blob | sql_server | http | delta
+    type: local                # local | azure_blob | sql_server | http | delta | unity_catalog
     base_path: ./data/raw
 
   my_target:
@@ -188,6 +188,21 @@ connections:
     headers:
       Authorization: "Bearer ${API_TOKEN}"
 ```
+
+### Unity Catalog (Databricks Serverless / Free Edition)
+```yaml
+connections:
+  uc_metadata:
+    type: unity_catalog
+    catalog: workspace            # Required. UC catalog name.
+    schema: odibi_logs            # Optional. Default: "default"
+    create_schema: true           # Optional. Auto-create schema if missing.
+```
+**Notes:**
+- UC managed tables require no filesystem access — the UC metastore handles storage.
+- Designed for Databricks Serverless and Free Edition where `/tmp`, `/Workspace`, and DBFS are restricted.
+- System catalog tables become UC tables (e.g., `workspace.odibi_logs.meta_tables`).
+- For stories, use a `local` connection with UC Volumes: `base_path: /Volumes/catalog/schema/volume/`.
 
 ---
 
