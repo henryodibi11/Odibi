@@ -213,6 +213,25 @@ class TestCreateDeltaConnection:
         result = create_delta_connection("d5", {"catalog": "main"})
         assert result.pandas_storage_options() == {}
 
+    def test_schema_from_model_dump_field_name(self):
+        # PipelineManager builds connections via model_dump(), which emits the
+        # field name ``schema_name`` (not the alias ``schema``). The factory must
+        # honor it instead of silently falling back to "default".
+        result = create_delta_connection("d6", {"catalog": "workspace", "schema_name": "sim_demo"})
+        assert result.get_path("meta_tables") == "workspace.sim_demo.meta_tables"
+
+    def test_volume_path_unchanged(self):
+        # Absolute Volume paths are real locations, not tables — no catalog.schema prefix.
+        result = create_delta_connection("d7", {"catalog": "workspace", "schema": "sim_demo"})
+        assert (
+            result.get_path("/Volumes/workspace/sim_demo/stories")
+            == "/Volumes/workspace/sim_demo/stories"
+        )
+
+    def test_already_qualified_not_double_prefixed(self):
+        result = create_delta_connection("d8", {"catalog": "workspace", "schema": "sim_demo"})
+        assert result.get_path("other.schema.tbl") == "other.schema.tbl"
+
 
 # ===================================================================
 # 5. create_sql_server_connection

@@ -209,14 +209,25 @@ def create_delta_connection(name: str, config: Dict[str, Any]) -> Any:
             self.schema = schema
 
         def get_path(self, table):
-            """Get fully qualified table name.
+            """Get fully qualified table name, or return an absolute path unchanged.
 
             Args:
-                table: Table name
+                table: A bare table name, an already-qualified ``catalog.schema.table``
+                    name, or an absolute path (e.g. a Unity Catalog Volume:
+                    ``/Volumes/...``).
 
             Returns:
-                Fully qualified table name in format: catalog.schema.table
+                - Absolute paths (starting with ``/``) unchanged — they are real
+                  filesystem locations (Volumes), not tables. Prefixing them with
+                  ``catalog.schema`` corrupts them (``workspace.default./Volumes/...``)
+                  and breaks story/metadata file writes on serverless.
+                - Names already containing a dot unchanged (avoids double-qualifying).
+                - Bare names as ``catalog.schema.table``.
             """
+            if table.startswith("/"):
+                return table
+            if "." in table:
+                return table
             return f"{self.catalog}.{self.schema}.{table}"
 
         def validate(self):
@@ -235,7 +246,12 @@ def create_delta_connection(name: str, config: Dict[str, Any]) -> Any:
             return {}
 
     catalog = config.get("catalog")
-    schema = config.get("schema") or "default"
+    # DeltaConnectionConfig stores the schema under the field name ``schema_name``
+    # (Pydantic alias ``schema``). PipelineManager builds connections via
+    # model_dump() (field names, not aliases), so the incoming dict has
+    # ``schema_name`` — read both so the configured schema isn't silently lost to
+    # the "default" fallback.
+    schema = config.get("schema") or config.get("schema_name") or "default"
     connection = DeltaCatalogConnection(catalog=catalog, schema=schema)
 
     ctx.log_connection(

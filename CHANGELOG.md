@@ -66,6 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Document Template** (Skill 10) — multi-phase project planning template
 - **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
+## [3.13.4] - 2026-07-02
+
+### Fixed
+
+- **Catalog-based `delta` connections silently lost their configured schema.** `DeltaConnectionConfig` stores the schema as the field `schema_name` (Pydantic alias `schema`), and `PipelineManager` builds connections via `model_dump()` (field names, not aliases) — so the factory's `config.get("schema")` was always `None` and every catalog-based `type: delta` connection silently fell back to schema `"default"`, ignoring the configured schema. The factory now reads `schema` **or** `schema_name`.
+- **`type: delta` (catalog mode) corrupted absolute/Volume paths and double-qualified names.** `DeltaCatalogConnection.get_path()` unconditionally prefixed `catalog.schema` onto every input — so `get_path("/Volumes/...")` returned `workspace.default./Volumes/...` (breaking serverless story/metadata writes) and `get_path("a.b.c")` returned `workspace.default.a.b.c`. It now returns absolute paths (starting with `/`) and already-qualified/`abfss://` names unchanged, matching `UnityCatalogConnection` (3.13.3). This is the class the YAML `type: delta` path actually instantiates — the 3.13.3 fix only covered `UnityCatalogConnection`, which the YAML config layer does not currently use.
+
+### Known Issues
+
+- **`type: unity_catalog` is not yet usable from YAML.** The type is registered as a connection factory and is a member of the `ConnectionType` enum, but it has no model in the `ConnectionConfig` discriminated union — so the discriminator routes it to a non-existent tag and validation fails. Managed-table system/story storage on serverless therefore requires `type: delta` with Volume paths for now (external Delta tables in the Volume). Wiring `unity_catalog` into the union is tracked as a follow-up.
+
 ## [3.13.3] - 2026-07-02
 
 ### Fixed
