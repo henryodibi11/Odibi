@@ -700,6 +700,33 @@ class DeltaConnectionConfig(BaseConnectionConfig):
     )
 
 
+class UnityCatalogConnectionConfig(BaseConnectionConfig):
+    """
+    Unity Catalog connection for Databricks managed tables.
+
+    Tables are addressed as ``catalog.schema.table``; the UC metastore manages
+    backend storage (S3/ADLS/GCS), so Spark needs no direct filesystem access.
+    Use this on Databricks (serverless or clusters) when system/story metadata and
+    outputs should be **managed** Unity Catalog tables.
+
+    Example:
+    ```yaml
+    uc_metadata:
+      type: "unity_catalog"
+      catalog: "workspace"
+      schema: "sim_demo"
+    ```
+    """
+
+    type: Literal[ConnectionType.UNITY_CATALOG] = ConnectionType.UNITY_CATALOG
+    catalog: str = Field(description="Unity Catalog catalog name (e.g. 'workspace', 'main')")
+    schema_name: str = Field(alias="schema", default="default", description="Schema/database name")
+    create_schema: bool = Field(
+        default=True,
+        description="Issue CREATE SCHEMA IF NOT EXISTS on first validate()",
+    )
+
+
 # --- SQL Server Auth ---
 
 
@@ -1004,6 +1031,7 @@ ConnectionConfig = Annotated[
         Annotated[LocalConnectionConfig, Tag(ConnectionType.LOCAL.value)],
         Annotated[AzureBlobConnectionConfig, Tag(ConnectionType.AZURE_BLOB.value)],
         Annotated[DeltaConnectionConfig, Tag(ConnectionType.DELTA.value)],
+        Annotated[UnityCatalogConnectionConfig, Tag(ConnectionType.UNITY_CATALOG.value)],
         Annotated[SQLServerConnectionConfig, Tag(ConnectionType.SQL_SERVER.value)],
         Annotated[HttpConnectionConfig, Tag(ConnectionType.HTTP.value)],
         Annotated[CustomConnectionConfig, Tag(_CUSTOM_CONNECTION_TAG)],

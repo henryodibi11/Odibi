@@ -109,6 +109,24 @@ def test_unknown_plugin_type_routes_to_custom():
     assert conn.whatever == 123
 
 
+def test_unity_catalog_type_resolves_to_its_model():
+    # Regression: unity_catalog was in ConnectionType + registered as a factory but
+    # had no model in the union, so the discriminator routed it to a non-existent tag
+    # and validation failed — the type was unusable from YAML.
+    conn = TA.validate_python(
+        {"type": "unity_catalog", "catalog": "workspace", "schema": "sim_demo"}
+    )
+    assert conn.__class__.__name__ == "UnityCatalogConnectionConfig"
+    assert conn.catalog == "workspace"
+    assert conn.schema_name == "sim_demo"
+
+
+def test_unity_catalog_schema_defaults():
+    conn = TA.validate_python({"type": "unity_catalog", "catalog": "main"})
+    assert conn.schema_name == "default"
+    assert conn.create_schema is True
+
+
 def test_auth_block_typo_is_rejected():
     with pytest.raises(ValidationError) as ei:
         TA.validate_python(

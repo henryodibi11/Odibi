@@ -292,6 +292,16 @@ class TestCreateUnityCatalogFactory:
         result = create_unity_catalog_connection("uc2", {"catalog": "main"})
         assert result.schema == "default"
 
+    def test_schema_from_model_dump_field_name(self):
+        # UnityCatalogConnectionConfig stores schema as field ``schema_name`` (alias
+        # ``schema``); PipelineManager builds connections via model_dump() (field
+        # names), so the factory must honor ``schema_name``, not fall back to default.
+        result = create_unity_catalog_connection(
+            "uc_md", {"catalog": "workspace", "schema_name": "sim_demo"}
+        )
+        assert result.schema == "sim_demo"
+        assert result.get_path("meta_tables") == "workspace.sim_demo.meta_tables"
+
     def test_create_schema_flag(self):
         result = create_unity_catalog_connection("uc3", {"catalog": "main", "create_schema": False})
         assert result.create_schema is False
