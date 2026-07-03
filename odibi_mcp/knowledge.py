@@ -692,25 +692,19 @@ pm.run("pipeline_name")""",
         self._ensure_odibi_registered()
         from odibi.plugins import _CONNECTION_FACTORIES
 
-        connection_docs = {
-            "local": "Local filesystem (CSV, Parquet, JSON, etc.)",
-            "http": "HTTP/REST API endpoints",
-            "azure_blob": "Azure Blob Storage",
-            "azure_adls": "Azure Data Lake Storage Gen2",
-            "delta": "Delta Lake tables",
-            "sql_server": "Microsoft SQL Server",
-            "azure_sql": "Azure SQL Database",
-            "unity_catalog": "Unity Catalog managed tables (Databricks Serverless/Free Edition)",
-        }
-
         result = []
         for name in sorted(_CONNECTION_FACTORIES.keys()):
-            result.append(
-                {
-                    "name": name,
-                    "description": connection_docs.get(name, "No description"),
-                }
-            )
+            cfg_cls = self._connection_config_class(name)
+            doc = self._first_line(cfg_cls.__doc__) if cfg_cls else "No description"
+            entry: dict[str, Any] = {"name": name, "description": doc}
+            if cfg_cls:
+                fields = [
+                    f.alias or fname
+                    for fname, f in cfg_cls.model_fields.items()
+                    if fname != "type" and fname != "validation_mode"
+                ]
+                entry["fields"] = fields
+            result.append(entry)
         return result
 
     def explain(self, name: str) -> dict[str, Any]:
@@ -768,25 +762,37 @@ pm.run("pipeline_name")""",
 
         # Check connections
         if name in _CONNECTION_FACTORIES:
-            connection_docs = {
-                "local": "Local filesystem connection for reading/writing files.",
-                "http": "HTTP/REST API connection. Use format: api for paginated REST APIs. See docs/guides/api_data_sources.md",
-                "api": "REST API data source. Use format: api with http connection. Supports pagination, retries, rate limiting. See docs/guides/api_data_sources.md",
-                "azure_blob": "Azure Blob Storage connection.",
-                "azure_adls": "Azure Data Lake Storage Gen2 connection.",
-                "delta": "Delta Lake connection for reading/writing Delta tables.",
-                "sql_server": "Microsoft SQL Server connection.",
-                "azure_sql": "Azure SQL Database connection.",
-                "unity_catalog": "Unity Catalog managed tables connection for Databricks Serverless and Free Edition. No filesystem access needed — UC metastore handles storage. Config keys: catalog (required), schema (default: 'default'), create_schema (optional, default: true). See odibi/connections/unity_catalog.py.",
-            }
-            result["found"] = True
-            result["matches"].append(
-                {
+            cfg_cls = self._connection_config_class(name)
+            if cfg_cls:
+                import inspect
+
+                doc = inspect.getdoc(cfg_cls) or ""
+                fields = {
+                    (f.alias or fname): {
+                        "required": f.is_required(),
+                        "description": f.description or "",
+                        "default": self._serialize_value(f.default)
+                        if not f.is_required()
+                        else None,
+                    }
+                    for fname, f in cfg_cls.model_fields.items()
+                    if fname != "type" and fname != "validation_mode"
+                }
+                match_entry: dict[str, Any] = {
                     "type": "connection",
                     "name": name,
-                    "description": connection_docs.get(name, "No documentation"),
+                    "description": doc,
+                    "fields": fields,
+                    "schema": cfg_cls.model_json_schema(),
                 }
-            )
+            else:
+                match_entry = {
+                    "type": "connection",
+                    "name": name,
+                    "description": "No Pydantic model found.",
+                }
+            result["found"] = True
+            result["matches"].append(match_entry)
 
         return result
 
@@ -1974,6 +1980,23 @@ pipelines:
     # =========================================================================
     # Helpers
     # =========================================================================
+
+    def _connection_config_class(self, type_name: str) -> type | None:
+        """Return the Pydantic config class for a connection type name."""
+        from odibi import config as cfg
+
+        _map: dict[str, type] = {
+            "local": cfg.LocalConnectionConfig,
+            "azure_blob": cfg.AzureBlobConnectionConfig,
+            "azure_adls": cfg.AzureBlobConnectionConfig,
+            "delta": cfg.DeltaConnectionConfig,
+            "unity_catalog": cfg.UnityCatalogConnectionConfig,
+            "sql_server": cfg.SQLServerConnectionConfig,
+            "azure_sql": cfg.SQLServerConnectionConfig,
+            "http": cfg.HttpConnectionConfig,
+            "custom": cfg.CustomConnectionConfig,
+        }
+        return _map.get(type_name)
 
     def _first_line(self, text: str | None) -> str | None:
         if not text:
