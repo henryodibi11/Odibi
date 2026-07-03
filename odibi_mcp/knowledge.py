@@ -490,7 +490,11 @@ pm.run("pipeline_name")""",
                 "available": [s["name"] for s in self.list_skills()],
             }
         meta, body = self._parse_frontmatter(skill_md.read_text(encoding="utf-8"))
-        return {"name": meta.get("name", name), "description": meta.get("description", ""), "content": body}
+        return {
+            "name": meta.get("name", name),
+            "description": meta.get("description", ""),
+            "content": body,
+        }
 
     def list_examples(self, pattern: str | None = None) -> list[dict[str, Any]]:
         """List runnable example pipeline YAMLs (optionally filtered by substring)."""
@@ -514,7 +518,9 @@ pm.run("pipeline_name")""",
         """
         from odibi import config as cfg
 
-        models = {
+        # -- single-model sections ------------------------------------------------
+        models: dict[str, type] = {
+            # core
             "project": cfg.ProjectConfig,
             "pipeline": cfg.PipelineConfig,
             "node": cfg.NodeConfig,
@@ -522,16 +528,79 @@ pm.run("pipeline_name")""",
             "write": cfg.WriteConfig,
             "transform": cfg.TransformConfig,
             "validation": cfg.ValidationConfig,
+            # quality
+            "gate": cfg.GateConfig,
+            "quarantine": cfg.QuarantineConfig,
+            "privacy": cfg.PrivacyConfig,
+            # advanced
+            "story": cfg.StoryConfig,
+            "system": cfg.SystemConfig,
+            "incremental": cfg.IncrementalConfig,
+            "alert": cfg.AlertConfig,
+            "performance": cfg.PerformanceConfig,
+            "simulation": cfg.SimulationConfig,
+            "delete_detection": cfg.DeleteDetectionConfig,
         }
+
+        # -- connection types (returned as a group) --------------------------------
+        connection_models: dict[str, type] = {
+            "local": cfg.LocalConnectionConfig,
+            "azure_blob": cfg.AzureBlobConnectionConfig,
+            "delta": cfg.DeltaConnectionConfig,
+            "unity_catalog": cfg.UnityCatalogConnectionConfig,
+            "sql_server": cfg.SQLServerConnectionConfig,
+            "http": cfg.HttpConnectionConfig,
+            "custom": cfg.CustomConnectionConfig,
+        }
+
+        # -- section=None → discovery index ----------------------------------------
         if section is None:
             return {
+                "categories": {
+                    "core": [
+                        "project",
+                        "pipeline",
+                        "node",
+                        "read",
+                        "write",
+                        "transform",
+                        "validation",
+                    ],
+                    "connections": sorted(connection_models.keys()),
+                    "quality": ["gate", "quarantine", "privacy"],
+                    "advanced": [
+                        "story",
+                        "system",
+                        "incremental",
+                        "alert",
+                        "performance",
+                        "simulation",
+                        "delete_detection",
+                    ],
+                },
                 "sections": sorted(models.keys()),
-                "hint": "Call get_schema(section='read') for a specific model's JSON Schema.",
+                "hint": (
+                    "Call get_schema(section='read') for a specific model's JSON Schema. "
+                    "Call get_schema(section='connections') for all connection type schemas."
+                ),
                 "project": cfg.ProjectConfig.model_json_schema(),
             }
+
+        # -- connections group -----------------------------------------------------
+        if section == "connections":
+            return {
+                "section": "connections",
+                "schemas": {
+                    name: model.model_json_schema()
+                    for name, model in sorted(connection_models.items())
+                },
+            }
+
+        # -- single section --------------------------------------------------------
         model = models.get(section)
         if model is None:
-            return {"error": f"Unknown section: {section}", "available": sorted(models.keys())}
+            available = sorted(models.keys()) + ["connections"]
+            return {"error": f"Unknown section: {section}", "available": available}
         return {"section": section, "schema": model.model_json_schema()}
 
     # =========================================================================
