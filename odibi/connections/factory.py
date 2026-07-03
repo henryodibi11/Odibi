@@ -463,7 +463,10 @@ def create_unity_catalog_connection(name: str, config: Dict[str, Any]) -> Any:
         )
         raise ValueError(f"Connection '{name}' missing 'catalog'. Got keys: {list(config.keys())}")
 
-    schema = config.get("schema", "default")
+    # UnityCatalogConnectionConfig stores schema as field ``schema_name`` (alias
+    # ``schema``); connections are built via model_dump() (field names, not aliases),
+    # so read both to avoid silently falling back to "default".
+    schema = config.get("schema") or config.get("schema_name") or "default"
     create_schema = config.get("create_schema", True)
 
     connection = UnityCatalogConnection(

@@ -23,6 +23,8 @@ except ImportError:
 
 from pydantic import BaseModel
 
+from odibi.config import connection_config_members as _connection_config_members
+
 # Try to import registry/transformers to get function metadata
 try:
     from odibi.registry import FunctionRegistry
@@ -241,14 +243,9 @@ TYPE_ALIAS_LINKS = {
 
 # Known Type Aliases to simplify display
 TYPE_ALIASES = {
-    "ConnectionConfig": [
-        "LocalConnectionConfig",
-        "AzureBlobConnectionConfig",
-        "DeltaConnectionConfig",
-        "SQLServerConnectionConfig",
-        "HttpConnectionConfig",
-        "CustomConnectionConfig",
-    ],
+    # Derived from the ConnectionConfig union (single source of truth) so a new
+    # connection type is picked up automatically — no hardcoded mirror to drift.
+    "ConnectionConfig": [m.__name__ for m in _connection_config_members()],
     "AzureBlobAuthConfig": [
         "AzureBlobKeyVaultAuth",
         "AzureBlobAccountKeyAuth",
