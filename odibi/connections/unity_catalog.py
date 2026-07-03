@@ -41,14 +41,24 @@ class UnityCatalogConnection(BaseConnection):
         self.name = name
 
     def get_path(self, table: str) -> str:
-        """Return the fully qualified UC table name.
+        """Return the fully qualified UC table name, or an absolute path unchanged.
 
         Args:
-            table: Table name (may already contain dots).
+            table: A bare table name, a fully qualified ``catalog.schema.table``
+                name, or an absolute path (e.g. a Unity Catalog Volume:
+                ``/Volumes/catalog/schema/volume/...``).
 
         Returns:
-            ``catalog.schema.table`` string.
+            - Absolute paths (starting with ``/``) unchanged — they are real
+              filesystem locations (Volumes), not table names. Prefixing them with
+              ``catalog.schema`` corrupts them (``workspace.default./Volumes/...``)
+              and breaks story/metadata file writes on serverless.
+            - Names already containing a dot unchanged (already qualified, or a
+              cloud URL like ``abfss://...``).
+            - Bare names as ``catalog.schema.table``.
         """
+        if table.startswith("/"):
+            return table
         if "." in table:
             return table
         return f"{self.catalog}.{self.schema}.{table}"

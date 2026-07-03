@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Document Template** (Skill 10) — multi-phase project planning template
 - **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
+## [3.13.3] - 2026-07-02
+
+### Fixed
+
+- **`PipelineManager` story/metadata writes failed on serverless with Unity Catalog Volume paths.** `UnityCatalogConnection.get_path()` prefixed *every* input with `catalog.schema`, including absolute Volume paths — so `get_path("/Volumes/workspace/default/stories")` returned `workspace.default./Volumes/workspace/default/stories`. The story generator then tried to `mkdir`/`open` that corrupted (relative) path and failed on serverless, where there is no writable local filesystem. `get_path()` now returns absolute paths (those starting with `/`, e.g. Unity Catalog Volumes) unchanged; bare names and already-qualified/`abfss://` names are handled as before. This complements the 3.13.2 session-reuse fix — together they let `PipelineManager.from_yaml()` bootstrap catalog tables *and* write stories on serverless.
+
 ## [3.13.2] - 2026-07-02
 
 ### Fixed

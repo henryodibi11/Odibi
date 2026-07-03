@@ -40,6 +40,27 @@ class TestUnityCatalogConnection:
         conn = UnityCatalogConnection(catalog="main")
         assert conn.get_path("my_table") == "main.default.my_table"
 
+    def test_get_path_volume_path_unchanged(self):
+        # Absolute Volume paths are real filesystem locations, not table names —
+        # must NOT be prefixed with catalog.schema (which broke serverless story
+        # writes: workspace.default./Volumes/...).
+        conn = UnityCatalogConnection(catalog="workspace", schema="default")
+        assert (
+            conn.get_path("/Volumes/workspace/default/stories")
+            == "/Volumes/workspace/default/stories"
+        )
+
+    def test_get_path_any_absolute_path_unchanged(self):
+        conn = UnityCatalogConnection(catalog="workspace", schema="default")
+        assert conn.get_path("/tmp/odibi/system") == "/tmp/odibi/system"
+
+    def test_get_path_cloud_url_unchanged(self):
+        # abfss:// URLs contain dots → already returned unchanged; guard against
+        # regression now that absolute-path handling was added.
+        conn = UnityCatalogConnection(catalog="workspace", schema="default")
+        url = "abfss://c@acct.dfs.core.windows.net/_system"
+        assert conn.get_path(url) == url
+
     def test_pandas_storage_options_empty(self):
         conn = UnityCatalogConnection(catalog="main", schema="s")
         assert conn.pandas_storage_options() == {}
