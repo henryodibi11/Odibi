@@ -63,6 +63,28 @@ class TestUCModeDetection:
         )
         assert cm._is_uc is False
 
+    def test_delta_catalog_connection_detected_as_uc(self):
+        # YAML `type: delta` (with a catalog) builds DeltaCatalogConnection — it must
+        # use managed-table mode, not file-path mode, otherwise bootstrap writes Delta
+        # at catalog.schema.name/meta_tables (invalid) on serverless.
+        from odibi.catalog import CatalogManager
+        from odibi.connections.factory import create_delta_connection
+
+        conn = create_delta_connection("sysd", {"catalog": "workspace", "schema": "sim_demo"})
+        config = SystemConfig(connection="sysd", path="odibi_test_system")
+        cm = CatalogManager(
+            spark=None,
+            config=config,
+            # base_path is what get_path(system.path) would produce for a bare name;
+            # in UC mode it is ignored — tables come from connection.get_path(name).
+            base_path="workspace.sim_demo.odibi_test_system",
+            engine=None,
+            connection=conn,
+        )
+        assert cm._is_uc is True
+        # Managed table names, independent of base_path / system.path.
+        assert cm.tables["meta_tables"] == "workspace.sim_demo.meta_tables"
+
 
 # ===================================================================
 # Table name resolution

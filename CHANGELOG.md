@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task Document Template** (Skill 10) — multi-phase project planning template
 - **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
+## [3.13.5] - 2026-07-02
+
+### Fixed
+
+- **`CatalogManager` treated `type: delta` system connections as file-path mode → invalid meta-table paths on serverless.** `_detect_uc_mode()` only recognized `UnityCatalogConnection`, but the YAML `type: delta` path builds `DeltaCatalogConnection`. So `_is_uc` was `False` and bootstrap used file-path mode — writing Delta at `catalog.schema.name/meta_tables` (e.g. `workspace.sim_demo.odibi_test_system/meta_tables`), an invalid path with no writable local filesystem on serverless. `_detect_uc_mode()` now recognizes both catalog-based connection classes, so `type: delta` creates **managed** meta-tables via `saveAsTable` (`workspace.sim_demo.meta_*`) — independent of `system.path`. Completes serverless `PipelineManager.from_yaml()` support alongside 3.13.2/3.13.4. (Story files still require `story.path` to be a Volume/`abfss://` path — HTML/JSON stories are files, not managed tables.)
+
 ## [3.13.4] - 2026-07-02
 
 ### Fixed

@@ -223,13 +223,23 @@ class CatalogManager:
         return self.engine is not None and self.engine.name == "pandas"
 
     def _detect_uc_mode(self) -> bool:
-        """Check if connection is a UnityCatalogConnection."""
+        """Check if the system connection is catalog-based (managed-table mode).
+
+        Both ``UnityCatalogConnection`` and the catalog-mode ``DeltaCatalogConnection``
+        (YAML ``type: delta`` with a ``catalog``) produce ``catalog.schema.table``
+        names and must use managed-table mode (``saveAsTable``), not file-path mode.
+        Without this, a ``type: delta`` system connection fell through to file-path
+        mode and tried to write Delta at ``catalog.schema.name/meta_tables`` — an
+        invalid path — on serverless. Detected by class name (not a ``catalog``
+        attribute) so it stays robust against MagicMock-based connections in tests,
+        where attribute access would fabricate a ``catalog``.
+        """
         if self.connection is None:
             return False
         conn_type = getattr(self.connection, "__class__", None)
         if conn_type is None:
             return False
-        return conn_type.__name__ == "UnityCatalogConnection"
+        return conn_type.__name__ in ("UnityCatalogConnection", "DeltaCatalogConnection")
 
     @property
     def is_unity_catalog_mode(self) -> bool:
