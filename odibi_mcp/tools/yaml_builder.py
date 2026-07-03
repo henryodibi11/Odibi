@@ -272,6 +272,7 @@ class ValidateConfigResponse:
     errors: list[dict[str, Any]]
     warnings: list[dict[str, Any]]
     summary: str
+    schema_tip: str = ""
 
 
 def validate_odibi_config(
@@ -343,11 +344,19 @@ def validate_odibi_config(
     else:
         summary = "Valid"
 
+    schema_tip = ""
+    if errors:
+        schema_tip = (
+            "Call get_schema(section='read'), get_schema(section='write'), "
+            "or get_schema(section='node') to see valid field names and types."
+        )
+
     return ValidateConfigResponse(
         valid=len(errors) == 0,
         errors=errors,
         warnings=warnings,
         summary=summary,
+        schema_tip=schema_tip,
     )
 
 

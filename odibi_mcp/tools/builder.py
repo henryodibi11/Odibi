@@ -142,6 +142,10 @@ def create_pipeline(pipeline_name: str, layer: str = "gold") -> Dict[str, Any]:
             "expires_in_minutes": _SESSION_TTL_MINUTES,
             "sessions_active": len(_sessions),
             "next_step": "Call add_node to add your first node",
+            "schema_tip": (
+                "Call get_schema(section='read'), get_schema(section='write'), "
+                "or get_schema(section='node') to see valid field names before configuring nodes."
+            ),
         }
 
 
@@ -543,7 +547,9 @@ def get_pipeline_state(session_id: str) -> Dict[str, Any]:
                 }
                 for n in session.nodes
             ],
-            "age_minutes": int((datetime.now(timezone.utc) - session.created_at).total_seconds() / 60),
+            "age_minutes": int(
+                (datetime.now(timezone.utc) - session.created_at).total_seconds() / 60
+            ),
             "expires_in_minutes": max(
                 0,
                 _SESSION_TTL_MINUTES
@@ -627,7 +633,8 @@ def render_pipeline_yaml(session_id: str) -> Dict[str, Any]:
             result["pipeline_name"] = session.pipeline_name
             result["node_count"] = len(session.nodes)
             result["next_step"] = (
-                "Save this YAML to a file and run with: python -m odibi run <filename>.yaml"
+                "Run validate_yaml on this output, then save to a file "
+                "and run with: python -m odibi run <filename>.yaml"
             )
         return result
 
