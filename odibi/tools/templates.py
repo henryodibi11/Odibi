@@ -576,6 +576,7 @@ def _get_connection_models() -> Dict[str, Type[BaseModel]]:
         HttpConnectionConfig,
         LocalConnectionConfig,
         SQLServerConnectionConfig,
+        UnityCatalogConnectionConfig,
     )
 
     return {
@@ -583,6 +584,7 @@ def _get_connection_models() -> Dict[str, Type[BaseModel]]:
         "azure_blob": AzureBlobConnectionConfig,
         "azure_adls": AzureBlobConnectionConfig,
         "delta": DeltaConnectionConfig,
+        "unity_catalog": UnityCatalogConnectionConfig,
         "sql_server": SQLServerConnectionConfig,
         "azure_sql": SQLServerConnectionConfig,
         "http": HttpConnectionConfig,

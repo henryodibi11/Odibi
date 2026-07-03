@@ -245,6 +245,7 @@ TYPE_ALIASES = {
         "LocalConnectionConfig",
         "AzureBlobConnectionConfig",
         "DeltaConnectionConfig",
+        "UnityCatalogConnectionConfig",
         "SQLServerConnectionConfig",
         "HttpConnectionConfig",
         "CustomConnectionConfig",
