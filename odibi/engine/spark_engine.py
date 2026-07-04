@@ -1236,6 +1236,21 @@ class SparkEngine(Engine):
                 )
                 raise
 
+        # Unity Catalog: qualify bare table/path names via the connection so
+        # the configured catalog.schema is honoured.  Without this, Spark
+        # resolves bare names against the session default (workspace.default),
+        # silently ignoring the YAML schema parameter.
+        from odibi.connections.unity_catalog import UnityCatalogConnection
+
+        if isinstance(connection, UnityCatalogConnection):
+            if not table and path:
+                resolved = connection.get_path(path)
+                if not resolved.startswith("/"):
+                    table = resolved
+                    path = None
+            elif table and "." not in table:
+                table = connection.get_path(table)
+
         # Handle Upsert/AppendOnce (Delta Only)
         if mode in ["upsert", "append_once"]:
             if format != "delta":
@@ -1318,20 +1333,6 @@ class SparkEngine(Engine):
                         elapsed_ms=round(elapsed, 2),
                     )
                     raise
-
-        # Unity Catalog: when path is used with a UC connection, get_path()
-        # returns a dotted table name (e.g. "workspace.sim_demo.my_table").
-        # This must go through saveAsTable(), not .save(), so promote it to
-        # a table write.  Volume paths (starting with "/") are real filesystem
-        # locations and should stay as path-based writes.
-        if not table and path:
-            from odibi.connections.unity_catalog import UnityCatalogConnection
-
-            if isinstance(connection, UnityCatalogConnection):
-                resolved = connection.get_path(path)
-                if not resolved.startswith("/"):
-                    table = resolved
-                    path = None
 
         # Get output location
         if table:

@@ -188,6 +188,36 @@ class TestUCWriteRouting:
         mock_writer.save.assert_called_once_with("/data/output/my_table")
         mock_writer.saveAsTable.assert_not_called()
 
+    def test_uc_bare_table_qualified(self):
+        """A bare table name (no dots) on a UC connection must be qualified
+        via get_path so the configured schema is honoured (#327)."""
+        conn = _make_uc_connection()
+        mock_df = MagicMock()
+        mock_writer = MagicMock()
+        mock_df.write = MagicMock()
+        mock_df.write.format.return_value = mock_writer
+        mock_writer.mode.return_value = mock_writer
+        mock_writer.partitionBy.return_value = mock_writer
+        mock_writer.option.return_value = mock_writer
+        mock_df.rdd.getNumPartitions.return_value = 1
+        mock_df.isStreaming = False
+
+        engine = _make_mock_spark_engine()
+        engine._optimize_delta_write = MagicMock()
+        engine._get_last_delta_commit_info = MagicMock(return_value={"version": 1})
+
+        engine.write(
+            df=mock_df,
+            connection=conn,
+            format="delta",
+            table="sim_iot_sensors",
+            path=None,
+            mode="overwrite",
+        )
+
+        mock_writer.saveAsTable.assert_called_once_with("workspace.sim_demo.sim_iot_sensors")
+        mock_writer.save.assert_not_called()
+
     def test_uc_with_table_kwarg_unchanged(self):
         """When table= is already provided, the UC promotion should not run."""
         conn = _make_uc_connection()

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.14.0] — 2026-07-04
+
+### Fixed
+
+- **Unity Catalog schema parameter ignored** (#327) — When a write node used `table: my_table` (bare name, no dots) with a UC connection, `SparkEngine.write()` passed the bare name directly to `saveAsTable()`. Spark resolved it against the session default (`workspace.default`), silently ignoring the `schema:` parameter from the YAML connection config. Now all bare table names are qualified via `connection.get_path()` → `catalog.schema.table` before any write operation, including upsert/merge paths.
+
+### Changed
+
+- **UC write qualification consolidated** — The path-to-table promotion and bare-table qualification logic is now a single block executed before the upsert handler, ensuring all write modes (overwrite, append, upsert, append_once) honour the connection's configured schema.
+
+### Added
+
+- **Regression test for #327** — `test_uc_bare_table_qualified` in `tests/unit/engine/test_uc_write_routing.py` verifies bare table names are qualified to `catalog.schema.table` when using a UC connection.
+
 ## [3.13.8] — 2026-07-03
 
 ### Fixed
