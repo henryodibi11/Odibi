@@ -4077,7 +4077,27 @@ class Node:
                                 result.error = e
                                 result.duration = time.time() - start_time
                                 self._cached_result = None
-                                self.context.unregister(self.config.name)
+
+                                cleanup_error = None
+                                try:
+                                    self.context.unregister(self.config.name)
+                                except Exception as context_error:
+                                    cleanup_error = context_error
+                                    result.metadata["context_cleanup_error"] = str(context_error)
+
+                                try:
+                                    output_retained = self.context.has(self.config.name)
+                                except Exception as context_error:
+                                    if cleanup_error is None:
+                                        result.metadata["context_cleanup_error"] = str(
+                                            context_error
+                                        )
+                                    result.metadata["context_cleanup_status"] = "unknown"
+                                else:
+                                    result.metadata["context_cleanup_status"] = (
+                                        "retained" if output_retained else "removed"
+                                    )
+
                                 ctx.warning(f"Failed to update HWM state: {e}")
                                 return result
 
