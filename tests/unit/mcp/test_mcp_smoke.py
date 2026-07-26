@@ -7,6 +7,7 @@ the old per-tool smoke test, against the new dispatcher architecture.
 """
 
 import json
+import os
 import secrets
 import subprocess
 import sys
@@ -66,6 +67,14 @@ def _call_over_http(client, action, authorization=None, **kwargs):
     return json.loads(message["result"]["content"][0]["text"])
 
 
+def _fresh_http_app(monkeypatch, origins=None):
+    if origins is None:
+        monkeypatch.delenv("ODIBI_MCP_CORS_ORIGINS", raising=False)
+    else:
+        monkeypatch.setenv("ODIBI_MCP_CORS_ORIGINS", origins)
+    return databricks_app.create_http_app()
+
+
 def test_facade_tools_present():
     assert hasattr(mcp_server, "mcp")
     assert callable(getattr(mcp_server.odibi_execute, "fn", mcp_server.odibi_execute))
@@ -111,6 +120,398 @@ def test_caller_cannot_supply_transport_identity():
     )
 
     assert result["code"] == "INVALID_ARGUMENT"
+
+
+@pytest.mark.parametrize(
+    "origin,expected",
+    [
+        ("HTTPS://Example.COM:443", "https://example.com"),
+        ("https://Example.COM:8443", "https://example.com:8443"),
+        ("http://LOCALHOST:80", "http://localhost"),
+        ("http://127.0.0.1:3000", "http://127.0.0.1:3000"),
+        ("http://[0:0:0:0:0:0:0:1]:3000", "http://[::1]:3000"),
+    ],
+)
+def test_cors_origin_normalization(origin, expected):
+    assert databricks_app._normalize_origin(origin) == expected
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "null",
+        "file://",
+        "custom://example.com",
+        "http://example.com",
+        "https://*.example.com",
+        "https://example.com/",
+        "https://example.com/path",
+        "https://example.com?query=value",
+        "https://example.com#fragment",
+        "https://user@example.com",
+        "https://example.com.",
+        "https://example..com",
+        "https://example_com",
+        "https://example.com%2eevil.invalid",
+        " https://example.com",
+        "https://example.com\n",
+        "https://example.com:0",
+        "https://example.com:65536",
+        "https://example.com:",
+        "https://example.com?",
+        "https://example.com#",
+        "https://example.com?#",
+        "https://[::1]evil.invalid",
+        "https://[::1].evil.invalid",
+        "https://[::1]x:443",
+        "https://[not-ipv6]",
+        "https://[127.0.0.1]",
+    ],
+)
+def test_cors_origin_rejects_non_origin_and_ambiguous_values(origin):
+    with pytest.raises(ValueError, match="^Invalid ODIBI_MCP_CORS_ORIGINS configuration$"):
+        databricks_app._normalize_origin(origin)
+
+
+@pytest.mark.parametrize(
+    "configured",
+    [
+        "",
+        " ",
+        "https://example.com,",
+        ",https://example.com",
+        "https://example.com,,https://other.example.com",
+        "https://example.com,https://EXAMPLE.com:443",
+        ",".join(f"https://host{index}.example.com" for index in range(17)),
+        "x" * 4097,
+    ],
+)
+def test_invalid_cors_configuration_fails_closed_without_echo(configured, monkeypatch, caplog):
+    monkeypatch.setenv("ODIBI_MCP_CORS_ORIGINS", configured)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        databricks_app.create_http_app()
+
+    assert str(exc_info.value) == "Invalid ODIBI_MCP_CORS_ORIGINS configuration"
+    assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "module,cwd",
+    [
+        (
+            "odibi_mcp.databricks_app",
+            Path(databricks_app.__file__).resolve().parents[1],
+        ),
+        ("databricks_app", Path(databricks_app.__file__).resolve().parent),
+    ],
+)
+def test_invalid_cors_configuration_aborts_import_with_fixed_error(module, cwd):
+    sentinel = "cors-import-secret-sentinel"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(databricks_app.__file__).resolve().parents[1])
+    env["ODIBI_MCP_CORS_ORIGINS"] = f"https://example.com:{sentinel}"
+
+    result = subprocess.run(
+        [sys.executable, "-c", f"import {module}"],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "Invalid ODIBI_MCP_CORS_ORIGINS configuration" in output
+    assert sentinel not in output
+
+
+def test_cors_configuration_accepts_exact_origin_count_limit():
+    configured = ",".join(f"https://host{index}.example.com" for index in range(16))
+
+    origins = databricks_app._configured_cors_origins(configured)
+
+    assert len(origins) == 16
+    assert origins[0] == "https://host0.example.com"
+    assert origins[-1] == "https://host15.example.com"
+
+
+def test_cors_configuration_accepts_exact_character_limit():
+    def host(index, length):
+        suffix = f".{index}.example"
+        remaining = length - len(suffix)
+        labels = []
+        while remaining:
+            label_length = min(63, remaining)
+            labels.append("a" * label_length)
+            remaining -= label_length
+            if remaining:
+                remaining -= 1
+        return ".".join(labels) + suffix
+
+    host_lengths = [241] * 15 + [242]
+    configured = ",".join(
+        f"https://{host(index, length)}:65535" for index, length in enumerate(host_lengths)
+    )
+
+    assert len(configured) == 4096
+    assert len(databricks_app._configured_cors_origins(configured)) == 16
+
+
+def test_cors_is_disabled_by_default_and_origin_denial_never_dispatches(monkeypatch):
+    from starlette.testclient import TestClient
+
+    calls = []
+    monkeypatch.setattr(
+        mcp_server._dispatcher,
+        "dispatch",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"unexpected": True},
+    )
+    app = _fresh_http_app(monkeypatch)
+
+    with TestClient(app) as client:
+        for origin in (
+            "https://browser.example.com",
+            "null",
+            "file://",
+            "custom://browser.example.com",
+        ):
+            response = client.options(
+                "/mcp",
+                headers={
+                    "origin": origin,
+                    "access-control-request-method": "POST",
+                    "access-control-request-headers": "authorization,content-type",
+                },
+            )
+            assert response.status_code == 403
+            assert response.text == "Cross-origin request denied"
+            assert not any(header.startswith("access-control-") for header in response.headers)
+
+    assert calls == []
+
+
+def test_configured_cors_preflight_is_exact_bounded_and_never_dispatches(monkeypatch):
+    from starlette.testclient import TestClient
+
+    calls = []
+    monkeypatch.setattr(
+        mcp_server._dispatcher,
+        "dispatch",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"unexpected": True},
+    )
+    app = _fresh_http_app(monkeypatch, "HTTPS://Browser.Example.COM:443,http://localhost:3000")
+
+    with TestClient(app) as client:
+        allowed = client.options(
+            "/mcp",
+            headers={
+                "origin": "https://browser.example.com",
+                "access-control-request-method": "POST",
+                "access-control-request-headers": (
+                    "authorization,content-type,mcp-protocol-version"
+                ),
+            },
+        )
+        assert allowed.status_code == 200
+        assert allowed.headers["access-control-allow-origin"] == "https://browser.example.com"
+        assert allowed.headers.get_list("access-control-allow-origin") == [
+            "https://browser.example.com"
+        ]
+        assert allowed.headers["access-control-allow-methods"] == "POST"
+        assert "access-control-allow-credentials" not in allowed.headers
+        assert "access-control-expose-headers" not in allowed.headers
+        assert "authorization" in allowed.headers["access-control-allow-headers"].lower()
+        assert "content-type" in allowed.headers["access-control-allow-headers"].lower()
+
+        for origin in (
+            "https://browser.example.com.evil.invalid",
+            "https://sibling.example.com",
+            "null",
+            "file://",
+            "custom://browser.example.com",
+        ):
+            denied = client.options(
+                "/mcp",
+                headers={
+                    "origin": origin,
+                    "access-control-request-method": "POST",
+                    "access-control-request-headers": "authorization,content-type",
+                },
+            )
+            assert denied.status_code == 403
+            assert denied.text == "Cross-origin request denied"
+            assert "access-control-allow-origin" not in denied.headers
+
+        wrong_method = client.options(
+            "/mcp",
+            headers={
+                "origin": "https://browser.example.com",
+                "access-control-request-method": "DELETE",
+            },
+        )
+        assert wrong_method.status_code == 400
+
+        wrong_header = client.options(
+            "/mcp",
+            headers={
+                "origin": "https://browser.example.com",
+                "access-control-request-method": "POST",
+                "access-control-request-headers": "x-arbitrary-header",
+            },
+        )
+        assert wrong_header.status_code == 400
+
+    assert calls == []
+
+
+def test_duplicate_origin_headers_fail_before_dispatch(monkeypatch):
+    from starlette.testclient import TestClient
+
+    calls = []
+    monkeypatch.setattr(
+        mcp_server._dispatcher,
+        "dispatch",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"unexpected": True},
+    )
+    app = _fresh_http_app(monkeypatch, "https://browser.example.com")
+
+    with TestClient(app) as client:
+        response = client.options(
+            "/mcp",
+            headers=[
+                ("origin", "https://browser.example.com"),
+                ("origin", "https://browser.example.com"),
+                ("access-control-request-method", "POST"),
+            ],
+        )
+
+    assert response.status_code == 403
+    assert response.text == "Cross-origin request denied"
+    assert calls == []
+
+
+@pytest.mark.parametrize("method", ["GET", "HEAD", "DELETE", "PUT", "PATCH", "OPTIONS"])
+def test_explicit_origin_non_post_requests_fail_before_fastmcp(method, monkeypatch):
+    from starlette.testclient import TestClient
+
+    calls = []
+    monkeypatch.setattr(
+        mcp_server._dispatcher,
+        "dispatch",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"unexpected": True},
+    )
+    app = _fresh_http_app(monkeypatch, "https://browser.example.com")
+
+    with TestClient(app) as client:
+        response = client.request(
+            method,
+            "/mcp",
+            headers={"origin": "https://browser.example.com"},
+        )
+
+    assert response.status_code == 403
+    if method != "HEAD":
+        assert response.text == "Cross-origin request denied"
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://[::1]evil.invalid",
+        "https://browser.example.com, https://evil.invalid",
+        "null",
+        "file://",
+    ],
+)
+def test_malformed_actual_post_fails_before_dispatch(origin, monkeypatch):
+    from starlette.testclient import TestClient
+
+    calls = []
+    monkeypatch.setattr(
+        mcp_server._dispatcher,
+        "dispatch",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"unexpected": True},
+    )
+    app = _fresh_http_app(monkeypatch, "https://browser.example.com")
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/mcp",
+            headers={
+                "origin": origin,
+                "accept": "application/json, text/event-stream",
+                "content-type": "application/json",
+            },
+            json={},
+        )
+
+    assert response.status_code == 403
+    assert response.text == "Cross-origin request denied"
+    assert "access-control-allow-origin" not in response.headers
+    assert calls == []
+
+
+def test_real_http_origin_policy_preserves_exact_bearer_authority(monkeypatch):
+    from starlette.testclient import TestClient
+
+    configured = secrets.token_urlsafe(32)
+    different = secrets.token_urlsafe(32)
+    calls = []
+    monkeypatch.setenv("ODIBI_MCP_AUTH_TOKEN", configured)
+    monkeypatch.setitem(
+        mcp_server._dispatcher._actions,
+        "create_pipeline",
+        lambda: calls.append("create_pipeline") or {"allowed": True},
+    )
+    app = _fresh_http_app(monkeypatch, "https://browser.example.com")
+
+    with TestClient(app) as client:
+        for authorization in (None, f"Bearer {different}"):
+            result = _call_over_http(client, "create_pipeline", authorization)
+            assert result["code"] == "AUTHORIZATION_REQUIRED"
+            assert calls == []
+
+        denied = client.post(
+            "/mcp",
+            headers={
+                "origin": "https://browser.example.com.evil.invalid",
+                "authorization": f"Bearer {configured}",
+                "accept": "application/json, text/event-stream",
+                "content-type": "application/json",
+            },
+            json={},
+        )
+        assert denied.status_code == 403
+        assert denied.text == "Cross-origin request denied"
+        assert calls == []
+
+        allowed_headers = {
+            "origin": "HTTPS://Browser.Example.COM:443",
+            "authorization": f"Bearer {configured}",
+            "accept": "application/json, text/event-stream",
+            "content-type": "application/json",
+        }
+        arguments = {"action": "create_pipeline"}
+        response = client.post(
+            "/mcp",
+            headers=allowed_headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {"name": "odibi_execute", "arguments": arguments},
+            },
+        )
+        result = json.loads(_mcp_message(response)["result"]["content"][0]["text"])
+
+    assert result == {"allowed": True}
+    assert response.headers["access-control-allow-origin"] == "https://browser.example.com"
+    assert "access-control-allow-credentials" not in response.headers
+    assert calls == ["create_pipeline"]
 
 
 def test_real_http_boundary_requires_exact_application_bearer(monkeypatch):
