@@ -1764,6 +1764,8 @@ def test_remote_logical_lineage_bypasses_all_legacy_and_ambient_effects(
         "duck_prepared",
         "duck_projection",
         "prepare_exception",
+        "prepared_subclass",
+        "projection_subclass",
     ],
 )
 def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
@@ -1771,7 +1773,18 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
 ):
     from odibi_mcp import dispatcher as dispatcher_module
 
-    projection = RemoteLogicalLineageProjection(pipeline="bounded", nodes=(), edges=())
+    class PreparedSubclass(PreparedRuntimeCall):
+        pass
+
+    class ProjectionSubclass(RemoteLogicalLineageProjection):
+        pass
+
+    projection_type = (
+        ProjectionSubclass
+        if prepared_case == "projection_subclass"
+        else RemoteLogicalLineageProjection
+    )
+    projection = projection_type(pipeline="bounded", nodes=(), edges=())
     prepared_kwargs = {"pipeline": PROJECTION_SENTINELS[4]}
     if prepared_case == "prepare_exception":
         prepared = None
@@ -1782,7 +1795,10 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
             logical_lineage=projection,
         )
     else:
-        prepared = PreparedRuntimeCall(
+        prepared_type = (
+            PreparedSubclass if prepared_case == "prepared_subclass" else PreparedRuntimeCall
+        )
+        prepared = prepared_type(
             action="story_read" if prepared_case == "mismatched_action" else "lineage_graph",
             kwargs=prepared_kwargs,
             project_root=tmp_path,
