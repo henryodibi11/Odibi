@@ -317,11 +317,26 @@ Every new coverage thread should:
 
 ### Linting & Formatting
 ```bash
-ruff check .                        # Check for issues
-ruff check . --fix                  # Auto-fix issues
-ruff format .                       # Format code
-pre-commit run --all-files          # Run all checks
+ruff format --check odibi/ tests/        # Exact full CI formatting baseline
+ruff check odibi/ tests/ odibi_mcp/      # Exact full CI lint check
+ruff check odibi/ tests/ odibi_mcp/ --fix
+ruff format odibi/ tests/
+pre-commit run --all-files
 ```
+
+Before every push, agents must run the exact full CI commands above with the
+repository-pinned Ruff version. Because `odibi_mcp/` has separate baseline formatting
+debt, also format-check every changed MCP Python file against the target branch:
+
+```bash
+BASE_SHA="$(git merge-base HEAD origin/main)"
+git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" HEAD -- ':(glob)odibi_mcp/**/*.py' \
+  | xargs -0 -r ruff format --check
+```
+
+Fix every Ruff violation introduced in changed files. A red required check is not
+acceptable merely because unrelated debt exists; isolate and record distinct baseline
+debt instead of dismissing the failure or weakening the required check.
 
 ### Documentation Generation
 ```bash

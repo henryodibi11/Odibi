@@ -131,7 +131,7 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "black==25.11.0",  # Pin exact version for consistent formatting across Python 3.9-3.12
-    "ruff>=0.1.0",
+    "ruff==0.14.6",
     "mypy>=1.5.0",
     "pre-commit>=3.4.0",
     "pyspark>=3.4.0",
@@ -182,6 +182,10 @@ target-version = ['py39', 'py310', 'py311']
 line-length = 100
 target-version = "py39"
 exclude = ["odibi_mcp/test_mcp_server_validation.py"]
+
+[tool.ruff.lint]
+# Preserve the historically enforced Ruff defaults across Ruff releases.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.lint.per-file-ignores]
 # These files require env vars or sys.path manipulation before imports
