@@ -1163,6 +1163,71 @@ def test_remote_downloads_use_controlled_output_and_exact_helper_kwargs(
     assert result["policy_applied"] == {"project_scoped": True}
 
 
+@pytest.mark.parametrize(
+    "action,kwargs",
+    [
+        (
+            "profile_folder",
+            {"connection": "sql", "folder_path": "folder", "pattern": "*.csv"},
+        ),
+        (
+            "download_file",
+            {
+                "connection": "sql",
+                "source_path": "folder/orders.csv",
+                "filename": "orders.csv",
+            },
+        ),
+        (
+            "download_sql",
+            {
+                "connection": "local",
+                "query": "SELECT * FROM Orders",
+                "filename": "orders.csv",
+            },
+        ),
+        (
+            "download_table",
+            {"connection": "local", "table": "Orders", "filename": "orders.csv"},
+        ),
+    ],
+)
+def test_remote_actions_reject_wrong_connection_type_before_delegate(
+    managed_dispatcher, action, kwargs
+):
+    dispatcher, _ = managed_dispatcher
+    dispatcher._actions[action] = lambda **call_kwargs: pytest.fail(
+        "wrong connection type reached a runtime-data effect"
+    )
+
+    result = dispatcher.dispatch(
+        action,
+        project="managed",
+        application_identity=REMOTE_IDENTITY,
+        **kwargs,
+    )
+
+    assert result["code"] == "PROJECT_SCOPE_REQUIRED"
+
+
+def test_remote_download_file_rejects_format_conversion_before_delegate(managed_dispatcher):
+    dispatcher, _ = managed_dispatcher
+    dispatcher._actions["download_file"] = lambda **kwargs: pytest.fail(
+        "download format mismatch reached a file read or write"
+    )
+
+    result = dispatcher.dispatch(
+        "download_file",
+        project="managed",
+        connection="local",
+        source_path="folder/orders.csv",
+        filename="orders.parquet",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result["code"] == "INVALID_RUNTIME_ARGUMENT"
+
+
 def test_remote_lineage_fails_closed_but_trusted_local_remains_available(
     managed_dispatcher, monkeypatch
 ):
@@ -1267,6 +1332,51 @@ def test_remote_workflow_allowlist_contains_no_runtime_data_tool_steps():
     assert _REMOTE_SAFE_WORKFLOWS <= set(WORKFLOWS)
     for workflow_name in _REMOTE_SAFE_WORKFLOWS:
         assert tool_names(WORKFLOWS[workflow_name]).isdisjoint(RUNTIME_DATA_ACTIONS)
+
+
+def test_remote_workflow_allowlist_with_complete_params_never_calls_runtime_data(monkeypatch):
+    from odibi_mcp.tools import workflows
+
+    params_by_workflow = {
+        "validate_yaml_simple": {"yaml": "project: managed"},
+        "build_and_validate": {
+            "pattern": "dimension",
+            "pipeline_name": "bounded",
+            "source_connection": "source",
+            "target_connection": "target",
+            "target_path": "output",
+            "source_table": "input",
+            "source_format": "csv",
+            "target_format": "delta",
+            "keys": ["id"],
+            "tracked_columns": ["value"],
+            "natural_key": "id",
+            "surrogate_key": "sk",
+        },
+        "debug_pipeline": {"yaml": "project: managed"},
+        "iterate_until_valid": {
+            "pattern": "dimension",
+            "name": "bounded",
+            "source": "input.csv",
+        },
+    }
+    called_tools = []
+
+    def fake_call_tool(name, args):
+        assert name not in RUNTIME_DATA_ACTIONS
+        called_tools.append(name)
+        if name == "apply_pattern_template":
+            return {"valid": True, "yaml": "project: managed"}
+        return {"valid": True}
+
+    monkeypatch.setattr(workflows, "_call_tool", fake_call_tool)
+
+    assert _REMOTE_SAFE_WORKFLOWS == set(params_by_workflow)
+    for workflow_name in sorted(_REMOTE_SAFE_WORKFLOWS):
+        result = workflows.run_workflow(workflow_name, params_by_workflow[workflow_name])
+        assert result["status"] == "COMPLETED"
+
+    assert called_tools
 
 
 def test_remote_helper_failure_and_payload_are_sanitized(managed_dispatcher, monkeypatch):
