@@ -770,8 +770,10 @@ def test_remote_lineage_serialized_response_byte_backstop_fails_closed(monkeypat
     )
     monkeypatch.setattr(access_contract, "_LINEAGE_RESPONSE_BYTE_LIMIT", 1)
 
-    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE") as error:
         render_remote_logical_lineage_projection(projection)
+
+    assert error.value.code == "LOGICAL_PROJECTION_UNAVAILABLE"
 
 
 @pytest.mark.parametrize(
