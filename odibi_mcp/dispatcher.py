@@ -258,6 +258,7 @@ class OdibiDispatcher:
             isinstance(application_identity, ApplicationIdentity)
             and application_identity.subject != "trusted-local"
         )
+        is_remote_lineage = is_remote_identity and action == "lineage_graph"
         remote_pattern_projection: RemotePatternRenderProjection | None = None
         if is_remote_identity and action == "apply_pattern_template":
             try:
@@ -278,55 +279,65 @@ class OdibiDispatcher:
                 return self._runtime_access_error(action, "REMOTE_WORKFLOW_DISABLED")
 
         prepared_runtime_call: PreparedRuntimeCall | None = None
+        remote_lineage_projection: RemoteLogicalLineageProjection | None = None
         if action in RUNTIME_DATA_ACTIONS and is_remote_identity:
             if args:
                 return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
             try:
                 access = self._managed_access or ManagedProjectAccess.from_environment()
-                prepared_runtime_call = access.prepare(action, kwargs)
-                kwargs = prepared_runtime_call.kwargs
+                if is_remote_lineage and type(access) is not ManagedProjectAccess:
+                    return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
+                prepared = access.prepare(action, kwargs)
+                if is_remote_lineage:
+                    if (
+                        type(prepared) is not PreparedRuntimeCall
+                        or prepared.action != action
+                        or type(prepared.logical_lineage) is not RemoteLogicalLineageProjection
+                    ):
+                        return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
+                    remote_lineage_projection = prepared.logical_lineage
+                else:
+                    kwargs = prepared.kwargs
+                prepared_runtime_call = prepared
             except RuntimeAccessDenied as error:
                 return self._runtime_access_error(action, error.code)
             except Exception:
-                return self._runtime_access_error(action, "PROJECT_SCOPE_REQUIRED")
+                code = (
+                    "LOGICAL_PROJECTION_UNAVAILABLE"
+                    if is_remote_lineage
+                    else "PROJECT_SCOPE_REQUIRED"
+                )
+                return self._runtime_access_error(action, code)
 
         try:
             with _RUNTIME_CONTEXT_LOCK:
                 previous_context = None
-                remote_lineage_projection: RemoteLogicalLineageProjection | None = None
-                if prepared_runtime_call is not None:
-                    remote_lineage_projection = prepared_runtime_call.logical_lineage
-                if prepared_runtime_call is not None and remote_lineage_projection is None:
+                if prepared_runtime_call is not None and not is_remote_lineage:
                     previous_context = self._bind_runtime_context(prepared_runtime_call)
                 try:
                     if remote_pattern_projection is not None:
                         result = self._render_remote_pattern_projection(remote_pattern_projection)
-                    elif remote_lineage_projection is not None:
+                    elif is_remote_lineage:
+                        assert remote_lineage_projection is not None
                         result = render_remote_logical_lineage_projection(remote_lineage_projection)
                     else:
                         result = self._actions[action](*args, **kwargs)
                     # Ensure result is serializable
                     serialized = self._to_serializable(result)
-                    if prepared_runtime_call is not None and remote_lineage_projection is None:
+                    if prepared_runtime_call is not None and not is_remote_lineage:
                         return sanitize_runtime_result(serialized, prepared_runtime_call)
                     return serialized
                 finally:
-                    if prepared_runtime_call is not None and remote_lineage_projection is None:
+                    if prepared_runtime_call is not None and not is_remote_lineage:
                         self._restore_runtime_context(previous_context)
         except RuntimeAccessDenied as error:
-            if (
-                prepared_runtime_call is not None
-                and prepared_runtime_call.logical_lineage is not None
-            ):
+            if is_remote_lineage:
                 return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
             return self._runtime_access_error(action, error.code)
         except TypeError as e:
             if remote_pattern_projection is not None:
                 return self._runtime_access_error(action, "PROJECTED_RENDER_FAILED")
-            if (
-                prepared_runtime_call is not None
-                and prepared_runtime_call.logical_lineage is not None
-            ):
+            if is_remote_lineage:
                 return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
             if prepared_runtime_call is not None:
                 return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
@@ -343,10 +354,7 @@ class OdibiDispatcher:
         except Exception as error:
             if remote_pattern_projection is not None:
                 return self._runtime_access_error(action, "PROJECTED_RENDER_FAILED")
-            if (
-                prepared_runtime_call is not None
-                and prepared_runtime_call.logical_lineage is not None
-            ):
+            if is_remote_lineage:
                 return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
             if prepared_runtime_call is not None:
                 return {

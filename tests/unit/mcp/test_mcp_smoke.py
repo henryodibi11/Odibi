@@ -17,7 +17,7 @@ import pytest
 pytest.importorskip("fastmcp")
 
 from odibi_mcp import databricks_app, mcp_server
-from odibi_mcp.contracts.access import ManagedProjectAccess
+from odibi_mcp.contracts.access import ManagedProjectAccess, PreparedRuntimeCall
 
 
 def _execute(action, **kwargs):
@@ -399,6 +399,59 @@ pipelines:
     assert "state" not in result and "events" not in result
     assert all(sentinel not in serialized for sentinel in sentinels)
     assert all(sentinel not in caplog.text for sentinel in sentinels)
+
+
+def test_real_http_remote_lineage_malformed_preparation_never_reaches_legacy_path(
+    tmp_path, monkeypatch, caplog
+):
+    from starlette.testclient import TestClient
+
+    from odibi_mcp import dispatcher as dispatcher_module
+
+    sentinel = "HTTP_MALFORMED_PREPARATION_SENTINEL_a1b2"
+    configured = secrets.token_urlsafe(32)
+    prepared = PreparedRuntimeCall(
+        action="lineage_graph",
+        kwargs={"pipeline": sentinel},
+        project_root=tmp_path,
+        config_path=tmp_path / "unvalidated.yaml",
+        config_snapshot={"unknown": sentinel},
+        config_fingerprint=sentinel,
+        logical_lineage=None,
+    )
+    access = ManagedProjectAccess("managed", tmp_path, tmp_path / "unvalidated.yaml")
+    effects = []
+
+    def unexpected(*args, **kwargs):
+        effects.append(sentinel)
+        return {"sentinel": sentinel}
+
+    monkeypatch.setenv("ODIBI_MCP_AUTH_TOKEN", configured)
+    monkeypatch.setattr(ManagedProjectAccess, "prepare", lambda self, action, kwargs: prepared)
+    monkeypatch.setattr(mcp_server._dispatcher, "_managed_access", access)
+    monkeypatch.setattr(mcp_server._dispatcher, "_bind_runtime_context", unexpected)
+    monkeypatch.setattr(mcp_server._dispatcher, "_restore_runtime_context", unexpected)
+    monkeypatch.setattr(dispatcher_module, "sanitize_runtime_result", unexpected)
+    monkeypatch.setattr(dispatcher_module, "render_remote_logical_lineage_projection", unexpected)
+    monkeypatch.setitem(mcp_server._dispatcher._actions, "lineage_graph", unexpected)
+
+    with TestClient(databricks_app.http_app) as client:
+        result = _call_over_http(
+            client,
+            "lineage_graph",
+            f"Bearer {configured}",
+            project="managed",
+            pipeline="bounded",
+        )
+
+    assert result == {
+        "error": "The logical lineage projection is unavailable",
+        "code": "LOGICAL_PROJECTION_UNAVAILABLE",
+        "action": "lineage_graph",
+    }
+    assert effects == []
+    assert sentinel not in json.dumps(result, sort_keys=True)
+    assert sentinel not in caplog.text
 
 
 def test_databricks_app_propagates_startup_failure(tmp_path):

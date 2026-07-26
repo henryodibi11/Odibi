@@ -26,6 +26,8 @@ from odibi_mcp.contracts.access import (
     ActionEffect,
     ApplicationIdentity,
     ManagedProjectAccess,
+    PreparedRuntimeCall,
+    RemoteLogicalLineageProjection,
 )
 from odibi_mcp.dispatcher import (
     ACTION_EFFECTS,
@@ -1750,6 +1752,133 @@ def test_remote_logical_lineage_bypasses_all_legacy_and_ambient_effects(
     serialized = json.dumps(result, indent=2, sort_keys=True)
     assert len(serialized.encode("utf-8")) <= 65536
     assert "state" not in result and "events" not in result
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
+    assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
+
+
+@pytest.mark.parametrize(
+    "prepared_case",
+    ["missing_projection", "mismatched_action", "duck_prepared", "duck_projection"],
+)
+def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
+    tmp_path, monkeypatch, caplog, prepared_case
+):
+    from odibi_mcp import dispatcher as dispatcher_module
+
+    projection = RemoteLogicalLineageProjection(pipeline="bounded", nodes=(), edges=())
+    prepared_kwargs = {"pipeline": PROJECTION_SENTINELS[4]}
+    if prepared_case == "duck_prepared":
+        prepared = SimpleNamespace(
+            action="lineage_graph",
+            kwargs=prepared_kwargs,
+            logical_lineage=projection,
+        )
+    else:
+        prepared = PreparedRuntimeCall(
+            action="story_read" if prepared_case == "mismatched_action" else "lineage_graph",
+            kwargs=prepared_kwargs,
+            project_root=tmp_path,
+            config_path=tmp_path / "odibi.yaml",
+            config_snapshot={"unknown": PROJECTION_SENTINELS[5]},
+            config_fingerprint=PROJECTION_SENTINELS[6],
+            logical_lineage=(
+                None
+                if prepared_case == "missing_projection"
+                else SimpleNamespace(pipeline=PROJECTION_SENTINELS[7])
+                if prepared_case == "duck_projection"
+                else projection
+            ),
+        )
+
+    access = ManagedProjectAccess("managed", tmp_path, tmp_path / "odibi.yaml")
+    monkeypatch.setattr(ManagedProjectAccess, "prepare", lambda self, action, kwargs: prepared)
+    dispatcher = OdibiDispatcher(access)
+    effects = []
+
+    def tripwire(name):
+        def unexpected(*args, **kwargs):
+            effects.append(name)
+            return {"sentinel": PROJECTION_SENTINELS[7]}
+
+        return unexpected
+
+    monkeypatch.setattr(dispatcher, "_bind_runtime_context", tripwire("bind_context"))
+    monkeypatch.setattr(dispatcher, "_restore_runtime_context", tripwire("restore_context"))
+    monkeypatch.setattr(dispatcher_module, "sanitize_runtime_result", tripwire("sanitizer"))
+    monkeypatch.setattr(
+        dispatcher_module,
+        "render_remote_logical_lineage_projection",
+        tripwire("projection_renderer"),
+    )
+    dispatcher._actions["lineage_graph"] = tripwire("legacy_lineage")
+
+    result = dispatcher.dispatch(
+        "lineage_graph",
+        project="managed",
+        pipeline="bounded",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "error": "The logical lineage projection is unavailable",
+        "code": "LOGICAL_PROJECTION_UNAVAILABLE",
+        "action": "lineage_graph",
+    }
+    assert effects == []
+    serialized = json.dumps(result, sort_keys=True)
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
+    assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
+
+
+def test_remote_logical_lineage_rejects_custom_managed_authority_before_projection_mint(
+    tmp_path, monkeypatch, caplog
+):
+    from odibi_mcp import dispatcher as dispatcher_module
+
+    calls = []
+    projection = RemoteLogicalLineageProjection(pipeline="bounded", nodes=(), edges=())
+
+    class MintingAccess:
+        def prepare(self, action, kwargs):
+            calls.append((action, kwargs))
+            return PreparedRuntimeCall(
+                action="lineage_graph",
+                kwargs={"pipeline": PROJECTION_SENTINELS[4]},
+                project_root=tmp_path,
+                config_path=tmp_path / "unvalidated.yaml",
+                config_snapshot={"unknown": PROJECTION_SENTINELS[5]},
+                config_fingerprint=PROJECTION_SENTINELS[6],
+                logical_lineage=projection,
+            )
+
+    dispatcher = OdibiDispatcher(MintingAccess())
+    effects = []
+
+    def unexpected(*args, **kwargs):
+        effects.append(PROJECTION_SENTINELS[7])
+        return {"sentinel": PROJECTION_SENTINELS[7]}
+
+    monkeypatch.setattr(dispatcher, "_bind_runtime_context", unexpected)
+    monkeypatch.setattr(dispatcher, "_restore_runtime_context", unexpected)
+    monkeypatch.setattr(dispatcher_module, "sanitize_runtime_result", unexpected)
+    monkeypatch.setattr(dispatcher_module, "render_remote_logical_lineage_projection", unexpected)
+    dispatcher._actions["lineage_graph"] = unexpected
+
+    result = dispatcher.dispatch(
+        "lineage_graph",
+        project="managed",
+        pipeline="bounded",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "error": "The logical lineage projection is unavailable",
+        "code": "LOGICAL_PROJECTION_UNAVAILABLE",
+        "action": "lineage_graph",
+    }
+    assert calls == []
+    assert effects == []
+    serialized = json.dumps(result, sort_keys=True)
     assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
     assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
 
