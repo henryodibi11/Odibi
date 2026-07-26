@@ -19,11 +19,8 @@ from typing import Any
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_request
 
-try:
-    from odibi_mcp.contracts.access import ApplicationIdentity, authenticate_bearer_identity
-except ImportError:  # Flat Databricks workspace deployment
-    from contracts.access import ApplicationIdentity, authenticate_bearer_identity
-from dispatcher import OdibiDispatcher  # No package prefix - files are at /workspace/ directly
+from odibi_mcp.contracts.access import ApplicationIdentity, authenticate_bearer_identity
+from odibi_mcp.dispatcher import OdibiDispatcher
 
 # Create FastMCP server instance
 mcp = FastMCP("odibi-knowledge")

@@ -8,10 +8,12 @@ See [INSTALL.md](INSTALL.md) for detailed installation instructions.
 
 **Quick start:**
 ```bash
-pip install odibi-mcp
+pip install "odibi[mcp]"
 ```
 
-This automatically installs the main `odibi` package and all required dependencies.
+The root `odibi` distribution is the canonical owner of the `odibi_mcp` package.
+The MCP extra requires Python 3.10 or newer because FastMCP 3.x does; core Odibi
+continues to support its wider declared Python range.
 
 ## Overview
 
@@ -94,7 +96,7 @@ The "Lazy Bronze" workflow for auto-generating pipelines:
 ### Stdio Mode (for MCP clients)
 
 ```bash
-python -m odibi_mcp.server
+python -m odibi_mcp
 ```
 
 ### HTTP Mode (for Databricks Apps)
@@ -105,8 +107,12 @@ python -m odibi_mcp.databricks_app
 
 Or with environment config:
 ```bash
-ODIBI_CONFIG=path/to/project.yaml python -m odibi_mcp.server
+ODIBI_CONFIG=path/to/project.yaml python -m odibi_mcp
 ```
+
+The root Databricks App configuration serves the package-qualified ASGI target
+`odibi_mcp.databricks_app:http_app`. Startup failures stop the application process;
+they are not converted into HTTP responses containing internal exception details.
 
 ## Configuration
 
@@ -117,7 +123,8 @@ See `mcp_config.example.yaml` for configuration options.
 After installing, verify all dependencies are available:
 
 ```bash
-python verify_install.py
+python -m pip check
+python -c "import odibi, odibi_mcp.mcp_server, odibi_mcp.databricks_app"
 ```
 
-This checks that the MCP gateway can import from both `odibi_mcp` and `odibi` packages.
+This checks the installed root distribution and both configured MCP import boundaries.
