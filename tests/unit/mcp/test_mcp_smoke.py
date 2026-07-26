@@ -199,14 +199,17 @@ def test_invalid_cors_configuration_fails_closed_without_echo(configured, monkey
 @pytest.mark.parametrize(
     "module,cwd",
     [
-        ("odibi_mcp.databricks_app", Path(__file__).resolve().parents[3]),
-        ("databricks_app", Path(__file__).resolve().parents[3] / "odibi_mcp"),
+        (
+            "odibi_mcp.databricks_app",
+            Path(databricks_app.__file__).resolve().parents[1],
+        ),
+        ("databricks_app", Path(databricks_app.__file__).resolve().parent),
     ],
 )
 def test_invalid_cors_configuration_aborts_import_with_fixed_error(module, cwd):
     sentinel = "cors-import-secret-sentinel"
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3])
+    env["PYTHONPATH"] = str(Path(databricks_app.__file__).resolve().parents[1])
     env["ODIBI_MCP_CORS_ORIGINS"] = f"https://example.com:{sentinel}"
 
     result = subprocess.run(
