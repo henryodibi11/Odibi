@@ -83,6 +83,8 @@ def corpus_dispatcher(tmp_path, monkeypatch):
     relative_drive_trap = tmp_path / "docs" / "guides" / "C:outside.md"
     relative_drive_trap.parent.mkdir(parents=True, exist_ok=True)
     relative_drive_trap.write_text("relative-drive fallback trap", encoding="utf-8")
+    ads_trap = tmp_path / "docs" / "guides" / "guide.md:secret.md"
+    ads_trap.write_text("alternate data stream trap", encoding="utf-8")
 
     skill = tmp_path / ".assistant" / "skills" / "safe-skill" / "SKILL.md"
     skill.parent.mkdir(parents=True)
@@ -231,6 +233,44 @@ def test_symlinked_odibi_docs_root_supports_exact_example(tmp_path, monkeypatch)
     assert result["source"] == "docs/patterns/linked_example.md"
 
 
+def test_configured_docs_directory_symlink_is_the_operator_owned_root(tmp_path, monkeypatch):
+    configured_root = tmp_path / "configured-root"
+    configured_root.mkdir()
+    owned_docs = tmp_path / "owned-docs"
+    example = owned_docs / "patterns" / "operator_owned.md"
+    example.parent.mkdir(parents=True)
+    example.write_text(
+        "# Operator owned\n\n```yaml\npipelines:\n  - pipeline: owned\n```\n",
+        encoding="utf-8",
+    )
+    doc = owned_docs / "guides" / "operator-owned.md"
+    doc.parent.mkdir()
+    doc.write_text("operator-owned documentation", encoding="utf-8")
+    try:
+        (configured_root / "docs").symlink_to(owned_docs, target_is_directory=True)
+    except (NotImplementedError, OSError) as error:
+        pytest.skip(f"symlink creation is genuinely unavailable: {error!r}")
+    monkeypatch.setenv("ODIBI_DOCS_ROOT", str(configured_root))
+
+    from odibi_mcp import knowledge
+
+    monkeypatch.setattr(knowledge, "_knowledge", None)
+    result = OdibiDispatcher().dispatch(
+        "get_example", pattern_name="operator-owned", application_identity=LOCAL_IDENTITY
+    )
+    doc_result = OdibiDispatcher().dispatch(
+        "get_doc",
+        doc_path="docs/guides/operator-owned.md",
+        application_identity=LOCAL_IDENTITY,
+    )
+
+    assert result["source"] == "docs/patterns/operator_owned.md"
+    assert doc_result == {
+        "path": "docs/guides/operator-owned.md",
+        "content": "operator-owned documentation",
+    }
+
+
 @pytest.mark.parametrize(
     "action,kwargs,expected_error",
     [
@@ -259,6 +299,11 @@ def test_symlinked_odibi_docs_root_supports_exact_example(tmp_path, monkeypatch)
             {"doc_path": "docs/guides/nested/topic.txt"},
             "Documentation file is unavailable.",
         ),
+        (
+            "get_doc",
+            {"doc_path": "docs/guides/guide.md:secret.md"},
+            "Documentation file is unavailable.",
+        ),
         ("get_example", {"pattern_name": "../../../outside"}, "Example is unavailable."),
         ("get_example", {"pattern_name": "/tmp/outside"}, "Example is unavailable."),
         ("get_example", {"pattern_name": "safe*"}, "Example is unavailable."),
@@ -282,6 +327,8 @@ def test_corpus_content_denials_happen_before_read(
 
     assert result["error"] == expected_error
     assert "content" not in result
+    if action == "get_example":
+        assert "escaped" not in result.get("available", [])
     assert not any(value in str(result) for value in kwargs.values())
 
 
@@ -314,14 +361,108 @@ def test_corpus_content_symlink_escape_denied_before_read(
     except (NotImplementedError, OSError) as error:
         pytest.skip(f"symlink creation is genuinely unavailable: {error!r}")
 
-    def unexpected_read(*args, **kwargs):
-        pytest.fail("escaped symlink content must not be read")
+    original_read = Path.read_text
 
-    monkeypatch.setattr(Path, "read_text", unexpected_read)
+    def guarded_read(path, *args, **kwargs):
+        if path == outside:
+            pytest.fail("escaped symlink content must not be read")
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read)
     result = corpus_dispatcher.dispatch(action, application_identity=LOCAL_IDENTITY, **kwargs)
 
     assert result["error"] == expected_error
     assert "content" not in result
+    if action == "get_example":
+        assert "escaped" not in result.get("available", [])
+
+
+def test_get_doc_descendant_directory_symlink_escape_denied_before_read(tmp_path, monkeypatch):
+    docs_root = tmp_path / "corpus" / "docs"
+    docs_root.mkdir(parents=True)
+    outside = tmp_path / "outside-patterns"
+    outside.mkdir()
+    (outside / "escaped.md").write_text("outside content", encoding="utf-8")
+    try:
+        (docs_root / "patterns").symlink_to(outside, target_is_directory=True)
+    except (NotImplementedError, OSError) as error:
+        pytest.skip(f"symlink creation is genuinely unavailable: {error!r}")
+
+    from odibi_mcp import knowledge
+
+    monkeypatch.setattr(knowledge, "_knowledge", OdibiKnowledge(tmp_path / "corpus"))
+
+    def unexpected_read(*args, **kwargs):
+        pytest.fail("escaped descendant directory content must not be read")
+
+    monkeypatch.setattr(Path, "read_text", unexpected_read)
+    result = OdibiDispatcher().dispatch(
+        "get_doc", doc_path="escaped.md", application_identity=LOCAL_IDENTITY
+    )
+
+    assert result == {"error": "Documentation file is unavailable."}
+
+
+def test_get_example_escaped_directory_exposes_no_names_or_match_oracle(tmp_path, monkeypatch):
+    docs_root = tmp_path / "corpus" / "docs"
+    docs_root.mkdir(parents=True)
+    outside = tmp_path / "outside-guides"
+    outside.mkdir()
+    (outside / "external_match.md").write_text(
+        "# External\n\n```yaml\npipelines: []\n```\n", encoding="utf-8"
+    )
+    try:
+        guides_link = docs_root / "guides"
+        guides_link.symlink_to(outside, target_is_directory=True)
+    except (NotImplementedError, OSError) as error:
+        pytest.skip(f"symlink creation is genuinely unavailable: {error!r}")
+
+    from odibi_mcp import knowledge
+
+    monkeypatch.setattr(knowledge, "_knowledge", OdibiKnowledge(tmp_path / "corpus"))
+
+    def unexpected_read(*args, **kwargs):
+        pytest.fail("escaped directory content must not be read")
+
+    original_iterdir = Path.iterdir
+    original_glob = Path.glob
+    original_exists = Path.exists
+
+    def guarded_iterdir(path, *args, **kwargs):
+        if path in {guides_link, outside}:
+            pytest.fail("escaped docs directory must not be enumerated")
+        return original_iterdir(path, *args, **kwargs)
+
+    def guarded_glob(path, *args, **kwargs):
+        if path in {guides_link, outside}:
+            pytest.fail("escaped docs directory must not be globbed")
+        return original_glob(path, *args, **kwargs)
+
+    def guarded_exists(path, *args, **kwargs):
+        if (
+            path == guides_link
+            or guides_link in path.parents
+            or path == outside
+            or outside in path.parents
+        ):
+            pytest.fail("escaped docs directory must not be probed with exists")
+        return original_exists(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unexpected_read)
+    monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
+    monkeypatch.setattr(Path, "glob", guarded_glob)
+    monkeypatch.setattr(Path, "exists", guarded_exists)
+    dispatcher = OdibiDispatcher()
+    matching = dispatcher.dispatch(
+        "get_example", pattern_name="external-match", application_identity=LOCAL_IDENTITY
+    )
+    nonmatching = dispatcher.dispatch(
+        "get_example", pattern_name="external-absent", application_identity=LOCAL_IDENTITY
+    )
+
+    assert matching == nonmatching
+    assert matching["error"] == "Example is unavailable."
+    assert "external_match" not in matching.get("available", [])
 
 
 def test_missing_skill_ignores_escaped_and_dangling_inventory_entries(
@@ -368,14 +509,15 @@ def test_missing_skill_ignores_escaped_and_dangling_inventory_entries(
         ("get_skill", {"name": "safe-skill"}, "Skill is unavailable.", "SKILL.md"),
     ],
 )
+@pytest.mark.parametrize("error_type", [OSError, RuntimeError, ValueError])
 def test_corpus_content_read_failures_are_sanitized(
-    corpus_dispatcher, monkeypatch, action, kwargs, expected_error, target_name
+    corpus_dispatcher, monkeypatch, action, kwargs, expected_error, target_name, error_type
 ):
     original_read = Path.read_text
 
     def failing_read(path, *args, **read_kwargs):
         if path.name == target_name:
-            raise OSError("generated failure at /sensitive/host/corpus")
+            raise error_type("generated failure at /sensitive/host/corpus")
         return original_read(path, *args, **read_kwargs)
 
     monkeypatch.setattr(Path, "read_text", failing_read)
@@ -383,6 +525,20 @@ def test_corpus_content_read_failures_are_sanitized(
 
     assert result == {"error": expected_error}
     assert "/sensitive/host/corpus" not in str(result)
+
+
+@pytest.mark.parametrize("error_type", [OSError, RuntimeError, ValueError])
+def test_skill_inventory_failures_are_sanitized(corpus_dispatcher, monkeypatch, error_type):
+    def failing_iterdir(path):
+        raise error_type("generated inventory failure at /sensitive/host/skills")
+
+    monkeypatch.setattr(Path, "iterdir", failing_iterdir)
+    result = corpus_dispatcher.dispatch(
+        "get_skill", name="not-present", application_identity=LOCAL_IDENTITY
+    )
+
+    assert result == {"error": "Skill is unavailable.", "available": []}
+    assert "/sensitive/host/skills" not in str(result)
 
 
 def test_example_directory_failure_is_sanitized(corpus_dispatcher, monkeypatch):
@@ -394,7 +550,25 @@ def test_example_directory_failure_is_sanitized(corpus_dispatcher, monkeypatch):
         "get_example", pattern_name="not_present", application_identity=LOCAL_IDENTITY
     )
 
-    assert result == {"error": "Example is unavailable."}
+    assert result["error"] == "Example is unavailable."
+    assert "/sensitive/host/docs" not in str(result)
+
+
+@pytest.mark.parametrize("error_type", [OSError, RuntimeError, ValueError])
+def test_example_resolution_probe_failure_is_sanitized(corpus_dispatcher, monkeypatch, error_type):
+    original_resolve = Path.resolve
+
+    def failing_resolve(path, *args, **kwargs):
+        if path.name == "probe_failure.md":
+            raise error_type("generated probe failure at /sensitive/host/docs")
+        return original_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", failing_resolve)
+    result = corpus_dispatcher.dispatch(
+        "get_example", pattern_name="probe-failure", application_identity=LOCAL_IDENTITY
+    )
+
+    assert result["error"] == "Example is unavailable."
     assert "/sensitive/host/docs" not in str(result)
 
 

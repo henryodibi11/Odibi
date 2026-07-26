@@ -45,7 +45,7 @@ def resolve_corpus_file(
     """Resolve a supported regular file contained by one corpus subtree."""
     if not isinstance(relative_path, str) or not relative_path or "\x00" in relative_path:
         return None
-    if "\\" in relative_path:
+    if "\\" in relative_path or ":" in relative_path:
         return None
 
     posix_path = PurePosixPath(relative_path)
@@ -61,10 +61,32 @@ def resolve_corpus_file(
         resolved_root = readable_root.resolve(strict=True)
         candidate = (resolved_root / Path(*posix_path.parts)).resolve(strict=True)
         candidate.relative_to(resolved_root)
+        return candidate if candidate.is_file() else None
     except (OSError, RuntimeError, ValueError):
         return None
 
-    return candidate if candidate.is_file() else None
+
+def resolve_corpus_directory(readable_root: Path, relative_path: str) -> Path | None:
+    """Resolve a directory contained by one canonical corpus subtree."""
+    if not isinstance(relative_path, str) or not relative_path or "\x00" in relative_path:
+        return None
+    if "\\" in relative_path or ":" in relative_path:
+        return None
+
+    posix_path = PurePosixPath(relative_path)
+    windows_path = PureWindowsPath(relative_path)
+    if posix_path.is_absolute() or windows_path.is_absolute() or windows_path.drive:
+        return None
+    if any(part in {"", ".", ".."} for part in relative_path.split("/")):
+        return None
+
+    try:
+        resolved_root = readable_root.resolve(strict=True)
+        candidate = (resolved_root / Path(*posix_path.parts)).resolve(strict=True)
+        candidate.relative_to(resolved_root)
+        return candidate if candidate.is_dir() else None
+    except (OSError, RuntimeError, ValueError):
+        return None
 
 
 def is_packaged() -> bool:
