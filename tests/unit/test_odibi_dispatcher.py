@@ -100,7 +100,6 @@ EXPECTED_EFFECT_ACTIONS = {
         "get_workflow",
         "list_transformers",
         "list_patterns",
-        "apply_pattern_template",
         "validate_yaml",
         "validate_pipeline",
         "get_task_guidance",
@@ -120,6 +119,7 @@ EXPECTED_EFFECT_ACTIONS = {
         "node_sample",
         "node_failed_rows",
         "lineage_graph",
+        "apply_pattern_template",
         "suggest_pipeline",
         "diagnose",
         "get_doc",
@@ -151,6 +151,32 @@ def test_all_registered_actions_have_the_reviewed_effect_classification():
     assert len(expected) == 43
     assert ACTION_EFFECTS == expected
     assert set(D._actions) == set(expected)
+
+
+def test_anonymous_pattern_template_denies_before_construction_render(monkeypatch):
+    """Tripwire the delegate that can read and mutate shared project context."""
+    fake_construction = ModuleType("tools.construction")
+
+    def unexpected_apply_pattern_template(*args, **kwargs):
+        pytest.fail("authorization must deny before construction reaches render_runnable_yaml")
+
+    fake_construction.apply_pattern_template = unexpected_apply_pattern_template
+    monkeypatch.setitem(sys.modules, "tools.construction", fake_construction)
+
+    result = OdibiDispatcher().dispatch(
+        "apply_pattern_template",
+        pattern="fact",
+        table_name="orders",
+        connection="project_connection",
+        source_path="orders",
+    )
+
+    assert result == {
+        "error": "Application identity is required for this action",
+        "code": "AUTHORIZATION_REQUIRED",
+        "action": "apply_pattern_template",
+        "effect": "sensitive_read",
+    }
 
 
 def test_registry_drift_fails_dispatcher_initialization():

@@ -35,7 +35,8 @@ ACTION_EFFECTS: dict[str, ActionEffect] = {
     # Construction
     "list_transformers": ActionEffect.PUBLIC_READ,
     "list_patterns": ActionEffect.PUBLIC_READ,
-    "apply_pattern_template": ActionEffect.PUBLIC_READ,
+    # Rendering reads and may update shared project connection context.
+    "apply_pattern_template": ActionEffect.SENSITIVE_READ,
     "suggest_pipeline": ActionEffect.SENSITIVE_READ,
     "create_ingestion_pipeline": ActionEffect.SESSION_MUTATION,
     # Validation
