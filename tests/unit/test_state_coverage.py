@@ -39,6 +39,12 @@ class _SparkConditionError(Exception):
         return self.condition
 
 
+class _WrappedJavaSparkError(Exception):
+    def __init__(self, java_exception, message="Spark JVM operation failed"):
+        super().__init__(message)
+        self.java_exception = java_exception
+
+
 @pytest.fixture
 def mocked_pyspark_modules():
     """Install minimal PySpark modules so state tests exercise Odibi, not a live JVM."""
@@ -370,8 +376,9 @@ class TestCatalogStateHWM:
         "error",
         [
             _SparkConditionError("PATH_NOT_FOUND"),
-            RuntimeError("[TABLE_OR_VIEW_NOT_FOUND] missing state table"),
+            _WrappedJavaSparkError(_SparkConditionError("PATH_NOT_FOUND")),
         ],
+        ids=["python-structured", "wrapped-java-structured"],
     )
     def test_get_hwm_spark_true_missing_state(self, error, mocked_pyspark_modules):
         spark = MagicMock()
@@ -379,6 +386,44 @@ class TestCatalogStateHWM:
 
         backend = CatalogStateBackend("/r", "/s", spark_session=spark)
         assert backend.get_hwm("k") is None
+
+    def test_get_hwm_spark_nested_bracketed_missing_text_is_operational(
+        self, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        nested = _SparkConditionError("PATH_NOT_FOUND")
+        error = RuntimeError("authorization wrapper contains [PATH_NOT_FOUND]")
+        error.__cause__ = nested
+        spark.read.format.return_value.load.side_effect = error
+
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+        with pytest.raises(RuntimeError) as raised:
+            backend.get_hwm("k")
+
+        assert raised.value is error
+
+    @pytest.mark.parametrize("failure_point", ["load", "filter", "first"])
+    def test_get_hwm_spark_structured_table_not_found_is_operational(
+        self, failure_point, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        error = _SparkConditionError("TABLE_OR_VIEW_NOT_FOUND")
+        loaded = spark.read.format.return_value.load.return_value
+        filtered = loaded.filter.return_value
+        selected = filtered.select.return_value
+
+        if failure_point == "load":
+            spark.read.format.return_value.load.side_effect = error
+        elif failure_point == "filter":
+            loaded.filter.side_effect = error
+        else:
+            selected.first.side_effect = error
+
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+        with pytest.raises(_SparkConditionError) as raised:
+            backend.get_hwm("k")
+
+        assert raised.value is error
 
     def test_get_hwm_spark_absent_key(self, mocked_pyspark_modules):
         spark = MagicMock()
@@ -597,6 +642,24 @@ class TestCatalogStateSpark:
         backend = CatalogStateBackend("/r", "/s", spark_session=spark)
         assert backend._spark_table_exists("/path") is False
 
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("operational wrapper contains [PATH_NOT_FOUND]"),
+            _SparkConditionError("TABLE_OR_VIEW_NOT_FOUND"),
+        ],
+        ids=["bracket-only-path", "structured-table"],
+    )
+    def test_spark_table_exists_false_missing_signals_are_visible(self, error):
+        spark = MagicMock()
+        spark.read.format.return_value.load.side_effect = error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with pytest.raises(type(error)) as raised:
+            backend._spark_table_exists("/path")
+
+        assert raised.value is error
+
     @pytest.mark.parametrize("failure_point", ["load", "count"])
     def test_spark_table_exists_operational_failure_is_visible(self, failure_point):
         spark = MagicMock()
@@ -613,15 +676,25 @@ class TestCatalogStateSpark:
         assert raised.value is error
 
     @pytest.mark.parametrize("batch", [False, True])
-    def test_spark_setter_probe_failure_performs_zero_writes(self, batch, mocked_pyspark_modules):
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("authorization failed"),
+            RuntimeError("operational wrapper contains [PATH_NOT_FOUND]"),
+            _SparkConditionError("TABLE_OR_VIEW_NOT_FOUND"),
+        ],
+        ids=["authorization", "bracket-only-path", "structured-table"],
+    )
+    def test_spark_setter_probe_failure_performs_zero_writes(
+        self, batch, error, mocked_pyspark_modules
+    ):
         spark = MagicMock()
         updates_df = MagicMock()
         spark.createDataFrame.return_value = updates_df
-        error = RuntimeError("authorization failed")
         spark.read.format.return_value.load.side_effect = error
         backend = CatalogStateBackend("/r", "/s", spark_session=spark)
 
-        with pytest.raises(RuntimeError, match="authorization failed") as raised:
+        with pytest.raises(type(error)) as raised:
             if batch:
                 backend.set_hwm_batch([{"key": "k", "value": "v"}])
             else:
@@ -672,6 +745,25 @@ class TestCatalogStateSpark:
         exists.assert_called_once_with("/s")
         retry_sleep.assert_not_called()
         updates_df.write.format.return_value.mode.return_value.save.assert_called_once_with("/s")
+        spark.sql.assert_not_called()
+
+    def test_spark_first_create_bracket_only_conflict_is_not_reprobed(self, mocked_pyspark_modules):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        create_error = RuntimeError("[DELTA_PATH_EXISTS] path already exists")
+        updates_df.write.format.return_value.mode.return_value.save.side_effect = create_error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with (
+            patch.object(backend, "_spark_table_exists", return_value=False) as exists,
+            pytest.raises(RuntimeError) as raised,
+        ):
+            backend.set_hwm("k", "v")
+
+        assert raised.value is create_error
+        exists.assert_called_once_with("/s")
+        updates_df.createOrReplaceTempView.assert_not_called()
         spark.sql.assert_not_called()
 
     def test_spark_first_create_race_reprobes_and_merges(self, mocked_pyspark_modules):

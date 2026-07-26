@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import random
-import re
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -11,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-_SPARK_MISSING_STATE_CONDITIONS = frozenset({"PATH_NOT_FOUND", "TABLE_OR_VIEW_NOT_FOUND"})
+_SPARK_MISSING_STATE_CONDITIONS = frozenset({"PATH_NOT_FOUND"})
 _SPARK_CREATE_CONFLICT_CONDITIONS = frozenset(
     {"DELTA_PATH_EXISTS", "PATH_ALREADY_EXISTS", "TABLE_OR_VIEW_ALREADY_EXISTS"}
 )
@@ -33,13 +32,11 @@ def _spark_error_condition(error: Exception) -> Optional[str]:
                 continue
             if condition:
                 return str(condition)
-
-    match = re.search(r"\[([A-Z][A-Z0-9_]*)\]", str(error))
-    return match.group(1) if match else None
+    return None
 
 
 def _is_missing_spark_state_error(error: Exception) -> bool:
-    """Return whether Spark explicitly reported a missing path or catalog table."""
+    """Return whether Spark structured metadata reports a missing configured path."""
     return _spark_error_condition(error) in _SPARK_MISSING_STATE_CONDITIONS
 
 
