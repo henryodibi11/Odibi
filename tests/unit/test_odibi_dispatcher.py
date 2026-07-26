@@ -1054,6 +1054,59 @@ def test_remote_map_environment_caps_many_schema_identifiers_at_requested_limit(
     }
 
 
+@pytest.mark.parametrize(
+    ("limit", "expected_capped"),
+    [
+        (1, True),
+        (100, False),
+    ],
+)
+def test_remote_map_environment_missing_sql_schema_never_embeds_available_inventory(
+    managed_dispatcher, monkeypatch, limit, expected_capped
+):
+    from odibi.connections.azure_sql import AzureSQL
+    from odibi_mcp import context as context_module
+
+    dispatcher, _ = managed_dispatcher
+    schema_names = [f"private_schema_{index:03d}_sentinel" for index in range(101)]
+    connection = AzureSQL(server="managed.invalid", database="managed")
+    monkeypatch.setattr(connection, "list_schemas", lambda: schema_names)
+    monkeypatch.setattr(
+        connection,
+        "list_tables",
+        lambda *args, **kwargs: pytest.fail("missing schema must not enumerate tables"),
+    )
+    monkeypatch.setattr(
+        context_module.MCPProjectContext,
+        "get_connection",
+        lambda self, name: connection,
+    )
+
+    result = dispatcher.dispatch(
+        "map_environment",
+        project="managed",
+        connection="sql",
+        path="missing_schema",
+        limit=limit,
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    serialized = json.dumps(result, sort_keys=True, default=str)
+    disclosed_identifiers = [name for name in schema_names if name in serialized]
+    assert "error" not in result
+    assert result["next_step"] == "Schema 'missing_schema' not found"
+    assert len(disclosed_identifiers) <= limit
+    assert disclosed_identifiers == []
+    assert result["truncated"] is expected_capped
+    assert result["truncated_reason"] == ("enumeration_limit" if expected_capped else None)
+    assert len(result["recommendations"]) == min(2, limit)
+    assert result["policy_applied"] == {
+        "project_scoped": True,
+        "enumeration_capped": expected_capped,
+        "enumeration_limit": limit,
+    }
+
+
 def test_remote_map_environment_reports_legacy_suggestion_display_cap(
     managed_dispatcher, monkeypatch
 ):

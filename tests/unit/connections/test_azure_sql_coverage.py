@@ -598,6 +598,8 @@ class TestDiscoverCatalog:
         with patch.object(conn, "list_schemas", return_value=["dbo"]):
             result = conn.discover_catalog(path="nonexistent")
         assert result["total_datasets"] == 0
+        assert result["next_step"] == "Schema 'nonexistent' not found"
+        assert "dbo" not in result["next_step"]
 
     def test_pattern_filter(self, conn_engine):
         conn, engine = conn_engine
