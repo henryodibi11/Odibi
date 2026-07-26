@@ -1,4 +1,8 @@
-"""Non-effectful pipeline validation and dry-run tools for MCP."""
+"""Pipeline validation and CLI dry-run tools for MCP.
+
+Dry-run always selects the CLI ``--dry-run`` command, but known catalog/bootstrap
+side effects remain unresolved pending global dry-run hardening.
+"""
 
 import tempfile
 from pathlib import Path
@@ -26,7 +30,7 @@ def test_pipeline(
 
     Args:
         yaml_content: Complete odibi YAML configuration
-        mode: Non-effectful testing mode (validate or dry-run)
+        mode: Supported testing mode (validate or dry-run)
         max_rows: Validated row bound forwarded by the MCP dispatcher
 
     Returns:

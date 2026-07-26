@@ -224,9 +224,11 @@ def test_execution_helper_builds_exact_dry_run_command(monkeypatch):
         ({"max_rows": 1001}, ValueError),
     ],
 )
-def test_execution_helper_rejects_invalid_controls_before_effects(monkeypatch, kwargs, error_type):
+def test_execution_helper_rejects_invalid_controls_before_downstream_calls(
+    monkeypatch, kwargs, error_type
+):
     def unexpected_call(*args, **call_kwargs):
-        pytest.fail("invalid controls must fail before parsing or execution effects")
+        pytest.fail("invalid controls must fail before parser, tempfile, or subprocess calls")
 
     monkeypatch.setattr(execution.yaml, "safe_load", unexpected_call)
     monkeypatch.setattr(execution.tempfile, "NamedTemporaryFile", unexpected_call)
@@ -236,9 +238,9 @@ def test_execution_helper_rejects_invalid_controls_before_effects(monkeypatch, k
         execution.test_pipeline(VALID_PIPELINE_YAML, **kwargs)
 
 
-def test_execution_helper_rejects_positional_mode_before_effects(monkeypatch):
+def test_execution_helper_rejects_positional_mode_before_downstream_calls(monkeypatch):
     def unexpected_call(*args, **kwargs):
-        pytest.fail("positional ambiguity must fail before parsing or execution effects")
+        pytest.fail("positional ambiguity must fail before parser, tempfile, or subprocess calls")
 
     monkeypatch.setattr(execution.yaml, "safe_load", unexpected_call)
     monkeypatch.setattr(execution.tempfile, "NamedTemporaryFile", unexpected_call)

@@ -130,7 +130,7 @@ TASK_GUIDANCE = {
                     {
                         "label": "Dry-run (recommended)",
                         "value": "dry-run",
-                        "description": "Show execution plan without running (safe, ~5 sec)",
+                        "description": "Invoke CLI --dry-run; catalog/bootstrap side effects remain possible (~5 sec)",
                     },
                 ],
                 "default": "dry-run",
