@@ -386,6 +386,14 @@ through bind, helper execution, serialization, and restoration. Tests should cov
 mutation between prepare/bind, concurrent isolation, exception restoration, and no pre-authorization
 connection initialization.
 
+### MCP CORS Origins Need Full Lexical Authority Validation
+
+Do not treat `urllib.parse.urlsplit().hostname` as proof that an entire browser origin authority was
+consumed: malformed values such as `https://[::1]evil.example` can expose a valid hostname prefix.
+Validate the complete `scheme://host[:port]` grammar first, then normalize and compare exact origins.
+Suppress parser exception chaining for operator-supplied values, and permit `OPTIONS` past the outer
+origin boundary only when `Access-Control-Request-Method` proves it is a CORS preflight.
+
 ### Mock PySpark Setup (Critical Order)
 PySpark 4.1.1 IS installed in this environment, so `catalog.py`'s try/except imports succeed and the fallback type stubs (lines 22-137) are NOT defined. These stubs are NOT dead code — they're essential for Pandas-only deployments. **Do not remove them.**
 
