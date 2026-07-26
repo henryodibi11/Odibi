@@ -2,10 +2,13 @@
 
 from unittest.mock import MagicMock, call, patch
 
+import pandas as pd
 import pytest
 
 from odibi.config import NodeConfig, RetryConfig
+from odibi.context import Context, PandasContext
 from odibi.node import Node, NodeResult
+from odibi.state import CatalogStateBackend, StateManager
 
 
 @pytest.fixture
@@ -500,6 +503,265 @@ class TestNodeExecuteWithRetries:
             assert result.success is False
             assert result.error is hwm_error
             assert result.metadata["hwm_error"] == "HWM write failed"
+
+    def test_execute_hwm_read_error_fails_before_data_write(self, mock_engine, connections):
+        config = NodeConfig(
+            name="incremental_node",
+            cache=True,
+            read={
+                "connection": "src",
+                "format": "csv",
+                "path": "input.csv",
+                "incremental": {
+                    "mode": "stateful",
+                    "column": "updated_at",
+                    "state_key": "test_hwm",
+                },
+            },
+            write={"connection": "dst", "format": "csv", "path": "output.csv"},
+        )
+        context = PandasContext()
+        node = Node(config=config, context=context, engine=mock_engine, connections=connections)
+        state_manager = MagicMock()
+        state_manager.get_hwm.side_effect = RuntimeError("state read unavailable")
+        node.state_manager = state_manager
+        node.executor.state_manager = state_manager
+
+        result = node.execute()
+
+        assert result.success is False
+        assert result.metadata["_run_record"]["status"] == "FAILURE"
+        assert result.metadata["retry_history"][0]["error"] == "state read unavailable"
+        mock_engine.write.assert_not_called()
+        assert context.has(config.name) is False
+        assert node._cached_result is None
+
+    def test_execute_hwm_commit_failure_cleans_up_then_rerun_uses_durable_boundary(
+        self, tmp_path, connections
+    ):
+        """Public execution exposes failed commit and explicit rerun recovery."""
+        events = []
+        frame = pd.DataFrame({"updated_at": pd.to_datetime(["2024-01-01", "2024-02-01"])})
+
+        class RecordingEngine:
+            name = "pandas"
+
+            def read(self, **_kwargs):
+                events.append("read")
+                return frame.copy()
+
+            def table_exists(self, *_args):
+                return True
+
+            def count_rows(self, df):
+                return len(df)
+
+            def get_schema(self, df):
+                return {column: str(dtype) for column, dtype in df.dtypes.items()}
+
+            def get_sample(self, df, n=10):
+                return df.head(n).to_dict(orient="records")
+
+            def write(self, **_kwargs):
+                events.append(("data_write", len(_kwargs["df"])))
+
+            def get_source_files(self, _df):
+                return []
+
+            def profile_nulls(self, _df):
+                return {}
+
+            def filter_greater_than(self, df, column, value):
+                events.append(("filter", column, value))
+                return df[df[column] > pd.Timestamp(value)]
+
+        class FailFirstCommitBackend(CatalogStateBackend):
+            def __init__(self, state_path):
+                super().__init__("/unused-runs", state_path, environment="test")
+                self.fail_first_commit = True
+
+            def set_hwm(self, key, value):
+                if self.fail_first_commit:
+                    self.fail_first_commit = False
+                    raise RuntimeError("HWM write failed")
+                super().set_hwm(key, value)
+
+        config = NodeConfig(
+            name="incremental_node",
+            cache=True,
+            read={
+                "connection": "src",
+                "format": "csv",
+                "path": "input.csv",
+                "incremental": {
+                    "mode": "stateful",
+                    "column": "updated_at",
+                    "state_key": "test_hwm",
+                },
+            },
+            write={"connection": "dst", "format": "csv", "path": "output.csv"},
+        )
+        context = PandasContext()
+        node = Node(
+            config=config,
+            context=context,
+            engine=RecordingEngine(),
+            connections=connections,
+        )
+        backend = FailFirstCommitBackend(str(tmp_path / "state"))
+        state_manager = StateManager(backend=backend)
+        node.state_manager = state_manager
+        node.executor.state_manager = state_manager
+
+        first_result = node.execute()
+
+        expected_hwm = pd.Timestamp("2024-02-01")
+        assert first_result.success is False
+        assert str(first_result.error) == "HWM write failed"
+        assert first_result.metadata["hwm_error"] == "HWM write failed"
+        assert first_result.metadata["hwm_pending"] is True
+        assert first_result.metadata["data_write_committed"] is True
+        assert first_result.metadata["retry_history"] == [
+            {
+                "attempt": 1,
+                "success": False,
+                "phase": "hwm_commit",
+                "data_write_committed": True,
+                "error": "HWM write failed",
+                "error_type": "RuntimeError",
+                "duration": first_result.metadata["retry_history"][0]["duration"],
+            }
+        ]
+        assert first_result.metadata["_run_record"]["status"] == "FAILURE"
+        assert first_result.duration >= first_result.metadata["hwm_commit_duration_ms"] / 1000
+        assert first_result.metadata["context_cleanup_status"] == "removed"
+        assert "context_cleanup_error" not in first_result.metadata
+        assert context.has(config.name) is False
+        assert node._cached_result is None
+        assert events == ["read", ("data_write", 2)]
+
+        second_result = node.execute()
+
+        assert second_result.success is True
+        assert second_result.metadata["hwm_pending"] is False
+        assert second_result.metadata["retry_history"][0]["success"] is True
+        assert second_result.metadata["_run_record"]["status"] == "SUCCESS"
+        assert context.has(config.name) is True
+        assert node._cached_result is context.get(config.name)
+        assert pd.Timestamp(backend.get_hwm("test_hwm")) == expected_hwm
+
+        third_result = node.execute()
+
+        assert third_result.success is True
+        assert third_result.rows_processed == 0
+        assert events == [
+            "read",
+            ("data_write", 2),
+            "read",
+            ("data_write", 2),
+            "read",
+            ("filter", "updated_at", "2024-02-01 00:00:00"),
+            ("data_write", 0),
+        ]
+
+    @pytest.mark.parametrize("cleanup_behavior", ["raises", "no_op"])
+    def test_execute_hwm_commit_failure_never_replays_when_context_cleanup_is_incomplete(
+        self, cleanup_behavior, connections
+    ):
+        """Cleanup failure is visible without replacing or replaying the HWM failure."""
+
+        class CleanupContext(PandasContext):
+            if cleanup_behavior == "no_op":
+                unregister = Context.unregister
+
+            else:
+
+                def unregister(self, name):
+                    raise RuntimeError(f"failed to unregister {name}")
+
+        frame = pd.DataFrame({"updated_at": pd.to_datetime(["2024-01-01"])})
+
+        class RecordingEngine:
+            name = "pandas"
+
+            def __init__(self):
+                self.write_calls = 0
+
+            def read(self, **_kwargs):
+                return frame.copy()
+
+            def table_exists(self, *_args):
+                return True
+
+            def count_rows(self, df):
+                return len(df)
+
+            def get_schema(self, df):
+                return {column: str(dtype) for column, dtype in df.dtypes.items()}
+
+            def get_sample(self, df, n=10):
+                return df.head(n).to_dict(orient="records")
+
+            def write(self, **_kwargs):
+                self.write_calls += 1
+
+            def get_source_files(self, _df):
+                return []
+
+            def profile_nulls(self, _df):
+                return {}
+
+        engine = RecordingEngine()
+
+        config = NodeConfig(
+            name="incremental_node",
+            cache=True,
+            read={
+                "connection": "src",
+                "format": "csv",
+                "path": "input.csv",
+                "incremental": {
+                    "mode": "stateful",
+                    "column": "updated_at",
+                    "state_key": "test_hwm",
+                },
+            },
+            write={"connection": "dst", "format": "csv", "path": "output.csv"},
+        )
+        context = CleanupContext()
+        retry_config = RetryConfig(enabled=True, max_attempts=3)
+        node = Node(
+            config=config,
+            context=context,
+            engine=engine,
+            connections=connections,
+            retry_config=retry_config,
+        )
+        state_manager = MagicMock()
+        hwm_error = RuntimeError("HWM write failed")
+        state_manager.get_hwm.return_value = None
+        state_manager.set_hwm.side_effect = hwm_error
+        node.state_manager = state_manager
+        node.executor.state_manager = state_manager
+
+        with patch.object(node.executor, "execute", wraps=node.executor.execute) as execute:
+            result = node.execute()
+
+        assert result.success is False
+        assert result.error is hwm_error
+        assert result.metadata["hwm_error"] == "HWM write failed"
+        assert result.metadata["context_cleanup_status"] == "retained"
+        if cleanup_behavior == "raises":
+            assert result.metadata["context_cleanup_error"] == (
+                "failed to unregister incremental_node"
+            )
+        else:
+            assert "context_cleanup_error" not in result.metadata
+        assert result.metadata["_run_record"]["status"] == "FAILURE"
+        assert context.has(config.name) is True
+        assert node._cached_result is None
+        execute.assert_called_once()
+        assert engine.write_calls == 1
 
     def test_execute_with_retries_caches_result_when_enabled(
         self, mock_context, mock_engine, connections, basic_config
