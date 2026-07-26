@@ -19,7 +19,9 @@ try:
         ApplicationIdentity,
         ManagedProjectAccess,
         PreparedRuntimeCall,
+        RemotePatternRenderProjection,
         RuntimeAccessDenied,
+        prepare_remote_pattern_render,
         sanitize_runtime_result,
     )
 except ImportError:  # Flat Databricks workspace deployment
@@ -29,7 +31,9 @@ except ImportError:  # Flat Databricks workspace deployment
         ApplicationIdentity,
         ManagedProjectAccess,
         PreparedRuntimeCall,
+        RemotePatternRenderProjection,
         RuntimeAccessDenied,
+        prepare_remote_pattern_render,
         sanitize_runtime_result,
     )
 
@@ -100,12 +104,14 @@ _RUNTIME_ACCESS_MESSAGES = {
     "PHYSICAL_REFERENCES_DISABLED": "Remote physical references are unavailable",
     "REMOTE_WORKFLOW_DISABLED": "This workflow is unavailable over the remote transport",
     "REMOTE_RENDERING_DISABLED": "This rendering action is unavailable over the remote transport",
+    "REMOTE_RENDER_PROJECTION_REQUIRED": "The remote-safe rendering projection is required",
+    "PROJECTED_RENDER_FAILED": "The remote-safe template could not be rendered",
     "RUNTIME_DATA_UNAVAILABLE": "Runtime data is unavailable",
 }
 
 _REMOTE_SAFE_WORKFLOWS = frozenset({"validate_yaml_simple"})
 _REMOTE_DISABLED_RENDERING_ACTIONS = frozenset(
-    {"apply_pattern_template", "create_ingestion_pipeline", "render_pipeline_yaml"}
+    {"create_ingestion_pipeline", "render_pipeline_yaml"}
 )
 _RUNTIME_CONTEXT_LOCK = RLock()
 
@@ -247,7 +253,15 @@ class OdibiDispatcher:
             isinstance(application_identity, ApplicationIdentity)
             and application_identity.subject != "trusted-local"
         )
-        if is_remote_identity and action in _REMOTE_DISABLED_RENDERING_ACTIONS:
+        remote_pattern_projection: RemotePatternRenderProjection | None = None
+        if is_remote_identity and action == "apply_pattern_template":
+            try:
+                remote_pattern_projection = prepare_remote_pattern_render(args, kwargs)
+            except RuntimeAccessDenied as error:
+                return self._runtime_access_error(action, error.code)
+            except Exception:
+                return self._runtime_access_error(action, "REMOTE_RENDER_PROJECTION_REQUIRED")
+        elif is_remote_identity and action in _REMOTE_DISABLED_RENDERING_ACTIONS:
             return self._runtime_access_error(action, "REMOTE_RENDERING_DISABLED")
         if is_remote_identity and action in {"run_workflow", "resume_workflow"}:
             if args:
@@ -277,7 +291,10 @@ class OdibiDispatcher:
                 if prepared_runtime_call is not None:
                     previous_context = self._bind_runtime_context(prepared_runtime_call)
                 try:
-                    result = self._actions[action](*args, **kwargs)
+                    if remote_pattern_projection is not None:
+                        result = self._render_remote_pattern_projection(remote_pattern_projection)
+                    else:
+                        result = self._actions[action](*args, **kwargs)
                     # Ensure result is serializable
                     serialized = self._to_serializable(result)
                     if prepared_runtime_call is not None:
@@ -289,6 +306,8 @@ class OdibiDispatcher:
         except RuntimeAccessDenied as error:
             return self._runtime_access_error(action, error.code)
         except TypeError as e:
+            if remote_pattern_projection is not None:
+                return self._runtime_access_error(action, "PROJECTED_RENDER_FAILED")
             if prepared_runtime_call is not None:
                 return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
             # Signature mismatch - provide helpful error
@@ -301,7 +320,9 @@ class OdibiDispatcher:
                 "expected_signature": str(sig),
                 "tip": f"Run odibi_help(action='{action}') for usage details",
             }
-        except Exception as e:
+        except Exception as error:
+            if remote_pattern_projection is not None:
+                return self._runtime_access_error(action, "PROJECTED_RENDER_FAILED")
             if prepared_runtime_call is not None:
                 return {
                     "error": "Runtime data is unavailable",
@@ -309,7 +330,7 @@ class OdibiDispatcher:
                     "action": action,
                 }
             return {
-                "error": str(e),
+                "error": str(error),
                 "action": action,
                 "tip": f"Run odibi_help(action='{action}') for usage details",
             }
@@ -1011,6 +1032,17 @@ class OdibiDispatcher:
         from tools.construction import list_patterns
 
         return list_patterns()
+
+    def _render_remote_pattern_projection(
+        self, projection: RemotePatternRenderProjection
+    ) -> dict[str, Any]:
+        """Render only the data-free projection prepared at the dispatch boundary."""
+        try:
+            from odibi_mcp.tools.render import render_remote_pattern_projection
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.render import render_remote_pattern_projection
+
+        return render_remote_pattern_projection(projection)
 
     def _apply_pattern_template(
         self, pattern: str, table_name: str, connection: str, source_path: str

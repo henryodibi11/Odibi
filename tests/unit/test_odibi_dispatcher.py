@@ -7,6 +7,7 @@ actions, so a help-only test passed. This test actually DISPATCHES each action a
 asserts it returns real data, so that regression can't recur.
 """
 
+import base64
 import io
 import json
 import sys
@@ -43,6 +44,12 @@ RENDER_SENTINELS = (
     "UNIQUE_CONNECTION_STRING_SENTINEL_8c4d",
     "UNIQUE_ACCOUNT_KEY_SENTINEL_9d5e",
     "UNIQUE_UNKNOWN_HOST_SENTINEL_a06f",
+)
+PROJECTION_SENTINELS = RENDER_SENTINELS + (
+    "UNIQUE_UNKNOWN_NESTED_SCALAR_SENTINEL_b17a",
+    "UNIQUE_BUILDER_SESSION_SENTINEL_c28b",
+    "UNIQUE_WORKFLOW_EVENT_SENTINEL_d39c",
+    "UNIQUE_REJECTED_RENDER_VALUE_SENTINEL_e40d",
 )
 
 VALID_PIPELINE_YAML = """
@@ -696,13 +703,19 @@ def test_all_registered_actions_have_the_reviewed_effect_classification():
 
 def test_anonymous_pattern_template_denies_before_construction_render(monkeypatch):
     """Tripwire the delegate that can read and mutate shared project context."""
+    from odibi_mcp import dispatcher as dispatcher_module
+
     fake_construction = ModuleType("tools.construction")
 
     def unexpected_apply_pattern_template(*args, **kwargs):
         pytest.fail("authorization must deny before construction reaches render_runnable_yaml")
 
+    def unexpected_projection(*args, **kwargs):
+        pytest.fail("authorization must deny before remote projection validation")
+
     fake_construction.apply_pattern_template = unexpected_apply_pattern_template
     monkeypatch.setitem(sys.modules, "tools.construction", fake_construction)
+    monkeypatch.setattr(dispatcher_module, "prepare_remote_pattern_render", unexpected_projection)
 
     result = OdibiDispatcher().dispatch(
         "apply_pattern_template",
@@ -1637,9 +1650,13 @@ def test_every_remote_perimeter_action_remains_identity_restricted():
     perimeter_actions = (
         RUNTIME_DATA_ACTIONS
         | _REMOTE_DISABLED_RENDERING_ACTIONS
-        | {"run_workflow", "resume_workflow"}
+        | {"apply_pattern_template", "run_workflow", "resume_workflow"}
     )
 
+    assert _REMOTE_DISABLED_RENDERING_ACTIONS == {
+        "create_ingestion_pipeline",
+        "render_pipeline_yaml",
+    }
     assert all(
         ACTION_EFFECTS[action] is not ActionEffect.PUBLIC_READ for action in perimeter_actions
     )
@@ -1706,19 +1723,302 @@ def test_remote_validate_workflow_has_transitive_effect_tripwires(monkeypatch):
     assert all(sentinel not in serialized for sentinel in RENDER_SENTINELS)
 
 
+def test_remote_safe_fact_projection_is_constant_bounded_and_context_free(monkeypatch):
+    from odibi_mcp import context as context_module
+    from odibi_mcp.tools import render as render_module
+
+    class UnexpectedManagedAccess:
+        def prepare(self, action, kwargs):
+            pytest.fail("constant remote projection must not prepare managed project context")
+
+    def unexpected_effect(*args, **kwargs):
+        pytest.fail("constant remote projection reached ambient context or the legacy delegate")
+
+    previous = context_module.get_project_context()
+    secret_config = yaml.safe_load(VALID_PIPELINE_YAML)
+    secret_config["connections"]["local"].update(
+        {
+            "password": RENDER_SENTINELS[0],
+            "connection_string": RENDER_SENTINELS[1],
+            "account_key": RENDER_SENTINELS[2],
+            "unknown_host": RENDER_SENTINELS[3],
+            "unknown_nested": {
+                "opaque": PROJECTION_SENTINELS[4],
+                "builder_state": PROJECTION_SENTINELS[5],
+                "workflow_event": PROJECTION_SENTINELS[6],
+            },
+        }
+    )
+    context_module.set_project_context(
+        context_module.MCPProjectContext.from_config_snapshot("managed.yaml", secret_config)
+    )
+    dispatcher = OdibiDispatcher(UnexpectedManagedAccess())
+    dispatcher._actions["apply_pattern_template"] = unexpected_effect
+    monkeypatch.setattr(render_module, "get_project_context", unexpected_effect)
+    try:
+        result = dispatcher.dispatch(
+            "apply_pattern_template",
+            pattern="fact",
+            table_name="fact_pipeline",
+            connection="local_input",
+            source_path="input.csv",
+            application_identity=REMOTE_IDENTITY,
+        )
+    finally:
+        context_module.set_project_context(previous)
+
+    expected = {
+        "project": "remote_safe_fact",
+        "engine": "pandas",
+        "connections": {
+            "local_input": {"type": "local", "base_path": "./data"},
+            "local_output": {"type": "local", "base_path": "./output"},
+        },
+        "pipelines": [
+            {
+                "pipeline": "fact_pipeline",
+                "layer": "gold",
+                "nodes": [
+                    {
+                        "name": "fact_node",
+                        "read": {
+                            "connection": "local_input",
+                            "format": "csv",
+                            "path": "input.csv",
+                        },
+                        "write": {
+                            "connection": "local_output",
+                            "format": "parquet",
+                            "path": "facts",
+                            "mode": "append",
+                        },
+                    }
+                ],
+            }
+        ],
+        "story": {"connection": "local_output", "path": "_stories"},
+        "system": {"connection": "local_output", "path": "_system"},
+    }
+    assert result["valid"] is True
+    assert result["errors"] == result["warnings"] == []
+    assert yaml.safe_load(result["yaml"]) == expected
+    assert len(result["yaml"].encode("utf-8")) <= 4 * 1024
+    serialized = json.dumps(result, sort_keys=True)
+    assert len(serialized.encode("utf-8")) <= 8 * 1024
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
+
+    def structure_size(value):
+        if isinstance(value, dict):
+            return 1 + sum(structure_size(item) for item in value.values())
+        if isinstance(value, list):
+            return 1 + sum(structure_size(item) for item in value)
+        return 1
+
+    assert structure_size(expected) <= 40
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {
+            "pattern": f"fact_{PROJECTION_SENTINELS[7]}",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": "input.csv",
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": "input.csv",
+            "token": RENDER_SENTINELS[0],
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": "input.csv",
+            "unknown": {"nested": {"opaque": PROJECTION_SENTINELS[4]}},
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": {"account_key": RENDER_SENTINELS[2]},
+            "source_path": "input.csv",
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": f"/{PROJECTION_SENTINELS[7]}/input.csv",
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": f"C:\\{PROJECTION_SENTINELS[7]}\\input.csv",
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": f"https://unknown.example/{RENDER_SENTINELS[3]}",
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": f"{PROJECTION_SENTINELS[7]}\ninput.csv",
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": PROJECTION_SENTINELS[7] + ("a" * 4096),
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": ["input.csv", PROJECTION_SENTINELS[4]],
+        },
+        {
+            "pattern": "fact",
+            "table_name": "fact_pipeline",
+            "connection": "local_input",
+            "source_path": "input.csv",
+            "root": PROJECTION_SENTINELS[7],
+            "config": {"password": RENDER_SENTINELS[0]},
+            "cwd": PROJECTION_SENTINELS[5],
+        },
+    ],
+)
+def test_invalid_remote_fact_projection_denies_before_all_helpers_without_echo(
+    monkeypatch, caplog, kwargs
+):
+    class UnexpectedManagedAccess:
+        def prepare(self, action, call_kwargs):
+            pytest.fail("invalid projection reached managed project preparation")
+
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.render", None)
+    monkeypatch.setitem(sys.modules, "tools.render", None)
+    dispatcher = OdibiDispatcher(UnexpectedManagedAccess())
+    dispatcher._actions["apply_pattern_template"] = lambda *args, **call_kwargs: pytest.fail(
+        "invalid projection reached the legacy construction delegate"
+    )
+    monkeypatch.setattr(
+        dispatcher,
+        "_render_remote_pattern_projection",
+        lambda projection: pytest.fail("invalid projection reached the renderer"),
+    )
+
+    result = dispatcher.dispatch(
+        "apply_pattern_template",
+        application_identity=REMOTE_IDENTITY,
+        **kwargs,
+    )
+
+    assert result == {
+        "error": "The remote-safe rendering projection is required",
+        "code": "REMOTE_RENDER_PROJECTION_REQUIRED",
+        "action": "apply_pattern_template",
+    }
+    serialized = json.dumps(result, sort_keys=True)
+    assert "yaml" not in result
+    assert "state" not in result
+    assert "events" not in result
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
+    assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
+
+
+def test_positional_remote_fact_projection_denies_without_delegate_or_value_echo():
+    dispatcher = OdibiDispatcher()
+    dispatcher._actions["apply_pattern_template"] = lambda *args, **kwargs: pytest.fail(
+        "positional projection reached the legacy construction delegate"
+    )
+
+    result = dispatcher.dispatch(
+        "apply_pattern_template",
+        "fact",
+        "fact_pipeline",
+        "local_input",
+        PROJECTION_SENTINELS[7],
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result["code"] == "REMOTE_RENDER_PROJECTION_REQUIRED"
+    assert PROJECTION_SENTINELS[7] not in json.dumps(result, sort_keys=True)
+
+
+def test_projected_render_failures_are_fixed_and_do_not_echo_exception(monkeypatch):
+    from odibi_mcp.tools import render as render_module
+
+    def fail_with_secret(*args, **kwargs):
+        raise RuntimeError(PROJECTION_SENTINELS[7])
+
+    monkeypatch.setattr(render_module.yaml, "safe_dump", fail_with_secret)
+    result = OdibiDispatcher().dispatch(
+        "apply_pattern_template",
+        pattern="fact",
+        table_name="fact_pipeline",
+        connection="local_input",
+        source_path="input.csv",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "yaml": "",
+        "valid": False,
+        "errors": [
+            {
+                "code": "PROJECTED_RENDER_FAILED",
+                "message": "The remote-safe template could not be rendered",
+            }
+        ],
+        "warnings": [],
+    }
+    assert PROJECTION_SENTINELS[7] not in json.dumps(result, sort_keys=True)
+
+
+def test_projected_renderer_rejects_non_projection_without_echo():
+    from odibi_mcp.tools.render import render_remote_pattern_projection
+
+    result = render_remote_pattern_projection({"secret": PROJECTION_SENTINELS[7]})
+
+    assert result["valid"] is False
+    assert result["errors"][0]["code"] == "PROJECTED_RENDER_FAILED"
+    assert PROJECTION_SENTINELS[7] not in json.dumps(result, sort_keys=True)
+
+
+def test_trusted_local_pattern_template_retains_legacy_delegate(monkeypatch):
+    calls = []
+    fake_construction = ModuleType("tools.construction")
+    fake_construction.apply_pattern_template = lambda *args: calls.append(args) or {
+        "trusted_local": True
+    }
+    monkeypatch.setitem(sys.modules, "tools.construction", fake_construction)
+
+    result = OdibiDispatcher().dispatch(
+        "apply_pattern_template",
+        pattern="dimension",
+        table_name="trusted_table",
+        connection="trusted_connection",
+        source_path="trusted_source",
+        application_identity=LOCAL_IDENTITY,
+    )
+
+    assert result == {"trusted_local": True}
+    assert calls == [("dimension", "trusted_table", "trusted_connection", "trusted_source")]
+
+
 @pytest.mark.parametrize(
     "action,kwargs,module_name",
     [
-        (
-            "apply_pattern_template",
-            {
-                "pattern": "dimension",
-                "table_name": "bounded",
-                "connection": "local",
-                "source_path": "input.csv",
-            },
-            "tools.construction",
-        ),
         (
             "create_ingestion_pipeline",
             {
@@ -1744,6 +2044,7 @@ def test_remote_renderer_routes_deny_before_helper_import_and_never_disclose_con
             "connection_string": RENDER_SENTINELS[1],
             "account_key": RENDER_SENTINELS[2],
             "unknown_host": RENDER_SENTINELS[3],
+            "unknown_nested": {"opaque": PROJECTION_SENTINELS[4]},
         }
     )
     context_module.set_project_context(
@@ -1768,7 +2069,7 @@ def test_remote_renderer_routes_deny_before_helper_import_and_never_disclose_con
     assert "yaml" not in result
     assert "state" not in result
     assert "events" not in result
-    assert all(sentinel not in serialized for sentinel in RENDER_SENTINELS)
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
 
 
 def test_remote_session_render_denial_preserves_secret_free_builder_state(monkeypatch):
@@ -1786,6 +2087,7 @@ def test_remote_session_render_denial_preserves_secret_free_builder_state(monkey
             "connection_string": RENDER_SENTINELS[1],
             "account_key": RENDER_SENTINELS[2],
             "unknown_host": RENDER_SENTINELS[3],
+            "unknown_nested": {"opaque": PROJECTION_SENTINELS[4]},
         }
     )
     context_module.set_project_context(
@@ -1796,6 +2098,7 @@ def test_remote_session_render_denial_preserves_secret_free_builder_state(monkey
         result = OdibiDispatcher().dispatch(
             "render_pipeline_yaml",
             session_id=session_id,
+            unknown={"nested": PROJECTION_SENTINELS[5]},
             application_identity=REMOTE_IDENTITY,
         )
         state_after = builder.get_pipeline_state(session_id)
@@ -1810,7 +2113,7 @@ def test_remote_session_render_denial_preserves_secret_free_builder_state(monkey
         {"response": result, "state_before": state_before, "state_after": state_after},
         sort_keys=True,
     )
-    assert all(sentinel not in serialized for sentinel in RENDER_SENTINELS)
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
 
 
 @pytest.mark.parametrize(
@@ -1841,7 +2144,7 @@ def test_remote_disabled_workflows_deny_before_import_without_secret_state_or_ev
         result = OdibiDispatcher().dispatch(
             "run_workflow",
             workflow_name=workflow_name,
-            params={},
+            params={"unknown": {"nested": PROJECTION_SENTINELS[6]}},
             application_identity=REMOTE_IDENTITY,
         )
     finally:
@@ -1851,7 +2154,37 @@ def test_remote_disabled_workflows_deny_before_import_without_secret_state_or_ev
     assert "state" not in result
     assert "events" not in result
     serialized = json.dumps(result, sort_keys=True)
-    assert all(sentinel not in serialized for sentinel in RENDER_SENTINELS)
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
+
+
+def test_remote_resume_never_decodes_or_echoes_unsigned_secret_state(monkeypatch):
+    resume_token = base64.b64encode(
+        json.dumps(
+            {
+                "state": {"unknown": {"nested": PROJECTION_SENTINELS[4]}},
+                "events": [{"message": PROJECTION_SENTINELS[6]}],
+            }
+        ).encode("utf-8")
+    ).decode("ascii")
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.workflows", None)
+    monkeypatch.setitem(sys.modules, "tools.workflows", None)
+
+    result = OdibiDispatcher().dispatch(
+        "resume_workflow",
+        resume_token=resume_token,
+        inputs={"secret": RENDER_SENTINELS[0]},
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "error": "This workflow is unavailable over the remote transport",
+        "code": "REMOTE_WORKFLOW_DISABLED",
+        "action": "resume_workflow",
+    }
+    serialized = json.dumps(result, sort_keys=True)
+    assert "state" not in result
+    assert "events" not in result
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
 
 
 def test_runtime_call_replaces_stale_same_path_context_with_validated_snapshot(managed_dispatcher):
