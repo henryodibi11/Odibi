@@ -12,10 +12,12 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from odibi_mcp.dispatcher import OdibiDispatcher
+from odibi_mcp.contracts.access import ActionEffect, ApplicationIdentity
+from odibi_mcp.dispatcher import ACTION_EFFECTS, OdibiDispatcher
 from odibi_mcp.tools import execution
 
 D = OdibiDispatcher()
+LOCAL_IDENTITY = ApplicationIdentity.trusted_local()
 
 VALID_PIPELINE_YAML = """
 project: bounded_test
@@ -49,9 +51,13 @@ def _is_error(result):
     return isinstance(result, dict) and set(result.keys()) <= {"error", "tip", "available"}
 
 
+def _trusted_dispatch(action, **kwargs):
+    return D.dispatch(action, application_identity=LOCAL_IDENTITY, **kwargs)
+
+
 @pytest.mark.parametrize("action,kwargs,expect_key", DISCOVERY_CALLS)
 def test_discovery_actions_return_real_data(action, kwargs, expect_key):
-    result = D.dispatch(action, **kwargs)
+    result = _trusted_dispatch(action, **kwargs)
     assert isinstance(result, dict), f"{action} did not return a dict"
     assert not _is_error(result), f"{action} returned an error: {result}"
     if expect_key:
@@ -84,8 +90,187 @@ def test_help_catalog_and_unknown_action():
 
 def test_get_doc_directory_is_graceful():
     # Passing a directory must return a clean error, not a raw OS exception.
-    result = D.dispatch("get_doc", doc_path="docs/simulation")
+    result = _trusted_dispatch("get_doc", doc_path="docs/simulation")
     assert "error" in result and "content" not in result
+
+
+EXPECTED_EFFECT_ACTIONS = {
+    ActionEffect.PUBLIC_READ: {
+        "list_workflows",
+        "get_workflow",
+        "list_transformers",
+        "list_patterns",
+        "apply_pattern_template",
+        "validate_yaml",
+        "validate_pipeline",
+        "get_task_guidance",
+        "list_task_types",
+        "onboard",
+        "get_schema",
+        "search_docs",
+        "list_docs",
+        "list_examples",
+        "list_skills",
+    },
+    ActionEffect.SENSITIVE_READ: {
+        "map_environment",
+        "profile_source",
+        "profile_folder",
+        "story_read",
+        "node_sample",
+        "node_failed_rows",
+        "lineage_graph",
+        "suggest_pipeline",
+        "diagnose",
+        "get_doc",
+        "get_example",
+        "get_skill",
+        "get_pipeline_state",
+        "render_pipeline_yaml",
+        "list_sessions",
+    },
+    ActionEffect.EXECUTION: {"run_workflow", "resume_workflow", "test_pipeline"},
+    ActionEffect.FILE_WRITE: {"download_sql", "download_table", "download_file"},
+    ActionEffect.SESSION_MUTATION: {
+        "create_ingestion_pipeline",
+        "create_pipeline",
+        "add_node",
+        "configure_read",
+        "configure_write",
+        "configure_transform",
+        "discard_pipeline",
+    },
+}
+
+
+def test_all_registered_actions_have_the_reviewed_effect_classification():
+    expected = {
+        action: effect for effect, actions in EXPECTED_EFFECT_ACTIONS.items() for action in actions
+    }
+
+    assert len(expected) == 43
+    assert ACTION_EFFECTS == expected
+    assert set(D._actions) == set(expected)
+
+
+def test_registry_drift_fails_dispatcher_initialization():
+    class DispatcherWithUnclassifiedAction(OdibiDispatcher):
+        def _register_actions(self):
+            actions = super()._register_actions()
+            actions["unclassified_action"] = lambda: {"unexpected": True}
+            return actions
+
+    with pytest.raises(RuntimeError, match="Action effect policy mismatch"):
+        DispatcherWithUnclassifiedAction()
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["profile_source", "test_pipeline", "download_file", "create_pipeline"],
+)
+@pytest.mark.parametrize("identity", [None, {"subject": "forged"}])
+def test_restricted_actions_deny_absent_or_malformed_identity_before_handler(action, identity):
+    dispatcher = OdibiDispatcher()
+
+    def unexpected_handler():
+        pytest.fail("authorization must run before the action handler")
+
+    dispatcher._actions[action] = unexpected_handler
+
+    result = dispatcher.dispatch(action, application_identity=identity)
+
+    assert result["code"] == "AUTHORIZATION_REQUIRED"
+    assert result["action"] == action
+
+
+def test_authenticated_identity_without_effect_is_forbidden_before_handler():
+    dispatcher = OdibiDispatcher()
+    dispatcher._actions["download_file"] = lambda: pytest.fail(
+        "authorization must run before the action handler"
+    )
+    identity = ApplicationIdentity(
+        subject="read-only-application",
+        authorized_effects=frozenset({ActionEffect.SENSITIVE_READ}),
+    )
+
+    result = dispatcher.dispatch("download_file", application_identity=identity)
+
+    assert result == {
+        "error": "Application identity is not authorized for this action",
+        "code": "FORBIDDEN",
+        "action": "download_file",
+        "effect": "file_write",
+    }
+
+
+@pytest.mark.parametrize(
+    "action,effect",
+    [
+        ("profile_source", ActionEffect.SENSITIVE_READ),
+        ("test_pipeline", ActionEffect.EXECUTION),
+        ("download_file", ActionEffect.FILE_WRITE),
+        ("create_pipeline", ActionEffect.SESSION_MUTATION),
+    ],
+)
+def test_identity_authorized_for_effect_invokes_handler_once(action, effect):
+    dispatcher = OdibiDispatcher()
+    calls = []
+    dispatcher._actions[action] = lambda: calls.append(action) or {"allowed": True}
+    identity = ApplicationIdentity(
+        subject="bounded-application", authorized_effects=frozenset({effect})
+    )
+
+    result = dispatcher.dispatch(action, application_identity=identity)
+
+    assert result == {"allowed": True}
+    assert calls == [action]
+
+
+def test_public_read_remains_anonymous():
+    dispatcher = OdibiDispatcher()
+    dispatcher._actions["list_workflows"] = lambda: {"public": True}
+
+    assert dispatcher.dispatch("list_workflows") == {"public": True}
+
+
+def test_help_exposes_every_action_effect():
+    help_result = D.help()
+
+    assert help_result["total_actions"] == 43
+    assert help_result["action_effects"] == {
+        action: effect.value for action, effect in sorted(ACTION_EFFECTS.items())
+    }
+    assert D.help(action="get_doc")["effect"] == "sensitive_read"
+
+
+def test_validate_pipeline_does_not_expose_connection_checks():
+    dispatcher = OdibiDispatcher()
+    calls = []
+    dispatcher._actions["validate_pipeline"] = lambda pipeline: calls.append(pipeline)
+
+    result = dispatcher.dispatch(
+        "validate_pipeline", pipeline="pipelines: []", check_connections=True
+    )
+
+    assert "error" in result
+    assert calls == []
+
+
+def test_direct_bootstrap_passes_explicit_trusted_local_identity(monkeypatch):
+    from odibi_mcp import bootstrap
+
+    identities = []
+
+    def capture_dispatch(self, action, *args, application_identity=None, **kwargs):
+        identities.append(application_identity)
+        return {"action": action}
+
+    monkeypatch.setattr(bootstrap.OdibiDispatcher, "dispatch", capture_dispatch)
+    odibi, _ = bootstrap.init()
+
+    assert odibi("test_pipeline") == {"action": "test_pipeline"}
+    assert len(identities) == 1
+    assert identities[0].authorizes(ActionEffect.EXECUTION)
 
 
 @pytest.mark.parametrize("sample_size", [1, 37, 1000])
@@ -100,7 +285,12 @@ def test_registered_test_pipeline_binds_bounded_mode_by_keyword(monkeypatch, sam
     fake_execution.test_pipeline = fake_test_pipeline
     monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
 
-    result = D.dispatch("test_pipeline", pipeline=VALID_PIPELINE_YAML, sample_size=sample_size)
+    result = D.dispatch(
+        "test_pipeline",
+        pipeline=VALID_PIPELINE_YAML,
+        sample_size=sample_size,
+        application_identity=LOCAL_IDENTITY,
+    )
 
     assert result == {"valid": True, "mode": "dry-run"}
     assert calls == [
@@ -123,7 +313,11 @@ def test_registered_test_pipeline_uses_bounded_defaults(monkeypatch):
     fake_execution.test_pipeline = fake_test_pipeline
     monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
 
-    result = D.dispatch("test_pipeline", pipeline=VALID_PIPELINE_YAML)
+    result = D.dispatch(
+        "test_pipeline",
+        pipeline=VALID_PIPELINE_YAML,
+        application_identity=LOCAL_IDENTITY,
+    )
 
     assert result == {"valid": True, "mode": "dry-run"}
     assert calls == [(VALID_PIPELINE_YAML, "dry-run", 100)]
@@ -148,7 +342,12 @@ def test_registered_test_pipeline_rejects_control_overrides_before_helper(
     fake_execution.test_pipeline = unexpected_call
     monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
 
-    result = D.dispatch("test_pipeline", pipeline=VALID_PIPELINE_YAML, **unexpected_kwargs)
+    result = D.dispatch(
+        "test_pipeline",
+        pipeline=VALID_PIPELINE_YAML,
+        application_identity=LOCAL_IDENTITY,
+        **unexpected_kwargs,
+    )
 
     assert "error" in result
 
@@ -173,7 +372,12 @@ def test_registered_test_pipeline_rejects_invalid_bounds_before_helper(monkeypat
     fake_execution.test_pipeline = unexpected_call
     monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
 
-    result = D.dispatch("test_pipeline", pipeline=VALID_PIPELINE_YAML, sample_size=sample_size)
+    result = D.dispatch(
+        "test_pipeline",
+        pipeline=VALID_PIPELINE_YAML,
+        sample_size=sample_size,
+        application_identity=LOCAL_IDENTITY,
+    )
 
     assert "error" in result
 
