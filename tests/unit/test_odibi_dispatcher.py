@@ -1858,6 +1858,7 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
     assert effects == []
     serialized = json.dumps(result, sort_keys=True)
     assert rejected_selector not in serialized
+    assert rejected_selector not in caplog.text
     assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
     assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
 
