@@ -1,18 +1,24 @@
+import json
 import secrets
 from pathlib import Path
 
 import pytest
 import yaml
 
+from odibi_mcp.contracts import access as access_contract
 from odibi_mcp.contracts.access import (
     AccessContext,
     ActionEffect,
     ApplicationIdentity,
     ConnectionPolicy,
+    LogicalLineageEdge,
+    LogicalLineageNode,
     ManagedProjectAccess,
     PreparedRuntimeCall,
+    RemoteLogicalLineageProjection,
     RuntimeAccessDenied,
     authenticate_bearer_identity,
+    render_remote_logical_lineage_projection,
     sanitize_runtime_result,
 )
 
@@ -55,6 +61,14 @@ pipelines:
 
 def _prepare(access, action, **kwargs):
     return access.prepare(action, {"project": "managed", **kwargs})
+
+
+def _configured_node(name, depends_on=None):
+    return {
+        "name": name,
+        "depends_on": depends_on or [],
+        "write": {"connection": "local", "format": "parquet", "path": f"out/{name}"},
+    }
 
 
 def test_connection_policy():
@@ -473,19 +487,313 @@ def test_download_rejects_missing_or_non_directory_export_root(managed_project, 
         )
 
 
-@pytest.mark.parametrize("action", ["lineage_graph", "diagnose"])
-def test_remote_physical_reference_actions_deny_before_config_read(
-    managed_project, monkeypatch, action
+def test_remote_diagnose_denies_before_config_read(managed_project, monkeypatch):
+    _, _, access = managed_project
+
+    def unexpected_read(*args, **kwargs):
+        pytest.fail("remote diagnose must deny before config or data read")
+
+    monkeypatch.setattr(Path, "open", unexpected_read)
+    with pytest.raises(RuntimeAccessDenied, match="PHYSICAL_REFERENCES_DISABLED"):
+        _prepare(access, "diagnose")
+
+
+def test_remote_lineage_prepares_and_renders_typed_inline_projection(managed_project):
+    _, config_path, access = managed_project
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["pipelines"][0]["nodes"] = [
+        _configured_node("source"),
+        _configured_node("clean", ["source"]),
+    ]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    prepared = _prepare(access, "lineage_graph", pipeline="bounded")
+    result = render_remote_logical_lineage_projection(prepared.logical_lineage)
+
+    assert prepared.kwargs == {"pipeline": "bounded"}
+    assert prepared.logical_lineage == RemoteLogicalLineageProjection(
+        pipeline="bounded",
+        nodes=(LogicalLineageNode("source"), LogicalLineageNode("clean")),
+        edges=(LogicalLineageEdge("source", "clean"),),
+    )
+    assert result == {
+        "kind": "logical_lineage_graph",
+        "pipeline": "bounded",
+        "status": "configured",
+        "nodes": [
+            {"id": "source", "type": "pipeline_node"},
+            {"id": "clean", "type": "pipeline_node"},
+        ],
+        "edges": [{"source": "source", "target": "clean", "kind": "dependency"}],
+        "counts": {
+            "nodes_total": 2,
+            "nodes_returned": 2,
+            "edges_total": 1,
+            "edges_returned": 1,
+        },
+        "truncated": False,
+        "truncation": {"nodes": False, "edges": False},
+        "policy_applied": {
+            "project_scoped": True,
+            "logical_only": True,
+            "inline_snapshot_only": True,
+            "node_limit": 64,
+            "edge_limit": 128,
+            "identifier_length_limit": 128,
+            "response_byte_limit": 65536,
+        },
+    }
+    assert len(json.dumps(result, indent=2).encode("utf-8")) <= 65536
+
+
+def test_remote_lineage_rejects_imports_without_reading_them(managed_project, monkeypatch):
+    root, config_path, access = managed_project
+    imported = root / "imported.yaml"
+    imported.write_text("sentinel: IMPORT_MUST_NOT_BE_READ", encoding="utf-8")
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["imports"] = ["imported.yaml"]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    original_open = Path.open
+    reads = []
+
+    def config_only_open(path, *args, **kwargs):
+        resolved = path.resolve()
+        reads.append(resolved)
+        if resolved != config_path.resolve():
+            pytest.fail("remote logical lineage attempted to read an imported config")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", config_only_open)
+
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        _prepare(access, "lineage_graph", pipeline="bounded")
+
+    assert reads == [config_path.resolve()]
+
+
+@pytest.mark.parametrize(
+    "nodes",
+    [
+        "not-a-list",
+        ["not-a-mapping"],
+        [{"name": "source", "depends_on": "not-a-list"}],
+        [{"name": "source", "depends_on": [1]}],
+        [{"name": "source", "depends_on": [{"name": "source"}]}],
+        [{"name": "source", "depends_on": ["missing"]}],
+        [{"name": "duplicate"}, {"name": "duplicate"}],
+        [
+            {"name": "source"},
+            {"name": "target", "depends_on": ["source", "source"]},
+        ],
+    ],
+)
+def test_remote_lineage_rejects_malformed_or_ambiguous_graphs(managed_project, nodes):
+    _, config_path, access = managed_project
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["pipelines"][0]["nodes"] = nodes
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        _prepare(access, "lineage_graph", pipeline="bounded")
+
+
+@pytest.mark.parametrize("length", [1, 128])
+def test_remote_lineage_identifier_length_boundaries(managed_project, length):
+    _, config_path, access = managed_project
+    identifier = "n" * length
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["pipelines"][0]["nodes"] = [_configured_node(identifier)]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    projection = _prepare(access, "lineage_graph", pipeline="bounded").logical_lineage
+
+    assert projection.nodes == (LogicalLineageNode(identifier),)
+
+
+def test_remote_lineage_rejects_unreviewed_caller_arguments_before_config_read(
+    managed_project, monkeypatch
 ):
     _, _, access = managed_project
 
     def unexpected_read(*args, **kwargs):
-        pytest.fail("remote physical-reference action must deny before config or data read")
+        pytest.fail("unreviewed lineage arguments reached managed config")
 
     monkeypatch.setattr(Path, "open", unexpected_read)
-    with pytest.raises(RuntimeAccessDenied, match="PHYSICAL_REFERENCES_DISABLED"):
-        kwargs = {"pipeline": "bounded"} if action == "lineage_graph" else {}
-        _prepare(access, action, **kwargs)
+    with pytest.raises(RuntimeAccessDenied, match="INVALID_RUNTIME_ARGUMENT"):
+        _prepare(
+            access,
+            "lineage_graph",
+            pipeline="bounded",
+            run_id="caller-runtime-selector",
+            cwd="caller-root",
+        )
+
+
+def test_remote_lineage_rejects_identifier_and_source_scan_cap_plus_one(managed_project):
+    _, config_path, access = managed_project
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["pipelines"][0]["nodes"] = [_configured_node("n" * 129)]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        _prepare(access, "lineage_graph", pipeline="bounded")
+
+    config["pipelines"][0]["nodes"] = [_configured_node(f"node_{index}") for index in range(257)]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        _prepare(access, "lineage_graph", pipeline="bounded")
+
+
+def test_remote_lineage_pipeline_and_dependency_source_scan_bounds(managed_project):
+    _, config_path, access = managed_project
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["pipelines"] = [{"pipeline": f"other_{index}", "nodes": []} for index in range(255)] + [
+        {"pipeline": "bounded", "nodes": []}
+    ]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    assert _prepare(access, "lineage_graph", pipeline="bounded").logical_lineage is not None
+
+    config["pipelines"].append({"pipeline": "one_too_many", "nodes": []})
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        _prepare(access, "lineage_graph", pipeline="bounded")
+
+    nodes = [_configured_node(f"node_{index}") for index in range(256)]
+    for target in range(16):
+        nodes[target]["depends_on"] = [f"node_{source}" for source in range(256)]
+    config["pipelines"] = [{"pipeline": "bounded", "nodes": nodes}]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    projection = _prepare(access, "lineage_graph", pipeline="bounded").logical_lineage
+    assert projection is not None and len(projection.edges) == 4096
+
+    nodes[16]["depends_on"] = ["node_0"]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        _prepare(access, "lineage_graph", pipeline="bounded")
+
+
+def test_remote_lineage_node_output_min_max_and_cap_plus_one_are_truthful():
+    for node_count, expected_returned, expected_truncated in (
+        (0, 0, False),
+        (1, 1, False),
+        (64, 64, False),
+        (65, 64, True),
+    ):
+        projection = RemoteLogicalLineageProjection(
+            pipeline="bounded",
+            nodes=tuple(LogicalLineageNode(f"node_{index}") for index in range(node_count)),
+            edges=(),
+        )
+
+        result = render_remote_logical_lineage_projection(projection)
+
+        assert result["counts"] == {
+            "nodes_total": node_count,
+            "nodes_returned": expected_returned,
+            "edges_total": 0,
+            "edges_returned": 0,
+        }
+        assert result["truncation"] == {"nodes": expected_truncated, "edges": False}
+        assert result["truncated"] is expected_truncated
+
+
+def test_remote_lineage_node_truncation_truthfully_marks_omitted_edges():
+    projection = RemoteLogicalLineageProjection(
+        pipeline="bounded",
+        nodes=tuple(LogicalLineageNode(f"node_{index}") for index in range(65)),
+        edges=(LogicalLineageEdge("node_0", "node_64"),),
+    )
+
+    result = render_remote_logical_lineage_projection(projection)
+
+    assert result["counts"] == {
+        "nodes_total": 65,
+        "nodes_returned": 64,
+        "edges_total": 1,
+        "edges_returned": 0,
+    }
+    assert result["truncation"] == {"nodes": True, "edges": True}
+    assert result["truncated"] is True
+
+
+def test_remote_lineage_edge_output_min_max_and_cap_plus_one_are_truthful():
+    nodes = tuple(LogicalLineageNode(f"node_{index}") for index in range(64))
+    pairs = [
+        (f"node_{source}", f"node_{target}") for target in range(64) for source in range(target)
+    ]
+    for edge_count, expected_truncated in ((0, False), (1, False), (128, False), (129, True)):
+        projection = RemoteLogicalLineageProjection(
+            pipeline="bounded",
+            nodes=nodes,
+            edges=tuple(LogicalLineageEdge(*pair) for pair in pairs[:edge_count]),
+        )
+
+        result = render_remote_logical_lineage_projection(projection)
+
+        assert result["counts"]["edges_total"] == edge_count
+        assert result["counts"]["edges_returned"] == min(edge_count, 128)
+        assert result["truncation"]["edges"] is expected_truncated
+        assert result["truncated"] is expected_truncated
+
+
+def test_remote_lineage_maximum_serialized_response_stays_within_byte_cap():
+    identifiers = tuple(f"n{index:03d}" + ("x" * 124) for index in range(64))
+    pairs = [
+        (identifiers[source], identifiers[target])
+        for target in range(64)
+        for source in range(target)
+    ]
+    projection = RemoteLogicalLineageProjection(
+        pipeline="p" * 128,
+        nodes=tuple(LogicalLineageNode(identifier) for identifier in identifiers),
+        edges=tuple(LogicalLineageEdge(*pair) for pair in pairs[:128]),
+    )
+
+    result = render_remote_logical_lineage_projection(projection)
+    serialized = json.dumps(result, indent=2).encode("utf-8")
+
+    assert result["counts"] == {
+        "nodes_total": 64,
+        "nodes_returned": 64,
+        "edges_total": 128,
+        "edges_returned": 128,
+    }
+    assert result["truncated"] is False
+    assert len(serialized) <= result["policy_applied"]["response_byte_limit"] == 65536
+
+
+def test_remote_lineage_serialized_response_byte_backstop_fails_closed(monkeypatch):
+    projection = RemoteLogicalLineageProjection(
+        pipeline="bounded",
+        nodes=(LogicalLineageNode("source"),),
+        edges=(),
+    )
+    monkeypatch.setattr(access_contract, "_LINEAGE_RESPONSE_BYTE_LIMIT", 1)
+
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE") as error:
+        render_remote_logical_lineage_projection(projection)
+
+    assert error.value.code == "LOGICAL_PROJECTION_UNAVAILABLE"
+
+
+@pytest.mark.parametrize(
+    "projection",
+    [
+        {"pipeline": "bounded"},
+        RemoteLogicalLineageProjection("bounded", ("not-a-node",), ()),
+        RemoteLogicalLineageProjection(
+            "bounded", (LogicalLineageNode("source"),), (LogicalLineageEdge("source", "missing"),)
+        ),
+        RemoteLogicalLineageProjection(
+            "bounded",
+            (LogicalLineageNode("source"), LogicalLineageNode("target")),
+            (LogicalLineageEdge("source", "target"), LogicalLineageEdge("source", "target")),
+        ),
+    ],
+)
+def test_remote_lineage_renderer_rejects_malformed_projection_shapes(projection):
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        render_remote_logical_lineage_projection(projection)
 
 
 def test_map_environment_and_suggestion_are_project_bounded(managed_project):
