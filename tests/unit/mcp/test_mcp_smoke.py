@@ -17,6 +17,7 @@ import pytest
 pytest.importorskip("fastmcp")
 
 from odibi_mcp import databricks_app, mcp_server
+from odibi_mcp.contracts.access import ManagedProjectAccess
 
 
 def _execute(action, **kwargs):
@@ -38,13 +39,16 @@ def _mcp_message(response):
     return json.loads(data_lines[-1])
 
 
-def _call_over_http(client, action, authorization=None):
+def _call_over_http(client, action, authorization=None, **kwargs):
     headers = {
         "accept": "application/json, text/event-stream",
         "content-type": "application/json",
     }
     if authorization is not None:
         headers["authorization"] = authorization
+    arguments = {"action": action}
+    if kwargs:
+        arguments["args_json"] = json.dumps(kwargs)
     response = client.post(
         "/mcp",
         headers=headers,
@@ -54,7 +58,7 @@ def _call_over_http(client, action, authorization=None):
             "method": "tools/call",
             "params": {
                 "name": "odibi_execute",
-                "arguments": {"action": action},
+                "arguments": arguments,
             },
         },
     )
@@ -159,6 +163,88 @@ def test_real_http_boundary_requires_exact_application_bearer(monkeypatch):
 
     assert result == {"allowed": True}
     assert calls == ["create_pipeline"]
+
+
+def test_real_http_runtime_data_requires_project_scope_after_bearer(tmp_path, monkeypatch):
+    from starlette.testclient import TestClient
+
+    root = tmp_path / "managed"
+    (root / "data" / "folder").mkdir(parents=True)
+    (root / "exports").mkdir()
+    config = root / "odibi.yaml"
+    config.write_text(
+        """
+project: managed
+connections:
+  local:
+    type: local
+    base_path: ./data
+story:
+  connection: local
+  path: stories
+system:
+  connection: local
+pipelines: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+    configured = secrets.token_urlsafe(32)
+    different = secrets.token_urlsafe(32)
+    calls = []
+    monkeypatch.setenv("ODIBI_MCP_AUTH_TOKEN", configured)
+    monkeypatch.setattr(
+        mcp_server._dispatcher,
+        "_managed_access",
+        ManagedProjectAccess("managed", root, config, root / "exports"),
+    )
+    monkeypatch.setattr(
+        mcp_server._dispatcher,
+        "_bind_runtime_context",
+        lambda config_path: None,
+    )
+    monkeypatch.setitem(
+        mcp_server._dispatcher._actions,
+        "profile_source",
+        lambda **kwargs: calls.append(kwargs) or {"path": kwargs["path"]},
+    )
+
+    with TestClient(databricks_app.http_app) as client:
+        wrong_identity = _call_over_http(
+            client,
+            "profile_source",
+            f"Bearer {different}",
+            project="managed",
+            connection="local",
+            path="folder/input.csv",
+        )
+        identity_only = _call_over_http(
+            client,
+            "profile_source",
+            f"Bearer {configured}",
+            connection="local",
+            path="folder/input.csv",
+        )
+        allowed = _call_over_http(
+            client,
+            "profile_source",
+            f"Bearer {configured}",
+            project="managed",
+            connection="local",
+            path="folder/input.csv",
+            max_rows=19,
+        )
+
+    assert wrong_identity["code"] == "AUTHORIZATION_REQUIRED"
+    assert identity_only["code"] == "PROJECT_SCOPE_REQUIRED"
+    assert allowed["path"] == "folder/input.csv"
+    assert allowed["policy_applied"] == {"project_scoped": True, "sample_capped": True}
+    assert calls == [
+        {
+            "connection": "local",
+            "path": "folder/input.csv",
+            "max_rows": 19,
+        }
+    ]
 
 
 def test_databricks_app_propagates_startup_failure(tmp_path):

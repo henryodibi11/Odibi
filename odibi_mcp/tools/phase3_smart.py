@@ -26,7 +26,13 @@ def _pattern_from_intent(intent: str):
     return None
 
 
-def suggest_pipeline(source_path: str, connection: str, intent: str) -> Dict[str, Any]:
+def suggest_pipeline(
+    source_path: str,
+    connection: str,
+    intent: str,
+    *,
+    sample_rows: int = 1000,
+) -> Dict[str, Any]:
     """Profile a source and auto-suggest the best pipeline pattern.
 
     Profiles the source internally, then recommends a pattern + ready-to-use
@@ -40,9 +46,17 @@ def suggest_pipeline(source_path: str, connection: str, intent: str) -> Dict[str
     Returns:
         {suggested_pattern, confidence, reason, ready_for.apply_pattern_template, next_step}
     """
-    from tools.smart import profile_source
+    try:
+        from odibi_mcp.tools.smart import profile_source
+    except ImportError:  # Flat Databricks workspace deployment
+        from tools.smart import profile_source
 
-    profile = profile_source(connection, source_path)
+    profile = profile_source(
+        connection,
+        source_path,
+        use_cache=False,
+        sample_rows=sample_rows,
+    )
     if not isinstance(profile, dict):
         return {
             "error": {

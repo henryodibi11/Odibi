@@ -13,13 +13,19 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from odibi_mcp.contracts.access import ActionEffect, ApplicationIdentity
-from odibi_mcp.dispatcher import ACTION_EFFECTS, OdibiDispatcher
+from odibi_mcp.contracts.access import (
+    RUNTIME_DATA_ACTIONS,
+    ActionEffect,
+    ApplicationIdentity,
+    ManagedProjectAccess,
+)
+from odibi_mcp.dispatcher import ACTION_EFFECTS, _REMOTE_SAFE_WORKFLOWS, OdibiDispatcher
 from odibi_mcp.knowledge import OdibiKnowledge
-from odibi_mcp.tools import execution
+from odibi_mcp.tools import execution, smart, story
 
 D = OdibiDispatcher()
 LOCAL_IDENTITY = ApplicationIdentity.trusted_local()
+REMOTE_IDENTITY = ApplicationIdentity.authenticated_application()
 
 VALID_PIPELINE_YAML = """
 project: bounded_test
@@ -97,6 +103,46 @@ def corpus_dispatcher(tmp_path, monkeypatch):
 
     monkeypatch.setattr(knowledge, "_knowledge", OdibiKnowledge(tmp_path))
     return OdibiDispatcher()
+
+
+@pytest.fixture
+def managed_dispatcher(tmp_path, monkeypatch):
+    """Dispatcher with one explicit managed project and no context side effects."""
+    root = tmp_path / "managed"
+    (root / "data" / "folder").mkdir(parents=True)
+    (root / "data" / "stories").mkdir()
+    (root / "exports").mkdir()
+    config = root / "odibi.yaml"
+    config.write_text(
+        """
+project: managed
+connections:
+  local:
+    type: local
+    base_path: ./data
+  sql:
+    type: azure_sql
+story:
+  connection: local
+  path: stories
+system:
+  connection: local
+pipelines:
+  - pipeline: bounded
+    nodes: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+    dispatcher = OdibiDispatcher(
+        ManagedProjectAccess(
+            project="managed",
+            project_root=root,
+            config_path=config,
+            export_root=root / "exports",
+        )
+    )
+    monkeypatch.setattr(dispatcher, "_bind_runtime_context", lambda config_path: None)
+    return dispatcher, root
 
 
 @pytest.mark.parametrize("action,kwargs,expect_key", DISCOVERY_CALLS)
@@ -716,7 +762,7 @@ def test_authenticated_identity_without_effect_is_forbidden_before_handler():
         ("create_pipeline", ActionEffect.SESSION_MUTATION),
     ],
 )
-def test_identity_authorized_for_effect_invokes_handler_once(action, effect):
+def test_identity_authorized_for_effect_still_requires_runtime_project_scope(action, effect):
     dispatcher = OdibiDispatcher()
     calls = []
     dispatcher._actions[action] = lambda: calls.append(action) or {"allowed": True}
@@ -726,8 +772,529 @@ def test_identity_authorized_for_effect_invokes_handler_once(action, effect):
 
     result = dispatcher.dispatch(action, application_identity=identity)
 
+    if action in {"profile_source", "download_file"}:
+        assert result["code"] == "PROJECT_SCOPE_REQUIRED"
+        assert calls == []
+    else:
+        assert result == {"allowed": True}
+        assert calls == [action]
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "map_environment",
+        "profile_source",
+        "profile_folder",
+        "suggest_pipeline",
+        "story_read",
+        "node_sample",
+        "node_failed_rows",
+        "lineage_graph",
+        "diagnose",
+        "download_sql",
+        "download_table",
+        "download_file",
+    ],
+)
+def test_valid_remote_identity_without_managed_scope_denies_before_all_effects(action):
+    dispatcher = OdibiDispatcher()
+
+    def unexpected_handler(*args, **kwargs):
+        pytest.fail(
+            "project denial must precede helper import, filesystem access, connection/query, "
+            "subprocess, pipeline, and write effects"
+        )
+
+    dispatcher._actions[action] = unexpected_handler
+
+    result = dispatcher.dispatch(action, application_identity=REMOTE_IDENTITY)
+
+    assert result == {
+        "error": "A valid managed project scope is required for this action",
+        "code": "PROJECT_SCOPE_REQUIRED",
+        "action": action,
+    }
+
+
+@pytest.mark.parametrize("action", sorted(RUNTIME_DATA_ACTIONS))
+def test_trusted_local_runtime_actions_do_not_require_remote_project_arguments(action):
+    dispatcher = OdibiDispatcher()
+    calls = []
+    dispatcher._actions[action] = lambda: calls.append(action) or {"allowed": True}
+
+    result = dispatcher.dispatch(action, application_identity=LOCAL_IDENTITY)
+
     assert result == {"allowed": True}
     assert calls == [action]
+
+
+@pytest.mark.parametrize(
+    "action,kwargs",
+    [
+        (
+            "profile_source",
+            {"project": "managed", "connection": "local", "path": "../outside.csv"},
+        ),
+        (
+            "profile_folder",
+            {"project": "managed", "connection": "local", "folder_path": "/outside"},
+        ),
+        (
+            "download_file",
+            {
+                "project": "managed",
+                "connection": "local",
+                "source_path": r"folder\outside.csv",
+                "filename": "outside.csv",
+            },
+        ),
+    ],
+)
+def test_remote_path_denials_precede_handler_and_effects(managed_dispatcher, action, kwargs):
+    dispatcher, _ = managed_dispatcher
+    dispatcher._actions[action] = lambda **call_kwargs: pytest.fail(
+        "invalid remote path reached a handler or effect"
+    )
+
+    result = dispatcher.dispatch(action, application_identity=REMOTE_IDENTITY, **kwargs)
+
+    assert result["code"] == "PATH_SCOPE_REQUIRED"
+
+
+def test_remote_profile_source_preserves_exact_bounded_helper_kwargs(
+    managed_dispatcher, monkeypatch
+):
+    dispatcher, _ = managed_dispatcher
+    calls = []
+    fake_smart = ModuleType("odibi_mcp.tools.smart")
+
+    def fake_profile_source(**kwargs):
+        calls.append(kwargs)
+        return {"path": kwargs["path"], "sample_rows": []}
+
+    fake_smart.profile_source = fake_profile_source
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.smart", fake_smart)
+
+    result = dispatcher.dispatch(
+        "profile_source",
+        project="managed",
+        connection="local",
+        path="folder/input.csv",
+        max_rows=37,
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert calls == [
+        {
+            "connection": "local",
+            "path": "folder/input.csv",
+            "max_attempts": 5,
+            "use_cache": False,
+            "sample_rows": 37,
+        }
+    ]
+    assert result == {
+        "path": "folder/input.csv",
+        "sample_rows": [],
+        "truncated": True,
+        "truncated_reason": "sampling_only",
+        "policy_applied": {"project_scoped": True, "sample_capped": True},
+    }
+
+
+def test_remote_profile_folder_preserves_exact_bounded_helper_kwargs(
+    managed_dispatcher, monkeypatch
+):
+    dispatcher, _ = managed_dispatcher
+    calls = []
+    fake_smart = ModuleType("odibi_mcp.tools.smart")
+
+    def fake_profile_folder(**kwargs):
+        calls.append(kwargs)
+        return {"total_files": 25, "profiled_count": 7, "file_profiles": []}
+
+    fake_smart.profile_folder = fake_profile_folder
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.smart", fake_smart)
+
+    result = dispatcher.dispatch(
+        "profile_folder",
+        project="managed",
+        connection="local",
+        folder_path="folder",
+        pattern="*.csv",
+        max_files=7,
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert calls == [
+        {
+            "connection": "local",
+            "folder_path": "folder",
+            "pattern": "*.csv",
+            "max_files": 7,
+        }
+    ]
+    assert result["truncated"] is True
+    assert result["truncated_reason"] == "file_limit"
+    assert result["policy_applied"] == {"project_scoped": True, "sample_capped": True}
+
+
+def test_remote_map_environment_rejects_inline_connection_before_delegate(managed_dispatcher):
+    dispatcher, _ = managed_dispatcher
+    dispatcher._actions["map_environment"] = lambda **kwargs: pytest.fail(
+        "inline connection reached catalog enumeration or outbound access"
+    )
+
+    result = dispatcher.dispatch(
+        "map_environment",
+        project="managed",
+        connection={"type": "http", "base_url": "http://private.invalid"},
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result["code"] == "INVALID_RUNTIME_ARGUMENT"
+
+
+def test_remote_map_environment_preserves_bounded_helper_kwargs(managed_dispatcher, monkeypatch):
+    dispatcher, _ = managed_dispatcher
+    calls = []
+    fake_smart = ModuleType("odibi_mcp.tools.smart")
+
+    def fake_map_environment(**kwargs):
+        calls.append(kwargs)
+        return {"connection": kwargs["connection"], "structure": [], "errors": []}
+
+    fake_smart.map_environment = fake_map_environment
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.smart", fake_smart)
+
+    result = dispatcher.dispatch(
+        "map_environment",
+        project="managed",
+        connection="local",
+        path="folder",
+        pattern="*.csv",
+        limit=29,
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert calls == [{"connection": "local", "path": "folder", "pattern": "*.csv", "limit": 29}]
+    assert result["policy_applied"] == {
+        "project_scoped": True,
+        "enumeration_capped": True,
+    }
+
+
+def test_remote_suggest_pipeline_profiles_with_bounded_kwargs(managed_dispatcher, monkeypatch):
+    dispatcher, _ = managed_dispatcher
+    calls = []
+    fake_phase3 = ModuleType("odibi_mcp.tools.phase3_smart")
+
+    def fake_suggest_pipeline(**kwargs):
+        calls.append(kwargs)
+        return {"suggested_pattern": "dimension"}
+
+    fake_phase3.suggest_pipeline = fake_suggest_pipeline
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.phase3_smart", fake_phase3)
+
+    result = dispatcher.dispatch(
+        "suggest_pipeline",
+        project="managed",
+        connection="local",
+        source_path="folder/input.csv",
+        intent="build a dimension",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert calls == [
+        {
+            "connection": "local",
+            "source_path": "folder/input.csv",
+            "intent": "build a dimension",
+            "sample_rows": 100,
+        }
+    ]
+    assert result == {
+        "suggested_pattern": "dimension",
+        "policy_applied": {"project_scoped": True, "sample_capped": True},
+    }
+
+
+@pytest.mark.parametrize("action", ["node_sample", "node_failed_rows"])
+def test_remote_story_rows_bind_limit_by_keyword(managed_dispatcher, monkeypatch, action):
+    dispatcher, _ = managed_dispatcher
+    calls = []
+    fake_story = ModuleType("odibi_mcp.tools.story")
+
+    def fake_story_rows(**kwargs):
+        calls.append(kwargs)
+        return {
+            "pipeline": kwargs["pipeline"],
+            "node": kwargs["node"],
+            "rows": [{"value": 1}],
+            "row_count": 1,
+            "truncated": False,
+            "truncated_reason": None,
+            "error": None,
+        }
+
+    setattr(fake_story, action, fake_story_rows)
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.story", fake_story)
+
+    result = dispatcher.dispatch(
+        action,
+        project="managed",
+        pipeline="bounded",
+        node="source",
+        limit=23,
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert calls == [{"pipeline": "bounded", "node": "source", "limit": 23}]
+    assert result["rows"] == [{"value": 1}]
+    assert result["policy_applied"] == {"project_scoped": True}
+
+
+def test_remote_story_read_preserves_selector_shape(managed_dispatcher, monkeypatch):
+    dispatcher, _ = managed_dispatcher
+    calls = []
+    fake_story = ModuleType("odibi_mcp.tools.story")
+
+    def fake_story_read(**kwargs):
+        calls.append(kwargs)
+        return {"pipeline": kwargs["pipeline"], "status": "success", "error_message": None}
+
+    fake_story.story_read = fake_story_read
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.story", fake_story)
+
+    result = dispatcher.dispatch(
+        "story_read",
+        project="managed",
+        pipeline="bounded",
+        run_id="run-2026",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert calls == [{"pipeline": "bounded", "run_selector": {"run_id": "run-2026"}}]
+    assert result == {
+        "pipeline": "bounded",
+        "status": "success",
+        "error_message": None,
+        "policy_applied": {"project_scoped": True},
+    }
+
+
+@pytest.mark.parametrize(
+    "action,caller_kwargs,helper_kwargs",
+    [
+        (
+            "download_sql",
+            {
+                "connection": "sql",
+                "query": "  SELECT * FROM Orders  ",
+                "filename": "orders.csv",
+                "limit": 41,
+            },
+            {"connection": "sql", "query": "SELECT * FROM Orders", "limit": 41},
+        ),
+        (
+            "download_table",
+            {
+                "connection": "sql",
+                "table": "dbo.Orders",
+                "filename": "orders.json",
+                "limit": 42,
+            },
+            {"connection": "sql", "table": "dbo.Orders", "limit": 42},
+        ),
+        (
+            "download_file",
+            {
+                "connection": "local",
+                "source_path": "folder/orders.parquet",
+                "filename": "orders.parquet",
+            },
+            {"connection": "local", "source_path": "folder/orders.parquet"},
+        ),
+    ],
+)
+def test_remote_downloads_use_controlled_output_and_exact_helper_kwargs(
+    managed_dispatcher, monkeypatch, action, caller_kwargs, helper_kwargs
+):
+    dispatcher, root = managed_dispatcher
+    calls = []
+    fake_smart = ModuleType("odibi_mcp.tools.smart")
+
+    def fake_download(**kwargs):
+        calls.append(kwargs)
+        return {
+            "status": "success",
+            "output_path": kwargs["output_path"],
+            "rows_saved": 1,
+            "truncated": False,
+            "truncated_reason": None,
+        }
+
+    setattr(fake_smart, action, fake_download)
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.smart", fake_smart)
+
+    result = dispatcher.dispatch(
+        action,
+        project="managed",
+        application_identity=REMOTE_IDENTITY,
+        **caller_kwargs,
+    )
+
+    output_path = root / "exports" / caller_kwargs["filename"]
+    expected = {**helper_kwargs, "output_path": str(output_path)}
+    if action in {"download_sql", "download_table"}:
+        expected.update(
+            {
+                "max_bytes": 10 * 1024 * 1024,
+                "exclusive": True,
+                "report_truncation": True,
+            }
+        )
+    else:
+        expected.update({"max_bytes": 10 * 1024 * 1024, "exclusive": True})
+    assert calls == [expected]
+    assert result["output_path"] == f"exports/{caller_kwargs['filename']}"
+    assert str(root) not in str(result)
+    assert result["policy_applied"] == {"project_scoped": True}
+
+
+def test_remote_lineage_fails_closed_but_trusted_local_remains_available(
+    managed_dispatcher, monkeypatch
+):
+    dispatcher, _ = managed_dispatcher
+    calls = []
+    fake_story = ModuleType("odibi_mcp.tools.story")
+
+    def fake_lineage_graph(**kwargs):
+        calls.append(kwargs)
+        return {"nodes": [{"id": "/physical/path"}], "edges": []}
+
+    fake_story.lineage_graph = fake_lineage_graph
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.story", fake_story)
+
+    remote = dispatcher.dispatch(
+        "lineage_graph",
+        project="managed",
+        pipeline="bounded",
+        application_identity=REMOTE_IDENTITY,
+    )
+    local = dispatcher.dispatch(
+        "lineage_graph",
+        pipeline="bounded",
+        application_identity=LOCAL_IDENTITY,
+    )
+
+    assert remote["code"] == "PHYSICAL_REFERENCES_DISABLED"
+    assert local == {"nodes": [{"id": "/physical/path"}], "edges": []}
+    assert calls == [{"pipeline": "bounded"}]
+
+
+@pytest.mark.parametrize(
+    "action,kwargs",
+    [
+        ("run_workflow", {"workflow_name": "inspect_pipeline_run", "params": {}}),
+        ("run_workflow", {"workflow_name": "debug_failed_run", "params": {}}),
+        ("resume_workflow", {"resume_token": "caller-controlled"}),
+    ],
+)
+def test_remote_workflow_indirections_deny_before_story_helper_import(action, kwargs):
+    dispatcher = OdibiDispatcher()
+    dispatcher._actions[action] = lambda **call_kwargs: pytest.fail(
+        "remote workflow reached an indirect runtime-data helper"
+    )
+
+    result = dispatcher.dispatch(action, application_identity=REMOTE_IDENTITY, **kwargs)
+
+    assert result == {
+        "error": "This workflow is unavailable over the remote transport",
+        "code": "REMOTE_WORKFLOW_DISABLED",
+        "action": action,
+    }
+
+
+def test_non_runtime_remote_workflow_and_trusted_local_workflows_remain_available():
+    dispatcher = OdibiDispatcher()
+    calls = []
+    dispatcher._actions["run_workflow"] = lambda **kwargs: calls.append(("run", kwargs)) or {
+        "allowed": True
+    }
+    dispatcher._actions["resume_workflow"] = lambda **kwargs: calls.append(("resume", kwargs)) or {
+        "allowed": True
+    }
+
+    safe_remote = dispatcher.dispatch(
+        "run_workflow",
+        workflow_name="validate_yaml_simple",
+        params={},
+        application_identity=REMOTE_IDENTITY,
+    )
+    local_run = dispatcher.dispatch(
+        "run_workflow",
+        workflow_name="inspect_pipeline_run",
+        params={},
+        application_identity=LOCAL_IDENTITY,
+    )
+    local_resume = dispatcher.dispatch(
+        "resume_workflow",
+        resume_token="trusted-local-token",
+        application_identity=LOCAL_IDENTITY,
+    )
+
+    assert safe_remote == local_run == local_resume == {"allowed": True}
+    assert calls == [
+        ("run", {"workflow_name": "validate_yaml_simple", "params": {}}),
+        ("run", {"workflow_name": "inspect_pipeline_run", "params": {}}),
+        ("resume", {"resume_token": "trusted-local-token"}),
+    ]
+
+
+def test_remote_workflow_allowlist_contains_no_runtime_data_tool_steps():
+    from odibi_mcp.tools.workflows import WORKFLOWS
+
+    def tool_names(value):
+        if isinstance(value, dict):
+            names = {value["tool"]} if isinstance(value.get("tool"), str) else set()
+            return names | set().union(*(tool_names(item) for item in value.values()), set())
+        if isinstance(value, list):
+            return set().union(*(tool_names(item) for item in value), set())
+        return set()
+
+    assert _REMOTE_SAFE_WORKFLOWS <= set(WORKFLOWS)
+    for workflow_name in _REMOTE_SAFE_WORKFLOWS:
+        assert tool_names(WORKFLOWS[workflow_name]).isdisjoint(RUNTIME_DATA_ACTIONS)
+
+
+def test_remote_helper_failure_and_payload_are_sanitized(managed_dispatcher, monkeypatch):
+    dispatcher, root = managed_dispatcher
+    fake_smart = ModuleType("odibi_mcp.tools.smart")
+
+    def fake_profile_source(**kwargs):
+        return {
+            "path": str(root / "data" / "private.csv"),
+            "errors": [f"failed at {root}/private using token secret"],
+            "password": "generated-secret",
+        }
+
+    fake_smart.profile_source = fake_profile_source
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.smart", fake_smart)
+
+    result = dispatcher.dispatch(
+        "profile_source",
+        project="managed",
+        connection="local",
+        path="folder/input.csv",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result["path"] == "[physical reference withheld]"
+    assert result["errors"] == ["Runtime data is unavailable."]
+    assert result["password"] == "[redacted]"
+    assert str(root) not in str(result)
 
 
 def test_public_read_remains_anonymous():
@@ -956,3 +1523,170 @@ def test_execution_helper_rejects_positional_mode_before_downstream_calls(monkey
 
     with pytest.raises(TypeError):
         execution.test_pipeline(VALID_PIPELINE_YAML, "dry-run")
+
+
+def test_download_sql_reports_truncation_and_atomically_publishes(tmp_path, monkeypatch):
+    import pandas as pd
+
+    queries = []
+
+    class AzureSQL:
+        def read_sql(self, query):
+            queries.append(query)
+            return pd.DataFrame({"id": [1, 2, 3]})
+
+    from odibi_mcp import context
+
+    monkeypatch.setattr(context, "resolve_connection", lambda name: (AzureSQL(), name))
+    output = tmp_path / "orders.csv"
+
+    result = smart.download_sql(
+        "sql",
+        "SELECT * FROM Orders",
+        str(output),
+        limit=2,
+        max_bytes=1024,
+        exclusive=True,
+        report_truncation=True,
+    )
+
+    assert queries == ["SELECT TOP 3 * FROM Orders"]
+    assert result["status"] == "success"
+    assert result["rows_saved"] == 2
+    assert result["truncated"] is True
+    assert result["truncated_reason"] == "row_limit"
+    assert output.read_text(encoding="utf-8").splitlines() == ["id", "1", "2"]
+    assert not list(tmp_path.glob(".orders.csv.*"))
+
+
+def test_download_sql_collision_preserves_existing_file_and_cleans_temporary(tmp_path, monkeypatch):
+    import pandas as pd
+
+    class AzureSQL:
+        def read_sql(self, query):
+            return pd.DataFrame({"id": [1]})
+
+    from odibi_mcp import context
+
+    monkeypatch.setattr(context, "resolve_connection", lambda name: (AzureSQL(), name))
+    output = tmp_path / "orders.csv"
+    output.write_text("operator-owned\n", encoding="utf-8")
+
+    result = smart.download_sql(
+        "sql",
+        "SELECT * FROM Orders",
+        str(output),
+        limit=1,
+        max_bytes=1024,
+        exclusive=True,
+        report_truncation=True,
+    )
+
+    assert result["status"] == "error"
+    assert output.read_text(encoding="utf-8") == "operator-owned\n"
+    assert not list(tmp_path.glob(".orders.csv.*"))
+
+
+def test_download_table_quotes_each_qualified_identifier_part(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        smart,
+        "download_sql",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"status": "success"},
+    )
+
+    result = smart.download_table(
+        "sql",
+        "warehouse.sales.Orders",
+        "orders.csv",
+        limit=17,
+        max_bytes=100,
+        exclusive=True,
+        report_truncation=True,
+    )
+
+    assert result == {"status": "success"}
+    assert calls == [
+        (
+            ("sql", "SELECT * FROM [warehouse].[sales].[Orders]", "orders.csv", 17),
+            {"max_bytes": 100, "exclusive": True, "report_truncation": True},
+        )
+    ]
+
+
+def test_download_sql_byte_limit_publishes_no_partial_file(tmp_path, monkeypatch):
+    import pandas as pd
+
+    class AzureSQL:
+        def read_sql(self, query):
+            return pd.DataFrame({"payload": ["large-value"]})
+
+    from odibi_mcp import context
+
+    monkeypatch.setattr(context, "resolve_connection", lambda name: (AzureSQL(), name))
+    output = tmp_path / "oversize.csv"
+
+    result = smart.download_sql(
+        "sql",
+        "SELECT * FROM Orders",
+        str(output),
+        limit=1,
+        max_bytes=1,
+        exclusive=True,
+        report_truncation=True,
+    )
+
+    assert result["status"] == "error"
+    assert not output.exists()
+    assert not list(tmp_path.glob(".oversize.csv.*"))
+
+
+def test_download_file_streams_to_byte_cap_without_partial_publish(tmp_path, monkeypatch):
+    source = tmp_path / "source.csv"
+    source.write_bytes(b"0123456789")
+    output = tmp_path / "bounded.csv"
+
+    class LocalConnection:
+        def get_path(self, path):
+            return str(source)
+
+    from odibi_mcp import context
+
+    monkeypatch.setattr(context, "resolve_connection", lambda name: (LocalConnection(), name))
+
+    result = smart.download_file(
+        "local",
+        "source.csv",
+        str(output),
+        max_bytes=5,
+        exclusive=True,
+    )
+
+    assert result["status"] == "error"
+    assert not output.exists()
+    assert not list(tmp_path.glob(".bounded.csv.*"))
+
+
+@pytest.mark.parametrize("function_name", ["node_sample", "node_failed_rows"])
+def test_story_row_helpers_report_truthful_truncation(monkeypatch, function_name):
+    monkeypatch.setattr(story, "get_project_context", lambda: None)
+    monkeypatch.setattr(story, "_find_story_file", lambda *args, **kwargs: (object(), "story"))
+    monkeypatch.setattr(
+        story,
+        "_load_story",
+        lambda *args: {
+            "nodes": [
+                {
+                    "name": "source",
+                    "sample_output": [{"id": 1}, {"id": 2}, {"id": 3}],
+                    "failed_rows": [{"id": 1}, {"id": 2}, {"id": 3}],
+                }
+            ]
+        },
+    )
+
+    result = getattr(story, function_name)("bounded", "source", limit=2)
+
+    assert result.row_count == 2
+    assert result.truncated is True
+    assert result.truncated_reason == "row_limit"

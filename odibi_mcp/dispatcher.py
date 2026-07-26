@@ -12,9 +12,25 @@ from datetime import datetime
 from pydantic import BaseModel
 
 try:
-    from odibi_mcp.contracts.access import ActionEffect, ApplicationIdentity
+    from odibi_mcp.contracts.access import (
+        RUNTIME_DATA_ACTIONS,
+        ActionEffect,
+        ApplicationIdentity,
+        ManagedProjectAccess,
+        PreparedRuntimeCall,
+        RuntimeAccessDenied,
+        sanitize_runtime_result,
+    )
 except ImportError:  # Flat Databricks workspace deployment
-    from contracts.access import ActionEffect, ApplicationIdentity
+    from contracts.access import (
+        RUNTIME_DATA_ACTIONS,
+        ActionEffect,
+        ApplicationIdentity,
+        ManagedProjectAccess,
+        PreparedRuntimeCall,
+        RuntimeAccessDenied,
+        sanitize_runtime_result,
+    )
 
 
 ACTION_EFFECTS: dict[str, ActionEffect] = {
@@ -73,6 +89,21 @@ ACTION_EFFECTS: dict[str, ActionEffect] = {
     "discard_pipeline": ActionEffect.SESSION_MUTATION,
 }
 
+_RUNTIME_ACCESS_MESSAGES = {
+    "PROJECT_SCOPE_REQUIRED": "A valid managed project scope is required for this action",
+    "INVALID_RUNTIME_ARGUMENT": "Runtime data arguments are invalid",
+    "PATH_SCOPE_REQUIRED": "A valid contained data path is required for this action",
+    "PRIVACY_LIMIT_REQUIRED": "A valid bounded privacy limit is required for this action",
+    "DOWNLOAD_FORMAT_REQUIRED": "The requested download format is not allowed",
+    "EXPORT_SCOPE_REQUIRED": "A valid controlled export destination is required",
+    "PHYSICAL_REFERENCES_DISABLED": "Remote physical references are unavailable",
+    "REMOTE_WORKFLOW_DISABLED": "This workflow is unavailable over the remote transport",
+}
+
+_REMOTE_SAFE_WORKFLOWS = frozenset(
+    {"validate_yaml_simple", "build_and_validate", "debug_pipeline", "iterate_until_valid"}
+)
+
 
 class OdibiDispatcher:
     """Universal action dispatcher for Odibi MCP gateway.
@@ -81,7 +112,7 @@ class OdibiDispatcher:
     and manages pause/resume workflow state.
     """
 
-    def __init__(self):
+    def __init__(self, managed_access: ManagedProjectAccess | None = None):
         """Initialize dispatcher with action registry."""
         self._actions: dict[str, Callable] = self._register_actions()
         registered = set(self._actions)
@@ -91,6 +122,7 @@ class OdibiDispatcher:
             stale = sorted(classified - registered)
             raise RuntimeError(f"Action effect policy mismatch: missing={missing}, stale={stale}")
         self._lazy_services = {}  # Lazy-loaded service instances
+        self._managed_access = managed_access
 
     def _register_actions(self) -> dict[str, Callable]:
         """Build action registry mapping action names to handler functions.
@@ -206,11 +238,43 @@ class OdibiDispatcher:
                     "effect": effect.value,
                 }
 
+        is_remote_identity = (
+            isinstance(application_identity, ApplicationIdentity)
+            and application_identity.subject != "trusted-local"
+        )
+        if is_remote_identity and action in {"run_workflow", "resume_workflow"}:
+            if args:
+                return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
+            workflow_name = kwargs.get("workflow_name")
+            if action == "resume_workflow" or (
+                action == "run_workflow" and workflow_name not in _REMOTE_SAFE_WORKFLOWS
+            ):
+                return self._runtime_access_error(action, "REMOTE_WORKFLOW_DISABLED")
+
+        prepared_runtime_call: PreparedRuntimeCall | None = None
+        if action in RUNTIME_DATA_ACTIONS and is_remote_identity:
+            if args:
+                return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
+            try:
+                access = self._managed_access or ManagedProjectAccess.from_environment()
+                prepared_runtime_call = access.prepare(action, kwargs)
+                self._bind_runtime_context(prepared_runtime_call.config_path)
+                kwargs = prepared_runtime_call.kwargs
+            except RuntimeAccessDenied as error:
+                return self._runtime_access_error(action, error.code)
+            except Exception:
+                return self._runtime_access_error(action, "PROJECT_SCOPE_REQUIRED")
+
         try:
             result = self._actions[action](*args, **kwargs)
             # Ensure result is serializable
-            return self._to_serializable(result)
+            serialized = self._to_serializable(result)
+            if prepared_runtime_call is not None:
+                return sanitize_runtime_result(serialized, prepared_runtime_call)
+            return serialized
         except TypeError as e:
+            if prepared_runtime_call is not None:
+                return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
             # Signature mismatch - provide helpful error
             import inspect
 
@@ -222,11 +286,49 @@ class OdibiDispatcher:
                 "tip": f"Run odibi_help(action='{action}') for usage details",
             }
         except Exception as e:
+            if prepared_runtime_call is not None:
+                return {
+                    "error": "Runtime data is unavailable",
+                    "code": "RUNTIME_DATA_UNAVAILABLE",
+                    "action": action,
+                }
             return {
                 "error": str(e),
                 "action": action,
                 "tip": f"Run odibi_help(action='{action}') for usage details",
             }
+
+    @staticmethod
+    def _runtime_access_error(action: str, code: str) -> dict[str, Any]:
+        """Return a stable denial without echoing caller or host values."""
+        return {
+            "error": _RUNTIME_ACCESS_MESSAGES.get(
+                code, "Runtime data access is unavailable for this action"
+            ),
+            "code": code,
+            "action": action,
+        }
+
+    @staticmethod
+    def _bind_runtime_context(config_path) -> None:
+        """Bind helpers to the one validated config without initializing connections."""
+        try:
+            from odibi_mcp.context import (
+                MCPProjectContext,
+                get_project_context,
+                set_project_context,
+            )
+        except ImportError:  # Flat Databricks workspace deployment
+            from context import MCPProjectContext, get_project_context, set_project_context
+
+        current = get_project_context()
+        if current is not None:
+            try:
+                if current.config_path.resolve(strict=True) == config_path:
+                    return
+            except (OSError, RuntimeError):
+                pass
+        set_project_context(MCPProjectContext.from_odibi_yaml(str(config_path)))
 
     def help(self, category: str | None = None, action: str | None = None) -> dict[str, Any]:
         """Generate help documentation.
@@ -388,7 +490,7 @@ class OdibiDispatcher:
                 },
                 {
                     "name": "profile_folder",
-                    "signature": "connection, folder_path",
+                    "signature": "project, connection, folder_path, pattern='*', max_files=20",
                     "description": "List files with metadata (size, format, mod time)",
                 },
             ],
@@ -525,18 +627,18 @@ class OdibiDispatcher:
             "Download": [
                 {
                     "name": "download_sql",
-                    "signature": "pipeline",
-                    "description": "Export pipeline as SQL DDL/DML",
+                    "signature": "project, connection, query, filename, limit=1000",
+                    "description": "Export a bounded read-only SQL result to the controlled export root",
                 },
                 {
                     "name": "download_table",
-                    "signature": "pipeline, node, format='csv'",
-                    "description": "Export node output as DataFrame",
+                    "signature": "project, connection, table, filename, limit=1000",
+                    "description": "Export a bounded table result to the controlled export root",
                 },
                 {
                     "name": "download_file",
-                    "signature": "pipeline, destination",
-                    "description": "Write pipeline YAML to file",
+                    "signature": "project, connection, source_path, filename",
+                    "description": "Copy a bounded storage object to the controlled export root",
                 },
             ],
             "Session Builder": [
@@ -770,48 +872,98 @@ class OdibiDispatcher:
         return get_workflow(workflow_name)
 
     # Discovery
-    def _map_environment(self, connection: str | None = None) -> dict[str, Any]:
+    def _map_environment(
+        self,
+        connection: str | None = None,
+        path: str = "",
+        pattern: str = "",
+        limit: int = 500,
+    ) -> dict[str, Any]:
         """List connections and environment info."""
-        from tools.smart import map_environment
+        try:
+            from odibi_mcp.tools.smart import map_environment
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.smart import map_environment
 
-        return map_environment(connection)
+        return map_environment(
+            connection=connection,
+            path=path,
+            pattern=pattern,
+            limit=limit,
+        )
 
     def _profile_source(self, connection: str, path: str, max_rows: int = 100) -> dict[str, Any]:
         """Profile a data source."""
-        from tools.smart import profile_source
+        try:
+            from odibi_mcp.tools.smart import profile_source
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.smart import profile_source
 
-        return profile_source(connection, path, max_rows)
+        return profile_source(
+            connection=connection,
+            path=path,
+            max_attempts=5,
+            use_cache=False,
+            sample_rows=max_rows,
+        )
 
-    def _profile_folder(self, connection: str, folder_path: str) -> dict[str, Any]:
+    def _profile_folder(
+        self,
+        connection: str,
+        folder_path: str,
+        pattern: str = "*",
+        max_files: int = 50,
+    ) -> dict[str, Any]:
         """List files in a folder."""
-        from tools.smart import profile_folder
+        try:
+            from odibi_mcp.tools.smart import profile_folder
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.smart import profile_folder
 
-        return profile_folder(connection, folder_path)
+        return profile_folder(
+            connection=connection,
+            folder_path=folder_path,
+            pattern=pattern,
+            max_files=max_files,
+        )
 
     # Inspection
     def _story_read(self, pipeline: str, run_id: str | None = None) -> dict[str, Any]:
         """Read pipeline execution story."""
-        from tools.story import story_read
+        try:
+            from odibi_mcp.tools.story import story_read
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.story import story_read
 
-        return story_read(pipeline, run_id)
+        run_selector = {"run_id": run_id} if run_id is not None else None
+        return story_read(pipeline=pipeline, run_selector=run_selector)
 
     def _node_sample(self, pipeline: str, node: str, limit: int = 10) -> dict[str, Any]:
         """Sample node output."""
-        from tools.story import node_sample
+        try:
+            from odibi_mcp.tools.story import node_sample
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.story import node_sample
 
-        return node_sample(pipeline, node, limit)
+        return node_sample(pipeline=pipeline, node=node, limit=limit)
 
     def _node_failed_rows(self, pipeline: str, node: str, limit: int = 10) -> dict[str, Any]:
         """Fetch quarantined rows."""
-        from tools.story import node_failed_rows
+        try:
+            from odibi_mcp.tools.story import node_failed_rows
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.story import node_failed_rows
 
-        return node_failed_rows(pipeline, node, limit)
+        return node_failed_rows(pipeline=pipeline, node=node, limit=limit)
 
     def _lineage_graph(self, pipeline: str) -> dict[str, Any]:
         """Generate lineage graph."""
-        from tools.story import lineage_graph
+        try:
+            from odibi_mcp.tools.story import lineage_graph
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.story import lineage_graph
 
-        return lineage_graph(pipeline)
+        return lineage_graph(pipeline=pipeline)
 
     # Construction
     def _list_transformers(self, category: str | None = None) -> dict[str, Any]:
@@ -836,9 +988,17 @@ class OdibiDispatcher:
 
     def _suggest_pipeline(self, source_path: str, connection: str, intent: str) -> dict[str, Any]:
         """Suggest pipeline based on data."""
-        from tools.phase3_smart import suggest_pipeline
+        try:
+            from odibi_mcp.tools.phase3_smart import suggest_pipeline
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.phase3_smart import suggest_pipeline
 
-        return suggest_pipeline(source_path, connection, intent)
+        return suggest_pipeline(
+            source_path=source_path,
+            connection=connection,
+            intent=intent,
+            sample_rows=100,
+        )
 
     def _create_ingestion_pipeline(
         self, source_path: str, connection: str, target_table: str
@@ -944,23 +1104,71 @@ class OdibiDispatcher:
         return self._import_knowledge()().get_skill(name)
 
     # Download
-    def _download_sql(self, pipeline: str) -> dict[str, Any]:
-        """Export pipeline as SQL."""
-        from tools.smart import download_sql
+    def _download_sql(
+        self,
+        connection: str,
+        query: str,
+        output_path: str,
+        limit: int = 1000,
+    ) -> dict[str, Any]:
+        """Export a bounded SQL result."""
+        try:
+            from odibi_mcp.tools.smart import download_sql
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.smart import download_sql
 
-        return download_sql(pipeline)
+        return download_sql(
+            connection=connection,
+            query=query,
+            output_path=output_path,
+            limit=limit,
+            max_bytes=10 * 1024 * 1024,
+            exclusive=True,
+            report_truncation=True,
+        )
 
-    def _download_table(self, pipeline: str, node: str, format: str = "csv") -> dict[str, Any]:
-        """Export node output as table."""
-        from tools.smart import download_table
+    def _download_table(
+        self,
+        connection: str,
+        table: str,
+        output_path: str,
+        limit: int = 1000,
+    ) -> dict[str, Any]:
+        """Export a bounded table result."""
+        try:
+            from odibi_mcp.tools.smart import download_table
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.smart import download_table
 
-        return download_table(pipeline, node, format)
+        return download_table(
+            connection=connection,
+            table=table,
+            output_path=output_path,
+            limit=limit,
+            max_bytes=10 * 1024 * 1024,
+            exclusive=True,
+            report_truncation=True,
+        )
 
-    def _download_file(self, pipeline: str, destination: str) -> dict[str, Any]:
-        """Write pipeline YAML to file."""
-        from tools.smart import download_file
+    def _download_file(
+        self,
+        connection: str,
+        source_path: str,
+        output_path: str,
+    ) -> dict[str, Any]:
+        """Copy a bounded storage object to the controlled export root."""
+        try:
+            from odibi_mcp.tools.smart import download_file
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.smart import download_file
 
-        return download_file(pipeline, destination)
+        return download_file(
+            connection=connection,
+            source_path=source_path,
+            output_path=output_path,
+            max_bytes=10 * 1024 * 1024,
+            exclusive=True,
+        )
 
     # Session Builder
     def _create_pipeline(self, pipeline_name: str, layer: str = "gold") -> dict[str, Any]:

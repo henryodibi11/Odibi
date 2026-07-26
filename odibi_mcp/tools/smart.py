@@ -644,7 +644,12 @@ def _transform_catalog_to_map_response(
 
 
 def profile_source(
-    connection: str | dict, path: str, max_attempts: int = 5, use_cache: bool = True
+    connection: str | dict,
+    path: str,
+    max_attempts: int = 5,
+    use_cache: bool = True,
+    *,
+    sample_rows: int = 1000,
 ) -> ProfileSourceResponse:
     """
     Profile a data source - delegates to core conn.profile().
@@ -663,7 +668,13 @@ def profile_source(
         path: Path to the source (e.g., "schema.table" for SQL, "folder/file.csv" for storage)
         max_attempts: Max attempts for CSV encoding/delimiter detection (kept for compatibility)
         use_cache: Use cached profile if available (default: True)
+        sample_rows: Maximum rows the connection may sample while profiling
     """
+    if type(sample_rows) is not int:
+        raise TypeError("sample_rows must be an integer")
+    if not 1 <= sample_rows <= 1000:
+        raise ValueError("sample_rows must be between 1 and 1000")
+
     from odibi_mcp.context import resolve_connection
     from odibi.discovery.types import TableProfile
     from odibi_mcp.tools.profile_cache import get_cached_profile, cache_profile
@@ -682,7 +693,7 @@ def profile_source(
         logger.info(f"profile_source: delegating to {conn_name}.profile(dataset='{path}')")
 
         # Call core's profile method
-        profile_dict = conn.profile(dataset=path, sample_rows=1000)
+        profile_dict = conn.profile(dataset=path, sample_rows=sample_rows)
         profile = TableProfile(**profile_dict)
 
         # Transform core response to MCP contract
@@ -2836,11 +2847,24 @@ def test_node(node_yaml: str, max_rows: int = 100) -> TestNodeResponse:
 # =============================================================================
 
 
+def _publish_download(temp_path, output_path, exclusive: bool) -> None:
+    """Publish a completed same-filesystem download without replacing a destination."""
+    import os
+
+    if exclusive:
+        os.link(temp_path, output_path)
+        os.unlink(temp_path)
+
+
 def download_sql(
     connection: str | dict,
     query: str,
     output_path: str,
     limit: int = 10000,
+    *,
+    max_bytes: int | None = None,
+    exclusive: bool = False,
+    report_truncation: bool = False,
 ) -> dict:
     """
     Run a SQL query and save results to a local file.
@@ -2862,6 +2886,9 @@ def download_sql(
         query: SQL query to execute (will have LIMIT/TOP applied)
         output_path: Local path to save results (e.g., "./data/results.parquet")
         limit: Max rows to download (default 10000 to prevent huge downloads)
+        max_bytes: Optional maximum serialized file size
+        exclusive: Publish atomically without replacing an existing destination
+        report_truncation: Fetch one extra row and report whether the result was capped
 
     Returns:
         Dict with status, rows_saved, output_path, columns, errors
@@ -2872,10 +2899,30 @@ def download_sql(
     """
     import pandas as pd
     from pathlib import Path
+    import os
+    import tempfile
 
     from odibi_mcp.context import resolve_connection
 
+    if type(limit) is not int:
+        raise TypeError("limit must be an integer")
+    if limit < 1:
+        raise ValueError("limit must be positive")
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 1):
+        raise ValueError("max_bytes must be a positive integer or None")
+    if type(exclusive) is not bool or type(report_truncation) is not bool:
+        raise TypeError("exclusive and report_truncation must be booleans")
+    query_upper = query.upper().strip()
+    if report_truncation and (
+        not query_upper.startswith("SELECT ")
+        or ";" in query
+        or "TOP " in query_upper
+        or "LIMIT " in query_upper
+    ):
+        raise ValueError("bounded downloads require one SELECT without TOP or LIMIT")
+
     conn_name = connection if isinstance(connection, str) else "inline"
+    temp_path = None
 
     try:
         conn, conn_name = resolve_connection(connection)
@@ -2895,14 +2942,14 @@ def download_sql(
 
     try:
         # Apply limit to query if not already present
-        query_upper = query.upper().strip()
+        query_limit = limit + 1 if report_truncation else limit
         if "TOP " not in query_upper and "LIMIT " not in query_upper:
             # For SQL Server, inject TOP after SELECT
             if query_upper.startswith("SELECT"):
-                query = query[:6] + f" TOP {limit} " + query[6:]
+                query = query[:6] + f" TOP {query_limit}" + query[6:]
             else:
                 # Fallback: wrap in subquery
-                query = f"SELECT TOP {limit} * FROM ({query}) AS limited_query"
+                query = f"SELECT TOP {query_limit} * FROM ({query}) AS limited_query"
 
         # Execute query using available method
         if hasattr(conn, "read_sql"):
@@ -2953,22 +3000,44 @@ def download_sql(
                 "errors": ["Connection does not support SQL execution methods"],
             }
 
+        truncated = report_truncation and len(df) > limit
+        if truncated:
+            df = df.iloc[:limit]
+
         # Determine output format from extension
         output_path_obj = Path(output_path)
         output_path_obj.parent.mkdir(parents=True, exist_ok=True)
         suffix = output_path_obj.suffix.lower()
+        if not suffix or suffix not in (".csv", ".json", ".xlsx", ".xls", ".parquet", ".pq"):
+            output_path_obj = output_path_obj.with_suffix(".parquet")
+            output_path = str(output_path_obj)
+            suffix = ".parquet"
+
+        write_path = output_path
+        if exclusive:
+            temporary = tempfile.NamedTemporaryFile(
+                dir=output_path_obj.parent,
+                prefix=f".{output_path_obj.name}.",
+                suffix=suffix,
+                delete=False,
+            )
+            temporary.close()
+            temp_path = temporary.name
+            write_path = temp_path
 
         if suffix == ".csv":
-            df.to_csv(output_path, index=False)
+            df.to_csv(write_path, index=False)
         elif suffix == ".json":
-            df.to_json(output_path, orient="records", indent=2)
+            df.to_json(write_path, orient="records", indent=2)
         elif suffix in (".xlsx", ".xls"):
-            df.to_excel(output_path, index=False)
+            df.to_excel(write_path, index=False)
         else:
-            # Default to parquet
-            if not suffix or suffix not in (".parquet", ".pq"):
-                output_path = str(output_path_obj.with_suffix(".parquet"))
-            df.to_parquet(output_path, index=False)
+            df.to_parquet(write_path, index=False)
+
+        if max_bytes is not None and Path(write_path).stat().st_size > max_bytes:
+            raise ValueError("Serialized download exceeds the configured byte limit")
+        _publish_download(write_path, output_path, exclusive)
+        temp_path = None
 
         return {
             "status": "success",
@@ -2976,10 +3045,17 @@ def download_sql(
             "rows_saved": len(df),
             "columns": list(df.columns),
             "output_path": str(output_path),
-            "format": suffix.lstrip(".") if suffix else "parquet",
+            "format": suffix.lstrip("."),
+            "truncated": truncated,
+            "truncated_reason": "row_limit" if truncated else None,
         }
 
     except Exception as e:
+        if temp_path is not None:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
         logger.exception(f"Error downloading SQL: {query[:100]}...")
         return {
             "status": "error",
@@ -2994,6 +3070,10 @@ def download_table(
     table: str,
     output_path: str,
     limit: int = 10000,
+    *,
+    max_bytes: int | None = None,
+    exclusive: bool = False,
+    report_truncation: bool = False,
 ) -> dict:
     """
     Download a full table (with row limit) to a local file.
@@ -3015,18 +3095,28 @@ def download_table(
     """
     # Parse table name to ensure proper quoting
     if "." in table:
-        schema, tbl = table.split(".", 1)
-        query = f"SELECT * FROM [{schema}].[{tbl}]"
+        query = "SELECT * FROM " + ".".join(f"[{part}]" for part in table.split("."))
     else:
         query = f"SELECT * FROM [{table}]"
 
-    return download_sql(connection, query, output_path, limit)
+    return download_sql(
+        connection,
+        query,
+        output_path,
+        limit,
+        max_bytes=max_bytes,
+        exclusive=exclusive,
+        report_truncation=report_truncation,
+    )
 
 
 def download_file(
     connection: str | dict,
     source_path: str,
     output_path: str,
+    *,
+    max_bytes: int | None = None,
+    exclusive: bool = False,
 ) -> dict:
     """
     Copy a file from ADLS/storage to local filesystem.
@@ -3044,6 +3134,8 @@ def download_file(
             }
         source_path: Path within the storage connection (e.g., "raw/data.csv")
         output_path: Local path to save the file
+        max_bytes: Optional maximum copied file size
+        exclusive: Publish atomically without replacing an existing destination
 
     Returns:
         Dict with status, source_path, output_path, bytes_copied, errors
@@ -3053,11 +3145,19 @@ def download_file(
         download_file("raw_adls", "exports/data.parquet", "./local/data.parquet")
     """
     import fsspec
+    import os
     from pathlib import Path
+    import tempfile
 
     from odibi_mcp.context import resolve_connection
 
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 1):
+        raise ValueError("max_bytes must be a positive integer or None")
+    if type(exclusive) is not bool:
+        raise TypeError("exclusive must be a boolean")
+
     conn_name = connection if isinstance(connection, str) else "inline"
+    temp_path = None
 
     try:
         conn, conn_name = resolve_connection(connection)
@@ -3088,6 +3188,17 @@ def download_file(
         # Create output directory if needed
         output_path_obj = Path(output_path)
         output_path_obj.parent.mkdir(parents=True, exist_ok=True)
+        write_path = output_path
+        if exclusive:
+            temporary = tempfile.NamedTemporaryFile(
+                dir=output_path_obj.parent,
+                prefix=f".{output_path_obj.name}.",
+                suffix=output_path_obj.suffix,
+                delete=False,
+            )
+            temporary.close()
+            temp_path = temporary.name
+            write_path = temp_path
 
         # Determine source filesystem
         if full_source_path.startswith(("abfss://", "abfs://", "az://")):
@@ -3113,22 +3224,35 @@ def download_file(
             fs = fsspec.filesystem("file")
             fs_path = full_source_path
 
-        # Download the file
-        with fs.open(fs_path, "rb") as remote_f:
-            content = remote_f.read()
+        # Download in bounded chunks so a remote object is never read into memory wholesale.
+        bytes_copied = 0
+        with fs.open(fs_path, "rb") as remote_f, open(write_path, "wb") as local_f:
+            while True:
+                content = remote_f.read(1024 * 1024)
+                if not content:
+                    break
+                bytes_copied += len(content)
+                if max_bytes is not None and bytes_copied > max_bytes:
+                    raise ValueError("Source file exceeds the configured byte limit")
+                local_f.write(content)
 
-        with open(output_path, "wb") as local_f:
-            local_f.write(content)
+        _publish_download(write_path, output_path, exclusive)
+        temp_path = None
 
         return {
             "status": "success",
             "connection": conn_name,
             "source_path": source_path,
             "output_path": str(output_path_obj.absolute()),
-            "bytes_copied": len(content),
+            "bytes_copied": bytes_copied,
         }
 
     except FileNotFoundError as e:
+        if temp_path is not None:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
         return {
             "status": "error",
             "connection": conn_name,
@@ -3136,6 +3260,11 @@ def download_file(
             "errors": [f"File not found: {e}"],
         }
     except Exception as e:
+        if temp_path is not None:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
         logger.exception(f"Error downloading file: {source_path}")
         return {
             "status": "error",

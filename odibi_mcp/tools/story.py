@@ -89,6 +89,8 @@ class NodeSampleResult:
     row_count: int
     status: str
     error: Optional[str]
+    truncated: bool = False
+    truncated_reason: Optional[str] = None
 
 
 @dataclass
@@ -101,6 +103,8 @@ class NodeFailedRowsResult:
     validations: List[dict]
     status: str
     error: Optional[str]
+    truncated: bool = False
+    truncated_reason: Optional[str] = None
 
 
 @dataclass
@@ -540,6 +544,7 @@ def node_sample(
                 (node_data.get("sample") or {}).get("columns") or node_data.get("columns") or []
             )
 
+        truncated = limit is not None and isinstance(sample_rows, list) and len(sample_rows) > limit
         if limit is not None and isinstance(sample_rows, list):
             sample_rows = sample_rows[: max(0, int(limit))]
 
@@ -551,6 +556,8 @@ def node_sample(
             row_count=len(sample_rows or []),
             status=node_data.get("status", "unknown"),
             error=None,
+            truncated=truncated,
+            truncated_reason="row_limit" if truncated else None,
         )
 
     except Exception as e:
@@ -647,6 +654,7 @@ def node_failed_rows(
         else:
             columns = node_data.get("columns") or []
 
+        truncated = limit is not None and isinstance(failed_rows, list) and len(failed_rows) > limit
         if limit is not None and isinstance(failed_rows, list):
             failed_rows = failed_rows[: max(0, int(limit))]
 
@@ -659,6 +667,8 @@ def node_failed_rows(
             validations=validations or [],
             status=node_data.get("status", "unknown"),
             error=None,
+            truncated=truncated,
+            truncated_reason="row_limit" if truncated else None,
         )
 
     except Exception as e:
