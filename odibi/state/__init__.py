@@ -3,11 +3,41 @@ import logging
 import os
 import random
 import time
+import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+_SPARK_MISSING_STATE_CONDITIONS = frozenset({"PATH_NOT_FOUND"})
+_SPARK_CREATE_CONFLICT_CONDITIONS = frozenset(
+    {"DELTA_PATH_EXISTS", "PATH_ALREADY_EXISTS", "TABLE_OR_VIEW_ALREADY_EXISTS"}
+)
+
+
+def _spark_error_condition(error: Exception) -> Optional[str]:
+    """Return a structured Spark error condition without classifying message prose."""
+    candidates = (error, getattr(error, "java_exception", None))
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        for accessor_name in ("getCondition", "getErrorClass"):
+            accessor = getattr(candidate, accessor_name, None)
+            if not callable(accessor):
+                continue
+            try:
+                condition = accessor()
+            except Exception:
+                continue
+            if condition:
+                return str(condition)
+    return None
+
+
+def _is_missing_spark_state_error(error: Exception) -> bool:
+    """Return whether Spark structured metadata reports a missing configured path."""
+    return _spark_error_condition(error) in _SPARK_MISSING_STATE_CONDITIONS
 
 
 def _retry_delta_operation(func, max_retries: int = 5, base_delay: float = 1.0):
@@ -313,23 +343,21 @@ class CatalogStateBackend(StateBackend):
         try:
             df = self.spark.read.format("delta").load(self.meta_state_path)
             row = df.filter(F.col("key") == key).select("value").first()
-            if row and row.value:
-                try:
-                    return json.loads(row.value)
-                except Exception as e:
-                    logger.debug(f"Failed to parse HWM value as JSON for key '{key}': {e}")
-                    return row.value
         except Exception as e:
-            error_str = str(e)
-            if "PATH_NOT_FOUND" in error_str or "does not exist" in error_str.lower():
+            if _is_missing_spark_state_error(e):
                 logger.debug(
                     f"HWM state table does not exist yet at {self.meta_state_path}. "
                     "It will be created on first write."
                 )
-            else:
-                logger.warning(
-                    f"Failed to get HWM for key '{key}' from {self.meta_state_path}: {e}"
-                )
+                return None
+            raise
+
+        if row and row.value:
+            try:
+                return json.loads(row.value)
+            except Exception as e:
+                logger.debug(f"Failed to parse HWM value as JSON for key '{key}': {e}")
+                return row.value
         return None
 
     def _get_hwm_local(self, key):
@@ -396,12 +424,10 @@ class CatalogStateBackend(StateBackend):
 
         updates_df = self.spark.createDataFrame([row], schema)
 
-        if not self._spark_table_exists(self.meta_state_path):
-            updates_df.write.format("delta").mode("overwrite").save(self.meta_state_path)
+        if self._create_hwm_spark_table_if_missing(updates_df):
             return
 
-        view_name = f"_odibi_hwm_updates_{abs(hash(row['key']))}"
-        updates_df.createOrReplaceTempView(view_name)
+        view_name = f"_odibi_hwm_updates_{uuid.uuid4().hex}"
 
         merge_sql = f"""
           MERGE INTO delta.`{self.meta_state_path}` AS t
@@ -413,8 +439,7 @@ class CatalogStateBackend(StateBackend):
             t.updated_at = s.updated_at
           WHEN NOT MATCHED THEN INSERT *
         """
-        self.spark.sql(merge_sql)
-        self.spark.catalog.dropTempView(view_name)
+        self._execute_hwm_spark_merge(updates_df, view_name, merge_sql)
 
     def _set_hwm_local(self, row):
         if not DeltaTable:
@@ -450,8 +475,45 @@ class CatalogStateBackend(StateBackend):
         try:
             return self.spark.read.format("delta").load(path).count() >= 0
         except Exception as e:
-            logger.debug(f"Table does not exist at {path}: {e}")
+            if _is_missing_spark_state_error(e):
+                logger.debug(f"HWM state table does not exist at {path}: {e}")
+                return False
+            raise
+
+    def _create_hwm_spark_table_if_missing(self, updates_df) -> bool:
+        """Create missing Spark state without overwriting or hiding failed probes."""
+        if self._spark_table_exists(self.meta_state_path):
             return False
+
+        try:
+            updates_df.write.format("delta").mode("errorifexists").save(self.meta_state_path)
+        except Exception as error:
+            if _spark_error_condition(error) not in _SPARK_CREATE_CONFLICT_CONDITIONS:
+                raise
+
+            # Another writer may have created the table after our first probe.
+            # Re-probe once and merge only when that table is now authoritative.
+            if not self._spark_table_exists(self.meta_state_path):
+                raise
+            return False
+
+        return True
+
+    def _execute_hwm_spark_merge(self, updates_df, view_name: str, merge_sql: str) -> None:
+        """Execute a Spark HWM MERGE and preserve SQL failure over cleanup failure."""
+        updates_df.createOrReplaceTempView(view_name)
+        try:
+            self.spark.sql(merge_sql)
+        except Exception:
+            try:
+                self.spark.catalog.dropTempView(view_name)
+            except Exception as cleanup_error:
+                logger.warning(
+                    f"Failed to drop Spark HWM temp view '{view_name}' after MERGE failure: "
+                    f"{cleanup_error}"
+                )
+            raise
+        self.spark.catalog.dropTempView(view_name)
 
     def set_hwm_batch(self, updates: List[Dict[str, Any]]) -> None:
         """Set multiple High-Water Mark values in a single MERGE operation.
@@ -498,12 +560,10 @@ class CatalogStateBackend(StateBackend):
 
         updates_df = self.spark.createDataFrame(rows, schema)
 
-        if not self._spark_table_exists(self.meta_state_path):
-            updates_df.write.format("delta").mode("overwrite").save(self.meta_state_path)
+        if self._create_hwm_spark_table_if_missing(updates_df):
             return
 
-        view_name = "_odibi_hwm_batch_updates"
-        updates_df.createOrReplaceTempView(view_name)
+        view_name = f"_odibi_hwm_batch_updates_{uuid.uuid4().hex}"
 
         merge_sql = f"""
           MERGE INTO delta.`{self.meta_state_path}` AS t
@@ -515,8 +575,7 @@ class CatalogStateBackend(StateBackend):
             t.updated_at = s.updated_at
           WHEN NOT MATCHED THEN INSERT *
         """
-        self.spark.sql(merge_sql)
-        self.spark.catalog.dropTempView(view_name)
+        self._execute_hwm_spark_merge(updates_df, view_name, merge_sql)
         logger.debug(f"Batch set {len(rows)} HWM value(s) via Spark")
 
     def _set_hwm_batch_local(self, rows: List[Dict[str, Any]]) -> None:

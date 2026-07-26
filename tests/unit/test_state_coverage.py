@@ -3,7 +3,9 @@
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timezone
+from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -26,6 +28,57 @@ from odibi.state import (
 )
 
 logging.getLogger("odibi").propagate = False
+
+
+class _SparkConditionError(Exception):
+    def __init__(self, condition, message=None):
+        super().__init__(message or f"[{condition}] Spark operation failed")
+        self.condition = condition
+
+    def getErrorClass(self):
+        return self.condition
+
+
+class _WrappedJavaSparkError(Exception):
+    def __init__(self, java_exception, message="Spark JVM operation failed"):
+        super().__init__(message)
+        self.java_exception = java_exception
+
+
+@pytest.fixture
+def mocked_pyspark_modules():
+    """Install minimal PySpark modules so state tests exercise Odibi, not a live JVM."""
+
+    class _SparkType:
+        def __init__(self, *args):
+            self.args = args
+
+    functions_module = ModuleType("pyspark.sql.functions")
+    functions_module.col = MagicMock(return_value=MagicMock())
+
+    types_module = ModuleType("pyspark.sql.types")
+    types_module.StringType = _SparkType
+    types_module.StructField = _SparkType
+    types_module.StructType = _SparkType
+    types_module.TimestampType = _SparkType
+
+    sql_module = ModuleType("pyspark.sql")
+    sql_module.functions = functions_module
+    sql_module.types = types_module
+
+    pyspark_module = ModuleType("pyspark")
+    pyspark_module.sql = sql_module
+
+    with patch.dict(
+        sys.modules,
+        {
+            "pyspark": pyspark_module,
+            "pyspark.sql": sql_module,
+            "pyspark.sql.functions": functions_module,
+            "pyspark.sql.types": types_module,
+        },
+    ):
+        yield functions_module
 
 
 # ===========================================================================
@@ -213,15 +266,14 @@ class TestCatalogStateLastRunLocal:
 
     def test_get_last_run_info_spark_dispatch(self):
         spark = MagicMock()
-        row = MagicMock()
-        row.status = "SUCCESS"
-        row.metrics_json = '{"x": 1}'
-        spark.read.format.return_value.load.return_value.filter.return_value.select.return_value.orderBy.return_value.first.return_value = row
-
         backend = CatalogStateBackend("/runs", "/state", spark_session=spark)
-        result = backend.get_last_run_info("p", "n")
-        assert result["success"] is True
-        assert result["metadata"] == {"x": 1}
+        expected = {"success": True, "metadata": {"x": 1}}
+
+        with patch.object(backend, "_get_last_run_spark", return_value=expected) as getter:
+            result = backend.get_last_run_info("p", "n")
+
+        assert result == expected
+        getter.assert_called_once_with("p", "n")
 
 
 class TestCatalogStateHWM:
@@ -303,20 +355,113 @@ class TestCatalogStateHWM:
 
     def test_get_hwm_spark_dispatch(self):
         spark = MagicMock()
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with patch.object(backend, "_get_hwm_spark", return_value={"x": 2}) as getter:
+            result = backend.get_hwm("k")
+
+        assert result == {"x": 2}
+        getter.assert_called_once_with("k")
+
+    def test_get_hwm_spark_json_value(self, mocked_pyspark_modules):
+        spark = MagicMock()
         row = MagicMock()
         row.value = '{"x": 2}'
         spark.read.format.return_value.load.return_value.filter.return_value.select.return_value.first.return_value = row
 
         backend = CatalogStateBackend("/r", "/s", spark_session=spark)
-        result = backend.get_hwm("k")
-        assert result == {"x": 2}
+        assert backend.get_hwm("k") == {"x": 2}
 
-    def test_get_hwm_spark_path_not_found(self):
+    @pytest.mark.parametrize(
+        "error",
+        [
+            _SparkConditionError("PATH_NOT_FOUND"),
+            _WrappedJavaSparkError(_SparkConditionError("PATH_NOT_FOUND")),
+        ],
+        ids=["python-structured", "wrapped-java-structured"],
+    )
+    def test_get_hwm_spark_true_missing_state(self, error, mocked_pyspark_modules):
         spark = MagicMock()
-        spark.read.format.return_value.load.side_effect = Exception("PATH_NOT_FOUND")
+        spark.read.format.return_value.load.side_effect = error
 
         backend = CatalogStateBackend("/r", "/s", spark_session=spark)
         assert backend.get_hwm("k") is None
+
+    def test_get_hwm_spark_nested_bracketed_missing_text_is_operational(
+        self, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        nested = _SparkConditionError("PATH_NOT_FOUND")
+        error = RuntimeError("authorization wrapper contains [PATH_NOT_FOUND]")
+        error.__cause__ = nested
+        spark.read.format.return_value.load.side_effect = error
+
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+        with pytest.raises(RuntimeError) as raised:
+            backend.get_hwm("k")
+
+        assert raised.value is error
+
+    @pytest.mark.parametrize("failure_point", ["load", "filter", "first"])
+    def test_get_hwm_spark_structured_table_not_found_is_operational(
+        self, failure_point, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        error = _SparkConditionError("TABLE_OR_VIEW_NOT_FOUND")
+        loaded = spark.read.format.return_value.load.return_value
+        filtered = loaded.filter.return_value
+        selected = filtered.select.return_value
+
+        if failure_point == "load":
+            spark.read.format.return_value.load.side_effect = error
+        elif failure_point == "filter":
+            loaded.filter.side_effect = error
+        else:
+            selected.first.side_effect = error
+
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+        with pytest.raises(_SparkConditionError) as raised:
+            backend.get_hwm("k")
+
+        assert raised.value is error
+
+    def test_get_hwm_spark_absent_key(self, mocked_pyspark_modules):
+        spark = MagicMock()
+        spark.read.format.return_value.load.return_value.filter.return_value.select.return_value.first.return_value = None
+
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+        assert backend.get_hwm("missing") is None
+
+    @pytest.mark.parametrize(
+        "failure_point", ["format", "load", "expression", "filter", "select", "first"]
+    )
+    def test_get_hwm_spark_operational_failure_is_visible(
+        self, failure_point, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        error = RuntimeError(f"{failure_point} credential does not exist")
+        loaded = spark.read.format.return_value.load.return_value
+        filtered = loaded.filter.return_value
+        selected = filtered.select.return_value
+
+        if failure_point == "format":
+            spark.read.format.side_effect = error
+        elif failure_point == "load":
+            spark.read.format.return_value.load.side_effect = error
+        elif failure_point == "expression":
+            mocked_pyspark_modules.col.side_effect = error
+        elif failure_point == "filter":
+            loaded.filter.side_effect = error
+        elif failure_point == "select":
+            filtered.select.side_effect = error
+        else:
+            selected.first.side_effect = error
+
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+        with pytest.raises(RuntimeError, match=failure_point) as raised:
+            backend.get_hwm("k")
+
+        assert raised.value is error
 
     def test_set_hwm_local_new_table(self, tmp_path):
         state_path = str(tmp_path / "state")
@@ -491,11 +636,200 @@ class TestCatalogStateSpark:
         backend = CatalogStateBackend("/r", "/s", spark_session=spark)
         assert backend._spark_table_exists("/path") is True
 
-    def test_spark_table_exists_false(self):
+    def test_spark_table_exists_false_for_structured_missing(self):
         spark = MagicMock()
-        spark.read.format.return_value.load.side_effect = Exception("not found")
+        spark.read.format.return_value.load.side_effect = _SparkConditionError("PATH_NOT_FOUND")
         backend = CatalogStateBackend("/r", "/s", spark_session=spark)
         assert backend._spark_table_exists("/path") is False
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("operational wrapper contains [PATH_NOT_FOUND]"),
+            _SparkConditionError("TABLE_OR_VIEW_NOT_FOUND"),
+        ],
+        ids=["bracket-only-path", "structured-table"],
+    )
+    def test_spark_table_exists_false_missing_signals_are_visible(self, error):
+        spark = MagicMock()
+        spark.read.format.return_value.load.side_effect = error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with pytest.raises(type(error)) as raised:
+            backend._spark_table_exists("/path")
+
+        assert raised.value is error
+
+    @pytest.mark.parametrize("failure_point", ["load", "count"])
+    def test_spark_table_exists_operational_failure_is_visible(self, failure_point):
+        spark = MagicMock()
+        error = RuntimeError(f"{failure_point} failed")
+        if failure_point == "load":
+            spark.read.format.return_value.load.side_effect = error
+        else:
+            spark.read.format.return_value.load.return_value.count.side_effect = error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with pytest.raises(RuntimeError, match=f"{failure_point} failed") as raised:
+            backend._spark_table_exists("/path")
+
+        assert raised.value is error
+
+    @pytest.mark.parametrize("batch", [False, True])
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("authorization failed"),
+            RuntimeError("operational wrapper contains [PATH_NOT_FOUND]"),
+            _SparkConditionError("TABLE_OR_VIEW_NOT_FOUND"),
+        ],
+        ids=["authorization", "bracket-only-path", "structured-table"],
+    )
+    def test_spark_setter_probe_failure_performs_zero_writes(
+        self, batch, error, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        spark.read.format.return_value.load.side_effect = error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with pytest.raises(type(error)) as raised:
+            if batch:
+                backend.set_hwm_batch([{"key": "k", "value": "v"}])
+            else:
+                backend.set_hwm("k", "v")
+
+        assert raised.value is error
+        updates_df.write.format.assert_not_called()
+        updates_df.createOrReplaceTempView.assert_not_called()
+        spark.sql.assert_not_called()
+
+    @pytest.mark.parametrize("batch", [False, True])
+    def test_spark_missing_state_creation_is_error_if_exists(self, batch, mocked_pyspark_modules):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        spark.read.format.return_value.load.side_effect = _SparkConditionError("PATH_NOT_FOUND")
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        if batch:
+            backend.set_hwm_batch([{"key": "k", "value": "v"}])
+        else:
+            backend.set_hwm("k", "v")
+
+        writer = updates_df.write.format.return_value
+        updates_df.write.format.assert_called_once_with("delta")
+        writer.mode.assert_called_once_with("errorifexists")
+        writer.mode.return_value.save.assert_called_once_with("/s")
+        spark.sql.assert_not_called()
+
+    def test_spark_first_create_operational_write_failure_is_not_retried(
+        self, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        write_error = RuntimeError("write authorization failed")
+        updates_df.write.format.return_value.mode.return_value.save.side_effect = write_error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with (
+            patch.object(backend, "_spark_table_exists", return_value=False) as exists,
+            patch("odibi.state.time.sleep") as retry_sleep,
+            pytest.raises(RuntimeError, match="write authorization failed") as raised,
+        ):
+            backend.set_hwm("k", "v")
+
+        assert raised.value is write_error
+        exists.assert_called_once_with("/s")
+        retry_sleep.assert_not_called()
+        updates_df.write.format.return_value.mode.return_value.save.assert_called_once_with("/s")
+        spark.sql.assert_not_called()
+
+    def test_spark_first_create_bracket_only_conflict_is_not_reprobed(self, mocked_pyspark_modules):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        create_error = RuntimeError("[DELTA_PATH_EXISTS] path already exists")
+        updates_df.write.format.return_value.mode.return_value.save.side_effect = create_error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with (
+            patch.object(backend, "_spark_table_exists", return_value=False) as exists,
+            pytest.raises(RuntimeError) as raised,
+        ):
+            backend.set_hwm("k", "v")
+
+        assert raised.value is create_error
+        exists.assert_called_once_with("/s")
+        updates_df.createOrReplaceTempView.assert_not_called()
+        spark.sql.assert_not_called()
+
+    def test_spark_first_create_race_reprobes_and_merges(self, mocked_pyspark_modules):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        updates_df.write.format.return_value.mode.return_value.save.side_effect = (
+            _SparkConditionError("DELTA_PATH_EXISTS")
+        )
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with (
+            patch.object(backend, "_spark_table_exists", side_effect=[False, True]) as exists,
+            patch("odibi.state.time.sleep") as retry_sleep,
+        ):
+            backend.set_hwm("k", "v")
+
+        assert exists.call_count == 2
+        retry_sleep.assert_not_called()
+        updates_df.write.format.return_value.mode.assert_called_once_with("errorifexists")
+        updates_df.createOrReplaceTempView.assert_called_once()
+        view_name = updates_df.createOrReplaceTempView.call_args.args[0]
+        assert view_name.startswith("_odibi_hwm_updates_")
+        spark.sql.assert_called_once()
+        spark.catalog.dropTempView.assert_called_once_with(view_name)
+
+    def test_spark_first_create_race_without_table_fails_closed(self, mocked_pyspark_modules):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        create_error = _SparkConditionError("DELTA_PATH_EXISTS")
+        updates_df.write.format.return_value.mode.return_value.save.side_effect = create_error
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with (
+            patch.object(backend, "_spark_table_exists", side_effect=[False, False]) as exists,
+            pytest.raises(_SparkConditionError) as raised,
+        ):
+            backend.set_hwm("k", "v")
+
+        assert raised.value is create_error
+        assert exists.call_count == 2
+        updates_df.createOrReplaceTempView.assert_not_called()
+        spark.sql.assert_not_called()
+
+    def test_spark_merge_failure_remains_authoritative_when_cleanup_fails(
+        self, mocked_pyspark_modules
+    ):
+        spark = MagicMock()
+        updates_df = MagicMock()
+        spark.createDataFrame.return_value = updates_df
+        merge_error = RuntimeError("merge failed")
+        spark.sql.side_effect = merge_error
+        spark.catalog.dropTempView.side_effect = RuntimeError("cleanup failed")
+        backend = CatalogStateBackend("/r", "/s", spark_session=spark)
+
+        with (
+            patch.object(backend, "_spark_table_exists", return_value=True),
+            pytest.raises(RuntimeError, match="merge failed") as raised,
+        ):
+            backend.set_hwm("k", "v")
+
+        assert raised.value is merge_error
+        updates_df.createOrReplaceTempView.assert_called_once()
+        view_name = updates_df.createOrReplaceTempView.call_args.args[0]
+        spark.catalog.dropTempView.assert_called_once_with(view_name)
 
 
 # ===========================================================================

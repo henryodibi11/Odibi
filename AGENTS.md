@@ -542,6 +542,9 @@ When testing `CatalogStateBackend` set_hwm/set_hwm_batch with real Delta writes,
 
 For missing-table creation across the declared delta-rs `>=0.18,<0.30` range, do not pass `schema_mode="merge"`: 0.18 defaults to the PyArrow writer and rejects that option, while later releases do not need it for a new table. `TableNotFoundError` and `CommitFailedError` are available throughout that range; import optional exception types separately so one unavailable symbol cannot disable all delta-rs support.
 
+### CatalogStateBackend: Spark Missing-State Tests
+Spark HWM state is loaded from a configured path, so absence means only `PATH_NOT_FOUND` obtained from structured `getCondition()`/`getErrorClass()` metadata on the Python or wrapped Java exception. Local Spark 3.5.7 + Delta Spark 3.3.2 reports an absent path that way, while a reachable Parquet-only path reports `DELTA_TABLE_NOT_FOUND` and must propagate. Do not classify `TABLE_OR_VIEW_NOT_FOUND`, generic prose, or bracket tokens rendered anywhere in an outer exception/cause chain. For public Spark dispatch tests, patch the backend helper (`_get_hwm_spark`/`_get_last_run_spark`) and assert delegation; test helper semantics separately with minimal fake `pyspark.sql.functions`/`types` modules so real `F.col()` does not require a live SparkContext before the MagicMock DataFrame chain is reached.
+
 ### Test File Naming
 **Do NOT use "spark" or "delta" in test file names.** The `conftest.py` skip filter catches them on Windows and skips the entire file. Use names like `test_catalog_mock_engine_reads.py` instead of `test_catalog_spark_reads.py`.
 
