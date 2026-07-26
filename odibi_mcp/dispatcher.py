@@ -255,7 +255,7 @@ class OdibiDispatcher:
             "Validation": [
                 {"name": "validate_yaml", "signature": "yaml_content", "description": "Config structure check (Pydantic strict validation)"},
                 {"name": "validate_pipeline", "signature": "pipeline", "description": "Dry-run validation (parse YAML, check connections, validate config)"},
-                {"name": "test_pipeline", "signature": "pipeline, sample_size=100", "description": "Full test with data (reads source, executes transforms, writes to temp)"},
+                {"name": "test_pipeline", "signature": "pipeline, sample_size=100", "description": "Dry-run validation and execution plan; never performs ordinary pipeline execution"},
                 {"name": "diagnose", "signature": "pipeline, error_context=None", "description": "Systematic troubleshooting (validation → connection → schema → transform analysis)"},
             ],
             "Task Guidance": [
@@ -505,9 +505,14 @@ class OdibiDispatcher:
         return validate_pipeline(pipeline)
     
     def _test_pipeline(self, pipeline: str, sample_size: int = 100) -> dict[str, Any]:
-        """Test pipeline with data."""
+        """Test a pipeline through the bounded MCP dry-run path."""
+        if type(sample_size) is not int:
+            raise TypeError("sample_size must be an integer")
+        if not 1 <= sample_size <= 1000:
+            raise ValueError("sample_size must be between 1 and 1000")
+
         from tools.execution import test_pipeline
-        return test_pipeline(pipeline, sample_size)
+        return test_pipeline(pipeline, mode="dry-run", max_rows=sample_size)
     
     def _diagnose(self, pipeline: str, error_context: str | None = None) -> dict[str, Any]:
         """Diagnose pipeline issues."""

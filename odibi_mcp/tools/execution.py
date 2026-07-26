@@ -24,6 +24,7 @@ class ExecutionError(Exception):
 
 def test_pipeline(
     yaml_content: str,
+    *,
     mode: Literal["validate", "dry-run", "sample"] = "dry-run",
     max_rows: int = 100,
 ) -> Dict[str, Any]:
@@ -44,6 +45,13 @@ def test_pipeline(
             "output": str,  # dry-run/sample stdout
         }
     """
+    if mode not in ("validate", "dry-run", "sample"):
+        raise ValueError("mode must be one of: validate, dry-run, sample")
+    if type(max_rows) is not int:
+        raise TypeError("max_rows must be an integer")
+    if not 1 <= max_rows <= 1000:
+        raise ValueError("max_rows must be between 1 and 1000")
+
     warnings = []
 
     # Step 1: Validate YAML syntax
@@ -115,9 +123,6 @@ def test_pipeline(
             "mode": mode,
             "message": f"YAML is valid. Pipeline '{config.pipelines[0].pipeline}' has {len(config.pipelines[0].nodes)} nodes.",
         }
-
-    # Cap max_rows
-    max_rows = min(max_rows, 1000)
 
     # Step 3: Execute via CLI
     with tempfile.NamedTemporaryFile(
