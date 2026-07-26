@@ -317,11 +317,18 @@ Every new coverage thread should:
 
 ### Linting & Formatting
 ```bash
-ruff check .                        # Check for issues
-ruff check . --fix                  # Auto-fix issues
-ruff format .                       # Format code
+ruff format --check odibi/ tests/   # Exact CI formatting check
+ruff check odibi/ tests/            # Exact CI lint check
+ruff check odibi/ tests/ --fix      # Auto-fix CI-path lint issues
+ruff format odibi/ tests/           # Format CI paths
 pre-commit run --all-files          # Run all checks
 ```
+
+Before every push, agents must run the exact CI commands `ruff format --check odibi/ tests/`
+and `ruff check odibi/ tests/` with the repository-pinned Ruff version. Fix every Ruff
+violation introduced in changed files. A red required check is not acceptable merely
+because unrelated debt exists; isolate and record distinct baseline debt instead of
+dismissing the failure or weakening the required check.
 
 ### Documentation Generation
 ```bash
