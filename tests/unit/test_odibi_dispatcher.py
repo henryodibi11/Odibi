@@ -213,6 +213,7 @@ def test_execution_helper_builds_exact_dry_run_command(monkeypatch):
 @pytest.mark.parametrize(
     "kwargs, error_type",
     [
+        ({"mode": "sample"}, ValueError),
         ({"mode": "run"}, ValueError),
         ({"mode": 1}, ValueError),
         ({"max_rows": True}, TypeError),
