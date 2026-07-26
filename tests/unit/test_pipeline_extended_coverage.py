@@ -33,7 +33,6 @@ def _make_pipeline(**overrides):
     p.performance_config = None
     p._pending_lineage_records = []
     p._pending_asset_records = []
-    p._pending_hwm_updates = []
     p._batch_mode_enabled = True
     p._buffer_lock = threading.Lock()
     p._story_future = None
@@ -395,18 +394,6 @@ class TestBufferMethods:
         p.buffer_asset_record({"y": 2})
         assert len(p._pending_asset_records) == 2
 
-    def test_buffer_hwm_update(self):
-        p = _make_pipeline()
-        p.buffer_hwm_update("key1", "val1")
-        assert p._pending_hwm_updates == [{"key": "key1", "value": "val1"}]
-
-    def test_buffer_hwm_multiple(self):
-        p = _make_pipeline()
-        p.buffer_hwm_update("k1", 1)
-        p.buffer_hwm_update("k2", 2)
-        assert len(p._pending_hwm_updates) == 2
-        assert p._pending_hwm_updates[1] == {"key": "k2", "value": 2}
-
 
 # ===========================================================================
 # Pipeline._get_databricks_*
@@ -488,26 +475,6 @@ class TestFlushBatchWrites:
         cm.register_assets_batch.assert_called_once_with(recs)
         assert p._pending_asset_records == []
 
-    @patch("odibi.pipeline.create_state_backend")
-    @patch("odibi.pipeline.StateManager")
-    def test_hwm_updates_flushed(self, mock_sm_cls, mock_backend):
-        cm = MagicMock()
-        pc = MagicMock()
-        p = _make_pipeline(catalog_manager=cm, project_config=pc)
-        updates = [{"key": "k", "value": "v"}]
-        p._pending_hwm_updates = updates
-        p._flush_batch_writes()
-        mock_sm_cls.return_value.set_hwm_batch.assert_called_once_with(updates)
-        assert p._pending_hwm_updates == []
-
-    def test_hwm_no_project_config(self):
-        cm = MagicMock()
-        p = _make_pipeline(catalog_manager=cm, project_config=None)
-        p._pending_hwm_updates = [{"key": "k", "value": "v"}]
-        p._flush_batch_writes()
-        # No error, records cleared
-        assert p._pending_hwm_updates == []
-
     def test_lineage_exception_non_fatal(self):
         cm = MagicMock()
         cm.record_lineage_batch.side_effect = RuntimeError("db error")
@@ -526,15 +493,12 @@ class TestFlushBatchWrites:
         p._ctx.warning.assert_called()
         assert p._pending_asset_records == []
 
-    @patch("odibi.pipeline.create_state_backend", side_effect=RuntimeError("fail"))
-    def test_hwm_exception_non_fatal(self, _):
-        cm = MagicMock()
-        pc = MagicMock()
-        p = _make_pipeline(catalog_manager=cm, project_config=pc)
-        p._pending_hwm_updates = [{"key": "k", "value": "v"}]
+    @patch("odibi.pipeline.create_state_backend")
+    def test_flush_has_no_competing_hwm_commit_path(self, create_backend):
+        p = _make_pipeline(catalog_manager=MagicMock(), project_config=MagicMock())
         p._flush_batch_writes()
-        p._ctx.warning.assert_called()
-        assert p._pending_hwm_updates == []
+        create_backend.assert_not_called()
+        assert not hasattr(p, "_pending_hwm_updates")
 
     def test_empty_buffers_no_calls(self):
         cm = MagicMock()

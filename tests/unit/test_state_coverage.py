@@ -10,6 +10,7 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 from deltalake import DeltaTable, write_deltalake
+from deltalake.exceptions import TableNotFoundError
 
 from odibi.state import (
     CatalogStateBackend,
@@ -296,6 +297,9 @@ class TestCatalogStateHWM:
 
     def test_set_hwm_local_new_table(self, tmp_path):
         state_path = str(tmp_path / "state")
+        with pytest.raises(TableNotFoundError):
+            DeltaTable(state_path)
+
         backend = CatalogStateBackend("/r", state_path, environment="test")
         backend.set_hwm("key1", {"val": 42})
         # Verify written
@@ -326,6 +330,34 @@ class TestCatalogStateHWM:
         assert len(result) == 1
         assert json.loads(result.iloc[0]["value"]) == "new_value"
 
+    def test_set_hwm_local_open_failure_is_visible_and_preserves_table(self, tmp_path):
+        state_path = str(tmp_path / "state")
+        table = pa.table(
+            {
+                "key": pa.array(["unrelated"], type=pa.string()),
+                "value": pa.array([json.dumps("keep")], type=pa.string()),
+                "environment": pa.array(["test"], type=pa.string()),
+                "updated_at": pa.array(
+                    [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+                    type=pa.timestamp("us", tz="UTC"),
+                ),
+            }
+        )
+        write_deltalake(state_path, table)
+        before = DeltaTable(state_path).to_pandas()
+        backend = CatalogStateBackend("/r", state_path, environment="test")
+
+        with (
+            patch("odibi.state.DeltaTable", side_effect=RuntimeError("open failed")),
+            patch("odibi.state.write_deltalake") as fallback_write,
+            pytest.raises(RuntimeError, match="open failed"),
+        ):
+            backend.set_hwm("target", "new")
+
+        fallback_write.assert_not_called()
+        after = DeltaTable(state_path).to_pandas()
+        pd.testing.assert_frame_equal(after, before)
+
     def test_set_hwm_batch_empty(self):
         backend = CatalogStateBackend("/r", "/s")
         backend.set_hwm_batch([])  # Should not raise
@@ -342,6 +374,51 @@ class TestCatalogStateHWM:
         dt = DeltaTable(state_path)
         result = dt.to_pandas()
         assert len(result) == 2
+        values = {row["key"]: json.loads(row["value"]) for _, row in result.iterrows()}
+        assert values == {"k1": "v1", "k2": "v2"}
+
+    def test_set_hwm_batch_merge_failure_preserves_all_rows_and_is_retryable(self, tmp_path):
+        state_path = str(tmp_path / "state")
+        table = pa.table(
+            {
+                "key": pa.array(["target", "unrelated"], type=pa.string()),
+                "value": pa.array([json.dumps("old"), json.dumps("keep")], type=pa.string()),
+                "environment": pa.array(["test", "test"], type=pa.string()),
+                "updated_at": pa.array(
+                    [
+                        datetime(2026, 1, 1, tzinfo=timezone.utc),
+                        datetime(2026, 1, 2, tzinfo=timezone.utc),
+                    ],
+                    type=pa.timestamp("us", tz="UTC"),
+                ),
+            }
+        )
+        write_deltalake(state_path, table)
+        before = DeltaTable(state_path).to_pandas().sort_values("key").reset_index(drop=True)
+        backend = CatalogStateBackend("/r", state_path, environment="test")
+        updates = [
+            {"key": "target", "value": "new"},
+            {"key": "inserted", "value": "added"},
+        ]
+        failing_table = MagicMock()
+        failing_table.merge.side_effect = RuntimeError("merge failed")
+
+        with (
+            patch("odibi.state.DeltaTable", return_value=failing_table),
+            patch("odibi.state.write_deltalake") as fallback_write,
+            pytest.raises(RuntimeError, match="merge failed"),
+        ):
+            backend.set_hwm_batch(updates)
+
+        fallback_write.assert_not_called()
+        unchanged = DeltaTable(state_path).to_pandas().sort_values("key").reset_index(drop=True)
+        pd.testing.assert_frame_equal(unchanged, before)
+
+        backend.set_hwm_batch(updates)
+
+        result = DeltaTable(state_path).to_pandas()
+        values = {row["key"]: json.loads(row["value"]) for _, row in result.iterrows()}
+        assert values == {"target": "new", "unrelated": "keep", "inserted": "added"}
 
 
 class TestCatalogStateSpark:

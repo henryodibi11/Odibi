@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, call, patch
 
+import pandas as pd
 import pytest
 
 from odibi.config import NodeConfig, RetryConfig
@@ -500,6 +501,91 @@ class TestNodeExecuteWithRetries:
             assert result.success is False
             assert result.error is hwm_error
             assert result.metadata["hwm_error"] == "HWM write failed"
+
+    def test_production_hwm_commit_fails_visible_then_retries_on_rerun(
+        self, mock_context, connections
+    ):
+        """A completed data write is not acknowledged until the direct HWM commit succeeds."""
+        events = []
+        frame = pd.DataFrame({"updated_at": pd.to_datetime(["2024-01-01", "2024-02-01"])})
+
+        class RecordingEngine:
+            name = "pandas"
+
+            def read(self, **_kwargs):
+                events.append("read")
+                return frame.copy()
+
+            def table_exists(self, *_args):
+                return True
+
+            def count_rows(self, df):
+                return len(df)
+
+            def get_schema(self, df):
+                return {column: str(dtype) for column, dtype in df.dtypes.items()}
+
+            def get_sample(self, df, n=10):
+                return df.head(n).to_dict(orient="records")
+
+            def write(self, **_kwargs):
+                events.append("data_write")
+
+            def get_source_files(self, _df):
+                return []
+
+            def profile_nulls(self, _df):
+                return {}
+
+        config = NodeConfig(
+            name="incremental_node",
+            read={
+                "connection": "src",
+                "format": "csv",
+                "path": "input.csv",
+                "incremental": {
+                    "mode": "stateful",
+                    "column": "updated_at",
+                    "state_key": "test_hwm",
+                },
+            },
+            write={"connection": "dst", "format": "csv", "path": "output.csv"},
+        )
+        node = Node(
+            config=config,
+            context=mock_context,
+            engine=RecordingEngine(),
+            connections=connections,
+        )
+        state_manager = MagicMock()
+        state_manager.get_hwm.return_value = None
+        hwm_error = RuntimeError("HWM write failed")
+
+        def set_hwm(key, value):
+            events.append(("hwm_write", key, value))
+            if state_manager.set_hwm.call_count == 1:
+                raise hwm_error
+
+        state_manager.set_hwm.side_effect = set_hwm
+        node.state_manager = state_manager
+        node.executor.state_manager = state_manager
+
+        first_result = node._execute_with_retries()
+        second_result = node._execute_with_retries()
+
+        expected_hwm = pd.Timestamp("2024-02-01")
+        assert first_result.success is False
+        assert first_result.error is hwm_error
+        assert first_result.metadata["hwm_error"] == "HWM write failed"
+        assert second_result.success is True
+        assert events == [
+            "read",
+            "data_write",
+            ("hwm_write", "test_hwm", expected_hwm),
+            "read",
+            "data_write",
+            ("hwm_write", "test_hwm", expected_hwm),
+        ]
 
     def test_execute_with_retries_caches_result_when_enabled(
         self, mock_context, mock_engine, connections, basic_config

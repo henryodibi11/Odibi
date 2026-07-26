@@ -166,7 +166,6 @@ class Pipeline:
         # These are flushed at pipeline end to eliminate concurrency conflicts
         self._pending_lineage_records: List[Dict[str, Any]] = []
         self._pending_asset_records: List[Dict[str, Any]] = []
-        self._pending_hwm_updates: List[Dict[str, Any]] = []
         self._batch_mode_enabled: bool = True  # Enable batch mode by default
         self._buffer_lock = threading.Lock()
 
@@ -677,7 +676,6 @@ class Pipeline:
                     batch_buffers = {
                         "lineage": self._pending_lineage_records,
                         "assets": self._pending_asset_records,
-                        "hwm": self._pending_hwm_updates,
                     }
 
                 node = Node(
@@ -1530,16 +1528,6 @@ class Pipeline:
         with self._buffer_lock:
             self._pending_asset_records.append(record)
 
-    def buffer_hwm_update(self, key: str, value: Any) -> None:
-        """Buffer a HWM update for batch write at pipeline end.
-
-        Args:
-            key: HWM state key
-            value: HWM value
-        """
-        with self._buffer_lock:
-            self._pending_hwm_updates.append({"key": key, "value": value})
-
     def _get_databricks_cluster_id(self) -> Optional[str]:
         """Extract Databricks cluster ID from Spark context."""
         try:
@@ -1602,7 +1590,7 @@ class Pipeline:
         """Flush all buffered catalog writes in single batch operations.
 
         This eliminates concurrency conflicts when running 35+ parallel nodes
-        by writing all lineage, assets, and HWM updates at once.
+        by writing all lineage and asset updates at once.
         """
         if not self.catalog_manager:
             return
@@ -1638,29 +1626,6 @@ class Pipeline:
                 )
             finally:
                 self._pending_asset_records = []
-
-        # Flush HWM updates
-        if self._pending_hwm_updates:
-            try:
-                if self.project_config:
-                    backend = create_state_backend(
-                        config=self.project_config,
-                        project_root=".",
-                        spark_session=getattr(self.engine, "spark", None),
-                    )
-                    state_manager = StateManager(backend=backend)
-                    state_manager.set_hwm_batch(self._pending_hwm_updates)
-                    self._ctx.debug(
-                        f"Batch updated {len(self._pending_hwm_updates)} HWM value(s)",
-                        hwm_count=len(self._pending_hwm_updates),
-                    )
-            except Exception as e:
-                self._ctx.warning(
-                    f"Failed to batch update HWM (non-fatal): {e}",
-                    error_type=type(e).__name__,
-                )
-            finally:
-                self._pending_hwm_updates = []
 
     def _sync_catalog_if_configured(self) -> None:
         """Sync catalog to secondary destination if sync_to is configured."""

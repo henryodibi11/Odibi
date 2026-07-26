@@ -57,11 +57,15 @@ try:
     import pandas as pd
     import pyarrow as pa
     from deltalake import DeltaTable, write_deltalake
+    from deltalake.exceptions import TableNotFoundError
 except ImportError:
     DeltaTable = None
     write_deltalake = None
     pd = None
     pa = None
+
+    class TableNotFoundError(Exception):
+        """Fallback type used only when the optional delta-rs dependency is absent."""
 
 
 class StateBackend(ABC):
@@ -410,13 +414,9 @@ class CatalogStateBackend(StateBackend):
         df = pd.DataFrame([row])
         df["updated_at"] = pd.to_datetime(df["updated_at"])
 
-        # Open the existing table; only a genuinely-missing table falls back to a
-        # create-via-append. A MERGE failure on an EXISTING table must NOT append
-        # (that leaves a duplicate row for the key, which can later be read back as
-        # an older watermark) — let it propagate so _retry_delta_operation retries.
         try:
             dt = DeltaTable(self.meta_state_path, storage_options=self.storage_options)
-        except Exception:
+        except TableNotFoundError:
             write_deltalake(
                 self.meta_state_path,
                 df,
@@ -520,25 +520,27 @@ class CatalogStateBackend(StateBackend):
 
         try:
             dt = DeltaTable(self.meta_state_path, storage_options=self.storage_options)
-            (
-                dt.merge(
-                    source=df,
-                    predicate="target.key = source.key",
-                    source_alias="source",
-                    target_alias="target",
-                )
-                .when_matched_update_all()
-                .when_not_matched_insert_all()
-                .execute()
-            )
-        except Exception:
-            # Table doesn't exist or merge failed - create/append
+        except TableNotFoundError:
             write_deltalake(
                 self.meta_state_path,
                 df,
-                mode="overwrite",
+                mode="append",
                 storage_options=self.storage_options,
+                schema_mode="merge",
             )
+            return
+
+        (
+            dt.merge(
+                source=df,
+                predicate="target.key = source.key",
+                source_alias="source",
+                target_alias="target",
+            )
+            .when_matched_update_all()
+            .when_not_matched_insert_all()
+            .execute()
+        )
         logger.debug(f"Batch set {len(rows)} HWM value(s) locally")
 
 
