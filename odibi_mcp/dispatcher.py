@@ -6,6 +6,7 @@ into a single dispatch surface. Based on the proven context_workbench architectu
 
 from __future__ import annotations
 
+from threading import RLock
 from typing import Any, Callable
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
@@ -98,11 +99,15 @@ _RUNTIME_ACCESS_MESSAGES = {
     "EXPORT_SCOPE_REQUIRED": "A valid controlled export destination is required",
     "PHYSICAL_REFERENCES_DISABLED": "Remote physical references are unavailable",
     "REMOTE_WORKFLOW_DISABLED": "This workflow is unavailable over the remote transport",
+    "REMOTE_RENDERING_DISABLED": "This rendering action is unavailable over the remote transport",
+    "RUNTIME_DATA_UNAVAILABLE": "Runtime data is unavailable",
 }
 
-_REMOTE_SAFE_WORKFLOWS = frozenset(
-    {"validate_yaml_simple", "build_and_validate", "debug_pipeline", "iterate_until_valid"}
+_REMOTE_SAFE_WORKFLOWS = frozenset({"validate_yaml_simple"})
+_REMOTE_DISABLED_RENDERING_ACTIONS = frozenset(
+    {"apply_pattern_template", "create_ingestion_pipeline", "render_pipeline_yaml"}
 )
+_RUNTIME_CONTEXT_LOCK = RLock()
 
 
 class OdibiDispatcher:
@@ -242,6 +247,8 @@ class OdibiDispatcher:
             isinstance(application_identity, ApplicationIdentity)
             and application_identity.subject != "trusted-local"
         )
+        if is_remote_identity and action in _REMOTE_DISABLED_RENDERING_ACTIONS:
+            return self._runtime_access_error(action, "REMOTE_RENDERING_DISABLED")
         if is_remote_identity and action in {"run_workflow", "resume_workflow"}:
             if args:
                 return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
@@ -258,7 +265,6 @@ class OdibiDispatcher:
             try:
                 access = self._managed_access or ManagedProjectAccess.from_environment()
                 prepared_runtime_call = access.prepare(action, kwargs)
-                self._bind_runtime_context(prepared_runtime_call.config_path)
                 kwargs = prepared_runtime_call.kwargs
             except RuntimeAccessDenied as error:
                 return self._runtime_access_error(action, error.code)
@@ -266,12 +272,22 @@ class OdibiDispatcher:
                 return self._runtime_access_error(action, "PROJECT_SCOPE_REQUIRED")
 
         try:
-            result = self._actions[action](*args, **kwargs)
-            # Ensure result is serializable
-            serialized = self._to_serializable(result)
-            if prepared_runtime_call is not None:
-                return sanitize_runtime_result(serialized, prepared_runtime_call)
-            return serialized
+            with _RUNTIME_CONTEXT_LOCK:
+                previous_context = None
+                if prepared_runtime_call is not None:
+                    previous_context = self._bind_runtime_context(prepared_runtime_call)
+                try:
+                    result = self._actions[action](*args, **kwargs)
+                    # Ensure result is serializable
+                    serialized = self._to_serializable(result)
+                    if prepared_runtime_call is not None:
+                        return sanitize_runtime_result(serialized, prepared_runtime_call)
+                    return serialized
+                finally:
+                    if prepared_runtime_call is not None:
+                        self._restore_runtime_context(previous_context)
+        except RuntimeAccessDenied as error:
+            return self._runtime_access_error(action, error.code)
         except TypeError as e:
             if prepared_runtime_call is not None:
                 return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
@@ -310,8 +326,8 @@ class OdibiDispatcher:
         }
 
     @staticmethod
-    def _bind_runtime_context(config_path) -> None:
-        """Bind helpers to the one validated config without initializing connections."""
+    def _bind_runtime_context(prepared: PreparedRuntimeCall):
+        """Bind the exact validated snapshot without initializing connections."""
         try:
             from odibi_mcp.context import (
                 MCPProjectContext,
@@ -322,13 +338,19 @@ class OdibiDispatcher:
             from context import MCPProjectContext, get_project_context, set_project_context
 
         current = get_project_context()
-        if current is not None:
-            try:
-                if current.config_path.resolve(strict=True) == config_path:
-                    return
-            except (OSError, RuntimeError):
-                pass
-        set_project_context(MCPProjectContext.from_odibi_yaml(str(config_path)))
+        snapshot = prepared.validated_config_snapshot()
+        set_project_context(MCPProjectContext.from_config_snapshot(prepared.config_path, snapshot))
+        return current
+
+    @staticmethod
+    def _restore_runtime_context(previous_context) -> None:
+        """Restore the process-global context while still holding the dispatcher lock."""
+        try:
+            from odibi_mcp.context import set_project_context
+        except ImportError:  # Flat Databricks workspace deployment
+            from context import set_project_context
+
+        set_project_context(previous_context)
 
     def help(self, category: str | None = None, action: str | None = None) -> dict[str, Any]:
         """Generate help documentation.
@@ -847,7 +869,10 @@ class OdibiDispatcher:
         self, workflow_name: str, params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Execute a named workflow."""
-        from tools.workflows import run_workflow
+        try:
+            from odibi_mcp.tools.workflows import run_workflow
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.workflows import run_workflow
 
         return run_workflow(workflow_name, params or {})
 
@@ -855,19 +880,28 @@ class OdibiDispatcher:
         self, resume_token: str, inputs: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Continue paused workflow."""
-        from tools.workflows import resume_workflow
+        try:
+            from odibi_mcp.tools.workflows import resume_workflow
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.workflows import resume_workflow
 
         return resume_workflow(resume_token, inputs or {})
 
     def _list_workflows(self) -> dict[str, Any]:
         """List available workflows."""
-        from tools.workflows import list_workflows
+        try:
+            from odibi_mcp.tools.workflows import list_workflows
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.workflows import list_workflows
 
         return list_workflows()
 
     def _get_workflow(self, workflow_name: str) -> dict[str, Any]:
         """Get workflow definition."""
-        from tools.workflows import get_workflow
+        try:
+            from odibi_mcp.tools.workflows import get_workflow
+        except ImportError:  # Flat Databricks workspace deployment
+            from tools.workflows import get_workflow
 
         return get_workflow(workflow_name)
 

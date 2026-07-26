@@ -376,6 +376,16 @@ wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && py
 
 **Read this before writing mock-based Spark tests. These pitfalls cost significant time to figure out.**
 
+### MCP Managed Context Must Bind a Validated Snapshot
+
+Remote MCP runtime-data preparation and helper execution must use the same parsed config object.
+Never authorize config path A and then call `MCPProjectContext.from_odibi_yaml()` or reuse a
+same-path global context: the file may rotate or the cached context may be stale. Carry a deep-copied
+fingerprinted snapshot, bind it without initializing connections, and hold the dispatcher context lock
+through bind, helper execution, serialization, and restoration. Tests should cover same-path staleness,
+mutation between prepare/bind, concurrent isolation, exception restoration, and no pre-authorization
+connection initialization.
+
 ### Mock PySpark Setup (Critical Order)
 PySpark 4.1.1 IS installed in this environment, so `catalog.py`'s try/except imports succeed and the fallback type stubs (lines 22-137) are NOT defined. These stubs are NOT dead code — they're essential for Pandas-only deployments. **Do not remove them.**
 

@@ -6,7 +6,9 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Optional, Any, Dict, List
+from urllib.parse import urlsplit
 
 import fsspec
 
@@ -16,6 +18,31 @@ from odibi_mcp.contracts.schema import SchemaChange
 from odibi_mcp.context import get_project_context, get_context_for_pipeline
 
 logger = logging.getLogger(__name__)
+
+
+def _cloud_story_base_path(conn, story_path: str) -> str:
+    """Convert the selected connection's prefix-aware URI to an fsspec path."""
+    resolved = conn.get_path(story_path)
+    if not isinstance(resolved, str):
+        raise ValueError("Cloud connection returned an invalid story path")
+    parsed = urlsplit(resolved)
+    container = getattr(conn, "container", None)
+    configured_prefix = getattr(conn, "path_prefix", None)
+    resolved_container = parsed.netloc.partition("@")[0]
+    parts = parsed.path.lstrip("/").split("/")
+    prefix_parts = configured_prefix.split("/") if isinstance(configured_prefix, str) else []
+    if (
+        parsed.scheme not in {"abfs", "abfss"}
+        or not isinstance(container, str)
+        or resolved_container != container
+        or not prefix_parts
+        or parts[: len(prefix_parts)] != prefix_parts
+        or not parsed.path
+        or any(part in {"", ".", ".."} for part in parts)
+        or PurePosixPath(parsed.path).is_absolute() is False
+    ):
+        raise ValueError("Cloud connection returned an invalid story path")
+    return f"{container}/{'/'.join(parts)}"
 
 
 def _get_story_fs_and_path(
@@ -31,11 +58,8 @@ def _get_story_fs_and_path(
         # Check if it's a cloud connection with storage options
         if hasattr(conn, "pandas_storage_options"):
             storage_options = conn.pandas_storage_options()
-            # Build the container/path for ADLS
-            # The container is part of the connection config
-            container = getattr(conn, "container", None)
-            if container:
-                base_path = f"{container}/{ctx.story_path.rstrip('/')}"
+            if getattr(conn, "container", None):
+                base_path = _cloud_story_base_path(conn, ctx.story_path)
                 fs = fsspec.filesystem("abfs", **storage_options)
                 return fs, base_path, storage_options
 

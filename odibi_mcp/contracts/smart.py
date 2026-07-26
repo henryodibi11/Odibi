@@ -50,6 +50,8 @@ class MapEnvironmentResponse:
     next_step: str = ""
     suggested_sources: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    truncated: bool = False
+    truncated_reason: Optional[str] = None
 
 
 @dataclass

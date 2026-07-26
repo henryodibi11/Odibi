@@ -494,7 +494,7 @@ def map_environment(
         catalog = CatalogSummary(**catalog_dict)
 
         # Transform core response to MCP contract
-        return _transform_catalog_to_map_response(catalog, conn_name, path)
+        return _transform_catalog_to_map_response(catalog, conn_name, path, limit)
 
     except NotImplementedError as e:
         logger.warning(f"Connection {conn_name} doesn't support discovery: {e}")
@@ -519,11 +519,12 @@ def map_environment(
 
 
 def _transform_catalog_to_map_response(
-    catalog: "CatalogSummary", conn_name: str, path: str = ""
+    catalog: "CatalogSummary", conn_name: str, path: str = "", limit: int = 500
 ) -> MapEnvironmentResponse:
     """Transform core CatalogSummary to MCP MapEnvironmentResponse."""
 
     conn_type = "sql" if catalog.tables else "storage"
+    truncated = catalog.total_datasets > limit
 
     # Build structure based on connection type
     structure = []
@@ -533,7 +534,8 @@ def _transform_catalog_to_map_response(
         # SQL connection - group by schema
         schema_map: Dict[str, List[str]] = {}
         if catalog.tables:
-            for table in catalog.tables:
+            truncated = truncated or len(catalog.tables) > limit
+            for table in catalog.tables[:limit]:
                 schema = table.namespace or "dbo"
                 if schema not in schema_map:
                     schema_map[schema] = []
@@ -556,7 +558,8 @@ def _transform_catalog_to_map_response(
 
         # Add folders to structure
         if catalog.folders:
-            for folder in catalog.folders:
+            truncated = truncated or len(catalog.folders) > limit
+            for folder in catalog.folders[:limit]:
                 folder_info = FolderInfo(
                     path=folder.name,
                     file_count=0,  # We don't know until we drill in
@@ -572,9 +575,10 @@ def _transform_catalog_to_map_response(
 
         # Add files to structure (grouped by parent folder if any)
         if catalog.files:
+            truncated = truncated or len(catalog.files) > limit
             folder_map: Dict[str, List[str]] = {}
 
-            for file in catalog.files:
+            for file in catalog.files[:limit]:
                 folder = file.namespace or "(root)"
                 if folder not in folder_map:
                     folder_map[folder] = []
@@ -630,16 +634,24 @@ def _transform_catalog_to_map_response(
         summary["total_files"] = len(catalog.files) if catalog.files else 0
         summary["total_folders"] = len(structure)
 
+    truncated = (
+        truncated
+        or len(structure) > limit
+        or len(suggested_sources) > min(10, limit)
+        or len(recommendations) > limit
+    )
     return MapEnvironmentResponse(
         connection=conn_name,
         connection_type=conn_type,
         scanned_at=catalog.generated_at,
         summary=summary,
-        structure=structure,
-        recommendations=recommendations,
+        structure=structure[:limit],
+        recommendations=recommendations[:limit],
         next_step=catalog.next_step or "profile_source",
-        suggested_sources=suggested_sources[:10],
+        suggested_sources=suggested_sources[: min(10, limit)],
         errors=[],
+        truncated=truncated,
+        truncated_reason="enumeration_limit" if truncated else None,
     )
 
 

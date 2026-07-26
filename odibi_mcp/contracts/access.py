@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import copy
+import hashlib
 import hmac
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Dict, FrozenSet, List, Optional, Set
@@ -159,8 +161,17 @@ class PreparedRuntimeCall:
     kwargs: Dict[str, object]
     project_root: Path
     config_path: Path
+    config_snapshot: Dict[str, object] = field(repr=False)
+    config_fingerprint: str = field(repr=False)
     output_path: Optional[Path] = None
     public_output_path: Optional[str] = None
+
+    def validated_config_snapshot(self) -> Dict[str, object]:
+        """Return an isolated copy only while it matches the validated snapshot."""
+        snapshot = copy.deepcopy(self.config_snapshot)
+        if _config_fingerprint(snapshot) != self.config_fingerprint:
+            raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
+        return snapshot
 
 
 @dataclass(frozen=True)
@@ -235,11 +246,14 @@ class ManagedProjectAccess:
             prepared_kwargs["output_path"] = str(output_path)
             public_output_path = output_path.relative_to(project_root).as_posix()
 
+        config_snapshot = copy.deepcopy(config)
         return PreparedRuntimeCall(
             action=action,
             kwargs=prepared_kwargs,
             project_root=project_root,
             config_path=config_path,
+            config_snapshot=config_snapshot,
+            config_fingerprint=_config_fingerprint(config_snapshot),
             output_path=output_path,
             public_output_path=public_output_path,
         )
@@ -420,11 +434,15 @@ class ManagedProjectAccess:
             connection_config = connections[story_connection]
             if not isinstance(connection_config, dict):
                 raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
-            if str(connection_config.get("type", "local")).lower() not in _STORAGE_CONNECTION_TYPES:
+            connection_type = str(connection_config.get("type", "local")).lower()
+            if connection_type not in _STORAGE_CONNECTION_TYPES:
                 raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
             base = _local_connection_base(connection_config, project_root, config_path)
             if base is None:
-                _relative_path(story_path, project_root)
+                if not _is_safe_component(connection_config.get("container")):
+                    raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
+                _cloud_relative_path(connection_config.get("path_prefix"))
+                _cloud_relative_path(story_path)
             else:
                 _configured_local_path(story_path, base, project_root)
 
@@ -433,6 +451,8 @@ def sanitize_runtime_result(value: object, prepared: PreparedRuntimeCall) -> obj
     """Remove host details and attach explicit policy metadata to a remote result."""
     sanitized = _sanitize_runtime_value(value)
     if not isinstance(sanitized, dict):
+        if prepared.action == "map_environment":
+            raise RuntimeAccessDenied("RUNTIME_DATA_UNAVAILABLE")
         return sanitized
 
     if prepared.public_output_path is not None and "output_path" in sanitized:
@@ -443,7 +463,14 @@ def sanitize_runtime_result(value: object, prepared: PreparedRuntimeCall) -> obj
     policy["project_scoped"] = True
 
     if prepared.action == "map_environment":
-        policy["enumeration_capped"] = True
+        limit = prepared.kwargs.get("limit")
+        if type(limit) is not int:
+            raise RuntimeAccessDenied("PRIVACY_LIMIT_REQUIRED")
+        truncated = _cap_map_environment_result(sanitized, limit)
+        sanitized["truncated"] = truncated
+        sanitized["truncated_reason"] = "enumeration_limit" if truncated else None
+        policy["enumeration_capped"] = truncated
+        policy["enumeration_limit"] = limit
     elif prepared.action == "profile_source":
         sanitized["truncated"] = True
         sanitized["truncated_reason"] = "sampling_only"
@@ -523,6 +550,29 @@ def _relative_path(value: str, root: Path) -> str:
     return "/".join(parts)
 
 
+def _cloud_relative_path(value: object) -> str:
+    """Validate an operator-configured path without treating a cloud prefix as local."""
+    if not isinstance(value, str):
+        raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
+    if (
+        not value
+        or len(value) > 1024
+        or any(ord(character) < 32 for character in value)
+        or "%" in value
+        or "\\" in value
+        or "//" in value
+        or ":" in value
+        or PurePosixPath(value).is_absolute()
+        or PureWindowsPath(value).drive
+        or PureWindowsPath(value).root
+    ):
+        raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
+    return "/".join(parts)
+
+
 def _configured_local_path(value: str, base: Path, project_root: Path) -> Path:
     """Resolve an operator-owned config path while keeping it inside the project."""
     if not value or "\x00" in value:
@@ -566,6 +616,11 @@ def _load_project_config(config_path: Path) -> Dict[str, object]:
     if not isinstance(config, dict):
         raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
     return config
+
+
+def _config_fingerprint(config: Dict[str, object]) -> str:
+    payload = yaml.safe_dump(config, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _local_connection_base(
@@ -621,6 +676,44 @@ def _sanitize_runtime_value(value: object, key: Optional[str] = None) -> object:
     ):
         return "[physical reference withheld]"
     return value
+
+
+def _cap_map_environment_result(result: Dict[str, object], limit: int) -> bool:
+    """Defensively cap every final map identifier collection."""
+    truncated = False
+    for key in (
+        "structure",
+        "suggested_sources",
+        "suggestions",
+        "recommendations",
+        "ready_for",
+    ):
+        collection = result.get(key)
+        if isinstance(collection, list) and len(collection) > limit:
+            result[key] = collection[:limit]
+            truncated = True
+
+    structure = result.get("structure")
+    if isinstance(structure, list):
+        for item in structure:
+            if not isinstance(item, dict):
+                continue
+            for key in ("sample_tables", "sample_files"):
+                identifiers = item.get(key)
+                if isinstance(identifiers, list) and len(identifiers) > limit:
+                    item[key] = identifiers[:limit]
+                    truncated = True
+
+    ready_for = result.get("ready_for")
+    if isinstance(ready_for, dict):
+        for key, identifiers in ready_for.items():
+            if isinstance(identifiers, list) and len(identifiers) > limit:
+                ready_for[key] = identifiers[:limit]
+                truncated = True
+
+    if result.get("truncated") is True:
+        truncated = True
+    return truncated
 
 
 class ConnectionPolicy(BaseModel):

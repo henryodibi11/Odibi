@@ -2,6 +2,7 @@ import secrets
 from pathlib import Path
 
 import pytest
+import yaml
 
 from odibi_mcp.contracts.access import (
     AccessContext,
@@ -178,17 +179,17 @@ def test_runtime_data_canonical_in_root_success_preserves_normalized_inputs(mana
         max_files=17,
     )
 
-    assert prepared == PreparedRuntimeCall(
-        action="profile_folder",
-        kwargs={
-            "connection": "local",
-            "folder_path": "folder",
-            "pattern": "*.csv",
-            "max_files": 17,
-        },
-        project_root=root.resolve(),
-        config_path=config.resolve(),
-    )
+    assert prepared.action == "profile_folder"
+    assert prepared.kwargs == {
+        "connection": "local",
+        "folder_path": "folder",
+        "pattern": "*.csv",
+        "max_files": 17,
+    }
+    assert prepared.project_root == root.resolve()
+    assert prepared.config_path == config.resolve()
+    assert prepared.validated_config_snapshot()["project"] == "managed"
+    assert len(prepared.config_fingerprint) == 64
 
 
 @pytest.mark.parametrize(
@@ -534,6 +535,116 @@ def test_map_environment_rejects_inline_connection_before_config_read(managed_pr
         )
 
 
+def test_prepared_runtime_config_fingerprint_rejects_snapshot_mutation(managed_project):
+    _, _, access = managed_project
+    prepared = _prepare(
+        access,
+        "profile_source",
+        connection="local",
+        path="folder/input.csv",
+    )
+
+    prepared.config_snapshot["project"] = "rotated-after-validation"
+
+    with pytest.raises(RuntimeAccessDenied, match="PROJECT_SCOPE_REQUIRED"):
+        prepared.validated_config_snapshot()
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        None,
+        "",
+        "../other-project",
+        "/other-project",
+        "C:/other-project",
+        "tenant//project",
+        r"tenant\project",
+        "tenant/./project",
+        "tenant/%2e%2e/project",
+        "tenant/project:stream",
+        "tenant/\x00project",
+    ],
+)
+def test_cloud_story_prefix_must_be_normalized_before_connection_access(managed_project, prefix):
+    root, config_path, access = managed_project
+    config = {
+        "project": "managed",
+        "connections": {
+            "cloud": {
+                "type": "azure_adls",
+                "account": "managedaccount",
+                "container": "stories",
+                "path_prefix": prefix,
+            }
+        },
+        "story": {"connection": "cloud", "path": "stories"},
+        "system": {"connection": "cloud"},
+        "pipelines": [{"pipeline": "bounded", "nodes": []}],
+    }
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    assert root.is_dir()
+
+    with pytest.raises(RuntimeAccessDenied, match="PROJECT_SCOPE_REQUIRED"):
+        _prepare(access, "story_read", pipeline="bounded")
+
+
+def test_cloud_story_prefix_is_preserved_in_validated_snapshot(managed_project):
+    _, config_path, access = managed_project
+    config = {
+        "project": "managed",
+        "connections": {
+            "cloud": {
+                "type": "azure_adls",
+                "account": "managedaccount",
+                "container": "stories",
+                "path_prefix": "tenant/managed",
+            }
+        },
+        "story": {"connection": "cloud", "path": "stories"},
+        "system": {"connection": "cloud"},
+        "pipelines": [{"pipeline": "bounded", "nodes": []}],
+    }
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    prepared = _prepare(access, "story_read", pipeline="bounded")
+
+    assert prepared.validated_config_snapshot()["connections"]["cloud"]["path_prefix"] == (
+        "tenant/managed"
+    )
+
+
+def test_map_environment_sanitizer_caps_final_identifier_collections(managed_project):
+    _, _, access = managed_project
+    prepared = _prepare(access, "map_environment", connection="local", limit=1)
+
+    result = sanitize_runtime_result(
+        {
+            "structure": [
+                {"name": "schema_a", "sample_tables": ["a", "b"]},
+                {"name": "schema_b", "sample_tables": ["c"]},
+            ],
+            "suggested_sources": ["schema_a.a", "schema_b.c"],
+            "recommendations": ["inspect schema_a", "inspect schema_b"],
+            "ready_for": ["schema_a.a", "schema_b.c"],
+        },
+        prepared,
+    )
+
+    assert len(result["structure"]) == 1
+    assert result["structure"][0]["sample_tables"] == ["a"]
+    assert result["suggested_sources"] == ["schema_a.a"]
+    assert result["recommendations"] == ["inspect schema_a"]
+    assert result["ready_for"] == ["schema_a.a"]
+    assert result["truncated"] is True
+    assert result["truncated_reason"] == "enumeration_limit"
+    assert result["policy_applied"] == {
+        "project_scoped": True,
+        "enumeration_capped": True,
+        "enumeration_limit": 1,
+    }
+
+
 def test_runtime_result_sanitizes_errors_credentials_and_physical_paths(managed_project):
     root, config, _ = managed_project
     prepared = PreparedRuntimeCall(
@@ -541,6 +652,8 @@ def test_runtime_result_sanitizes_errors_credentials_and_physical_paths(managed_
         kwargs={},
         project_root=root,
         config_path=config,
+        config_snapshot={},
+        config_fingerprint="",
     )
 
     result = sanitize_runtime_result(
