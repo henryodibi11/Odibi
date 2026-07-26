@@ -1758,7 +1758,13 @@ def test_remote_logical_lineage_bypasses_all_legacy_and_ambient_effects(
 
 @pytest.mark.parametrize(
     "prepared_case",
-    ["missing_projection", "mismatched_action", "duck_prepared", "duck_projection"],
+    [
+        "missing_projection",
+        "mismatched_action",
+        "duck_prepared",
+        "duck_projection",
+        "prepare_exception",
+    ],
 )
 def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
     tmp_path, monkeypatch, caplog, prepared_case
@@ -1767,7 +1773,9 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
 
     projection = RemoteLogicalLineageProjection(pipeline="bounded", nodes=(), edges=())
     prepared_kwargs = {"pipeline": PROJECTION_SENTINELS[4]}
-    if prepared_case == "duck_prepared":
+    if prepared_case == "prepare_exception":
+        prepared = None
+    elif prepared_case == "duck_prepared":
         prepared = SimpleNamespace(
             action="lineage_graph",
             kwargs=prepared_kwargs,
@@ -1791,7 +1799,13 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
         )
 
     access = ManagedProjectAccess("managed", tmp_path, tmp_path / "odibi.yaml")
-    monkeypatch.setattr(ManagedProjectAccess, "prepare", lambda self, action, kwargs: prepared)
+
+    def prepare(self, action, kwargs):
+        if prepared_case == "prepare_exception":
+            raise RuntimeError(PROJECTION_SENTINELS[7])
+        return prepared
+
+    monkeypatch.setattr(ManagedProjectAccess, "prepare", prepare)
     dispatcher = OdibiDispatcher(access)
     effects = []
 
