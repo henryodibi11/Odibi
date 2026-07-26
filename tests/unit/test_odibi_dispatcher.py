@@ -1842,10 +1842,11 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
     )
     dispatcher._actions["lineage_graph"] = tripwire("legacy_lineage")
 
+    rejected_selector = PROJECTION_SENTINELS[0]
     result = dispatcher.dispatch(
         "lineage_graph",
         project="managed",
-        pipeline=PROJECTION_SENTINELS[0],
+        pipeline=rejected_selector,
         application_identity=REMOTE_IDENTITY,
     )
 
@@ -1856,6 +1857,7 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
     }
     assert effects == []
     serialized = json.dumps(result, sort_keys=True)
+    assert rejected_selector not in serialized
     assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
     assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
 
