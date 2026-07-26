@@ -1845,7 +1845,7 @@ def test_remote_logical_lineage_rejects_malformed_preparation_before_any_effect(
     result = dispatcher.dispatch(
         "lineage_graph",
         project="managed",
-        pipeline="bounded",
+        pipeline=PROJECTION_SENTINELS[0],
         application_identity=REMOTE_IDENTITY,
     )
 
