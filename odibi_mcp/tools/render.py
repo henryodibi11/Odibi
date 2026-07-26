@@ -4,12 +4,106 @@ Produces complete, runnable YAML by merging pipeline config with project context
 Used by both construction.py (Phase 1) and builder.py (Phase 2).
 """
 
+import json
 from typing import Any, Dict, List
 
 import yaml
 
-from odibi.config import PipelineConfig
+from odibi.config import PipelineConfig, ProjectConfig
 from odibi_mcp.context import get_project_context
+
+try:
+    from odibi_mcp.contracts.access import RemotePatternRenderProjection
+except ImportError:  # Flat Databricks workspace deployment
+    from contracts.access import RemotePatternRenderProjection
+
+
+_MAX_PROJECTED_YAML_BYTES = 4 * 1024
+_MAX_PROJECTED_RESPONSE_BYTES = 8 * 1024
+
+
+def render_remote_pattern_projection(
+    projection: RemotePatternRenderProjection,
+) -> Dict[str, Any]:
+    """Render the constant remote fact template without consulting ambient context."""
+    if type(projection) is not RemotePatternRenderProjection:
+        return {
+            "yaml": "",
+            "valid": False,
+            "errors": [
+                {
+                    "code": "PROJECTED_RENDER_FAILED",
+                    "message": "The remote-safe template could not be rendered",
+                }
+            ],
+            "warnings": [],
+        }
+
+    full_config = {
+        "project": "remote_safe_fact",
+        "engine": "pandas",
+        "connections": {
+            "local_input": {"type": "local", "base_path": "./data"},
+            "local_output": {"type": "local", "base_path": "./output"},
+        },
+        "pipelines": [
+            {
+                "pipeline": "fact_pipeline",
+                "layer": "gold",
+                "nodes": [
+                    {
+                        "name": "fact_node",
+                        "read": {
+                            "connection": "local_input",
+                            "format": "csv",
+                            "path": "input.csv",
+                        },
+                        "write": {
+                            "connection": "local_output",
+                            "format": "parquet",
+                            "path": "facts",
+                            "mode": "append",
+                        },
+                    }
+                ],
+            }
+        ],
+        "story": {"connection": "local_output", "path": "_stories"},
+        "system": {"connection": "local_output", "path": "_system"},
+    }
+
+    try:
+        ProjectConfig(**full_config)
+        yaml_content = yaml.safe_dump(full_config, default_flow_style=False, sort_keys=False)
+        if len(yaml_content.encode("utf-8")) > _MAX_PROJECTED_YAML_BYTES:
+            raise ValueError("projected YAML exceeded its fixed bound")
+        reparsed = yaml.safe_load(yaml_content)
+        if reparsed != full_config:
+            raise ValueError("projected YAML changed shape during serialization")
+        ProjectConfig(**reparsed)
+        result = {
+            "yaml": yaml_content,
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+            "next_step": "Review and save this fixed local starter before running it",
+        }
+        serialized = json.dumps(result, sort_keys=True, separators=(",", ":"))
+        if len(serialized.encode("utf-8")) > _MAX_PROJECTED_RESPONSE_BYTES:
+            raise ValueError("projected response exceeded its fixed bound")
+        return result
+    except Exception:
+        return {
+            "yaml": "",
+            "valid": False,
+            "errors": [
+                {
+                    "code": "PROJECTED_RENDER_FAILED",
+                    "message": "The remote-safe template could not be rendered",
+                }
+            ],
+            "warnings": [],
+        }
 
 
 def _ensure_local_connection(connections: Dict[str, Any]) -> str:

@@ -154,6 +154,34 @@ class RuntimeAccessDenied(Exception):
 
 
 @dataclass(frozen=True)
+class RemotePatternRenderProjection:
+    """Nominal authority to render the fixed remote-safe fact template."""
+
+
+_REMOTE_PATTERN_RENDER_ARGUMENTS = (
+    ("pattern", "fact"),
+    ("table_name", "fact_pipeline"),
+    ("connection", "local_input"),
+    ("source_path", "input.csv"),
+)
+
+
+def prepare_remote_pattern_render(
+    args: tuple[object, ...], caller_kwargs: Dict[str, object]
+) -> RemotePatternRenderProjection:
+    """Return a data-free projection only for the exact reviewed remote template."""
+    if args or len(caller_kwargs) != len(_REMOTE_PATTERN_RENDER_ARGUMENTS):
+        raise RuntimeAccessDenied("REMOTE_RENDER_PROJECTION_REQUIRED")
+    for name, expected in _REMOTE_PATTERN_RENDER_ARGUMENTS:
+        if name not in caller_kwargs:
+            raise RuntimeAccessDenied("REMOTE_RENDER_PROJECTION_REQUIRED")
+        value = caller_kwargs[name]
+        if type(value) is not str or value != expected:
+            raise RuntimeAccessDenied("REMOTE_RENDER_PROJECTION_REQUIRED")
+    return RemotePatternRenderProjection()
+
+
+@dataclass(frozen=True)
 class PreparedRuntimeCall:
     """Validated helper arguments and operator-owned paths for one remote call."""
 
