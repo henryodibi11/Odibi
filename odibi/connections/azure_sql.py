@@ -867,7 +867,7 @@ class AzureSQL(BaseConnection):
                     schemas=[],
                     tables=[],
                     total_datasets=0,
-                    next_step=f"Schema '{path}' not found. Available: {', '.join(all_schemas)}",
+                    next_step=f"Schema '{path}' not found",
                 ).model_dump()
         else:
             schemas = all_schemas

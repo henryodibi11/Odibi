@@ -485,6 +485,8 @@ class TestDiscoverCatalog:
         with patch("odibi.connections.postgres.pd.read_sql", return_value=schemas_df):
             result = conn.discover_catalog(path="nonexistent")
         assert result["total_datasets"] == 0
+        assert result["next_step"] == "Schema 'nonexistent' not found"
+        assert "public" not in result["next_step"]
 
     def test_pattern_filter(self, conn_engine):
         conn, engine = conn_engine

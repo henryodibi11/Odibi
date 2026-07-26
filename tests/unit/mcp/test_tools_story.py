@@ -1,3 +1,5 @@
+import pytest
+
 from odibi_mcp.contracts.selectors import DEFAULT_RUN_SELECTOR
 
 
@@ -55,3 +57,17 @@ def test_story_read_basic(monkeypatch, tmp_path):
     assert result.duration_seconds == 12.3
     assert result.node_count == 2
     assert result.success_count == 2
+
+
+def test_cloud_story_resolver_rejects_path_that_omits_configured_prefix():
+    from odibi_mcp.tools import story as story_module
+
+    class PrefixOmittingConnection:
+        container = "managed-container"
+        path_prefix = "tenant/managed"
+
+        def get_path(self, relative_path):
+            return f"abfss://managed-container@managedaccount.dfs.core.windows.net/{relative_path}"
+
+    with pytest.raises(ValueError, match="invalid story path"):
+        story_module._cloud_story_base_path(PrefixOmittingConnection(), "stories")

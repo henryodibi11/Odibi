@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import os
 import logging
 from pathlib import Path
@@ -66,6 +67,17 @@ class MCPProjectContext:
         with open(config_path) as f:
             config = yaml.safe_load(f)
 
+        return cls.from_config_snapshot(config_path, config)
+
+    @classmethod
+    def from_config_snapshot(
+        cls, config_path: str | Path, config: Dict[str, Any]
+    ) -> "MCPProjectContext":
+        """Build a context from the exact already-validated configuration snapshot."""
+        if not isinstance(config, dict):
+            raise ValueError("Project configuration snapshot must be a mapping")
+        config_path = Path(config_path)
+        config = copy.deepcopy(config)
         project_name = config.get("project", "unknown")
 
         # Extract story configuration
@@ -271,7 +283,7 @@ def get_project_context() -> Optional[MCPProjectContext]:
     return _project_context
 
 
-def set_project_context(ctx: MCPProjectContext) -> None:
+def set_project_context(ctx: Optional[MCPProjectContext]) -> None:
     """Set the global project context."""
     global _project_context
     _project_context = ctx
