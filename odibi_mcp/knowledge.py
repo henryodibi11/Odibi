@@ -6,9 +6,12 @@ Combines structured CLI data with semantic vector search.
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any
+
+from odibi_mcp.corpus import corpus_root, resolve_corpus_file
 
 logger = logging.getLogger(__name__)
 
@@ -131,11 +134,9 @@ pm.run("pipeline_name")""",
     }
 
     def __init__(self, odibi_root: Path | None = None):
-        from odibi_mcp.corpus import corpus_root
-
         # Resolve docs/examples/.assistant from the repo (repo mode) or the packaged
         # snapshot (pip mode) so the doc/skill/example tools work in both.
-        self.odibi_root = odibi_root or corpus_root()
+        self.odibi_root = (odibi_root or corpus_root()).resolve()
         self.index_dir = self.odibi_root / ".odibi" / "index"
         self._embedder = None
         self._vector_store = None
@@ -302,29 +303,28 @@ pm.run("pipeline_name")""",
         Args:
             doc_path: Relative path like "docs/patterns/scd2.md"
         """
-        path = self.odibi_root / doc_path
-        if not path.is_file():
-            # Try common prefixes
-            for prefix in ["docs/", "docs/patterns/", "docs/guides/", "docs/features/"]:
-                alt = self.odibi_root / prefix / doc_path
-                if alt.is_file():
-                    path = alt
-                    break
+        if not isinstance(doc_path, str):
+            return {"error": "Documentation file is unavailable."}
 
-        if path.is_dir():
-            # A directory was passed (e.g. "docs/simulation") — point the caller at
-            # list_docs/search_docs instead of trying to read a folder.
-            return {
-                "error": f"'{doc_path}' is a directory, not a doc. "
-                "Use list_docs(category=...) or search_docs(query=...) to find a file."
-            }
-
-        if path.is_file():
-            return {
-                "path": str(path.relative_to(self.odibi_root)),
-                "content": path.read_text(encoding="utf-8"),
-            }
-        return {"error": f"Doc not found: {doc_path}"}
+        requested = doc_path[5:] if doc_path.startswith("docs/") else doc_path
+        docs_root = self.odibi_root / "docs"
+        candidate_roots = [
+            docs_root,
+            docs_root / "patterns",
+            docs_root / "guides",
+            docs_root / "features",
+        ]
+        for candidate_root in candidate_roots:
+            path = resolve_corpus_file(candidate_root, requested, allowed_suffixes=(".md",))
+            if path is None:
+                continue
+            try:
+                relative = path.relative_to(docs_root.resolve(strict=True)).as_posix()
+                content = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError, ValueError):
+                return {"error": "Documentation file is unavailable."}
+            return {"path": f"docs/{relative}", "content": content}
+        return {"error": "Documentation file is unavailable."}
 
     def list_docs(self, category: str | None = None) -> list[dict[str, Any]]:
         """List available documentation files.
@@ -483,18 +483,41 @@ pm.run("pipeline_name")""",
 
     def get_skill(self, name: str) -> dict[str, Any]:
         """Return a skill's full body so the agent can load its guidance."""
-        skill_md = self._skills_dir() / name / "SKILL.md"
-        if not skill_md.exists():
+        if not isinstance(name, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", name) is None:
+            return {"error": "Skill is unavailable."}
+        skill_md = resolve_corpus_file(
+            self._skills_dir(), f"{name}/SKILL.md", allowed_suffixes=(".md",)
+        )
+        if skill_md is None:
             return {
-                "error": f"Skill not found: {name}",
-                "available": [s["name"] for s in self.list_skills()],
+                "error": "Skill is unavailable.",
+                "available": self._available_skill_names(),
             }
-        meta, body = self._parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+        try:
+            text = skill_md.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            return {"error": "Skill is unavailable."}
+        meta, body = self._parse_frontmatter(text)
         return {
             "name": meta.get("name", name),
             "description": meta.get("description", ""),
             "content": body,
         }
+
+    def _available_skill_names(self) -> list[str]:
+        """List contained skill directory names without reading skill content."""
+        skills_dir = self._skills_dir()
+        try:
+            entries = list(skills_dir.iterdir())
+        except OSError:
+            return []
+        return sorted(
+            entry.name
+            for entry in entries
+            if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", entry.name)
+            and resolve_corpus_file(skills_dir, f"{entry.name}/SKILL.md", allowed_suffixes=(".md",))
+            is not None
+        )
 
     def list_examples(self, pattern: str | None = None) -> list[dict[str, Any]]:
         """List runnable example pipeline YAMLs (optionally filtered by substring)."""
@@ -1130,7 +1153,11 @@ pipelines:
             {"name": str, "yaml": str, "python": str, "description": str, "source": str}
         """
 
+        if not isinstance(pattern_name, str):
+            return {"error": "Example is unavailable."}
         pattern_lower = pattern_name.lower().replace("-", "_").replace(" ", "_")
+        if re.fullmatch(r"[a-z0-9_]+", pattern_lower) is None:
+            return {"error": "Example is unavailable."}
 
         # Search locations in priority order (exact matches first, then glob patterns)
         search_paths = [
@@ -1197,13 +1224,25 @@ pipelines:
                 if parent.exists():
                     import fnmatch
 
-                    for f in parent.iterdir():
+                    try:
+                        matching_files = list(parent.iterdir())
+                    except OSError:
+                        return {"error": "Example is unavailable."}
+                    for f in matching_files:
                         if fnmatch.fnmatch(f.name.lower(), pattern.lower()):
-                            result = self._extract_example_from_doc(f, pattern_name, source_type)
+                            resolved = self._resolve_doc_candidate(f)
+                            if resolved is None:
+                                return {"error": "Example is unavailable."}
+                            result = self._extract_example_from_doc(
+                                resolved, pattern_name, source_type
+                            )
                             if result:
                                 return result
             elif path_pattern.exists():
-                result = self._extract_example_from_doc(path_pattern, pattern_name, source_type)
+                resolved = self._resolve_doc_candidate(path_pattern)
+                if resolved is None:
+                    return {"error": "Example is unavailable."}
+                result = self._extract_example_from_doc(resolved, pattern_name, source_type)
                 if result:
                     return result
 
@@ -1217,15 +1256,27 @@ pipelines:
         # Fallback: search all pattern docs for the term
         patterns_dir = self.odibi_root / "docs" / "patterns"
         if patterns_dir.exists():
-            for md_file in patterns_dir.glob("*.md"):
-                content = md_file.read_text(encoding="utf-8")
+            try:
+                pattern_docs = list(patterns_dir.glob("*.md"))
+            except OSError:
+                return {"error": "Example is unavailable."}
+            for md_file in pattern_docs:
+                try:
+                    content = self._read_doc_text(md_file)
+                except (OSError, UnicodeError):
+                    return {"error": "Example is unavailable."}
+                if content is None:
+                    continue
                 if pattern_lower in content.lower():
                     result = self._extract_example_from_doc(md_file, pattern_name, "pattern")
                     if result:
                         return result
 
         # List available examples
-        available = self._list_available_examples()
+        try:
+            available = self._list_available_examples()
+        except OSError:
+            return {"error": "Example is unavailable."}
 
         return {
             "error": f"No example found for '{pattern_name}'",
@@ -1237,11 +1288,11 @@ pipelines:
         self, doc_path: Path, name: str, source_type: str
     ) -> dict[str, Any] | None:
         """Extract YAML examples and description from a markdown doc."""
-        import re
-
         try:
-            content = doc_path.read_text(encoding="utf-8")
-        except Exception:
+            content = self._read_doc_text(doc_path)
+        except (OSError, UnicodeError):
+            return {"error": "Example is unavailable."}
+        if content is None:
             return None
 
         # Get title/description from first heading and paragraph
@@ -1288,7 +1339,7 @@ pipelines:
             "yaml_examples": meaningful_yaml[:5],  # Up to 5 examples
             "python": meaningful_python[0] if meaningful_python else "",
             "python_examples": meaningful_python[:3],
-            "source": str(doc_path.relative_to(self.odibi_root)),
+            "source": doc_path.relative_to(self.odibi_root).as_posix(),
             "source_type": source_type,
         }
 
@@ -1296,11 +1347,11 @@ pipelines:
         self, doc_path: Path, transformer_name: str
     ) -> dict[str, Any] | None:
         """Extract a specific transformer example from transformers.md."""
-        import re
-
         try:
-            content = doc_path.read_text(encoding="utf-8")
-        except Exception:
+            content = self._read_doc_text(doc_path)
+        except (OSError, UnicodeError):
+            return {"error": "Example is unavailable."}
+        if content is None:
             return None
 
         # Look for section about this transformer
@@ -1331,9 +1382,25 @@ pipelines:
             "yaml_examples": [yaml_content],
             "python": "",
             "python_examples": [],
-            "source": str(doc_path.relative_to(self.odibi_root)),
+            "source": doc_path.relative_to(self.odibi_root).as_posix(),
             "source_type": "transformer",
         }
+
+    def _read_doc_text(self, doc_path: Path) -> str | None:
+        """Read one Markdown document only after canonical docs-root containment."""
+        resolved = self._resolve_doc_candidate(doc_path)
+        if resolved is None:
+            return None
+        return resolved.read_text(encoding="utf-8")
+
+    def _resolve_doc_candidate(self, doc_path: Path) -> Path | None:
+        """Resolve one lexical docs candidate through the corpus file boundary."""
+        docs_root = self.odibi_root / "docs"
+        try:
+            relative = doc_path.relative_to(docs_root).as_posix()
+        except ValueError:
+            return None
+        return resolve_corpus_file(docs_root, relative, allowed_suffixes=(".md",))
 
     def _list_available_examples(self) -> list[str]:
         """List all available example names from docs."""
