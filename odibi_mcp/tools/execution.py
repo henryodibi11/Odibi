@@ -1,9 +1,7 @@
-"""Pipeline execution and testing tools for MCP.
+"""Pipeline validation and CLI dry-run tools for MCP.
 
-Provides safe, sandboxed pipeline testing with three modes:
-1. validate - YAML structure validation only
-2. dry-run - Validation + execution plan (no actual execution)
-3. sample - Limited execution on first N rows (local only)
+Dry-run always selects the CLI ``--dry-run`` command, but known catalog/bootstrap
+side effects remain unresolved pending global dry-run hardening.
 """
 
 import tempfile
@@ -24,15 +22,16 @@ class ExecutionError(Exception):
 
 def test_pipeline(
     yaml_content: str,
-    mode: Literal["validate", "dry-run", "sample"] = "dry-run",
+    *,
+    mode: Literal["validate", "dry-run"] = "dry-run",
     max_rows: int = 100,
 ) -> Dict[str, Any]:
-    """Test a pipeline YAML without full execution.
+    """Validate a pipeline YAML or build its dry-run execution plan.
 
     Args:
         yaml_content: Complete odibi YAML configuration
-        mode: Testing mode (validate, dry-run, sample)
-        max_rows: Max rows to process in sample mode (capped at 1000)
+        mode: Supported testing mode (validate or dry-run)
+        max_rows: Validated row bound forwarded by the MCP dispatcher
 
     Returns:
         {
@@ -40,10 +39,17 @@ def test_pipeline(
             "errors": list,
             "warnings": list,
             "mode": str,
-            "execution_plan": str,  # dry-run/sample mode
-            "output": str,  # dry-run/sample stdout
+            "execution_plan": str,  # dry-run mode
+            "output": str,  # dry-run stdout
         }
     """
+    if mode not in ("validate", "dry-run"):
+        raise ValueError("mode must be one of: validate, dry-run")
+    if type(max_rows) is not int:
+        raise TypeError("max_rows must be an integer")
+    if not 1 <= max_rows <= 1000:
+        raise ValueError("max_rows must be between 1 and 1000")
+
     warnings = []
 
     # Step 1: Validate YAML syntax
@@ -73,40 +79,7 @@ def test_pipeline(
             "mode": mode,
         }
 
-    # Security: Sample mode requires local connections only (check before validate mode exit)
-    if mode == "sample":
-        for conn_name, conn_cfg in config.connections.items():
-            # Check if connection is defined (not placeholder)
-            # Placeholders are empty ConnectionConfig objects with no type
-            if isinstance(conn_cfg, dict):
-                # YAML dict form
-                conn_type = conn_cfg.get("type", None)
-            else:
-                # Pydantic model
-                conn_type = getattr(conn_cfg, "type", None)
-
-            # If no type specified, it's a placeholder - not safe for sample mode
-            # If type is specified and not local/file, also not safe
-            if conn_type is None:
-                warnings.append(
-                    {
-                        "code": "SAMPLE_MODE_SECURITY",
-                        "message": f"Sample mode requires fully defined connections. Connection '{conn_name}' is a placeholder. Switching to dry-run mode.",
-                    }
-                )
-                mode = "dry-run"
-                break
-            elif conn_type not in ("local", "file"):
-                warnings.append(
-                    {
-                        "code": "SAMPLE_MODE_SECURITY",
-                        "message": f"Sample mode only supports local connections. Connection '{conn_name}' is type '{conn_type}'. Switching to dry-run mode.",
-                    }
-                )
-                mode = "dry-run"
-                break
-
-    # Validate mode stops here (after security checks)
+    # Validate mode stops here without creating a file or launching a subprocess.
     if mode == "validate":
         return {
             "valid": True,
@@ -115,9 +88,6 @@ def test_pipeline(
             "mode": mode,
             "message": f"YAML is valid. Pipeline '{config.pipelines[0].pipeline}' has {len(config.pipelines[0].nodes)} nodes.",
         }
-
-    # Cap max_rows
-    max_rows = min(max_rows, 1000)
 
     # Step 3: Execute via CLI
     with tempfile.NamedTemporaryFile(
@@ -129,18 +99,7 @@ def test_pipeline(
     try:
         cmd = [sys.executable, "-m", "odibi", "run", tmp_path]
 
-        if mode == "dry-run":
-            cmd.append("--dry-run")
-        elif mode == "sample":
-            # Sample mode: run first pipeline with limit
-            # Note: odibi doesn't have --limit flag, so we rely on read config limits
-            # This is best-effort - actual limiting happens in the YAML
-            warnings.append(
-                {
-                    "code": "SAMPLE_LIMIT",
-                    "message": f"Sample mode will execute pipeline. Row limit ({max_rows}) must be set in YAML read config.",
-                }
-            )
+        cmd.append("--dry-run")
 
         result = subprocess.run(
             cmd,
@@ -182,9 +141,9 @@ def test_pipeline(
             "errors": [],
             "warnings": warnings,
             "mode": mode,
-            "execution_plan": result.stdout if mode == "dry-run" else None,
+            "execution_plan": result.stdout,
             "output": result.stdout,
-            "message": f"Pipeline executed successfully in {mode} mode",
+            "message": "Pipeline dry-run completed successfully",
         }
 
     except subprocess.TimeoutExpired:
