@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from odibi_mcp.contracts import access as access_contract
 from odibi_mcp.contracts.access import (
     AccessContext,
     ActionEffect,
@@ -759,6 +760,18 @@ def test_remote_lineage_maximum_serialized_response_stays_within_byte_cap():
     }
     assert result["truncated"] is False
     assert len(serialized) <= result["policy_applied"]["response_byte_limit"] == 65536
+
+
+def test_remote_lineage_serialized_response_byte_backstop_fails_closed(monkeypatch):
+    projection = RemoteLogicalLineageProjection(
+        pipeline="bounded",
+        nodes=(LogicalLineageNode("source"),),
+        edges=(),
+    )
+    monkeypatch.setattr(access_contract, "_LINEAGE_RESPONSE_BYTE_LIMIT", 1)
+
+    with pytest.raises(RuntimeAccessDenied, match="LOGICAL_PROJECTION_UNAVAILABLE"):
+        render_remote_logical_lineage_projection(projection)
 
 
 @pytest.mark.parametrize(
