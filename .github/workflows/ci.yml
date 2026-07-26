@@ -101,7 +101,7 @@ jobs:
           flags: base
           fail_ci_if_error: false
 
-  # MCP SECURITY JOB (REQUIRED) - Qualifies the source-flat FastMCP HTTP identity seam
+  # MCP SECURITY JOB (REQUIRED) - Qualifies the installed root wheel and HTTP identity seam
   mcp-security:
     name: MCP Security (Python 3.11)
     runs-on: ubuntu-latest
@@ -120,21 +120,35 @@ jobs:
       - name: Install MCP security dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e '.[mcp]' 'pytest>=7.4.0'
+          python -m pip install build 'pytest>=7.4.0'
+
+      - name: Build and install the root wheel with MCP
+        run: |
+          mkdir -p "$RUNNER_TEMP/odibi-src" "$RUNNER_TEMP/odibi-dist" "$RUNNER_TEMP/mcp-tests"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/odibi-src"
+          python -m build --wheel --outdir "$RUNNER_TEMP/odibi-dist" "$RUNNER_TEMP/odibi-src"
+          WHEEL="$(find "$RUNNER_TEMP/odibi-dist" -maxdepth 1 -name '*.whl' -print -quit)"
+          test -n "$WHEEL"
+          python -m pip install "${WHEEL}[mcp]"
+          python -m pip check
+          cp tests/unit/mcp/test_access.py "$RUNNER_TEMP/mcp-tests/"
+          cp tests/unit/test_odibi_dispatcher.py "$RUNNER_TEMP/mcp-tests/"
+          cp tests/unit/mcp/test_mcp_smoke.py "$RUNNER_TEMP/mcp-tests/"
 
       - name: Require the FastMCP HTTP request API
-        run: python -c "import fastmcp; from fastmcp.server.dependencies import get_http_request"
+        working-directory: ${{ runner.temp }}
+        run: |
+          python -c "import fastmcp; from fastmcp.server.dependencies import get_http_request"
+          python -c "import odibi, odibi_mcp, odibi_mcp.dispatcher, odibi_mcp.mcp_server, odibi_mcp.databricks_app"
+          python -c "import os, pathlib, odibi, odibi_mcp; workspace = pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve(); assert all(workspace not in pathlib.Path(module.__file__).resolve().parents for module in (odibi, odibi_mcp))"
 
-      # The current server uses source-flat imports. PRB-2026-0003 separately owns
-      # package/deployment import repair, so this job states the qualified layout.
-      - name: Run MCP authorization and HTTP contract tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}/odibi_mcp:${{ github.workspace }}
+      - name: Run installed-package authorization and HTTP contract tests
+        working-directory: ${{ runner.temp }}/mcp-tests
         run: |
           python -m pytest -q \
-            tests/unit/mcp/test_access.py \
-            tests/unit/test_odibi_dispatcher.py \
-            tests/unit/mcp/test_mcp_smoke.py
+            test_access.py \
+            test_odibi_dispatcher.py \
+            test_mcp_smoke.py
 
   # EXTRAS JOB (OPTIONAL) - Tests optional dependencies (Spark, Azure)
   # This job can fail without breaking the build (experimental features)

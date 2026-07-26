@@ -8,12 +8,15 @@ the old per-tool smoke test, against the new dispatcher architecture.
 
 import json
 import secrets
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 pytest.importorskip("fastmcp")
 
-from odibi_mcp import mcp_server
+from odibi_mcp import databricks_app, mcp_server
 
 
 def _execute(action, **kwargs):
@@ -118,7 +121,7 @@ def test_real_http_boundary_requires_exact_application_bearer(monkeypatch):
         "create_pipeline",
         lambda: calls.append("create_pipeline") or {"allowed": True},
     )
-    http_app = mcp_server.mcp.http_app(stateless_http=True)
+    http_app = databricks_app.http_app
 
     with TestClient(http_app) as client:
         initialize = client.post(
@@ -140,6 +143,8 @@ def test_real_http_boundary_requires_exact_application_bearer(monkeypatch):
         )
         assert _mcp_message(initialize)["result"]["serverInfo"]["name"] == "odibi-knowledge"
 
+        assert "instructions" in _call_over_http(client, "onboard")
+
         for authorization in (
             None,
             "Bearer",
@@ -154,3 +159,38 @@ def test_real_http_boundary_requires_exact_application_bearer(monkeypatch):
 
     assert result == {"allowed": True}
     assert calls == ["create_pipeline"]
+
+
+def test_databricks_app_propagates_startup_failure(tmp_path):
+    """A deployment startup error must stop import, not become an HTTP response."""
+    script = """
+import importlib
+import sys
+
+from odibi_mcp import mcp_server
+
+
+def fail_startup(*args, **kwargs):
+    raise RuntimeError("generated startup sentinel")
+
+
+mcp_server.mcp.http_app = fail_startup
+try:
+    importlib.import_module("odibi_mcp.databricks_app")
+except RuntimeError as error:
+    assert str(error) == "generated startup sentinel"
+else:
+    raise AssertionError("databricks_app masked the generated startup failure")
+"""
+    package_root = str(Path(mcp_server.__file__).resolve().parents[1])
+
+    result = subprocess.run(
+        [sys.executable, "-c", f"import sys; sys.path.insert(0, {package_root!r})\n{script}"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
