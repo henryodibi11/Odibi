@@ -19,9 +19,11 @@ try:
         ApplicationIdentity,
         ManagedProjectAccess,
         PreparedRuntimeCall,
+        RemoteLogicalLineageProjection,
         RemotePatternRenderProjection,
         RuntimeAccessDenied,
         prepare_remote_pattern_render,
+        render_remote_logical_lineage_projection,
         sanitize_runtime_result,
     )
 except ImportError:  # Flat Databricks workspace deployment
@@ -31,9 +33,11 @@ except ImportError:  # Flat Databricks workspace deployment
         ApplicationIdentity,
         ManagedProjectAccess,
         PreparedRuntimeCall,
+        RemoteLogicalLineageProjection,
         RemotePatternRenderProjection,
         RuntimeAccessDenied,
         prepare_remote_pattern_render,
+        render_remote_logical_lineage_projection,
         sanitize_runtime_result,
     )
 
@@ -106,6 +110,7 @@ _RUNTIME_ACCESS_MESSAGES = {
     "REMOTE_RENDERING_DISABLED": "This rendering action is unavailable over the remote transport",
     "REMOTE_RENDER_PROJECTION_REQUIRED": "The remote-safe rendering projection is required",
     "PROJECTED_RENDER_FAILED": "The remote-safe template could not be rendered",
+    "LOGICAL_PROJECTION_UNAVAILABLE": "The logical lineage projection is unavailable",
     "RUNTIME_DATA_UNAVAILABLE": "Runtime data is unavailable",
 }
 
@@ -288,26 +293,41 @@ class OdibiDispatcher:
         try:
             with _RUNTIME_CONTEXT_LOCK:
                 previous_context = None
+                remote_lineage_projection: RemoteLogicalLineageProjection | None = None
                 if prepared_runtime_call is not None:
+                    remote_lineage_projection = prepared_runtime_call.logical_lineage
+                if prepared_runtime_call is not None and remote_lineage_projection is None:
                     previous_context = self._bind_runtime_context(prepared_runtime_call)
                 try:
                     if remote_pattern_projection is not None:
                         result = self._render_remote_pattern_projection(remote_pattern_projection)
+                    elif remote_lineage_projection is not None:
+                        result = render_remote_logical_lineage_projection(remote_lineage_projection)
                     else:
                         result = self._actions[action](*args, **kwargs)
                     # Ensure result is serializable
                     serialized = self._to_serializable(result)
-                    if prepared_runtime_call is not None:
+                    if prepared_runtime_call is not None and remote_lineage_projection is None:
                         return sanitize_runtime_result(serialized, prepared_runtime_call)
                     return serialized
                 finally:
-                    if prepared_runtime_call is not None:
+                    if prepared_runtime_call is not None and remote_lineage_projection is None:
                         self._restore_runtime_context(previous_context)
         except RuntimeAccessDenied as error:
+            if (
+                prepared_runtime_call is not None
+                and prepared_runtime_call.logical_lineage is not None
+            ):
+                return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
             return self._runtime_access_error(action, error.code)
         except TypeError as e:
             if remote_pattern_projection is not None:
                 return self._runtime_access_error(action, "PROJECTED_RENDER_FAILED")
+            if (
+                prepared_runtime_call is not None
+                and prepared_runtime_call.logical_lineage is not None
+            ):
+                return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
             if prepared_runtime_call is not None:
                 return self._runtime_access_error(action, "INVALID_RUNTIME_ARGUMENT")
             # Signature mismatch - provide helpful error
@@ -323,6 +343,11 @@ class OdibiDispatcher:
         except Exception as error:
             if remote_pattern_projection is not None:
                 return self._runtime_access_error(action, "PROJECTED_RENDER_FAILED")
+            if (
+                prepared_runtime_call is not None
+                and prepared_runtime_call.logical_lineage is not None
+            ):
+                return self._runtime_access_error(action, "LOGICAL_PROJECTION_UNAVAILABLE")
             if prepared_runtime_call is not None:
                 return {
                     "error": "Runtime data is unavailable",

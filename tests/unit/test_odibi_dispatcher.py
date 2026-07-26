@@ -1549,7 +1549,7 @@ def test_remote_download_file_rejects_format_conversion_before_delegate(managed_
     assert result["code"] == "INVALID_RUNTIME_ARGUMENT"
 
 
-def test_remote_lineage_fails_closed_but_trusted_local_remains_available(
+def test_remote_lineage_uses_logical_projection_but_trusted_local_retains_legacy_helper(
     managed_dispatcher, monkeypatch
 ):
     dispatcher, _ = managed_dispatcher
@@ -1575,9 +1575,306 @@ def test_remote_lineage_fails_closed_but_trusted_local_remains_available(
         application_identity=LOCAL_IDENTITY,
     )
 
-    assert remote["code"] == "PHYSICAL_REFERENCES_DISABLED"
+    assert remote["kind"] == "logical_lineage_graph"
+    assert remote["pipeline"] == "bounded"
+    assert remote["nodes"] == []
+    assert remote["edges"] == []
+    assert remote["counts"] == {
+        "nodes_total": 0,
+        "nodes_returned": 0,
+        "edges_total": 0,
+        "edges_returned": 0,
+    }
+    assert remote["truncated"] is False
+    assert remote["policy_applied"]["logical_only"] is True
     assert local == {"nodes": [{"id": "/physical/path"}], "edges": []}
     assert calls == [{"pipeline": "bounded"}]
+
+
+def test_remote_logical_lineage_bypasses_all_legacy_and_ambient_effects(
+    managed_dispatcher, monkeypatch, caplog
+):
+    from odibi_mcp import context as context_module
+    from odibi_mcp.tools import builder, workflows
+
+    dispatcher, root = managed_dispatcher
+    config_path = root / "odibi.yaml"
+    story_path = root / "data" / "stories" / "bounded.json"
+    import_path = root / "imported-pipeline.yaml"
+    story_path.write_text(
+        json.dumps(
+            {
+                "lineage": {
+                    "nodes": [{"id": f"abfss://container/{PROJECTION_SENTINELS[7]}"}],
+                    "edges": [],
+                },
+                "events": [{"message": PROJECTION_SENTINELS[6]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    import_path.write_text(
+        yaml.safe_dump(
+            {
+                "pipelines": [
+                    {
+                        "pipeline": "imported",
+                        "nodes": [{"name": PROJECTION_SENTINELS[4]}],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["connections"]["local"].update(
+        {
+            "password": RENDER_SENTINELS[0],
+            "connection_string": RENDER_SENTINELS[1],
+            "account_key": RENDER_SENTINELS[2],
+            "token": f"token-{RENDER_SENTINELS[0]}",
+            "host": f"host-{RENDER_SENTINELS[3]}",
+            "account": f"account-{RENDER_SENTINELS[2]}",
+            "container": f"container-{PROJECTION_SENTINELS[4]}",
+            "unknown_nested": {
+                "opaque": PROJECTION_SENTINELS[4],
+                "list": [PROJECTION_SENTINELS[5], PROJECTION_SENTINELS[6]],
+            },
+        }
+    )
+    config["pipelines"][0]["nodes"] = [
+        {
+            "name": "source",
+            "depends_on": [],
+            "read": {
+                "connection": "local",
+                "format": "sql",
+                "path": f"abfss://private/{PROJECTION_SENTINELS[7]}",
+                "query": f"SELECT '{PROJECTION_SENTINELS[4]}' FROM private_table",
+                "options": {"host": RENDER_SENTINELS[3]},
+            },
+            "unknown": {"value": PROJECTION_SENTINELS[5]},
+        },
+        {
+            "name": "clean",
+            "depends_on": ["source"],
+            "transform": {"steps": [{"sql": f"SELECT '{PROJECTION_SENTINELS[6]}' FROM df"}]},
+            "write": {
+                "connection": "local",
+                "format": "delta",
+                "path": f"s3://private/{PROJECTION_SENTINELS[7]}",
+            },
+        },
+    ]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    stale_config = yaml.safe_load(VALID_PIPELINE_YAML)
+    stale_config["unknown"] = {"ambient": PROJECTION_SENTINELS[4]}
+    stale_context = context_module.MCPProjectContext.from_config_snapshot(
+        root / "stale-context.yaml", stale_config
+    )
+    previous_context = context_module.get_project_context()
+    previous_cache = dict(context_module._project_cache)
+    context_module.set_project_context(stale_context)
+    context_module._project_cache["bounded"] = stale_context
+    session = builder.create_pipeline("bounded_lineage_tripwire")
+    session_id = session["session_id"]
+    state_before = builder.get_pipeline_state(session_id)
+    workflow_before = dict(workflows.WORKFLOWS)
+    original_open = Path.open
+    reads = []
+
+    def config_only_open(path, *args, **kwargs):
+        resolved = path.resolve()
+        reads.append(resolved)
+        if resolved != config_path.resolve():
+            pytest.fail("logical lineage read a story, runtime, import, or other file")
+        return original_open(path, *args, **kwargs)
+
+    def unexpected_effect(*args, **kwargs):
+        raise RuntimeError(PROJECTION_SENTINELS[7])
+
+    fake_lineage = ModuleType("odibi_mcp.tools.lineage")
+    fake_lineage.lineage_graph = unexpected_effect
+    fake_story = ModuleType("odibi_mcp.tools.story")
+    fake_story.lineage_graph = unexpected_effect
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.lineage", fake_lineage)
+    monkeypatch.setitem(sys.modules, "tools.lineage", fake_lineage)
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.story", fake_story)
+    monkeypatch.setitem(sys.modules, "tools.story", fake_story)
+    monkeypatch.setattr(Path, "open", config_only_open)
+    monkeypatch.setattr(Path, "glob", unexpected_effect)
+    monkeypatch.setattr(Path, "rglob", unexpected_effect)
+    monkeypatch.setattr(Path, "iterdir", unexpected_effect)
+    monkeypatch.setattr(dispatcher, "_bind_runtime_context", unexpected_effect)
+    monkeypatch.setattr(context_module, "get_project_context", unexpected_effect)
+    monkeypatch.setattr(context_module, "set_project_context", unexpected_effect)
+    monkeypatch.setattr(
+        context_module.MCPProjectContext, "initialize_connections", unexpected_effect
+    )
+
+    try:
+        result = dispatcher.dispatch(
+            "lineage_graph",
+            project="managed",
+            pipeline="bounded",
+            application_identity=REMOTE_IDENTITY,
+        )
+        state_after = builder.get_pipeline_state(session_id)
+    finally:
+        monkeypatch.undo()
+        context_module.set_project_context(previous_context)
+        context_module._project_cache.clear()
+        context_module._project_cache.update(previous_cache)
+        builder.discard_pipeline(session_id)
+
+    assert result["nodes"] == [
+        {"id": "source", "type": "pipeline_node"},
+        {"id": "clean", "type": "pipeline_node"},
+    ]
+    assert result["edges"] == [{"source": "source", "target": "clean", "kind": "dependency"}]
+    assert result["policy_applied"] == {
+        "project_scoped": True,
+        "logical_only": True,
+        "inline_snapshot_only": True,
+        "node_limit": 64,
+        "edge_limit": 128,
+        "identifier_length_limit": 128,
+        "response_byte_limit": 65536,
+    }
+    assert reads == [config_path.resolve()]
+    assert state_after == state_before
+    assert workflows.WORKFLOWS == workflow_before
+    assert context_module.get_project_context() is previous_context
+    assert context_module._project_cache == previous_cache
+    serialized = json.dumps(result, indent=2, sort_keys=True)
+    assert len(serialized.encode("utf-8")) <= 65536
+    assert "state" not in result and "events" not in result
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
+    assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
+
+
+def test_remote_logical_lineage_import_denial_is_fixed_and_reads_only_canonical_config(
+    managed_dispatcher, monkeypatch, caplog
+):
+    dispatcher, root = managed_dispatcher
+    config_path = root / "odibi.yaml"
+    imported_path = root / "imported-pipeline.yaml"
+    imported_path.write_text(
+        yaml.safe_dump(
+            {
+                "pipelines": [
+                    {
+                        "pipeline": "bounded",
+                        "nodes": [{"name": PROJECTION_SENTINELS[4]}],
+                    }
+                ],
+                "password": RENDER_SENTINELS[0],
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["imports"] = [f"imported-pipeline-{PROJECTION_SENTINELS[7]}.yaml"]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    original_open = Path.open
+    reads = []
+
+    def config_only_open(path, *args, **kwargs):
+        resolved = path.resolve()
+        reads.append(resolved)
+        if resolved != config_path.resolve():
+            pytest.fail("remote logical lineage resolved or read an import")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", config_only_open)
+    monkeypatch.setattr(
+        dispatcher,
+        "_bind_runtime_context",
+        lambda *args, **kwargs: pytest.fail("import denial bound ambient context"),
+    )
+    dispatcher._actions["lineage_graph"] = lambda **kwargs: pytest.fail(
+        "import denial reached the legacy lineage helper"
+    )
+
+    result = dispatcher.dispatch(
+        "lineage_graph",
+        project="managed",
+        pipeline="bounded",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "error": "The logical lineage projection is unavailable",
+        "code": "LOGICAL_PROJECTION_UNAVAILABLE",
+        "action": "lineage_graph",
+    }
+    assert reads == [config_path.resolve()]
+    serialized = json.dumps(result, sort_keys=True)
+    assert all(sentinel not in serialized for sentinel in PROJECTION_SENTINELS)
+    assert all(sentinel not in caplog.text for sentinel in PROJECTION_SENTINELS)
+
+
+def test_remote_logical_lineage_renderer_failure_is_fixed_without_exception_echo(
+    managed_dispatcher, monkeypatch, caplog
+):
+    from odibi_mcp import dispatcher as dispatcher_module
+
+    dispatcher, _ = managed_dispatcher
+
+    def fail_with_sentinel(*args, **kwargs):
+        raise RuntimeError(PROJECTION_SENTINELS[7])
+
+    monkeypatch.setattr(
+        dispatcher_module, "render_remote_logical_lineage_projection", fail_with_sentinel
+    )
+
+    result = dispatcher.dispatch(
+        "lineage_graph",
+        project="managed",
+        pipeline="bounded",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "error": "The logical lineage projection is unavailable",
+        "code": "LOGICAL_PROJECTION_UNAVAILABLE",
+        "action": "lineage_graph",
+    }
+    assert PROJECTION_SENTINELS[7] not in json.dumps(result, sort_keys=True)
+    assert PROJECTION_SENTINELS[7] not in caplog.text
+
+
+def test_remote_diagnose_stays_denied_before_config_and_legacy_helper(
+    managed_dispatcher, monkeypatch, caplog
+):
+    dispatcher, _ = managed_dispatcher
+    fake_diagnose = ModuleType("odibi_mcp.tools.diagnose")
+
+    def unexpected_effect(*args, **kwargs):
+        raise RuntimeError(PROJECTION_SENTINELS[7])
+
+    fake_diagnose.diagnose = unexpected_effect
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.diagnose", fake_diagnose)
+    monkeypatch.setitem(sys.modules, "tools.diagnose", fake_diagnose)
+    monkeypatch.setattr(Path, "open", unexpected_effect)
+    monkeypatch.setattr(Path, "glob", unexpected_effect)
+    monkeypatch.setattr(Path, "rglob", unexpected_effect)
+    monkeypatch.setattr(Path, "iterdir", unexpected_effect)
+
+    result = dispatcher.dispatch(
+        "diagnose",
+        project="managed",
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "error": "Remote physical references are unavailable",
+        "code": "PHYSICAL_REFERENCES_DISABLED",
+        "action": "diagnose",
+    }
+    assert PROJECTION_SENTINELS[7] not in json.dumps(result, sort_keys=True)
+    assert PROJECTION_SENTINELS[7] not in caplog.text
 
 
 @pytest.mark.parametrize(

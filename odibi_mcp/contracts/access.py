@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import hmac
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -110,7 +111,8 @@ _CONNECTION_ACTIONS = frozenset(
         "download_file",
     }
 )
-_STORY_ACTIONS = frozenset({"story_read", "node_sample", "node_failed_rows", "lineage_graph"})
+_STORY_ACTIONS = frozenset({"story_read", "node_sample", "node_failed_rows"})
+_PIPELINE_ACTIONS = _STORY_ACTIONS | {"lineage_graph"}
 _SQL_CONNECTION_TYPES = frozenset({"azure_sql", "sql_server"})
 _STORAGE_CONNECTION_TYPES = frozenset({"local", "azure_adls", "azure_blob"})
 _SAFE_DOWNLOAD_SUFFIXES = frozenset({".csv", ".json", ".parquet"})
@@ -143,6 +145,13 @@ _SQL_SELECT_RE = re.compile(
 )
 _GLOB_RE = re.compile(r"[A-Za-z0-9*?_.\[\]-]{1,128}\Z")
 _PHYSICAL_PATH_FRAGMENT_RE = re.compile(r"(?:^|[\s(=])(?:/[^\s]+|[A-Za-z]:[\\/][^\s]*|\\\\[^\s]+)")
+_LINEAGE_SOURCE_PIPELINE_LIMIT = 256
+_LINEAGE_SOURCE_NODE_LIMIT = 256
+_LINEAGE_SOURCE_EDGE_LIMIT = 4096
+_LINEAGE_NODE_LIMIT = 64
+_LINEAGE_EDGE_LIMIT = 128
+_LINEAGE_IDENTIFIER_LENGTH_LIMIT = 128
+_LINEAGE_RESPONSE_BYTE_LIMIT = 64 * 1024
 
 
 class RuntimeAccessDenied(Exception):
@@ -182,6 +191,30 @@ def prepare_remote_pattern_render(
 
 
 @dataclass(frozen=True)
+class LogicalLineageNode:
+    """One validated logical node identifier from the managed inline snapshot."""
+
+    id: str
+
+
+@dataclass(frozen=True)
+class LogicalLineageEdge:
+    """One validated pipeline-internal dependency from the managed inline snapshot."""
+
+    source: str
+    target: str
+
+
+@dataclass(frozen=True)
+class RemoteLogicalLineageProjection:
+    """Closed authority for one bounded remote logical-lineage response."""
+
+    pipeline: str
+    nodes: tuple[LogicalLineageNode, ...]
+    edges: tuple[LogicalLineageEdge, ...]
+
+
+@dataclass(frozen=True)
 class PreparedRuntimeCall:
     """Validated helper arguments and operator-owned paths for one remote call."""
 
@@ -193,6 +226,7 @@ class PreparedRuntimeCall:
     config_fingerprint: str = field(repr=False)
     output_path: Optional[Path] = None
     public_output_path: Optional[str] = None
+    logical_lineage: Optional[RemoteLogicalLineageProjection] = None
 
     def validated_config_snapshot(self) -> Dict[str, object]:
         """Return an isolated copy only while it matches the validated snapshot."""
@@ -241,20 +275,26 @@ class ManagedProjectAccess:
             raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
 
         prepared_kwargs = self._prepare_action_inputs(action, kwargs, project_root)
-        if action in {"lineage_graph", "diagnose"}:
+        if action == "diagnose":
             raise RuntimeAccessDenied("PHYSICAL_REFERENCES_DISABLED")
 
         config = _load_project_config(config_path)
         if config.get("project") != self.project:
             raise RuntimeAccessDenied("PROJECT_SCOPE_REQUIRED")
 
-        self._validate_config_membership(
-            action,
-            prepared_kwargs,
-            config,
-            project_root,
-            config_path,
-        )
+        logical_lineage = None
+        if action == "lineage_graph":
+            pipeline = prepared_kwargs["pipeline"]
+            assert isinstance(pipeline, str)
+            logical_lineage = _prepare_remote_logical_lineage(config, pipeline)
+        else:
+            self._validate_config_membership(
+                action,
+                prepared_kwargs,
+                config,
+                project_root,
+                config_path,
+            )
 
         output_path = None
         public_output_path = None
@@ -284,6 +324,7 @@ class ManagedProjectAccess:
             config_fingerprint=_config_fingerprint(config_snapshot),
             output_path=output_path,
             public_output_path=public_output_path,
+            logical_lineage=logical_lineage,
         )
 
     def _prepare_action_inputs(
@@ -315,7 +356,7 @@ class ManagedProjectAccess:
             if not _is_safe_component(connection):
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
 
-        if action in _STORY_ACTIONS:
+        if action in _PIPELINE_ACTIONS:
             pipeline = prepared.get("pipeline")
             if not _is_safe_component(pipeline):
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
@@ -515,6 +556,156 @@ def sanitize_runtime_result(value: object, prepared: PreparedRuntimeCall) -> obj
 
     sanitized["policy_applied"] = policy
     return sanitized
+
+
+def render_remote_logical_lineage_projection(
+    projection: RemoteLogicalLineageProjection,
+) -> Dict[str, object]:
+    """Render only the closed logical identifiers carried by a nominal projection."""
+    if type(projection) is not RemoteLogicalLineageProjection:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+    if not _is_safe_component(projection.pipeline) or type(projection.nodes) is not tuple:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+    if type(projection.edges) is not tuple:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+    if len(projection.nodes) > _LINEAGE_SOURCE_NODE_LIMIT:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+    if len(projection.edges) > _LINEAGE_SOURCE_EDGE_LIMIT:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+
+    node_ids: list[str] = []
+    node_id_set: set[str] = set()
+    for node in projection.nodes:
+        if type(node) is not LogicalLineageNode or not _is_safe_component(node.id):
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        if node.id in node_id_set:
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        node_ids.append(node.id)
+        node_id_set.add(node.id)
+
+    edge_pair_set: set[tuple[str, str]] = set()
+    for edge in projection.edges:
+        if (
+            type(edge) is not LogicalLineageEdge
+            or not _is_safe_component(edge.source)
+            or not _is_safe_component(edge.target)
+            or edge.source not in node_id_set
+            or edge.target not in node_id_set
+        ):
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        pair = (edge.source, edge.target)
+        if pair in edge_pair_set:
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        edge_pair_set.add(pair)
+
+    returned_node_ids = node_ids[:_LINEAGE_NODE_LIMIT]
+    returned_node_set = set(returned_node_ids)
+    eligible_edges = [
+        edge
+        for edge in projection.edges
+        if edge.source in returned_node_set and edge.target in returned_node_set
+    ]
+    returned_edges = eligible_edges[:_LINEAGE_EDGE_LIMIT]
+    nodes_truncated = len(returned_node_ids) < len(projection.nodes)
+    edges_truncated = len(returned_edges) < len(projection.edges)
+
+    result: Dict[str, object] = {
+        "kind": "logical_lineage_graph",
+        "pipeline": projection.pipeline,
+        "status": "configured",
+        "nodes": [{"id": node_id, "type": "pipeline_node"} for node_id in returned_node_ids],
+        "edges": [
+            {"source": edge.source, "target": edge.target, "kind": "dependency"}
+            for edge in returned_edges
+        ],
+        "counts": {
+            "nodes_total": len(projection.nodes),
+            "nodes_returned": len(returned_node_ids),
+            "edges_total": len(projection.edges),
+            "edges_returned": len(returned_edges),
+        },
+        "truncated": nodes_truncated or edges_truncated,
+        "truncation": {"nodes": nodes_truncated, "edges": edges_truncated},
+        "policy_applied": {
+            "project_scoped": True,
+            "logical_only": True,
+            "inline_snapshot_only": True,
+            "node_limit": _LINEAGE_NODE_LIMIT,
+            "edge_limit": _LINEAGE_EDGE_LIMIT,
+            "identifier_length_limit": _LINEAGE_IDENTIFIER_LENGTH_LIMIT,
+            "response_byte_limit": _LINEAGE_RESPONSE_BYTE_LIMIT,
+        },
+    }
+    if len(json.dumps(result, indent=2).encode("utf-8")) > _LINEAGE_RESPONSE_BYTE_LIMIT:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+    return result
+
+
+def _prepare_remote_logical_lineage(
+    config: Dict[str, object], pipeline: str
+) -> RemoteLogicalLineageProjection:
+    """Project explicit inline node dependencies without resolving config imports."""
+    if "imports" in config:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+    pipelines = config.get("pipelines")
+    if not isinstance(pipelines, list) or len(pipelines) > _LINEAGE_SOURCE_PIPELINE_LIMIT:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+
+    matches: list[Dict[str, object]] = []
+    for item in pipelines:
+        if not isinstance(item, dict):
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        identifier = item.get("pipeline", item.get("name"))
+        if not _is_safe_component(identifier):
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        if identifier == pipeline:
+            matches.append(item)
+    if len(matches) != 1:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+
+    raw_nodes = matches[0].get("nodes")
+    if not isinstance(raw_nodes, list) or len(raw_nodes) > _LINEAGE_SOURCE_NODE_LIMIT:
+        raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+
+    nodes: list[LogicalLineageNode] = []
+    raw_node_mappings: list[Dict[str, object]] = []
+    node_ids: set[str] = set()
+    for raw_node in raw_nodes:
+        if not isinstance(raw_node, dict):
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        node_id = raw_node.get("name")
+        if not _is_safe_component(node_id) or node_id in node_ids:
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        assert isinstance(node_id, str)
+        node_ids.add(node_id)
+        nodes.append(LogicalLineageNode(id=node_id))
+        raw_node_mappings.append(raw_node)
+
+    edges: list[LogicalLineageEdge] = []
+    edge_pairs: set[tuple[str, str]] = set()
+    dependency_count = 0
+    for node, raw_node in zip(nodes, raw_node_mappings):
+        dependencies = raw_node.get("depends_on", [])
+        if not isinstance(dependencies, list):
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        dependency_count += len(dependencies)
+        if dependency_count > _LINEAGE_SOURCE_EDGE_LIMIT:
+            raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+        for dependency in dependencies:
+            if not _is_safe_component(dependency) or dependency not in node_ids:
+                raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+            assert isinstance(dependency, str)
+            pair = (dependency, node.id)
+            if pair in edge_pairs:
+                raise RuntimeAccessDenied("LOGICAL_PROJECTION_UNAVAILABLE")
+            edge_pairs.add(pair)
+            edges.append(LogicalLineageEdge(source=dependency, target=node.id))
+
+    return RemoteLogicalLineageProjection(
+        pipeline=pipeline,
+        nodes=tuple(nodes),
+        edges=tuple(edges),
+    )
 
 
 def _canonical_directory(value: object, code: str) -> Path:
