@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -30,8 +32,20 @@ jobs:
       - name: Check code formatting (Ruff)
         run: ruff format --check odibi/ tests/
 
+      - name: Check changed MCP formatting (Ruff)
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -o pipefail
+          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            BASE_SHA="$(git rev-list --max-parents=0 HEAD)"
+          fi
+          git cat-file -e "$BASE_SHA^{commit}"
+          git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- ':(glob)odibi_mcp/**/*.py' \
+            | xargs -0 -r ruff format --check
+
       - name: Lint code (Ruff)
-        run: ruff check odibi/ tests/
+        run: ruff check odibi/ tests/ odibi_mcp/
 
   # BASE JOB (REQUIRED) - Tests core Pandas functionality
   # This job MUST pass for the build to be considered successful
