@@ -696,6 +696,25 @@ def test_remote_lineage_node_output_min_max_and_cap_plus_one_are_truthful():
         assert result["truncated"] is expected_truncated
 
 
+def test_remote_lineage_node_truncation_truthfully_marks_omitted_edges():
+    projection = RemoteLogicalLineageProjection(
+        pipeline="bounded",
+        nodes=tuple(LogicalLineageNode(f"node_{index}") for index in range(65)),
+        edges=(LogicalLineageEdge("node_0", "node_64"),),
+    )
+
+    result = render_remote_logical_lineage_projection(projection)
+
+    assert result["counts"] == {
+        "nodes_total": 65,
+        "nodes_returned": 64,
+        "edges_total": 1,
+        "edges_returned": 0,
+    }
+    assert result["truncation"] == {"nodes": True, "edges": True}
+    assert result["truncated"] is True
+
+
 def test_remote_lineage_edge_output_min_max_and_cap_plus_one_are_truthful():
     nodes = tuple(LogicalLineageNode(f"node_{index}") for index in range(64))
     pairs = [
