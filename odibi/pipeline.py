@@ -1528,6 +1528,14 @@ class Pipeline:
         with self._buffer_lock:
             self._pending_asset_records.append(record)
 
+    def buffer_hwm_update(self, key: str, value: Any) -> None:
+        """Deprecated: HWM updates must be committed explicitly by their owner."""
+        raise RuntimeError(
+            "Pipeline.buffer_hwm_update() no longer buffers HWM updates. "
+            "Commit explicitly with StateManager.set_hwm() or set_hwm_batch(); "
+            "no HWM update was acknowledged."
+        )
+
     def _get_databricks_cluster_id(self) -> Optional[str]:
         """Extract Databricks cluster ID from Spark context."""
         try:

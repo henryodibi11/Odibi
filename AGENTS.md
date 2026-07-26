@@ -540,6 +540,8 @@ def sql_executor(query, context):
 ### CatalogStateBackend: Null Type Columns
 When testing `CatalogStateBackend` set_hwm/set_hwm_batch with real Delta writes, always provide a non-None `environment` value (e.g., `environment="test"`). If environment is None, Pandas creates a Null-type column that Delta Lake rejects with `SchemaMismatchError: Invalid data type for Delta Lake: Null`. Similarly, seed Delta test data using `pa.table()` with explicit types instead of `pd.DataFrame` to avoid Null type inference.
 
+For missing-table creation across the declared delta-rs `>=0.18,<0.30` range, do not pass `schema_mode="merge"`: 0.18 defaults to the PyArrow writer and rejects that option, while later releases do not need it for a new table. `TableNotFoundError` and `CommitFailedError` are available throughout that range; import optional exception types separately so one unavailable symbol cannot disable all delta-rs support.
+
 ### Test File Naming
 **Do NOT use "spark" or "delta" in test file names.** The `conftest.py` skip filter catches them on Windows and skips the entire file. Use names like `test_catalog_mock_engine_reads.py` instead of `test_catalog_spark_reads.py`.
 

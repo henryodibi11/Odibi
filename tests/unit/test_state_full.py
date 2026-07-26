@@ -205,7 +205,8 @@ class TestCatalogStateBackend:
     @patch("odibi.state.DeltaTable", None)
     def test_get_hwm_local_no_lib(self):
         b = self._make()
-        assert b.get_hwm("key1") is None
+        with pytest.raises(ImportError, match="deltalake library is required"):
+            b.get_hwm("key1")
 
     @patch("odibi.state.DeltaTable")
     def test_get_hwm_local_found(self, mock_dt_cls):

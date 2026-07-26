@@ -10,7 +10,7 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 from deltalake import DeltaTable, write_deltalake
-from deltalake.exceptions import TableNotFoundError
+from deltalake.exceptions import CommitFailedError, TableNotFoundError
 
 from odibi.state import (
     CatalogStateBackend,
@@ -260,6 +260,29 @@ class TestCatalogStateHWM:
         backend = CatalogStateBackend("/r", state_path)
         assert backend.get_hwm("missing") is None
 
+    @pytest.mark.parametrize("failure_point", ["open", "dataset", "scan"])
+    def test_get_hwm_local_operational_failure_is_visible(self, failure_point):
+        backend = CatalogStateBackend("/r", "/state")
+        error = RuntimeError(f"{failure_point} failed")
+        delta_table = MagicMock()
+        dataset = MagicMock()
+        delta_table.to_pyarrow_dataset.return_value = dataset
+
+        if failure_point == "open":
+            delta_table_factory = MagicMock(side_effect=error)
+        else:
+            delta_table_factory = MagicMock(return_value=delta_table)
+            if failure_point == "dataset":
+                delta_table.to_pyarrow_dataset.side_effect = error
+            else:
+                dataset.to_table.side_effect = error
+
+        with (
+            patch("odibi.state.DeltaTable", delta_table_factory),
+            pytest.raises(RuntimeError, match=f"{failure_point} failed"),
+        ):
+            backend.get_hwm("k")
+
     def test_get_hwm_local_non_json_value(self, tmp_path):
         state_path = str(tmp_path / "state")
         table = pa.table(
@@ -357,6 +380,46 @@ class TestCatalogStateHWM:
         fallback_write.assert_not_called()
         after = DeltaTable(state_path).to_pandas()
         pd.testing.assert_frame_equal(after, before)
+
+    def test_set_hwm_local_retries_typed_first_create_conflict(self, tmp_path):
+        state_path = str(tmp_path / "state")
+        backend = CatalogStateBackend("/r", state_path, environment="test")
+        competing_row = pd.DataFrame(
+            {
+                "key": ["competing"],
+                "value": [json.dumps("survives")],
+                "environment": ["test"],
+                "updated_at": [datetime.now(timezone.utc)],
+            }
+        )
+        real_write = write_deltalake
+        create_attempts = 0
+
+        def lose_first_create(path, _df, **kwargs):
+            nonlocal create_attempts
+            create_attempts += 1
+            real_write(
+                path,
+                competing_row,
+                mode="append",
+                storage_options=kwargs.get("storage_options"),
+            )
+            raise CommitFailedError("version 0 already exists")
+
+        with (
+            patch("odibi.state.write_deltalake", side_effect=lose_first_create),
+            patch("odibi.state.time.sleep") as retry_sleep,
+        ):
+            backend.set_hwm("requested", "committed-after-retry")
+
+        result = DeltaTable(state_path).to_pandas()
+        values = {row["key"]: json.loads(row["value"]) for _, row in result.iterrows()}
+        assert values == {
+            "competing": "survives",
+            "requested": "committed-after-retry",
+        }
+        assert create_attempts == 1
+        retry_sleep.assert_called_once()
 
     def test_set_hwm_batch_empty(self):
         backend = CatalogStateBackend("/r", "/s")
@@ -564,7 +627,8 @@ class TestSqlServerOperations:
         conn.execute.side_effect = Exception("err")
         backend = SqlServerSystemBackend(conn)
         backend._tables_created = True
-        assert backend.get_hwm("k") is None
+        with pytest.raises(Exception, match="err"):
+            backend.get_hwm("k")
 
     def test_set_hwm(self):
         conn = MagicMock()
@@ -578,7 +642,8 @@ class TestSqlServerOperations:
         conn.execute.side_effect = Exception("err")
         backend = SqlServerSystemBackend(conn)
         backend._tables_created = True
-        backend.set_hwm("k", "v")  # Should not raise
+        with pytest.raises(Exception, match="err"):
+            backend.set_hwm("k", "v")
 
     def test_set_hwm_batch(self):
         conn = MagicMock()

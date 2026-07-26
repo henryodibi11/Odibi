@@ -25,7 +25,7 @@ def _retry_delta_operation(func, max_retries: int = 5, base_delay: float = 1.0):
             return func()
         except Exception as e:
             error_str = str(e)
-            is_concurrent = any(
+            is_concurrent = isinstance(e, CommitFailedError) or any(
                 msg in error_str
                 for msg in [
                     "ConcurrentAppendException",
@@ -66,6 +66,14 @@ except ImportError:
 
     class TableNotFoundError(Exception):
         """Fallback type used only when the optional delta-rs dependency is absent."""
+
+
+try:
+    from deltalake.exceptions import CommitFailedError
+except ImportError:
+
+    class CommitFailedError(Exception):
+        """Fallback type used only when this delta-rs exception is unavailable."""
 
 
 class StateBackend(ABC):
@@ -326,34 +334,35 @@ class CatalogStateBackend(StateBackend):
 
     def _get_hwm_local(self, key):
         if not DeltaTable:
-            return None
+            raise ImportError("deltalake library is required for local state backend.")
         try:
             dt = DeltaTable(self.meta_state_path, storage_options=self.storage_options)
-            ds = dt.to_pyarrow_dataset()
-            import pyarrow.compute as pc
+        except TableNotFoundError:
+            return None
 
-            filter_expr = pc.field("key") == key
-            table = ds.to_table(filter=filter_expr)
+        ds = dt.to_pyarrow_dataset()
+        import pyarrow.compute as pc
 
-            if table.num_rows == 0:
-                return None
+        filter_expr = pc.field("key") == key
+        table = ds.to_table(filter=filter_expr)
 
-            # Latest-wins: if more than one row exists for this key (e.g. a prior
-            # append-fallback left a duplicate), take the most recent by updated_at
-            # so the watermark never moves backward. Without this, row [0] is in
-            # arbitrary file/scan order and could be an older value.
-            if table.num_rows > 1 and "updated_at" in table.column_names:
-                table = table.sort_by([("updated_at", "descending")])
+        if table.num_rows == 0:
+            return None
 
-            val_str = table.column("value")[0].as_py()
-            if val_str:
-                try:
-                    return json.loads(val_str)
-                except Exception as e:
-                    logger.debug(f"Failed to parse HWM value as JSON for key '{key}': {e}")
-                    return val_str
-        except Exception as e:
-            logger.warning(f"Failed to get HWM for key '{key}' from {self.meta_state_path}: {e}")
+        # Latest-wins: if more than one row exists for this key (e.g. a prior
+        # append-fallback left a duplicate), take the most recent by updated_at
+        # so the watermark never moves backward. Without this, row [0] is in
+        # arbitrary file/scan order and could be an older value.
+        if table.num_rows > 1 and "updated_at" in table.column_names:
+            table = table.sort_by([("updated_at", "descending")])
+
+        val_str = table.column("value")[0].as_py()
+        if val_str:
+            try:
+                return json.loads(val_str)
+            except Exception as e:
+                logger.debug(f"Failed to parse HWM value as JSON for key '{key}': {e}")
+                return val_str
         return None
 
     def set_hwm(self, key: str, value: Any) -> None:
@@ -422,7 +431,6 @@ class CatalogStateBackend(StateBackend):
                 df,
                 mode="append",
                 storage_options=self.storage_options,
-                schema_mode="merge",
             )
             return
 
@@ -526,7 +534,6 @@ class CatalogStateBackend(StateBackend):
                 df,
                 mode="append",
                 storage_options=self.storage_options,
-                schema_mode="merge",
             )
             return
 
@@ -684,39 +691,33 @@ class SqlServerSystemBackend(StateBackend):
     def get_hwm(self, key: str) -> Any:
         """Get HWM value from SQL Server."""
         self._ensure_tables()
-        try:
-            sql = f"""
-            SELECT [value] FROM [{self.schema_name}].[meta_state]
-            WHERE [key] = :key
-            """
-            result = self.connection.execute(sql, {"key": key})
-            if result and result[0][0]:
-                try:
-                    return json.loads(result[0][0])
-                except Exception:
-                    return result[0][0]
-        except Exception as e:
-            logger.warning(f"Failed to get HWM: {e}")
+        sql = f"""
+        SELECT [value] FROM [{self.schema_name}].[meta_state]
+        WHERE [key] = :key
+        """
+        result = self.connection.execute(sql, {"key": key})
+        if result and result[0][0]:
+            try:
+                return json.loads(result[0][0])
+            except Exception:
+                return result[0][0]
         return None
 
     def set_hwm(self, key: str, value: Any) -> None:
         """Set HWM value in SQL Server using MERGE."""
         self._ensure_tables()
         val_str = json.dumps(value, default=str)
-        try:
-            sql = f"""
-            MERGE [{self.schema_name}].[meta_state] AS target
-            USING (SELECT :key AS [key]) AS source
-            ON target.[key] = source.[key]
-            WHEN MATCHED THEN
-                UPDATE SET [value] = :value, environment = :env, updated_at = GETUTCDATE()
-            WHEN NOT MATCHED THEN
-                INSERT ([key], [value], environment, updated_at)
-                VALUES (:key, :value, :env, GETUTCDATE());
-            """
-            self.connection.execute(sql, {"key": key, "value": val_str, "env": self.environment})
-        except Exception as e:
-            logger.warning(f"Failed to set HWM: {e}")
+        sql = f"""
+        MERGE [{self.schema_name}].[meta_state] AS target
+        USING (SELECT :key AS [key]) AS source
+        ON target.[key] = source.[key]
+        WHEN MATCHED THEN
+            UPDATE SET [value] = :value, environment = :env, updated_at = GETUTCDATE()
+        WHEN NOT MATCHED THEN
+            INSERT ([key], [value], environment, updated_at)
+            VALUES (:key, :value, :env, GETUTCDATE());
+        """
+        self.connection.execute(sql, {"key": key, "value": val_str, "env": self.environment})
 
     def set_hwm_batch(self, updates: List[Dict[str, Any]]) -> None:
         """Set multiple HWM values."""

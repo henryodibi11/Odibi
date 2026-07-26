@@ -4,6 +4,7 @@ import threading
 from concurrent.futures import Future
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 from odibi.node import NodeResult
 from odibi.pipeline import Pipeline, PipelineResults
@@ -498,6 +499,14 @@ class TestFlushBatchWrites:
         p = _make_pipeline(catalog_manager=MagicMock(), project_config=MagicMock())
         p._flush_batch_writes()
         create_backend.assert_not_called()
+        assert not hasattr(p, "_pending_hwm_updates")
+
+    def test_deprecated_hwm_buffer_fails_loudly_without_enqueuing(self):
+        p = _make_pipeline(catalog_manager=MagicMock())
+
+        with pytest.raises(RuntimeError, match=r"StateManager\.set_hwm\(\)"):
+            p.buffer_hwm_update("orders_hwm", "2026-01-01")
+
         assert not hasattr(p, "_pending_hwm_updates")
 
     def test_empty_buffers_no_calls(self):

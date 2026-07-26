@@ -4041,6 +4041,51 @@ class Node:
                 attempt_duration = time.time() - attempt_start
 
                 if result.success:
+                    if result.metadata.get("hwm_pending"):
+                        hwm_update = result.metadata.get("hwm_update")
+                        if hwm_update:
+                            hwm_commit_start = time.time()
+                            try:
+                                self.state_manager.set_hwm(hwm_update["key"], hwm_update["value"])
+                                result.metadata["hwm_pending"] = False
+                                ctx.debug(
+                                    "HWM state updated",
+                                    hwm_key=hwm_update["key"],
+                                    hwm_value=str(hwm_update["value"]),
+                                )
+                            except Exception as e:
+                                attempt_duration = time.time() - attempt_start
+                                retry_history.append(
+                                    {
+                                        "attempt": attempts,
+                                        "success": False,
+                                        "phase": "hwm_commit",
+                                        "data_write_committed": True,
+                                        "error": str(e),
+                                        "error_type": type(e).__name__,
+                                        "duration": round(attempt_duration, 3),
+                                    }
+                                )
+                                result.metadata["hwm_error"] = str(e)
+                                result.metadata["data_write_committed"] = True
+                                result.metadata["attempts"] = attempts
+                                result.metadata["retry_history"] = retry_history
+                                result.metadata["hwm_commit_duration_ms"] = round(
+                                    (time.time() - hwm_commit_start) * 1000, 3
+                                )
+                                result.success = False
+                                result.error = e
+                                result.duration = time.time() - start_time
+                                self._cached_result = None
+                                self.context.unregister(self.config.name)
+                                ctx.warning(f"Failed to update HWM state: {e}")
+                                return result
+
+                            result.metadata["hwm_commit_duration_ms"] = round(
+                                (time.time() - hwm_commit_start) * 1000, 3
+                            )
+
+                    attempt_duration = time.time() - attempt_start
                     retry_history.append(
                         {
                             "attempt": attempts,
@@ -4052,24 +4097,8 @@ class Node:
                     result.metadata["retry_history"] = retry_history
                     result.duration = time.time() - start_time
 
-                    if self.config.cache and self.context.get(self.config.name) is not None:
+                    if self.config.cache and self.context.has(self.config.name):
                         self._cached_result = self.context.get(self.config.name)
-
-                    if result.metadata.get("hwm_pending"):
-                        hwm_update = result.metadata.get("hwm_update")
-                        if hwm_update:
-                            try:
-                                self.state_manager.set_hwm(hwm_update["key"], hwm_update["value"])
-                                ctx.debug(
-                                    "HWM state updated",
-                                    hwm_key=hwm_update["key"],
-                                    hwm_value=str(hwm_update["value"]),
-                                )
-                            except Exception as e:
-                                result.metadata["hwm_error"] = str(e)
-                                result.success = False
-                                result.error = e
-                                ctx.warning(f"Failed to update HWM state: {e}")
 
                     return result
 
