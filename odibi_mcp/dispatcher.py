@@ -11,6 +11,68 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pydantic import BaseModel
 
+try:
+    from odibi_mcp.contracts.access import ActionEffect, ApplicationIdentity
+except ImportError:  # Flat Databricks workspace deployment
+    from contracts.access import ActionEffect, ApplicationIdentity
+
+
+ACTION_EFFECTS: dict[str, ActionEffect] = {
+    # Workflows
+    "run_workflow": ActionEffect.EXECUTION,
+    "resume_workflow": ActionEffect.EXECUTION,
+    "list_workflows": ActionEffect.PUBLIC_READ,
+    "get_workflow": ActionEffect.PUBLIC_READ,
+    # Discovery
+    "map_environment": ActionEffect.SENSITIVE_READ,
+    "profile_source": ActionEffect.SENSITIVE_READ,
+    "profile_folder": ActionEffect.SENSITIVE_READ,
+    # Inspection
+    "story_read": ActionEffect.SENSITIVE_READ,
+    "node_sample": ActionEffect.SENSITIVE_READ,
+    "node_failed_rows": ActionEffect.SENSITIVE_READ,
+    "lineage_graph": ActionEffect.SENSITIVE_READ,
+    # Construction
+    "list_transformers": ActionEffect.PUBLIC_READ,
+    "list_patterns": ActionEffect.PUBLIC_READ,
+    # Rendering reads and may update shared project connection context.
+    "apply_pattern_template": ActionEffect.SENSITIVE_READ,
+    "suggest_pipeline": ActionEffect.SENSITIVE_READ,
+    "create_ingestion_pipeline": ActionEffect.SESSION_MUTATION,
+    # Validation
+    "validate_yaml": ActionEffect.PUBLIC_READ,
+    "validate_pipeline": ActionEffect.PUBLIC_READ,
+    "test_pipeline": ActionEffect.EXECUTION,
+    "diagnose": ActionEffect.SENSITIVE_READ,
+    # Task guidance
+    "get_task_guidance": ActionEffect.PUBLIC_READ,
+    "list_task_types": ActionEffect.PUBLIC_READ,
+    # Onboarding
+    "onboard": ActionEffect.PUBLIC_READ,
+    "get_schema": ActionEffect.PUBLIC_READ,
+    "search_docs": ActionEffect.PUBLIC_READ,
+    "get_doc": ActionEffect.SENSITIVE_READ,
+    "list_docs": ActionEffect.PUBLIC_READ,
+    "list_examples": ActionEffect.PUBLIC_READ,
+    "get_example": ActionEffect.SENSITIVE_READ,
+    "list_skills": ActionEffect.PUBLIC_READ,
+    "get_skill": ActionEffect.SENSITIVE_READ,
+    # Download
+    "download_sql": ActionEffect.FILE_WRITE,
+    "download_table": ActionEffect.FILE_WRITE,
+    "download_file": ActionEffect.FILE_WRITE,
+    # Session builder
+    "create_pipeline": ActionEffect.SESSION_MUTATION,
+    "add_node": ActionEffect.SESSION_MUTATION,
+    "configure_read": ActionEffect.SESSION_MUTATION,
+    "configure_write": ActionEffect.SESSION_MUTATION,
+    "configure_transform": ActionEffect.SESSION_MUTATION,
+    "get_pipeline_state": ActionEffect.SENSITIVE_READ,
+    "render_pipeline_yaml": ActionEffect.SENSITIVE_READ,
+    "list_sessions": ActionEffect.SENSITIVE_READ,
+    "discard_pipeline": ActionEffect.SESSION_MUTATION,
+}
+
 
 class OdibiDispatcher:
     """Universal action dispatcher for Odibi MCP gateway.
@@ -22,6 +84,12 @@ class OdibiDispatcher:
     def __init__(self):
         """Initialize dispatcher with action registry."""
         self._actions: dict[str, Callable] = self._register_actions()
+        registered = set(self._actions)
+        classified = set(ACTION_EFFECTS)
+        if registered != classified:
+            missing = sorted(registered - classified)
+            stale = sorted(classified - registered)
+            raise RuntimeError(f"Action effect policy mismatch: missing={missing}, stale={stale}")
         self._lazy_services = {}  # Lazy-loaded service instances
 
     def _register_actions(self) -> dict[str, Callable]:
@@ -85,12 +153,19 @@ class OdibiDispatcher:
             "discard_pipeline": self._discard_pipeline,
         }
 
-    def dispatch(self, action: str, *args, **kwargs) -> dict[str, Any]:
+    def dispatch(
+        self,
+        action: str,
+        *args,
+        application_identity: ApplicationIdentity | None = None,
+        **kwargs,
+    ) -> dict[str, Any]:
         """Execute an action by name with args.
 
         Args:
             action: Action name (e.g., 'profile_source', 'run_workflow')
             *args: Positional arguments for the action
+            application_identity: Transport-authenticated principal, when available
             **kwargs: Keyword arguments for the action
 
         Returns:
@@ -113,6 +188,23 @@ class OdibiDispatcher:
                     "Session Builder",
                 ],
             }
+
+        effect = ACTION_EFFECTS[action]
+        if effect is not ActionEffect.PUBLIC_READ:
+            if not isinstance(application_identity, ApplicationIdentity):
+                return {
+                    "error": "Application identity is required for this action",
+                    "code": "AUTHORIZATION_REQUIRED",
+                    "action": action,
+                    "effect": effect.value,
+                }
+            if not application_identity.authorizes(effect):
+                return {
+                    "error": "Application identity is not authorized for this action",
+                    "code": "FORBIDDEN",
+                    "action": action,
+                    "effect": effect.value,
+                }
 
         try:
             result = self._actions[action](*args, **kwargs)
@@ -247,6 +339,9 @@ class OdibiDispatcher:
                 },
             ],
             "total_actions": 43,
+            "action_effects": {
+                action: effect.value for action, effect in sorted(ACTION_EFFECTS.items())
+            },
             "usage": {
                 "discovery": "odibi_help(category='Workflows')",
                 "action_details": "odibi_help(action='profile_source')",
@@ -500,10 +595,14 @@ class OdibiDispatcher:
                 "tip": "Run odibi_help() to see all categories",
             }
 
+        actions = [
+            {**item, "effect": ACTION_EFFECTS[item["name"]].value}
+            for item in actions_by_category[category]
+        ]
         return {
             "kind": "category_help",
             "category": category,
-            "actions": actions_by_category[category],
+            "actions": actions,
             "usage_example": f"odibi_execute('{actions_by_category[category][0]['name']}', '{{...}}')",
         }
 
@@ -600,6 +699,7 @@ class OdibiDispatcher:
                 return {
                     "kind": "action_help",
                     "action": action,
+                    "effect": ACTION_EFFECTS[action].value,
                     "signature": str(sig),
                     "description": "Documentation coming soon",
                     "tip": "Action exists but detailed docs not yet written. Try calling it to see what it returns.",
@@ -609,7 +709,12 @@ class OdibiDispatcher:
                 "tip": "Run odibi_help() to see all actions",
             }
 
-        return {"kind": "action_help", "action": action, **action_docs[action]}
+        return {
+            "kind": "action_help",
+            "action": action,
+            "effect": ACTION_EFFECTS[action].value,
+            **action_docs[action],
+        }
 
     # === SERIALIZATION HELPERS ===
 

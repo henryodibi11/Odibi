@@ -3,13 +3,26 @@
 Usage:
     python -m odibi_mcp.mcp_server          # stdio transport (default)
     fastmcp run odibi_mcp.mcp_server:mcp    # or via fastmcp CLI
+
+Restricted HTTP actions require a Bearer credential matching
+``ODIBI_MCP_AUTH_TOKEN``. Stdio has no HTTP identity and therefore exposes only
+actions classified as public reads; use ``odibi_mcp.bootstrap`` for explicitly
+trusted in-process access.
 """
+
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_http_request
+
+try:
+    from odibi_mcp.contracts.access import ApplicationIdentity, authenticate_bearer_identity
+except ImportError:  # Flat Databricks workspace deployment
+    from contracts.access import ApplicationIdentity, authenticate_bearer_identity
 from dispatcher import OdibiDispatcher  # No package prefix - files are at /workspace/ directly
 
 # Create FastMCP server instance
@@ -19,10 +32,22 @@ mcp = FastMCP("odibi-knowledge")
 _dispatcher = OdibiDispatcher()
 
 
+def _http_application_identity() -> ApplicationIdentity | None:
+    """Authenticate the current HTTP request without trusting proxy-specific headers."""
+    try:
+        request = get_http_request()
+    except RuntimeError:
+        return None
+    return authenticate_bearer_identity(
+        request.headers.get("authorization"),
+        os.environ.get("ODIBI_MCP_AUTH_TOKEN"),
+    )
+
+
 @mcp.tool()
 def odibi_execute(action: str, args_json: str | None = None) -> str:
     """Execute an Odibi action via the universal dispatcher.
-    
+
     This is the gateway to all 37+ Odibi actions across 9 categories:
     - Workflows: run_workflow, resume_workflow, list_workflows, get_workflow
     - Discovery: map_environment, profile_source, profile_folder
@@ -33,15 +58,15 @@ def odibi_execute(action: str, args_json: str | None = None) -> str:
     - Onboarding: onboard, get_schema, search_docs, get_doc, list_docs, list_examples, get_example, list_skills, get_skill
     - Download: download_sql, download_table, download_file
     - Session Builder: create_pipeline, add_node, configure_read, configure_write, configure_transform, get_pipeline_state, render_pipeline_yaml, list_sessions, discard_pipeline
-    
+
     Args:
         action: Action name (e.g., 'profile_source', 'run_workflow', 'validate_yaml')
         args_json: JSON string of keyword arguments for the action (optional)
                   Example: '{"source_path": "/data/file.csv", "profile_level": "full"}'
-    
+
     Returns:
         JSON string containing the action result or error message
-    
+
     Examples:
         odibi_execute("list_workflows")
         odibi_execute("profile_source", '{"source_path": "/data/sensors.csv"}')
@@ -54,32 +79,52 @@ def odibi_execute(action: str, args_json: str | None = None) -> str:
             try:
                 kwargs = json.loads(args_json)
                 if not isinstance(kwargs, dict):
-                    return json.dumps({
-                        "error": "args_json must be a JSON object (dict), not " + type(kwargs).__name__,
-                        "tip": "Pass arguments as JSON object: '{\"key\": \"value\"}'"
-                    })
+                    return json.dumps(
+                        {
+                            "error": "args_json must be a JSON object (dict), not "
+                            + type(kwargs).__name__,
+                            "tip": 'Pass arguments as JSON object: \'{"key": "value"}\'',
+                        }
+                    )
             except json.JSONDecodeError as e:
-                return json.dumps({
-                    "error": f"Invalid JSON in args_json: {str(e)}",
-                    "tip": "Ensure args_json is valid JSON. Example: '{\"key\": \"value\"}'"
-                })
-        
+                return json.dumps(
+                    {
+                        "error": f"Invalid JSON in args_json: {str(e)}",
+                        "tip": 'Ensure args_json is valid JSON. Example: \'{"key": "value"}\'',
+                    }
+                )
+
+        if "application_identity" in kwargs:
+            return json.dumps(
+                {
+                    "error": "application_identity is controlled by the request transport",
+                    "code": "INVALID_ARGUMENT",
+                    "action": action,
+                }
+            )
+
         # Dispatch to action
-        result = _dispatcher.dispatch(action, **kwargs)
+        result = _dispatcher.dispatch(
+            action,
+            application_identity=_http_application_identity(),
+            **kwargs,
+        )
         return json.dumps(result, indent=2)
-        
+
     except Exception as e:
-        return json.dumps({
-            "error": f"Unexpected error executing {action}: {str(e)}",
-            "action": action,
-            "tip": "Run odibi_help() to see available actions and usage"
-        })
+        return json.dumps(
+            {
+                "error": f"Unexpected error executing {action}: {str(e)}",
+                "action": action,
+                "tip": "Run odibi_help() to see available actions and usage",
+            }
+        )
 
 
 @mcp.tool()
 def odibi_help(category: str | None = None, action: str | None = None) -> str:
     """Get help on Odibi actions and capabilities.
-    
+
     Args:
         category: Optional category filter. Available categories:
                  - Workflows
@@ -92,10 +137,10 @@ def odibi_help(category: str | None = None, action: str | None = None) -> str:
                  - Download
                  - Session Builder
         action: Optional action name for detailed help on a specific action
-    
+
     Returns:
         JSON string containing help documentation
-    
+
     Examples:
         odibi_help()  # Full action catalog
         odibi_help(category="Discovery")  # Actions in Discovery category
@@ -105,10 +150,12 @@ def odibi_help(category: str | None = None, action: str | None = None) -> str:
         result = _dispatcher.help(category=category, action=action)
         return json.dumps(result, indent=2)
     except Exception as e:
-        return json.dumps({
-            "error": f"Error getting help: {str(e)}",
-            "tip": "Try odibi_help() with no arguments for the full catalog"
-        })
+        return json.dumps(
+            {
+                "error": f"Error getting help: {str(e)}",
+                "tip": "Try odibi_help() with no arguments for the full catalog",
+            }
+        )
 
 
 def main() -> None:
