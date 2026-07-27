@@ -153,11 +153,16 @@ In parallel mode, nodes are grouped into execution layers. Nodes within the same
 
 ### Dry Run Mode
 
-Simulate execution without performing actual read/write operations:
+Legacy dry-run enters the ordinary pipeline runtime, initializes runtime facilities,
+and then skips ordinary node execution; surrounding lifecycle effects can still occur:
 
 ```python
 results = manager.run(dry_run=True)
 ```
+
+This skips ordinary node execution but remains legacy late runtime simulation with
+possible surrounding lifecycle effects. Use [immutable planning](planning.md#legacy-runtime-simulation-is-different)
+for a bounded logical plan.
 
 Dry run validates:
 - Configuration syntax

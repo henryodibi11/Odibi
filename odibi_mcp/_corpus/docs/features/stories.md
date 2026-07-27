@@ -7,7 +7,7 @@ Auto-generated pipeline execution documentation with rich metadata, sample data,
 Odibi's Story system provides:
 - **Execution timeline**: Complete record of pipeline runs with timestamps
 - **Node-level metrics**: Duration, row counts, schema changes per node
-- **Sample data capture**: Input/output samples with automatic redaction
+- **Sample data capture**: Bounded input/output samples with explicit privacy controls
 - **Multiple renderers**: HTML, Markdown, JSON output formats
 - **Themes**: Customizable styling for HTML reports
 - **Retention policies**: Automatic cleanup of old stories
@@ -41,7 +41,6 @@ story:
 | `max_failure_samples` | int | No | `500` | Total failed rows across all validations |
 | `max_sampled_validations` | int | No | `5` | After this many validations, show only counts |
 | `theme` | string | No | `default` | Built-in options: `'default'`, `'corporate'`, `'dark'`, `'minimal'`, or path to custom theme YAML file |
-| `include_samples` | bool | No | `true` | Whether to include data samples |
 
 ### Remote Storage
 
@@ -82,9 +81,13 @@ For each node in the pipeline:
 | `rows_change` | Row count difference |
 | `rows_change_pct` | Percentage change in row count |
 
-### Sample Data
+### Sample Data and Privacy
 
-Sample data is captured with automatic redaction of sensitive values:
+`StoryConfig.max_sample_rows` defaults to `10`; ordinary node input/output samples are
+captured when it is greater than zero. With the default `NodeConfig.sensitive: false`,
+values are not automatically secret/PII-detected and may appear. `sensitive: true`
+replaces the node Story sample with a redaction message; an explicit column list redacts
+only named columns that are present.
 
 ```yaml
 sample_data:
@@ -100,9 +103,14 @@ Configure sample capture:
 
 ```yaml
 story:
-  max_sample_rows: 5      # Limit sample size
-  include_samples: true   # Enable/disable samples
+  max_sample_rows: 0      # Disable ordinary node input/output sample capture
 ```
+
+This does not disable every validation-failure artifact, log, connector, or external
+sink. Transform privacy is also separate: `columns.<name>.pii: true` together with a
+`privacy.method` of `hash`, `mask`, or `redact` changes configured PII columns during
+node execution. PII metadata alone does nothing without a privacy method; these
+transforms are not the same as Story display redaction.
 
 ### Schema Changes
 
