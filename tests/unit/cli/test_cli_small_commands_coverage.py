@@ -188,7 +188,7 @@ class TestAddTemplatesParser:
 
 
 class TestValidateCommand:
-    @patch("odibi.cli.main.cmd_validate", return_value=0)
+    @patch("odibi.cli.validate.cmd_validate", return_value=0)
     def test_all_valid(self, mock_cmd, capsys):
         from odibi.cli.validate import validate_command
 
@@ -197,7 +197,7 @@ class TestValidateCommand:
         assert ret == 0
         assert mock_cmd.call_args.args[0].file == "test.yaml"
 
-    @patch("odibi.cli.main.cmd_validate", return_value=1)
+    @patch("odibi.cli.validate.cmd_validate", return_value=1)
     def test_invalid(self, mock_cmd, capsys):
         from odibi.cli.validate import validate_command
 
@@ -206,7 +206,7 @@ class TestValidateCommand:
         assert ret == 1
         mock_cmd.assert_called_once()
 
-    @patch("odibi.cli.main.cmd_validate", return_value=1)
+    @patch("odibi.cli.validate.cmd_validate", return_value=1)
     def test_exception(self, mock_cmd, capsys):
         from odibi.cli.validate import validate_command
 

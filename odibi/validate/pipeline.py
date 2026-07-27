@@ -10,7 +10,7 @@ and the MCP `validate_yaml` tool both route here, so they can never diverge.
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from dotenv import dotenv_values
@@ -45,7 +45,7 @@ def _build_validation_environment(config_path: Path) -> Dict[str, str]:
 def _load_failure_result(exc: Exception, config_path: Path) -> Dict[str, Any]:
     """Convert expected loader failures to value-redacted public errors."""
     chain = []
-    current: BaseException | None = exc
+    current: Optional[BaseException] = exc
     while current is not None and current not in chain:
         chain.append(current)
         current = current.__cause__ or current.__context__
@@ -165,7 +165,7 @@ def _validate_loaded_project(project_config: ProjectConfig) -> Dict[str, Any]:
     return _safe_semantic_result(_result(errors, warnings))
 
 
-def validate_config_file(path: str | Path, env: str = None) -> Dict[str, Any]:
+def validate_config_file(path: Union[str, Path], env: str = None) -> Dict[str, Any]:
     """Validate a file through the normalized, pre-runtime model authority."""
     config_path = Path(path)
     try:

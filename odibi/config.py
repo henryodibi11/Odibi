@@ -5925,7 +5925,7 @@ class ProjectConfig(StrictModel):
 def load_config_from_file(
     path: str,
     env: str = None,
-    environment: Mapping[str, str] | None = None,
+    environment: Optional[Mapping[str, str]] = None,
 ) -> ProjectConfig:
     """
     Load and validate configuration from file.
