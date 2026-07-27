@@ -2,6 +2,7 @@
 
 import re
 import warnings
+from collections.abc import Mapping
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union, get_args, get_origin
 
@@ -5921,7 +5922,11 @@ class ProjectConfig(StrictModel):
         return self
 
 
-def load_config_from_file(path: str) -> ProjectConfig:
+def load_config_from_file(
+    path: str,
+    env: str = None,
+    environment: Optional[Mapping[str, str]] = None,
+) -> ProjectConfig:
     """
     Load and validate configuration from file.
 
@@ -5952,7 +5957,7 @@ def load_config_from_file(path: str) -> ProjectConfig:
     from odibi.utils import load_yaml_with_env
     from odibi.utils.config_loader import build_yaml_line_map
 
-    config_dict = load_yaml_with_env(path)
+    config_dict = load_yaml_with_env(path, env=env, environment=environment)
     config_dict = resolve_recipes(config_dict)
     try:
         return ProjectConfig(**config_dict)

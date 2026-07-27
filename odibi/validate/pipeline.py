@@ -7,13 +7,187 @@ wrong-key detection, pattern params) are layered on top. The CLI (`odibi validat
 and the MCP `validate_yaml` tool both route here, so they can never diverge.
 """
 
-from typing import Any, Dict, List
+import os
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
+from dotenv import dotenv_values
 
-from odibi.config import PipelineConfig, ProjectConfig
+from odibi.config import PipelineConfig, ProjectConfig, load_config_from_file
 from odibi.patterns import _PATTERNS
 from odibi.registry import FunctionRegistry
+
+
+def _result(errors: List[Dict[str, Any]], warnings=None) -> Dict[str, Any]:
+    warnings = warnings or []
+    if errors:
+        summary = f"{len(errors)} error(s), {len(warnings)} warning(s)"
+    elif warnings:
+        summary = f"Valid with {len(warnings)} warning(s)"
+    else:
+        summary = "Valid"
+    return {"valid": not errors, "errors": errors, "warnings": warnings, "summary": summary}
+
+
+def _build_validation_environment(config_path: Path) -> Dict[str, str]:
+    """Build runtime-compatible root environment without process mutation."""
+    environment = dict(os.environ)
+    dotenv_path = config_path.parent / ".env"
+    if dotenv_path.is_file():
+        for name, value in dotenv_values(dotenv_path).items():
+            if value is not None:
+                environment[name] = value
+    return environment
+
+
+def _load_failure_result(exc: Exception, config_path: Path) -> Dict[str, Any]:
+    """Convert expected loader failures to value-redacted public errors."""
+    chain = []
+    current: Optional[BaseException] = exc
+    while current is not None and current not in chain:
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    safe_text = "\n".join(str(item) for item in chain)
+    error = {
+        "field_path": "root",
+        "source_path": str(config_path),
+        "fix": "Check the configuration file and try again.",
+    }
+    missing_env = re.search(r"Missing environment variable: ([A-Za-z_][A-Za-z0-9_]*)", safe_text)
+    recipe = re.search(r"recipe ['\"]?([A-Za-z_][A-Za-z0-9_-]*)", safe_text, re.IGNORECASE)
+    yaml_error = next((item for item in chain if isinstance(item, yaml.YAMLError)), None)
+    if isinstance(exc, FileNotFoundError) and not config_path.exists():
+        error.update(code="CONFIG_FILE_NOT_FOUND", message="Configuration file was not found.")
+    elif missing_env:
+        error.update(
+            code="MISSING_ENVIRONMENT_VARIABLE",
+            field_path=missing_env.group(1),
+            message=f"Required environment variable '{missing_env.group(1)}' is not set.",
+            fix="Set the named variable in the process environment or sibling .env file.",
+        )
+    elif yaml_error is not None or "YAML parsing failed" in safe_text:
+        error.update(code="YAML_PARSE_ERROR", message="Configuration contains invalid YAML syntax.")
+        mark = getattr(yaml_error, "problem_mark", None)
+        if mark is not None:
+            error.update(line=mark.line + 1, column=mark.column + 1)
+    elif "import" in safe_text.lower() and any(
+        isinstance(item, FileNotFoundError) for item in chain
+    ):
+        error.update(
+            code="IMPORT_LOAD_ERROR", message="An imported configuration file could not be loaded."
+        )
+    elif recipe or "recipe" in safe_text.lower():
+        error.update(code="RECIPE_ERROR", field_path="recipes", message="Recipe expansion failed.")
+        if recipe:
+            error["recipe"] = recipe.group(1)
+    elif "Configuration validation failed" in safe_text or any(
+        callable(getattr(item, "errors", None)) for item in chain
+    ):
+        error.update(
+            code="MODEL_VALIDATION_FAILED",
+            message="Configuration does not match the project model.",
+            fix="Check required fields and field types.",
+        )
+        location = re.search(r"(?:^|\n)\s*[^\n]+ - ([A-Za-z0-9_.]+):", safe_text)
+        if location:
+            error["field_path"] = location.group(1)
+    else:
+        error.update(code="VALIDATION_INTERNAL_ERROR", message="Validation failed unexpectedly.")
+    return _result([error])
+
+
+def _safe_semantic_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove loaded configuration values from file-validation diagnostics."""
+    messages = {
+        "NO_NODES": "A pipeline has no nodes.",
+        "INVALID_NODE_NAME": "A node name must use alphanumeric characters and underscores.",
+        "WRONG_KEY_SOURCE": "A node uses the unsupported 'source' key.",
+        "WRONG_KEY_SINK": "A node uses the unsupported 'sink' key.",
+        "WRONG_KEY_INPUTS": "A node uses the legacy 'inputs' key.",
+        "WRONG_KEY_OUTPUTS": "A node uses the legacy 'outputs' key.",
+        "MISSING_DEPENDENCY": "A node dependency does not exist in the pipeline.",
+        "PATTERN_REQUIRES": "A required pattern parameter is missing.",
+        "TRANSFORMER_NOT_VERIFIED": "A transformer is not in the shipped registry; project transforms are not imported during safe validation.",
+        "INVALID_TRANSFORMER_PARAMS": "Transformer parameters are invalid.",
+        "PYDANTIC_VALIDATION_FAILED": "Configuration does not match the expected model.",
+    }
+    for kind in ("errors", "warnings"):
+        for diagnostic in result.get(kind, []):
+            diagnostic["message"] = messages.get(
+                diagnostic.get("code"), "Configuration semantic validation failed."
+            )
+            diagnostic.pop("fix", None)
+    return result
+
+
+def _register_shipped_transformers_without_overwriting_project() -> None:
+    """Register built-ins while preserving existing project-owned names."""
+    project_functions = {
+        name: function
+        for name, function in FunctionRegistry._functions.items()
+        if not getattr(function, "__module__", "").startswith("odibi.transformers")
+    }
+    project_signatures = {
+        name: FunctionRegistry._signatures[name]
+        for name in project_functions
+        if name in FunctionRegistry._signatures
+    }
+    project_param_models = {
+        name: FunctionRegistry._param_models[name]
+        for name in project_functions
+        if name in FunctionRegistry._param_models
+    }
+
+    from odibi.transformers import register_standard_library
+
+    register_standard_library()
+    for name, function in project_functions.items():
+        FunctionRegistry._functions[name] = function
+        if name in project_signatures:
+            FunctionRegistry._signatures[name] = project_signatures[name]
+        if name in project_param_models:
+            FunctionRegistry._param_models[name] = project_param_models[name]
+        else:
+            FunctionRegistry._param_models.pop(name, None)
+
+
+def _validate_loaded_project(project_config: ProjectConfig) -> Dict[str, Any]:
+    errors: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
+    try:
+        _register_shipped_transformers_without_overwriting_project()
+    except Exception:
+        pass
+    for index, pipeline_config in enumerate(project_config.pipelines):
+        _validate_pipeline_nodes(pipeline_config, errors, warnings, f"pipelines[{index}]", index)
+    return _safe_semantic_result(_result(errors, warnings))
+
+
+def validate_config_file(path: Union[str, Path], env: str = None) -> Dict[str, Any]:
+    """Validate a file through the normalized, pre-runtime model authority."""
+    config_path = Path(path)
+    try:
+        project_config = load_config_from_file(
+            str(config_path), env=env, environment=_build_validation_environment(config_path)
+        )
+    except Exception as exc:
+        return _load_failure_result(exc, config_path)
+    try:
+        return _validate_loaded_project(project_config)
+    except Exception:
+        return _result(
+            [
+                {
+                    "code": "VALIDATION_INTERNAL_ERROR",
+                    "field_path": "root",
+                    "source_path": str(config_path),
+                    "message": "Validation failed unexpectedly.",
+                    "fix": "Check the configuration file and try again.",
+                }
+            ]
+        )
 
 
 def _pydantic_errors_to_structured(exc: Exception, location: str) -> List[Dict[str, Any]]:
@@ -110,26 +284,21 @@ def validate_yaml(yaml_content: str) -> Dict[str, Any]:
     errors: List[Dict[str, Any]] = []
     warnings: List[Dict[str, Any]] = []
 
-    # Register the standard transformer library so transformer/pattern checks match
-    # what `odibi run` sees. Without this the validator false-rejects builtin
-    # transformers (clean_text, deduplicate, ...) as "not found".
     try:
-        from odibi.transformers import register_standard_library
-
-        register_standard_library()
+        _register_shipped_transformers_without_overwriting_project()
     except Exception:  # pragma: no cover - defensive; never block validation on this
         pass
 
     try:
         config = yaml.safe_load(yaml_content)
-    except yaml.YAMLError as e:
+    except yaml.YAMLError:
         return {
             "valid": False,
             "errors": [
                 {
                     "code": "YAML_PARSE_ERROR",
                     "field_path": "root",
-                    "message": str(e),
+                    "message": "Content contains invalid YAML syntax.",
                     "fix": "Fix YAML syntax errors",
                 }
             ],
@@ -152,17 +321,29 @@ def validate_yaml(yaml_content: str) -> Dict[str, Any]:
             "summary": "Invalid config structure",
         }
 
+    if config.get("imports"):
+        return _result(
+            [
+                {
+                    "code": "IMPORT_PATH_REQUIRED",
+                    "field_path": "imports",
+                    "message": "Imports require a source path.",
+                    "fix": "Call validate_config_file() for file-based configuration.",
+                }
+            ]
+        )
+
     # Attempt recipe resolution before validation
     from odibi.recipes import resolve_recipes
 
     try:
         config = resolve_recipes(config)
-    except ValueError as e:
+    except ValueError:
         errors.append(
             {
                 "code": "RECIPE_ERROR",
                 "field_path": "recipes",
-                "message": str(e),
+                "message": "Recipe expansion failed.",
                 "fix": "Check recipe names and required variables",
             }
         )
@@ -420,7 +601,7 @@ def _validate_pipeline_nodes(
         _check_wrong_keys(node, node_loc, errors, warnings)
         _check_dependencies(node, node_names, node_loc, errors)
         _validate_pattern_params(node, pipeline_idx, node_idx, errors)
-        _validate_transformer_params(node, pipeline_idx, node_idx, errors)
+        _validate_transformer_params(node, pipeline_idx, node_idx, errors, warnings)
         _validate_simulation_block(node, node_loc, errors)
 
 
@@ -551,18 +732,24 @@ def _validate_transformer_params(
     pipeline_idx: int,
     node_idx: int,
     errors: List[Dict[str, Any]],
+    warnings: List[Dict[str, Any]],
 ) -> None:
     """Validate transformer parameters."""
+
+    def is_shipped(name: str) -> bool:
+        function = FunctionRegistry.get_function(name)
+        module = getattr(function, "__module__", "") if function else ""
+        return module == "odibi.transformers" or module.startswith("odibi.transformers.")
+
     if node.transform and node.transform.steps:
         for step_idx, step in enumerate(node.transform.steps):
             if hasattr(step, "function") and step.function:
-                if not FunctionRegistry.has_function(step.function):
-                    errors.append(
+                if not is_shipped(step.function):
+                    warnings.append(
                         {
-                            "code": "UNKNOWN_TRANSFORMER",
+                            "code": "TRANSFORMER_NOT_VERIFIED",
                             "field_path": f"pipelines[{pipeline_idx}].nodes[{node_idx}].transform.steps[{step_idx}].function",
-                            "message": f"Transformer '{step.function}' not found",
-                            "fix": "Use 'odibi list transformers' to see available transformers",
+                            "message": f"Transformer '{step.function}' is not in the shipped registry; project transforms are not imported during safe validation.",
                         }
                     )
                 else:
@@ -579,13 +766,12 @@ def _validate_transformer_params(
                         )
 
     if node.transformer and node.transformer not in _PATTERNS:
-        if not FunctionRegistry.has_function(node.transformer):
-            errors.append(
+        if not is_shipped(node.transformer):
+            warnings.append(
                 {
-                    "code": "UNKNOWN_TRANSFORMER",
+                    "code": "TRANSFORMER_NOT_VERIFIED",
                     "field_path": f"pipelines[{pipeline_idx}].nodes[{node_idx}].transformer",
-                    "message": f"Transformer '{node.transformer}' not found",
-                    "fix": "Use 'odibi list transformers' or 'odibi list patterns'",
+                    "message": f"Transformer '{node.transformer}' is not in the shipped registry; project transforms are not imported during safe validation.",
                 }
             )
         else:

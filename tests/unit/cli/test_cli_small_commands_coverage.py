@@ -188,51 +188,28 @@ class TestAddTemplatesParser:
 
 
 class TestValidateCommand:
-    @patch("odibi.pipeline.PipelineManager")
-    def test_all_valid(self, mock_pm_cls, capsys):
+    @patch("odibi.cli.validate.cmd_validate", return_value=0)
+    def test_all_valid(self, mock_cmd, capsys):
         from odibi.cli.validate import validate_command
 
-        mock_manager = MagicMock()
-        mock_manager._pipelines = {
-            "p1": MagicMock(
-                validate=MagicMock(return_value={"valid": True, "warnings": [], "errors": []})
-            ),
-        }
-        mock_pm_cls.from_yaml.return_value = mock_manager
         args = _make_args(config="test.yaml", env=None)
         ret = validate_command(args)
         assert ret == 0
-        assert "valid" in capsys.readouterr().out.lower()
+        assert mock_cmd.call_args.args[0].file == "test.yaml"
 
-    @patch("odibi.pipeline.PipelineManager")
-    def test_invalid(self, mock_pm_cls, capsys):
+    @patch("odibi.cli.validate.cmd_validate", return_value=1)
+    def test_invalid(self, mock_cmd, capsys):
         from odibi.cli.validate import validate_command
 
-        mock_manager = MagicMock()
-        mock_manager._pipelines = {
-            "p1": MagicMock(
-                validate=MagicMock(
-                    return_value={
-                        "valid": False,
-                        "warnings": ["warn1"],
-                        "errors": ["err1"],
-                    }
-                )
-            ),
-        }
-        mock_pm_cls.from_yaml.return_value = mock_manager
         args = _make_args(config="test.yaml", env=None)
         ret = validate_command(args)
         assert ret == 1
-        out = capsys.readouterr().out
-        assert "err1" in out
-        assert "warn1" in out
+        mock_cmd.assert_called_once()
 
-    @patch("odibi.pipeline.PipelineManager")
-    def test_exception(self, mock_pm_cls, capsys):
+    @patch("odibi.cli.validate.cmd_validate", return_value=1)
+    def test_exception(self, mock_cmd, capsys):
         from odibi.cli.validate import validate_command
 
-        mock_pm_cls.from_yaml.side_effect = Exception("bad yaml")
         args = _make_args(config="test.yaml", env=None)
         ret = validate_command(args)
         assert ret == 1

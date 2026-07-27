@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Any, Dict, Tuple
 
@@ -356,7 +357,10 @@ def build_yaml_line_map(content: str) -> Dict[Tuple[Any, ...], Tuple[int, int]]:
 
 
 def load_yaml_with_env(
-    path: str, env: str = None, _defer_substitution: bool = False
+    path: str,
+    env: str = None,
+    _defer_substitution: bool = False,
+    environment: Mapping[str, str] | None = None,
 ) -> Dict[str, Any]:
     """Load YAML file with environment variable substitution and imports.
 
@@ -377,6 +381,7 @@ def load_yaml_with_env(
         ValueError: If environment variable is missing
         yaml.YAMLError: If YAML parsing fails
     """
+    environment_values = os.environ if environment is None else environment
     logger.debug("Loading YAML configuration", path=path, env=env)
 
     if not os.path.exists(path):
@@ -392,11 +397,9 @@ def load_yaml_with_env(
     with open(abs_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Debug: Log first 100 chars to detect encoding/BOM issues
     logger.debug(
         "File content loaded",
         file_size=len(content),
-        first_100_repr=repr(content[:100]),
     )
 
     env_vars_found = []
@@ -404,7 +407,7 @@ def load_yaml_with_env(
     def replace_env(match):
         var_name = match.group(1)
         env_vars_found.append(var_name)
-        value = os.environ.get(var_name)
+        value = environment_values.get(var_name)
         if value is None:
             logger.error(
                 "Missing required environment variable",
@@ -446,9 +449,9 @@ def load_yaml_with_env(
     try:
         data = yaml.safe_load(substituted_content) or {}
     except yaml.YAMLError as e:
-        logger.error("YAML parsing failed", path=abs_path, error=str(e))
+        logger.error("YAML parsing failed", path=abs_path, error_type=type(e).__name__)
         raise ValueError(
-            f"YAML parsing failed for file '{abs_path}': {e}\n"
+            f"YAML parsing failed for file '{abs_path}'.\n"
             "Common causes: indentation errors, missing colons, tabs instead of spaces, or invalid YAML structure.\n"
             "Tip: Validate your YAML with an online linter or see docs/ODIBI_DEEP_CONTEXT.md#yaml for examples."
         ) from e
@@ -503,7 +506,10 @@ def load_yaml_with_env(
                 # would blank those placeholders to "". The top-level call substitutes once
                 # over the fully-merged config (parent + child vars combined).
                 imported_data = load_yaml_with_env(
-                    full_import_path, env=env, _defer_substitution=True
+                    full_import_path,
+                    env=env,
+                    _defer_substitution=True,
+                    environment=environment_values,
                 )
             except Exception as e:
                 logger.error(
@@ -511,11 +517,9 @@ def load_yaml_with_env(
                     import_path=import_path,
                     resolved_path=full_import_path,
                     parent_file=abs_path,
-                    error=str(e),
+                    error_type=type(e).__name__,
                 )
-                raise ValueError(
-                    f"Failed to load import '{import_path}' (resolved: {full_import_path}): {e}"
-                ) from e
+                raise ValueError(f"Failed to load import '{import_path}'.") from e
 
             # Merge imported data INTO the current data
             # This way, the main file acts as the "master" that accumulates imports
@@ -561,7 +565,12 @@ def load_yaml_with_env(
             # We pass env=None to avoid infinite recursion if it somehow references itself,
             # though strictly it shouldn't matter as we look for env.{env}.yaml based on the passed env.
             # But logically, an env specific file shouldn't load other env specific files for the same env.
-            env_data = load_yaml_with_env(env_file_path, env=None, _defer_substitution=True)
+            env_data = load_yaml_with_env(
+                env_file_path,
+                env=None,
+                _defer_substitution=True,
+                environment=environment_values,
+            )
             logger.debug(
                 "Merging external environment overrides",
                 env_file=env_file_path,

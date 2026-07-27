@@ -11,7 +11,14 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 if TYPE_CHECKING:
     import pandas as pd
 
-from odibi.config import AlertConfig, ErrorStrategy, PipelineConfig, ProjectConfig, RetryConfig
+from odibi.config import (
+    AlertConfig,
+    ErrorStrategy,
+    PipelineConfig,
+    ProjectConfig,
+    RetryConfig,
+    load_config_from_file,
+)
 from odibi.context import create_context
 from odibi.engine.registry import get_engine_class
 from odibi.exceptions import DependencyError
@@ -24,7 +31,6 @@ from odibi.state import StateManager, create_state_backend
 from odibi.story import StoryGenerator
 from odibi.story.lineage_utils import generate_lineage
 from odibi.transformers import register_standard_library
-from odibi.utils import load_yaml_with_env
 from odibi.utils.alerting import send_alert
 from odibi.utils.logging import configure_logging, logger
 from odibi.utils.logging_context import (
@@ -2137,7 +2143,7 @@ class PipelineManager:
             load_transforms_module(os.path.join(cwd, "transforms.py"))
 
         try:
-            config = load_yaml_with_env(str(yaml_path_obj), env=env)
+            project_config = load_config_from_file(str(yaml_path_obj), env=env)
             logger.debug("Configuration loaded successfully")
         except FileNotFoundError:
             logger.error(f"YAML file not found: {yaml_path}")
@@ -2146,7 +2152,6 @@ class PipelineManager:
                 f"Verify the file exists and consider using an absolute path."
             )
 
-        project_config = ProjectConfig(**config)
         logger.debug(
             "Project config validated",
             project=project_config.project,
