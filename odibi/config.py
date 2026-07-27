@@ -40,7 +40,7 @@ class StrictModel(BaseModel):
     are intentionally NOT strict.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -895,7 +895,7 @@ class HttpBasicAuth(StrictModel):
 
     mode: Literal[HttpAuthMode.BASIC] = HttpAuthMode.BASIC
     username: str
-    password: str
+    password: str = Field(repr=False)
 
 
 class HttpBearerAuth(StrictModel):
@@ -909,21 +909,23 @@ class HttpBearerAuth(StrictModel):
     """
 
     mode: Literal[HttpAuthMode.BEARER] = HttpAuthMode.BEARER
-    token: str
+    token: str = Field(repr=False)
 
 
 class HttpApiKeyAuth(StrictModel):
-    """Custom API key authentication with configurable header.
+    """Custom header authentication using one safely rendered API key.
 
     **When to Use:** APIs requiring custom header-based authentication (e.g., X-API-Key).
 
     Attributes:
         mode: Set to "api_key"
+        api_key: Required non-empty API key
         header_name: Name of the header (default: "Authorization")
         value_template: Template for header value with {token} placeholder (default: "Bearer {token}")
     """
 
     mode: Literal[HttpAuthMode.API_KEY] = HttpAuthMode.API_KEY
+    api_key: str = Field(min_length=1, repr=False)
     header_name: str = "Authorization"
     value_template: str = "Bearer {token}"
 

@@ -463,7 +463,7 @@ connections:
       password: ${API_PASSWORD}
 ```
 
-#### API Key
+#### API Key (Default Authorization Header)
 
 ```yaml
 connections:
@@ -472,8 +472,22 @@ connections:
     base_url: https://api.example.com/
     auth:
       mode: api_key
-      header_name: X-API-Key                    # Optional, defaults to Authorization
-      value_template: "${API_KEY}"              # how to render the header value
+      api_key: ${API_KEY}                       # Authorization: Bearer <API_KEY>
+```
+
+For an API that expects the raw key in a custom header, use exactly one literal
+`{token}` placeholder:
+
+```yaml
+connections:
+  custom_apikey_api:
+    type: http
+    base_url: https://api.example.com/
+    auth:
+      mode: api_key
+      api_key: ${API_KEY}
+      header_name: X-API-Key
+      value_template: "{token}"
 ```
 
 ### Custom Headers
@@ -683,6 +697,7 @@ connections:
     type: http
     base_url: https://api.weather.com/v1/
     auth:
+      mode: api_key
       api_key: ${WEATHER_API_KEY}
 
 pipelines:

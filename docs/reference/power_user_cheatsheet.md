@@ -189,7 +189,8 @@ Auth (pick one):
   [ ] none
   [ ] bearer     → token: ${ENV_VAR}
   [ ] basic      → username: ${ENV_VAR}  password: ${ENV_VAR}
-  [ ] api_key    → key: ${ENV_VAR}  header: ____________________
+  [ ] api_key    → api_key: ${ENV_VAR}  header_name: ____________________
+                   value_template: exactly one {token} (default: Bearer {token})
 
 Pagination:
   [ ] none

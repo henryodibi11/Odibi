@@ -733,12 +733,18 @@
       "type": "object"
     },
     "HttpApiKeyAuth": {
-      "description": "Custom API key authentication with configurable header.\n\n**When to Use:** APIs requiring custom header-based authentication (e.g., X-API-Key).\n\nAttributes:\n    mode: Set to \"api_key\"\n    header_name: Name of the header (default: \"Authorization\")\n    value_template: Template for header value with {token} placeholder (default: \"Bearer {token}\")",
+      "additionalProperties": false,
+      "description": "Custom header authentication using one safely rendered API key.\n\n**When to Use:** APIs requiring custom header-based authentication (e.g., X-API-Key).\n\nAttributes:\n    mode: Set to \"api_key\"\n    api_key: Required non-empty API key\n    header_name: Name of the header (default: \"Authorization\")\n    value_template: Template for header value with {token} placeholder (default: \"Bearer {token}\")",
       "properties": {
         "mode": {
           "const": "api_key",
           "default": "api_key",
           "title": "Mode",
+          "type": "string"
+        },
+        "api_key": {
+          "minLength": 1,
+          "title": "Api Key",
           "type": "string"
         },
         "header_name": {
@@ -752,6 +758,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "api_key"
+      ],
       "title": "HttpApiKeyAuth",
       "type": "object"
     },

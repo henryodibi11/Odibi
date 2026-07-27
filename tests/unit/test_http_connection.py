@@ -1,10 +1,31 @@
 """Unit tests for HttpConnection."""
 
 import base64
+import hmac
+from unittest.mock import patch
 
 import pytest
 
 from odibi.connections.http import HttpConnection
+
+
+@pytest.fixture(autouse=True)
+def restore_global_logger_secrets():
+    """Keep process-global secret registration isolated between tests."""
+    import odibi.connections.factory as factory_module
+    import odibi.connections.http as http_module
+    import odibi.utils.logging as logging_module
+
+    secrets = logging_module.logger._secrets
+    original_secrets = set(secrets)
+    assert factory_module.logger is logging_module.logger
+    assert http_module.logger is logging_module.logger
+
+    try:
+        yield
+    finally:
+        secrets.clear()
+        secrets.update(original_secrets)
 
 
 class TestHttpConnectionInit:
@@ -94,6 +115,83 @@ class TestHttpConnectionAuth:
         )
         assert conn.headers["Accept"] == "application/json"
         assert conn.headers["Authorization"] == "Bearer my-token"
+
+    def test_token_auth_precedence_beats_basic_and_api_key(self):
+        conn = HttpConnection(
+            base_url="https://api.example.com",
+            auth={
+                "token": "winner",
+                "username": "user",
+                "password": "pass",
+                "api_key": "loser",
+            },
+            validate=False,
+        )
+        assert hmac.compare_digest(conn.headers["Authorization"], "Bearer winner")
+        assert "X-API-Key" not in conn.headers
+
+    def test_basic_auth_precedence_beats_api_key(self):
+        conn = HttpConnection(
+            base_url="https://api.example.com",
+            auth={
+                "username": "user",
+                "password": "pass",
+                "api_key": "loser",
+            },
+            validate=False,
+        )
+        expected = f"Basic {base64.b64encode(b'user:pass').decode()}"
+        assert hmac.compare_digest(conn.headers["Authorization"], expected)
+        assert "X-API-Key" not in conn.headers
+
+    @pytest.mark.parametrize("header_name", ["", "Bad Header", "Bad:Header", "Bad\nHeader"])
+    def test_generated_auth_rejects_invalid_header_name_with_fixed_error(self, header_name):
+        sentinel = "header-name-sentinel"
+        with pytest.raises(ValueError) as exc_info:
+            HttpConnection(
+                base_url="https://api.example.com",
+                auth={"api_key": sentinel, "header_name": header_name},
+                validate=False,
+            )
+
+        assert str(exc_info.value) == "HTTP authentication header name is invalid"
+        assert sentinel not in str(exc_info.value)
+
+    @pytest.mark.parametrize("control", [chr(code) for code in range(32)] + [chr(127)])
+    def test_generated_auth_rejects_every_ascii_control_with_fixed_error(self, control):
+        sentinel = f"control-value-sentinel{control}tail"
+        with pytest.raises(ValueError) as exc_info:
+            HttpConnection(
+                base_url="https://api.example.com",
+                auth={"api_key": sentinel},
+                validate=False,
+            )
+
+        assert str(exc_info.value) == (
+            "HTTP authentication header value contains a control character"
+        )
+        assert "control-value-sentinel" not in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("auth", "registered"),
+        [
+            ({"token": "token-sentinel"}, {"token-sentinel", "Bearer token-sentinel"}),
+            (
+                {"username": "user", "password": "password-sentinel"},
+                {
+                    "password-sentinel",
+                    "user:password-sentinel",
+                    "Basic dXNlcjpwYXNzd29yZC1zZW50aW5lbA==",
+                },
+            ),
+            ({"api_key": "api-key-sentinel"}, {"api-key-sentinel"}),
+        ],
+    )
+    def test_generated_auth_registers_raw_and_generated_secrets(self, auth, registered):
+        with patch("odibi.connections.http.logger.register_secret") as register_secret:
+            HttpConnection(base_url="https://api.example.com", auth=auth, validate=False)
+
+        assert registered.issubset({call.args[0] for call in register_secret.call_args_list})
 
 
 class TestHttpConnectionValidate:
