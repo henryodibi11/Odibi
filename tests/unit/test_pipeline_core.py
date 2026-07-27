@@ -1,6 +1,6 @@
 """Unit tests for pipeline.py core classes - targeting uncovered lines."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from odibi.node import NodeResult
 from odibi.pipeline import PipelineResults
@@ -54,25 +54,16 @@ class TestPipelineResults:
 
 
 class TestPipelineManagerFactory:
-    @patch("odibi.pipeline.load_yaml_with_env")
+    @patch("odibi.pipeline.load_config_from_file")
     @patch("odibi.pipeline.load_plugins")
-    def test_from_yaml_loads_config(self, mock_plugins, mock_yaml):
+    def test_from_yaml_loads_config(self, mock_plugins, mock_load):
         from odibi.pipeline import PipelineManager
 
-        mock_yaml.return_value = {
-            "project": {"name": "test_project"},
-            "pipelines": [
-                {
-                    "name": "etl",
-                    "nodes": [
-                        {
-                            "name": "node1",
-                            "source": {"format": "csv", "path": "/data.csv"},
-                        }
-                    ],
-                }
-            ],
-        }
+        project_config = MagicMock()
+        project_config.project = "test_project"
+        project_config.pipelines = []
+        project_config.connections = {}
+        mock_load.return_value = project_config
 
         with patch.object(PipelineManager, "__init__", return_value=None):
             try:
@@ -80,4 +71,4 @@ class TestPipelineManagerFactory:
             except Exception:
                 pass  # Init mock may not set all attrs
             # Verify yaml was loaded
-            mock_yaml.assert_called_once()
+            mock_load.assert_called_once_with("fake.yaml", env=None)
