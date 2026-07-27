@@ -20,7 +20,9 @@ odibi run my_pipeline.yaml
 ```
 
 **Common Flags:**
-*   `--dry-run`: Simulate execution (don't write data).
+*   `--dry-run`: Legacy late runtime simulation; runtime initialization and lifecycle
+    effects remain possible. For a bounded plan use `cat CONFIG | odibi plan --stdin
+    --format json`; see [immutable planning](../features/planning.md#legacy-runtime-simulation-is-different).
 *   `--resume`: Resume from the last failure (skips successful nodes).
 *   `--env prod`: Load production environment variables.
 

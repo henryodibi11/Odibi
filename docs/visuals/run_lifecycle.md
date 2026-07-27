@@ -379,7 +379,7 @@ See [Incremental Decision Tree](incremental_decision_tree.md).
 # Standard run
 odibi run odibi.yaml
 
-# Dry-run (validate without writing)
+# Legacy late runtime simulation; not immutable planning or a no-effect boundary
 odibi run odibi.yaml --dry-run
 
 # Run specific node only
@@ -389,6 +389,10 @@ odibi run odibi.yaml --node clean_customers
 odibi run odibi.yaml --env production
 
 ```
+
+See the authoritative [operation safety
+ladder](../features/planning.md#operation-safety-ladder) before choosing validation,
+immutable planning, legacy simulation, or execution.
 
 ---
 

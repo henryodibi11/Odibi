@@ -184,6 +184,8 @@ nav:
           - Best Practices: guides/best_practices.md
       - Interfaces:
           - CLI Master Guide: guides/cli_master_guide.md
+          - Immutable Planning: features/planning.md
+          - MCP Universal Gateway: guides/mcp_guide.md
           - Python API Guide: guides/python_api_guide.md
       - Semantic Layer:
           - Overview: semantics/index.md

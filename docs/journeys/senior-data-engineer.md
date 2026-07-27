@@ -530,9 +530,12 @@ odibi doctor
 # Visualize dependency graph
 odibi graph odibi.yaml
 
-# Dry-run (no writes)
+# Legacy late runtime simulation; surrounding lifecycle effects remain possible
 odibi run odibi.yaml --dry-run
 ```
+
+Use the [operation safety ladder](../features/planning.md#operation-safety-ladder) to
+choose validation or immutable planning before accepting runtime effects.
 
 **Exercise 2: Debugging Failed Pipelines**
 
