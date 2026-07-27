@@ -5,6 +5,7 @@ with the repo's source-of-truth (docs/ + examples/ + .assistant/).
 """
 
 from pathlib import Path
+import json
 
 import pytest
 
@@ -173,3 +174,40 @@ def test_packaged_corpus_in_sync_with_source():
         f"corpus examples out of sync (run scripts/build_corpus.py): "
         f"src={src_examples} pkg={pkg_examples}"
     )
+
+
+def test_agent_safety_selected_mirrors_and_index_entries():
+    contract = json.loads(
+        (REPO / "tests/fixtures/agent_safety_contract.json").read_text(encoding="utf-8")
+    )
+    index = json.loads((REPO / "odibi_mcp/_corpus/index.json").read_text(encoding="utf-8"))
+    indexed = [entry["path"] for entry in index["docs"]]
+    for source, mirror in contract["mirror_pairs"].items():
+        assert (REPO / source).read_bytes() == (REPO / mirror).read_bytes()
+        corpus_path = mirror.removeprefix("odibi_mcp/_corpus/")
+        assert indexed.count(corpus_path) == 1
+        entry = next(item for item in index["docs"] if item["path"] == corpus_path)
+        lines = (REPO / source).read_text(encoding="utf-8").splitlines()
+        title = Path(source).stem
+        summary = ""
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("# ") and title == Path(source).stem:
+                title = stripped[2:].strip()
+            elif (
+                stripped
+                and not stripped.startswith("#")
+                and not stripped.startswith("---")
+                and not summary
+            ):
+                summary = stripped[:200]
+            if title != Path(source).stem and summary:
+                break
+        parts = Path(corpus_path).parts
+        expected_section = parts[1] if len(parts) > 2 else "docs"
+        assert entry == {
+            "path": corpus_path,
+            "title": title,
+            "section": expected_section,
+            "summary": summary,
+        }

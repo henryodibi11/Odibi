@@ -1,6 +1,12 @@
 {
   "docs": [
     {
+      "path": "docs/ODIBI_DEEP_CONTEXT.md",
+      "title": "Odibi Deep Context",
+      "section": "docs",
+      "summary": "> **What is Odibi?** A Python data pipeline framework for building enterprise data warehouses. It orchestrates nodes (read → transform → validate → write) with dependency resolution, supports Pandas/S"
+    },
+    {
       "path": "docs/examples/canonical/01_hello_world.md",
       "title": "Example 1: Hello World (CSV → Parquet)",
       "section": "examples",
@@ -37,16 +43,16 @@
       "summary": "Copy-paste ready configs for the 5 most common use cases."
     },
     {
+      "path": "docs/examples/canonical/THE_REFERENCE.md",
+      "title": "THE Reference Implementation",
+      "section": "examples",
+      "summary": "> **This is the canonical Odibi pipeline. Copy this. Learn from this. Start here.**"
+    },
+    {
       "path": "docs/examples/canonical/runnable/03_scd2_demo/README.md",
       "title": "SCD2 History Tracking Demo",
       "section": "examples",
       "summary": "This example demonstrates **Slowly Changing Dimension Type 2 (SCD2)** history tracking."
-    },
-    {
-      "path": "docs/examples/canonical/runnable/my_project/README.md",
-      "title": "my_project",
-      "section": "examples",
-      "summary": "A data engineering project built with [Odibi](https://github.com/henryodibi11/Odibi)."
     },
     {
       "path": "docs/examples/canonical/runnable/README.md",
@@ -55,16 +61,16 @@
       "summary": "Ready-to-run versions of the canonical examples. Each config uses sample data from `../sample_data/`."
     },
     {
+      "path": "docs/examples/canonical/runnable/my_project/README.md",
+      "title": "my_project",
+      "section": "examples",
+      "summary": "A data engineering project built with [Odibi](https://github.com/henryodibi11/Odibi)."
+    },
+    {
       "path": "docs/examples/canonical/sample_data/README.md",
       "title": "Sample Data for Canonical Examples",
       "section": "examples",
       "summary": "Copy these files to your project's `data/landing/` folder to run the examples."
-    },
-    {
-      "path": "docs/examples/canonical/THE_REFERENCE.md",
-      "title": "THE Reference Implementation",
-      "section": "examples",
-      "summary": "> **This is the canonical Odibi pipeline. Copy this. Learn from this. Start here.**"
     },
     {
       "path": "docs/features/alerting.md",
@@ -163,6 +169,12 @@
       "summary": "Orchestrate complex data workflows with dependency-aware execution, parallel processing, and intelligent error handling."
     },
     {
+      "path": "docs/features/planning.md",
+      "title": "Immutable Pipeline Planning",
+      "section": "features",
+      "summary": "Odibi's immutable planner creates a bounded logical graph from caller-supplied YAML"
+    },
+    {
       "path": "docs/features/plugins.md",
       "title": "Plugins & Extensibility",
       "section": "features",
@@ -245,6 +257,12 @@
       "title": "Golden Path: From Zero to Production",
       "section": "docs",
       "summary": "Get a working Odibi pipeline in under 10 minutes. One path. No choices."
+    },
+    {
+      "path": "docs/guides/MIGRATION_GUIDE.md",
+      "title": "Odibi V3 Migration Guide",
+      "section": "guides",
+      "summary": "**Change:** PII status now inherits from upstream nodes. If a column is marked as `pii: true` in a source node, it will remain PII in all downstream nodes unless explicitly declassified."
     },
     {
       "path": "docs/guides/ai-agent-guide.md",
@@ -356,9 +374,9 @@
     },
     {
       "path": "docs/guides/mcp_guide.md",
-      "title": "Odibi MCP Server Guide",
+      "title": "Odibi MCP Universal Gateway",
       "section": "guides",
-      "summary": "The **odibi-knowledge** MCP (Model Context Protocol) server exposes 15 knowledge tools for AI assistants to interact with your odibi pipelines, understand the framework, and help build data pipelines."
+      "summary": "Odibi MCP exposes two gateway tools: `odibi_execute(action, args_json=None)` performs a"
     },
     {
       "path": "docs/guides/mcp_recipes.md",
@@ -377,12 +395,6 @@
       "title": "Medallion Architecture Guide",
       "section": "guides",
       "summary": "A beginner-friendly guide to understanding Bronze, Silver, and Gold data layers."
-    },
-    {
-      "path": "docs/guides/MIGRATION_GUIDE.md",
-      "title": "Odibi V3 Migration Guide",
-      "section": "guides",
-      "summary": "**Change:** PII status now inherits from upstream nodes. If a column is marked as `pii: true` in a source node, it will remain PII in all downstream nodes unless explicitly declassified."
     },
     {
       "path": "docs/guides/odibi_for_renewable_energy.md",
@@ -499,10 +511,10 @@
       "summary": "If you are on Windows, **Windows Subsystem for Linux (WSL 2)** is the only supported way to develop with Odibi (especially for Spark compatibility)."
     },
     {
-      "path": "docs/ODIBI_DEEP_CONTEXT.md",
-      "title": "Odibi Deep Context",
-      "section": "docs",
-      "summary": "> **What is Odibi?** A Python data pipeline framework for building enterprise data warehouses. It orchestrates nodes (read → transform → validate → write) with dependency resolution, supports Pandas/S"
+      "path": "docs/patterns/README.md",
+      "title": "Odibi Data Patterns",
+      "section": "patterns",
+      "summary": "This directory contains documentation for common data pipeline patterns used in Odibi. Each pattern solves a specific problem and includes step-by-step examples."
     },
     {
       "path": "docs/patterns/aggregation.md",
@@ -565,12 +577,6 @@
       "summary": "title: Merge/Upsert Pattern"
     },
     {
-      "path": "docs/patterns/README.md",
-      "title": "Odibi Data Patterns",
-      "section": "patterns",
-      "summary": "This directory contains documentation for common data pipeline patterns used in Odibi. Each pattern solves a specific problem and includes step-by-step examples."
-    },
-    {
       "path": "docs/patterns/scd2.md",
       "title": "SCD Type 2 (Slowly Changing Dimensions)",
       "section": "patterns",
@@ -599,6 +605,18 @@
       "title": "Pattern: Windowed Reprocess (Silver → Gold Aggregates)",
       "section": "patterns",
       "summary": "**Status:** Core Pattern"
+    },
+    {
+      "path": "docs/reference/ENGINE_PARITY.md",
+      "title": "Engine Parity Table",
+      "section": "reference",
+      "summary": "> **Issue:** [#229](https://github.com/invenergy/odibi/issues/229)"
+    },
+    {
+      "path": "docs/reference/PARITY_TABLE.md",
+      "title": "Engine Parity Table",
+      "section": "reference",
+      "summary": "Comparison of Pandas, Spark, and Polars engine capabilities as of v3.4.3."
     },
     {
       "path": "docs/reference/api/cli.md",
@@ -661,22 +679,10 @@
       "summary": "**The internal map. Where things live, how they connect, and where to look when something breaks.**"
     },
     {
-      "path": "docs/reference/ENGINE_PARITY.md",
-      "title": "Engine Parity Table",
-      "section": "reference",
-      "summary": "> **Issue:** [#229](https://github.com/invenergy/odibi/issues/229)"
-    },
-    {
       "path": "docs/reference/glossary.md",
       "title": "Quick Glossary",
       "section": "reference",
       "summary": "Standard terminology used across Odibi documentation."
-    },
-    {
-      "path": "docs/reference/PARITY_TABLE.md",
-      "title": "Engine Parity Table",
-      "section": "reference",
-      "summary": "Comparison of Pandas, Spark, and Polars engine capabilities as of v3.4.3."
     },
     {
       "path": "docs/reference/power_user_cheatsheet.md",
@@ -1093,6 +1099,12 @@
       "summary": "> **Level:** Intermediate"
     },
     {
+      "path": "docs/validation/README.md",
+      "title": "Data Validation",
+      "section": "validation",
+      "summary": "Odibi provides a comprehensive validation framework to ensure data quality at every stage of your pipeline."
+    },
+    {
       "path": "docs/validation/contracts.md",
       "title": "Contracts",
       "section": "validation",
@@ -1103,12 +1115,6 @@
       "title": "FK Validation",
       "section": "validation",
       "summary": "The FK Validation module declares and validates referential integrity between fact and dimension tables."
-    },
-    {
-      "path": "docs/validation/README.md",
-      "title": "Data Validation",
-      "section": "validation",
-      "summary": "Odibi provides a comprehensive validation framework to ensure data quality at every stage of your pipeline."
     },
     {
       "path": "docs/validation/tests.md",

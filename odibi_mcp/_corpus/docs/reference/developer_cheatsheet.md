@@ -197,7 +197,8 @@ def test_rename():
 # Running pipelines
 odibi run project.yaml                    # Run all pipelines
 odibi run project.yaml --env prod         # Run with environment
-odibi run project.yaml --dry-run          # Validate without executing
+odibi run project.yaml --dry-run          # Legacy late runtime simulation; effects possible
+cat project.yaml | odibi plan --stdin --format json  # Require status == "planned"
 
 # Introspection
 odibi list transformers                   # All 54 transformers
@@ -214,6 +215,9 @@ pytest tests/ -v                          # Run all tests
 ruff check . --fix                        # Lint and fix
 python odibi/introspect.py                # Regenerate YAML schema docs
 ```
+
+See the [operation safety ladder](../features/planning.md#operation-safety-ladder) for
+authoritative validate, plan, legacy-simulation, and execution semantics.
 
 ---
 
