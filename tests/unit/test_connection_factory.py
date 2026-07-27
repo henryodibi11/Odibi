@@ -1,9 +1,16 @@
 """Unit tests for connection factory."""
 
+import copy
+import hmac
+import socket
+import urllib.request
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
+from pydantic import ValidationError
 
+from odibi.config import HttpApiKeyAuth, HttpBasicAuth, HttpBearerAuth, HttpConnectionConfig
 from odibi.connections.factory import (
     create_azure_blob_connection,
     create_delta_connection,
@@ -12,6 +19,25 @@ from odibi.connections.factory import (
     create_sql_server_connection,
     register_builtins,
 )
+
+
+@pytest.fixture(autouse=True)
+def restore_global_logger_secrets():
+    """Keep process-global secret registration isolated between tests."""
+    import odibi.connections.factory as factory_module
+    import odibi.connections.http as http_module
+    import odibi.utils.logging as logging_module
+
+    secrets = logging_module.logger._secrets
+    original_secrets = set(secrets)
+    assert factory_module.logger is logging_module.logger
+    assert http_module.logger is logging_module.logger
+
+    try:
+        yield
+    finally:
+        secrets.clear()
+        secrets.update(original_secrets)
 
 
 class TestCreateLocalConnection:
@@ -60,6 +86,21 @@ class TestCreateHttpConnection:
 
         assert conn.headers["Accept"] == "application/json"
 
+    def test_non_empty_manual_headers_are_not_mutated_by_auth(self):
+        config = {
+            "base_url": "https://offline.invalid",
+            "headers": {"Accept": "application/json", "Authorization": "manual"},
+            "auth": {"token": "replacement-sentinel"},
+        }
+        original = copy.deepcopy(config)
+
+        conn = create_http_connection("offline", config)
+
+        assert config == original
+        assert conn.headers is not config["headers"]
+        assert conn.headers["Accept"] == "application/json"
+        assert hmac.compare_digest(conn.headers["Authorization"], "Bearer replacement-sentinel")
+
     def test_passes_auth(self):
         """Should pass auth to connection."""
         conn = create_http_connection(
@@ -71,6 +112,241 @@ class TestCreateHttpConnection:
         )
 
         assert "Authorization" in conn.headers
+
+    @pytest.mark.parametrize(
+        ("auth", "expected_name", "expected_value"),
+        [
+            ({"mode": "none"}, None, None),
+            (
+                {"mode": "basic", "username": "offline-user", "password": "basic-sentinel"},
+                "Authorization",
+                "Basic b2ZmbGluZS11c2VyOmJhc2ljLXNlbnRpbmVs",
+            ),
+            (
+                {"mode": "bearer", "token": "bearer-sentinel"},
+                "Authorization",
+                "Bearer bearer-sentinel",
+            ),
+            (
+                {"mode": "api_key", "api_key": "key-sentinel"},
+                "Authorization",
+                "Bearer key-sentinel",
+            ),
+            (
+                {
+                    "mode": "api_key",
+                    "api_key": "key-sentinel",
+                    "header_name": "X-API-Key",
+                    "value_template": "prefix-{token}-suffix",
+                },
+                "X-API-Key",
+                "prefix-key-sentinel-suffix",
+            ),
+        ],
+    )
+    def test_public_model_dump_to_factory(self, auth, expected_name, expected_value):
+        config = HttpConnectionConfig(base_url="https://offline.invalid", auth=auth)
+        dumped = config.model_dump()
+        original = copy.deepcopy(dumped)
+
+        conn = create_http_connection("offline", dumped)
+
+        assert dumped == original
+        if expected_name is None:
+            assert conn.headers == {}
+        else:
+            assert hmac.compare_digest(conn.headers[expected_name], expected_value)
+
+    def test_api_key_with_braces_is_replaced_once(self):
+        config = HttpConnectionConfig(
+            base_url="https://offline.invalid",
+            auth={"mode": "api_key", "api_key": "key-{other}-sentinel"},
+        )
+
+        conn = create_http_connection("offline", config.model_dump())
+
+        assert hmac.compare_digest(conn.headers["Authorization"], "Bearer key-{other}-sentinel")
+
+    @pytest.mark.parametrize(
+        "value_template",
+        ["no placeholder", "{token}{token}", "{other}", "{token}-{other}", "{{token}}"],
+    )
+    def test_api_key_rejects_invalid_templates_without_echo(self, value_template):
+        sentinel = "template-secret-sentinel"
+        auth = {"mode": "api_key", "api_key": sentinel, "value_template": value_template}
+
+        with pytest.raises(ValueError) as exc_info:
+            create_http_connection("offline", {"base_url": "https://offline.invalid", "auth": auth})
+
+        assert str(exc_info.value) == (
+            "HTTP API-key value_template must contain exactly one literal "
+            "'{token}' placeholder and no other braces"
+        )
+        assert sentinel not in str(exc_info.value)
+
+    def test_mode_api_key_mapping_requires_key(self):
+        with pytest.raises(ValueError) as exc_info:
+            create_http_connection(
+                "offline",
+                {"base_url": "https://offline.invalid", "auth": {"mode": "api_key"}},
+            )
+
+        assert str(exc_info.value) == "HTTP API-key authentication requires a non-empty 'api_key'"
+
+    def test_no_mode_api_key_through_factory_remains_raw_x_api_key(self):
+        conn = create_http_connection(
+            "offline",
+            {"base_url": "https://offline.invalid", "auth": {"api_key": "raw-sentinel"}},
+        )
+
+        assert hmac.compare_digest(conn.headers["X-API-Key"], "raw-sentinel")
+        assert "Authorization" not in conn.headers
+
+    def test_factory_registers_raw_and_rendered_api_key_before_connection_creation(self):
+        events = []
+
+        def register(secret):
+            events.append(("register", secret))
+
+        def construct(**kwargs):
+            events.append(("construct", kwargs["auth"]))
+            return MagicMock()
+
+        with (
+            patch("odibi.connections.factory.logger.register_secret", side_effect=register),
+            patch("odibi.connections.http.HttpConnection", side_effect=construct),
+        ):
+            create_http_connection(
+                "offline",
+                {
+                    "base_url": "https://offline.invalid",
+                    "auth": {"mode": "api_key", "api_key": "raw-sentinel"},
+                },
+            )
+
+        assert events[:2] == [
+            ("register", "raw-sentinel"),
+            ("register", "Bearer raw-sentinel"),
+        ]
+        assert events[2][0] == "construct"
+
+    def test_real_offline_auth_lifecycle_redacts_after_logging_reconfiguration(
+        self, monkeypatch, capsys
+    ):
+        import logging
+
+        import odibi.connections.factory as factory_module
+        import odibi.connections.http as http_module
+        import odibi.utils.logging as logging_module
+        from odibi.utils.setup_helpers import fetch_keyvault_secret
+
+        attempts = []
+
+        def blocked(name):
+            def tripwire(*args, **kwargs):
+                attempts.append(name)
+                raise AssertionError(f"offline tripwire called: {name}")
+
+            return tripwire
+
+        monkeypatch.setattr(socket, "getaddrinfo", blocked("socket.getaddrinfo"))
+        monkeypatch.setattr(socket, "create_connection", blocked("socket.create_connection"))
+        monkeypatch.setattr(socket.socket, "connect", blocked("socket.connect"))
+        monkeypatch.setattr(requests.sessions.Session, "request", blocked("requests"))
+        monkeypatch.setattr(urllib.request, "urlopen", blocked("urllib"))
+        monkeypatch.setattr("odibi.utils.setup_helpers.fetch_keyvault_secret", blocked("keyvault"))
+        assert fetch_keyvault_secret is not None
+
+        raw = "offline-raw-lifecycle-sentinel"
+        rendered = f"Bearer {raw}"
+        config = HttpConnectionConfig(
+            base_url="https://offline.invalid",
+            headers={"Accept": "application/json"},
+            auth={"mode": "api_key", "api_key": raw},
+        )
+        dumped = config.model_dump()
+        original = copy.deepcopy(dumped)
+        logger = logging_module.logger
+        secrets = logger._secrets
+        original_secrets = set(secrets)
+        original_structured = logger.structured
+        original_level = logger.level
+        stdlib_loggers = {
+            name: logging.getLogger(name)
+            for name in [
+                "odibi",
+                "py4j",
+                "azure",
+                "azure.core.pipeline.policies.http_logging_policy",
+                "adlfs",
+                "urllib3",
+                "fsspec",
+            ]
+        }
+        original_stdlib_levels = {name: item.level for name, item in stdlib_loggers.items()}
+
+        try:
+            conn = create_http_connection("offline", dumped)
+            logging_module.configure_logging(structured=True, level="INFO")
+            logging_module.logger.info(raw)
+            logging_module.logger.info(rendered)
+            output = capsys.readouterr().out
+
+            assert dumped == original
+            assert hmac.compare_digest(conn.headers["Authorization"], rendered)
+            assert logging_module.logger is logger
+            assert factory_module.logger is logger
+            assert http_module.logger is logger
+            assert logger._secrets is secrets
+            assert raw in secrets and rendered in secrets
+            assert logger.structured is True
+            assert logger.level == logging.INFO
+            assert output.count("[REDACTED]") >= 2
+            assert raw not in output
+            assert rendered not in output
+            assert attempts == []
+        finally:
+            secrets.clear()
+            secrets.update(original_secrets)
+            logger._configure(original_structured, logging.getLevelName(original_level))
+            for name, stdlib_logger in stdlib_loggers.items():
+                stdlib_logger.setLevel(original_stdlib_levels[name])
+
+    @pytest.mark.parametrize("alias", ["key", "header"])
+    def test_public_api_key_rejects_unsupported_aliases_without_input_echo(self, alias):
+        sentinel = "rejected-credential-sentinel"
+
+        with pytest.raises(ValidationError) as exc_info:
+            HttpConnectionConfig(
+                base_url="https://offline.invalid",
+                auth={"mode": "api_key", "api_key": sentinel, alias: sentinel},
+            )
+
+        diagnostic = str(exc_info.value)
+        assert alias in diagnostic
+        assert "Unknown key" in diagnostic
+        assert sentinel not in diagnostic
+
+    def test_api_key_is_required_and_non_empty(self):
+        for auth in ({"mode": "api_key"}, {"mode": "api_key", "api_key": ""}):
+            with pytest.raises(ValidationError):
+                HttpConnectionConfig(base_url="https://offline.invalid", auth=auth)
+
+    def test_auth_repr_hides_secrets_but_dump_preserves_them(self):
+        models = [
+            HttpBasicAuth(username="user", password="basic-repr-sentinel"),
+            HttpBearerAuth(token="bearer-repr-sentinel"),
+            HttpApiKeyAuth(api_key="api-repr-sentinel"),
+        ]
+
+        for model in models:
+            secret = next(
+                value
+                for key, value in model.model_dump().items()
+                if key in {"password", "token", "api_key"}
+            )
+            assert secret not in repr(model)
+            assert secret in model.model_dump().values()
 
 
 class TestCreateAzureBlobConnection:

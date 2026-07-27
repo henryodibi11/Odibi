@@ -1,9 +1,14 @@
 """HTTP Connection implementation."""
 
+import re
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 from odibi.connections.base import BaseConnection
+from odibi.utils.logging import logger
+
+
+_HTTP_HEADER_NAME_RE = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 
 
 class HttpConnection(BaseConnection):
@@ -29,20 +34,33 @@ class HttpConnection(BaseConnection):
 
         if auth:
             if "token" in auth:
-                self.headers["Authorization"] = f"Bearer {auth['token']}"
+                value = f"Bearer {auth['token']}"
+                self._set_auth_header("Authorization", value, auth["token"])
             elif "username" in auth and "password" in auth:
                 import base64
 
                 creds = f"{auth['username']}:{auth['password']}"
                 b64_creds = base64.b64encode(creds.encode()).decode()
-                self.headers["Authorization"] = f"Basic {b64_creds}"
+                value = f"Basic {b64_creds}"
+                self._set_auth_header("Authorization", value, auth["password"], creds)
             elif "api_key" in auth:
                 # Common pattern: X-API-Key header or similar
                 header_name = auth.get("header_name", "X-API-Key")
-                self.headers[header_name] = auth["api_key"]
+                self._set_auth_header(header_name, auth["api_key"], auth["api_key"])
 
         if validate:
             self.validate()
+
+    def _set_auth_header(self, header_name: str, value: str, *secrets: str) -> None:
+        """Validate, register, and install one generated authentication header."""
+        for secret in (*secrets, value):
+            logger.register_secret(secret)
+
+        if not isinstance(header_name, str) or not _HTTP_HEADER_NAME_RE.fullmatch(header_name):
+            raise ValueError("HTTP authentication header name is invalid")
+        if not isinstance(value, str) or any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("HTTP authentication header value contains a control character")
+        self.headers[header_name] = value
 
     def validate(self) -> None:
         """Validate connection configuration.

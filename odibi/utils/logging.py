@@ -87,6 +87,12 @@ class StructuredLogger:
             logging.basicConfig(level=self.level, format="%(message)s", stream=sys.stdout)
 
         self.logger = logging.getLogger("odibi")
+        self._apply_levels()
+
+        self._initialized = True
+
+    def _apply_levels(self) -> None:
+        """Apply the configured level to Odibi and noisy third-party loggers."""
         self.logger.setLevel(self.level)
 
         third_party_level = max(self.level, logging.WARNING)
@@ -100,7 +106,11 @@ class StructuredLogger:
         ]:
             logging.getLogger(logger_name).setLevel(third_party_level)
 
-        self._initialized = True
+    def _configure(self, structured: bool, level: str) -> None:
+        """Reconfigure this logger without replacing its secret registry."""
+        self.structured = structured
+        self.level = getattr(logging, level.upper(), logging.INFO)
+        self._apply_levels()
 
     def register_secret(self, secret: str) -> None:
         """Register a secret string to be redacted from logs.
@@ -199,5 +209,4 @@ logger = StructuredLogger()
 
 def configure_logging(structured: bool, level: str) -> None:
     """Configure the global logger."""
-    global logger
-    logger = StructuredLogger(structured=structured, level=level)
+    logger._configure(structured=structured, level=level)

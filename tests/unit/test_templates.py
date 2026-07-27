@@ -249,6 +249,28 @@ class TestDiscriminatedUnions:
         assert "basic" in result
         assert "bearer" in result
         assert "api_key" in result
+        assert "# api_key: null  # REQUIRED" in result
+        assert "header_name: Authorization" in result
+        assert '# value_template: "Bearer {token}"  # optional' in result
+        assert "# key:" not in result
+        assert "# header:" not in result
+
+    def test_http_schema_requires_api_key_with_public_defaults(self):
+        from pathlib import Path
+
+        from odibi.config import HttpApiKeyAuth
+
+        schema = json.loads(Path("docs/schemas/odibi.json").read_text())
+        auth_schema = schema["$defs"]["HttpApiKeyAuth"]
+
+        assert auth_schema == HttpApiKeyAuth.model_json_schema()
+        assert auth_schema["additionalProperties"] is False
+        assert "api_key" in auth_schema["required"]
+        assert auth_schema["properties"]["api_key"]["minLength"] == 1
+        assert auth_schema["properties"]["header_name"]["default"] == "Authorization"
+        assert auth_schema["properties"]["value_template"]["default"] == "Bearer {token}"
+        assert "key" not in auth_schema["properties"]
+        assert "header" not in auth_schema["properties"]
 
     def test_union_shows_required_fields_per_option(self):
         from odibi.tools.templates import show_template

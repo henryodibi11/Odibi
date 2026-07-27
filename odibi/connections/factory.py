@@ -31,10 +31,36 @@ def create_http_connection(name: str, config: Dict[str, Any]) -> Any:
     from odibi.connections.http import HttpConnection
 
     base_url = config.get("base_url", "")
+    headers = dict(config.get("headers") or {})
+    auth = config.get("auth")
+    if isinstance(auth, dict) and auth.get("mode") == "api_key":
+        api_key = auth.get("api_key")
+        if not isinstance(api_key, str) or not api_key:
+            raise ValueError("HTTP API-key authentication requires a non-empty 'api_key'")
+
+        value_template = auth.get("value_template", "Bearer {token}")
+        template_error = (
+            "HTTP API-key value_template must contain exactly one literal "
+            "'{token}' placeholder and no other braces"
+        )
+        if not isinstance(value_template, str) or value_template.count("{token}") != 1:
+            raise ValueError(template_error)
+        template_remainder = value_template.replace("{token}", "", 1)
+        if "{" in template_remainder or "}" in template_remainder:
+            raise ValueError(template_error)
+
+        rendered_value = value_template.replace("{token}", api_key, 1)
+        logger.register_secret(api_key)
+        logger.register_secret(rendered_value)
+        auth = {
+            "api_key": rendered_value,
+            "header_name": auth.get("header_name", "Authorization"),
+        }
+
     connection = HttpConnection(
         base_url=base_url,
-        headers=config.get("headers"),
-        auth=config.get("auth"),
+        headers=headers,
+        auth=auth,
     )
 
     ctx.log_connection(
