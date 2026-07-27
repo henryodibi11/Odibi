@@ -2937,10 +2937,13 @@ def test_direct_bootstrap_passes_explicit_trusted_local_identity(monkeypatch):
 @pytest.mark.parametrize(
     "pipeline",
     [
-        PLANNED_LOGICAL_YAML,
-        VALID_PIPELINE_YAML,
-        "project: [",
-        "x" * (planning.DEFAULT_PLANNING_LIMITS.max_input_bytes + 1),
+        pytest.param(PLANNED_LOGICAL_YAML, id="planned-logical"),
+        pytest.param(VALID_PIPELINE_YAML, id="planned-runtime-config"),
+        pytest.param("project: [", id="invalid-yaml"),
+        pytest.param(
+            "x" * (planning.DEFAULT_PLANNING_LIMITS.max_input_bytes + 1),
+            id="input-limit-exceeded",
+        ),
     ],
 )
 def test_trusted_dispatcher_planning_response_exactly_matches_package(
