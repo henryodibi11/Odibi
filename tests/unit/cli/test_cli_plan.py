@@ -91,11 +91,16 @@ def _invoke(monkeypatch: pytest.MonkeyPatch, payload: bytes) -> tuple[int, str, 
 @pytest.mark.parametrize(
     ("payload", "expected_exit", "expected_status"),
     (
-        (PLANNED_YAML, 0, "planned"),
-        (INVALID_YAML, 2, "invalid"),
-        (UNRESOLVED_YAML, 3, "unresolved"),
-        (b"\xff", 2, "invalid"),
-        (b"x" * (DEFAULT_PLANNING_LIMITS.max_input_bytes + 1), 2, "invalid"),
+        pytest.param(PLANNED_YAML, 0, "planned", id="planned"),
+        pytest.param(INVALID_YAML, 2, "invalid", id="invalid-yaml"),
+        pytest.param(UNRESOLVED_YAML, 3, "unresolved", id="unresolved"),
+        pytest.param(b"\xff", 2, "invalid", id="invalid-utf8"),
+        pytest.param(
+            b"x" * (DEFAULT_PLANNING_LIMITS.max_input_bytes + 1),
+            2,
+            "invalid",
+            id="input-limit-exceeded",
+        ),
     ),
 )
 def test_direct_command_matches_package_response_and_preserves_streams(
@@ -327,10 +332,14 @@ def test_external_python_module_emits_exact_one_line_without_writes(tmp_path: Pa
 @pytest.mark.parametrize(
     ("payload", "expected_exit"),
     (
-        (PLANNED_YAML, 0),
-        (INVALID_YAML, 2),
-        (UNRESOLVED_YAML, 3),
-        (b"x" * (DEFAULT_PLANNING_LIMITS.max_input_bytes + 1), 2),
+        pytest.param(PLANNED_YAML, 0, id="planned"),
+        pytest.param(INVALID_YAML, 2, id="invalid-yaml"),
+        pytest.param(UNRESOLVED_YAML, 3, id="unresolved"),
+        pytest.param(
+            b"x" * (DEFAULT_PLANNING_LIMITS.max_input_bytes + 1),
+            2,
+            id="input-limit-exceeded",
+        ),
     ),
 )
 def test_installed_console_script_matches_package_in_read_only_ambient_root(
