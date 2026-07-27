@@ -131,6 +131,7 @@ jobs:
           test -n "$WHEEL"
           python -m pip install "${WHEEL}[mcp]"
           python -m pip check
+          cp tests/conftest.py "$RUNNER_TEMP/mcp-tests/"
           cp tests/unit/mcp/test_access.py "$RUNNER_TEMP/mcp-tests/"
           cp tests/unit/test_odibi_dispatcher.py "$RUNNER_TEMP/mcp-tests/"
           cp tests/unit/mcp/test_mcp_smoke.py "$RUNNER_TEMP/mcp-tests/"

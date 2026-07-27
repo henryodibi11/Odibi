@@ -2292,7 +2292,12 @@ class PipelineManager:
 
         Args:
             pipelines: Pipeline name(s) to run.
-            dry_run: Whether to simulate execution.
+            dry_run: Select legacy late runtime simulation. This is not an immutable
+                planning boundary: construction and surrounding lifecycle behavior may
+                load ``.env``, project or installed code, providers and credentials,
+                engines, catalogs and state, logging, telemetry, stories, lineage, and
+                alerts. Use ``odibi.planning.plan_pipeline_yaml`` for immutable logical
+                planning from explicitly supplied YAML text.
             resume_from_failure: Whether to skip successfully completed nodes from last run.
             parallel: Whether to run nodes in parallel.
             max_workers: Maximum number of worker threads for parallel execution.

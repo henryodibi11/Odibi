@@ -13,6 +13,23 @@ The Odibi CLI is your primary tool for:
 
 ## Commands
 
+### odibi plan
+
+Build a bounded immutable logical plan from YAML supplied explicitly on standard input.
+
+```bash
+cat config.yaml | odibi plan --stdin --format json
+```
+
+Both `--stdin` and `--format json` are mandatory. The command does not accept a
+configuration path, environment overlay, project root, selector, or runtime option.
+It returns planner schema `1.0`; only `status == "planned"` is success. An
+`unresolved` response means that provider, extension, or runtime meaning was excluded
+and must not be treated as a valid executable plan.
+
+See [Immutable Pipeline Planning](planning.md) for the schema, bounds, exit codes,
+security boundary, and package/MCP equivalents.
+
 ### odibi run
 
 Execute a pipeline from a YAML configuration file.
@@ -26,7 +43,7 @@ odibi run config.yaml
 | Flag | Description |
 |------|-------------|
 | `--env` | Environment to apply overrides (e.g., dev, qat, prod) |
-| `--dry-run` | Simulate execution without writing data |
+| `--dry-run` | Legacy late runtime simulation; may initialize runtime facilities and cause side effects |
 | `--resume` | Resume from last failure (skip successful nodes) |
 | `--parallel` | Run independent nodes in parallel |
 | `--workers` | Number of worker threads for parallel execution (default: 4) |
@@ -44,7 +61,7 @@ odibi run my_pipeline.yaml
 # Production run with parallel execution
 odibi run my_pipeline.yaml --env production --parallel --workers 8
 
-# Test without writing data
+# Legacy runtime simulation (not an immutable planning boundary)
 odibi run my_pipeline.yaml --dry-run
 
 # Resume a failed run
@@ -289,8 +306,8 @@ From v3 → v5
 # 1. Validate configuration
 odibi validate my_pipeline.yaml
 
-# 2. Dry run to test logic
-odibi run my_pipeline.yaml --dry-run
+# 2. Build an immutable logical plan from the supplied YAML text
+cat my_pipeline.yaml | odibi plan --stdin --format json
 
 # 3. Execute pipeline
 odibi run my_pipeline.yaml --env production --parallel
@@ -311,7 +328,7 @@ odibi catalog runs config.yaml --status FAILED --limit 10
 # Resume from failure
 odibi run config.yaml --resume
 
-# Run single node for debugging
+# Legacy single-node runtime simulation; may cause surrounding lifecycle effects
 odibi run config.yaml --node failing_node --dry-run
 ```
 

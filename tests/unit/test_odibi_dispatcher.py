@@ -21,6 +21,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 import yaml
 
+import odibi.planning as planning
 from odibi_mcp.contracts.access import (
     RUNTIME_DATA_ACTIONS,
     ActionEffect,
@@ -66,6 +67,18 @@ pipelines:
       - name: source
         read: {connection: local, format: csv, path: input.csv}
         write: {connection: local, format: delta, table: output}
+"""
+
+PLANNED_LOGICAL_YAML = """
+project: logical_test
+pipelines:
+  - pipeline: bounded
+    nodes:
+      - name: source
+        read: {}
+      - name: sink
+        depends_on: [source]
+        write: {}
 """
 
 # Discovery/onboarding actions that delegate to OdibiKnowledge — the ones that were broken.
@@ -2140,8 +2153,7 @@ def test_remote_validate_workflow_has_transitive_effect_tripwires(monkeypatch):
     for tool_name in workflows.TOOL_REGISTRY:
         monkeypatch.setitem(workflows.TOOL_REGISTRY, tool_name, unexpected_effect)
     monkeypatch.setitem(workflows.TOOL_REGISTRY, "test_pipeline", validate_only)
-    monkeypatch.setattr(execution.tempfile, "NamedTemporaryFile", unexpected_effect)
-    monkeypatch.setattr(execution.subprocess, "run", unexpected_effect)
+    monkeypatch.setattr(execution.immutable_planning, "plan_pipeline_yaml", unexpected_effect)
     monkeypatch.setattr(context_module, "resolve_connection", unexpected_effect)
     monkeypatch.setattr(
         context_module.MCPProjectContext,
@@ -2922,17 +2934,96 @@ def test_direct_bootstrap_passes_explicit_trusted_local_identity(monkeypatch):
     assert identities[0].authorizes(ActionEffect.EXECUTION)
 
 
+@pytest.mark.parametrize(
+    "pipeline",
+    [
+        PLANNED_LOGICAL_YAML,
+        VALID_PIPELINE_YAML,
+        "project: [",
+        "x" * (planning.DEFAULT_PLANNING_LIMITS.max_input_bytes + 1),
+    ],
+)
+def test_trusted_dispatcher_planning_response_exactly_matches_package(
+    pipeline, immutable_planning_tripwires
+):
+    expected = planning.plan_pipeline_yaml(pipeline).to_dict()
+
+    with immutable_planning_tripwires() as attempts:
+        result = D.dispatch(
+            "test_pipeline",
+            pipeline=pipeline,
+            application_identity=LOCAL_IDENTITY,
+        )
+
+    assert result == expected
+    assert set(result) == {"schema_version", "status", "plan", "diagnostics", "truncated"}
+    assert attempts == []
+
+
+def test_trusted_bootstrap_planning_response_exactly_matches_package():
+    from odibi_mcp import bootstrap
+
+    odibi, _ = bootstrap.init()
+
+    assert (
+        odibi("test_pipeline", pipeline=PLANNED_LOGICAL_YAML)
+        == planning.plan_pipeline_yaml(PLANNED_LOGICAL_YAML).to_dict()
+    )
+
+
+def test_trusted_direct_adapter_repeats_without_effect_or_state_growth(
+    immutable_planning_tripwires,
+):
+    expected = planning.plan_pipeline_yaml(PLANNED_LOGICAL_YAML).to_dict()
+
+    with immutable_planning_tripwires() as attempts:
+        results = [
+            D.dispatch(
+                "test_pipeline",
+                pipeline=PLANNED_LOGICAL_YAML,
+                application_identity=LOCAL_IDENTITY,
+            )
+            for _ in range(25)
+        ]
+
+    assert results == [expected] * 25
+    assert attempts == []
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        None,
+        object(),
+        ApplicationIdentity(subject="unauthorized", authorized_effects=frozenset()),
+    ],
+)
+def test_restricted_planning_denies_before_input_or_planner(monkeypatch, identity):
+    def unexpected_plan(*args, **kwargs):
+        pytest.fail("authorization denial must occur before parsing or planning")
+
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", unexpected_plan)
+
+    result = D.dispatch(
+        "test_pipeline",
+        pipeline="malformed: [ credential-canary",
+        application_identity=identity,
+    )
+
+    assert result["code"] in {"AUTHORIZATION_REQUIRED", "FORBIDDEN"}
+    assert "credential-canary" not in json.dumps(result)
+
+
 @pytest.mark.parametrize("sample_size", [1, 37, 1000])
-def test_registered_test_pipeline_binds_bounded_mode_by_keyword(monkeypatch, sample_size):
+def test_registered_test_pipeline_accepts_but_ignores_bounded_sample_size(monkeypatch, sample_size):
     calls = []
-    fake_execution = ModuleType("tools.execution")
+    expected = {"schema_version": "1.0", "status": "planned"}
 
-    def fake_test_pipeline(yaml_content, *, mode, max_rows):
-        calls.append({"yaml_content": yaml_content, "mode": mode, "max_rows": max_rows})
-        return {"valid": True, "mode": mode}
+    def fake_plan(yaml_content):
+        calls.append(yaml_content)
+        return SimpleNamespace(to_dict=lambda: expected)
 
-    fake_execution.test_pipeline = fake_test_pipeline
-    monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", fake_plan)
 
     result = D.dispatch(
         "test_pipeline",
@@ -2941,26 +3032,19 @@ def test_registered_test_pipeline_binds_bounded_mode_by_keyword(monkeypatch, sam
         application_identity=LOCAL_IDENTITY,
     )
 
-    assert result == {"valid": True, "mode": "dry-run"}
-    assert calls == [
-        {
-            "yaml_content": VALID_PIPELINE_YAML,
-            "mode": "dry-run",
-            "max_rows": sample_size,
-        }
-    ]
+    assert result == expected
+    assert calls == [VALID_PIPELINE_YAML]
 
 
 def test_registered_test_pipeline_uses_bounded_defaults(monkeypatch):
     calls = []
-    fake_execution = ModuleType("tools.execution")
+    expected = {"schema_version": "1.0", "status": "planned"}
 
-    def fake_test_pipeline(yaml_content, *, mode, max_rows):
-        calls.append((yaml_content, mode, max_rows))
-        return {"valid": True, "mode": mode}
+    def fake_plan(yaml_content):
+        calls.append(yaml_content)
+        return SimpleNamespace(to_dict=lambda: expected)
 
-    fake_execution.test_pipeline = fake_test_pipeline
-    monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", fake_plan)
 
     result = D.dispatch(
         "test_pipeline",
@@ -2968,8 +3052,8 @@ def test_registered_test_pipeline_uses_bounded_defaults(monkeypatch):
         application_identity=LOCAL_IDENTITY,
     )
 
-    assert result == {"valid": True, "mode": "dry-run"}
-    assert calls == [(VALID_PIPELINE_YAML, "dry-run", 100)]
+    assert result == expected
+    assert calls == [VALID_PIPELINE_YAML]
 
 
 @pytest.mark.parametrize(
@@ -2983,13 +3067,10 @@ def test_registered_test_pipeline_uses_bounded_defaults(monkeypatch):
 def test_registered_test_pipeline_rejects_control_overrides_before_helper(
     monkeypatch, unexpected_kwargs
 ):
-    fake_execution = ModuleType("tools.execution")
-
     def unexpected_call(*args, **kwargs):
         pytest.fail("registered test_pipeline must not expose helper-native controls")
 
-    fake_execution.test_pipeline = unexpected_call
-    monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", unexpected_call)
 
     result = D.dispatch(
         "test_pipeline",
@@ -3001,25 +3082,24 @@ def test_registered_test_pipeline_rejects_control_overrides_before_helper(
     assert "error" in result
 
 
-def test_help_describes_registered_test_pipeline_as_dry_run_only():
+def test_help_describes_registered_test_pipeline_as_immutable_schema():
     validation_help = D.help(category="Validation")
     test_help = next(
         action for action in validation_help["actions"] if action["name"] == "test_pipeline"
     )
 
-    assert test_help["signature"] == "pipeline, sample_size=100"
-    assert "never performs ordinary pipeline execution" in test_help["description"]
+    assert test_help["signature"] == "pipeline"
+    assert "schema 1.0" in test_help["description"]
+    assert "status=planned" in test_help["description"]
+    assert "sample_size" not in json.dumps(test_help)
 
 
 @pytest.mark.parametrize("sample_size", [True, 1.5, "10", 0, -1, 1001])
 def test_registered_test_pipeline_rejects_invalid_bounds_before_helper(monkeypatch, sample_size):
-    fake_execution = ModuleType("tools.execution")
-
     def unexpected_call(*args, **kwargs):
-        pytest.fail("execution helper must not be called for an invalid sample_size")
+        pytest.fail("planner must not be called for an invalid sample_size")
 
-    fake_execution.test_pipeline = unexpected_call
-    monkeypatch.setitem(sys.modules, "tools.execution", fake_execution)
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", unexpected_call)
 
     result = D.dispatch(
         "test_pipeline",
@@ -3031,36 +3111,177 @@ def test_registered_test_pipeline_rejects_invalid_bounds_before_helper(monkeypat
     assert "error" in result
 
 
-def test_execution_helper_builds_exact_dry_run_command(monkeypatch):
+@pytest.mark.parametrize("max_rows", [1, 37, 1000])
+def test_execution_helper_dry_run_returns_exact_shared_schema_and_ignores_rows(
+    monkeypatch, max_rows
+):
     calls = []
+    expected = {"schema_version": "1.0", "status": "planned"}
 
-    def fake_run(command, **kwargs):
-        calls.append((command, kwargs))
-        return SimpleNamespace(returncode=0, stdout="dry-run plan", stderr="")
+    def fake_plan(yaml_content):
+        calls.append(yaml_content)
+        return SimpleNamespace(to_dict=lambda: expected)
 
-    monkeypatch.setattr(execution.subprocess, "run", fake_run)
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", fake_plan)
 
-    result = execution.test_pipeline(VALID_PIPELINE_YAML, mode="dry-run", max_rows=37)
+    result = execution.test_pipeline(
+        VALID_PIPELINE_YAML,
+        mode="dry-run",
+        max_rows=max_rows,
+    )
 
-    command, kwargs = calls[0]
-    temp_path = command[-2]
-    assert command == [
-        sys.executable,
-        "-m",
-        "odibi",
-        "run",
-        temp_path,
-        "--dry-run",
-    ]
-    assert kwargs == {
-        "capture_output": True,
-        "text": True,
-        "timeout": 30,
-        "cwd": execution.Path.cwd(),
-    }
+    assert result == expected
+    assert calls == [VALID_PIPELINE_YAML]
+    assert not hasattr(execution, "tempfile")
+    assert not hasattr(execution, "subprocess")
+    assert not hasattr(execution, "Path")
+
+
+def test_execution_helper_validate_mode_preserves_validation_only_shape(monkeypatch):
+    def unexpected_plan(*args, **kwargs):
+        pytest.fail("validation-only mode must not invoke immutable planning")
+
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", unexpected_plan)
+
+    result = execution.test_pipeline(VALID_PIPELINE_YAML, mode="validate", max_rows=37)
+
     assert result["valid"] is True
-    assert result["mode"] == "dry-run"
-    assert not execution.Path(temp_path).exists()
+    assert result["mode"] == "validate"
+    assert "schema_version" not in result
+
+
+def test_execution_helper_has_one_canonical_module_identity():
+    from odibi_mcp import dispatcher as dispatcher_module
+
+    assert sys.modules["odibi_mcp.tools.execution"] is execution
+    assert "tools.execution" not in sys.modules
+    dispatcher_source = Path(dispatcher_module.__file__).read_text(encoding="utf-8")
+    assert "from tools.execution" not in dispatcher_source
+
+
+@pytest.mark.parametrize(
+    ("pipeline", "status", "success_log"),
+    [
+        (PLANNED_LOGICAL_YAML, "planned", True),
+        (VALID_PIPELINE_YAML, "unresolved", False),
+        ("project: [", "invalid", False),
+    ],
+)
+def test_trusted_debug_workflow_embeds_exact_plan_and_only_planned_succeeds(
+    monkeypatch, immutable_planning_tripwires, pipeline, status, success_log
+):
+    from odibi_mcp.tools import workflows
+
+    def unexpected_tool(*args, **kwargs):
+        pytest.fail("planning workflow invoked a runtime or fallback tool")
+
+    for name in workflows.TOOL_REGISTRY:
+        if name != "validate_yaml_runnable":
+            monkeypatch.setitem(workflows.TOOL_REGISTRY, name, unexpected_tool)
+
+    with immutable_planning_tripwires() as attempts:
+        result = D.dispatch(
+            "run_workflow",
+            workflow_name="debug_pipeline",
+            params={"yaml": pipeline},
+            application_identity=LOCAL_IDENTITY,
+        )
+
+    expected = planning.plan_pipeline_yaml(pipeline).to_dict()
+    embedded = result["state"]["results"]["quick"]
+    messages = [event["message"] for event in result["events"] if "message" in event]
+    assert result["status"] == "COMPLETED"
+    assert embedded == expected
+    assert embedded["status"] == status
+    assert ("Immutable logical plan completed." in messages) is success_log
+    assert not {"valid", "execution_plan", "output"}.intersection(embedded)
+    assert attempts == []
+
+
+@pytest.mark.parametrize(
+    ("pipeline", "success_log"),
+    [
+        (PLANNED_LOGICAL_YAML, True),
+        (VALID_PIPELINE_YAML, False),
+        ("project: [", False),
+    ],
+)
+def test_trusted_build_workflow_embeds_exact_plan_and_only_planned_succeeds(
+    monkeypatch, immutable_planning_tripwires, pipeline, success_log
+):
+    from odibi_mcp.tools import workflows
+
+    def unexpected_tool(*args, **kwargs):
+        pytest.fail("build planning workflow invoked an unregistered runtime or fallback tool")
+
+    for name in workflows.TOOL_REGISTRY:
+        if name not in {"apply_pattern_template", "test_pipeline"}:
+            monkeypatch.setitem(workflows.TOOL_REGISTRY, name, unexpected_tool)
+    monkeypatch.setitem(
+        workflows.TOOL_REGISTRY,
+        "apply_pattern_template",
+        lambda **kwargs: {"valid": True, "yaml": pipeline},
+    )
+
+    with immutable_planning_tripwires() as attempts:
+        result = D.dispatch(
+            "run_workflow",
+            workflow_name="build_and_validate",
+            params={
+                "pattern": "fact",
+                "pipeline_name": "bounded",
+                "source_connection": "source",
+                "target_connection": "target",
+                "target_path": "target",
+                "source_table": "source",
+            },
+            application_identity=LOCAL_IDENTITY,
+        )
+
+    expected = planning.plan_pipeline_yaml(pipeline).to_dict()
+    embedded = result["state"]["results"]["validation"]
+    messages = [event["message"] for event in result["events"] if "message" in event]
+    assert result["status"] == "COMPLETED"
+    assert embedded == expected
+    assert ("Immutable logical plan completed." in messages) is success_log
+    assert attempts == []
+
+
+def test_workflow_inventory_routes_only_planning_spelling_to_schema_one():
+    from odibi_mcp.tools import workflows
+
+    references = []
+
+    def collect(value, workflow_name):
+        if isinstance(value, dict):
+            if value.get("type") == "call":
+                references.append(
+                    (workflow_name, value.get("tool"), value.get("args", {}).get("mode"))
+                )
+            for nested in value.values():
+                collect(nested, workflow_name)
+        elif isinstance(value, list):
+            for nested in value:
+                collect(nested, workflow_name)
+
+    for workflow_name, definition in workflows.WORKFLOWS.items():
+        collect(definition, workflow_name)
+
+    planner_references = {
+        reference
+        for reference in references
+        if reference[1] == "validate_yaml_runnable" or reference[2] == "dry-run"
+    }
+    validation_references = {reference for reference in references if reference[2] == "validate"}
+    assert planner_references == {
+        ("build_and_validate", "test_pipeline", "dry-run"),
+        ("debug_pipeline", "validate_yaml_runnable", None),
+    }
+    assert validation_references == {
+        ("validate_yaml_simple", "test_pipeline", "validate"),
+        ("iterate_until_valid", "test_pipeline", "validate"),
+    }
+    assert _REMOTE_SAFE_WORKFLOWS == {"validate_yaml_simple"}
 
 
 @pytest.mark.parametrize(
@@ -3081,11 +3302,10 @@ def test_execution_helper_rejects_invalid_controls_before_downstream_calls(
     monkeypatch, kwargs, error_type
 ):
     def unexpected_call(*args, **call_kwargs):
-        pytest.fail("invalid controls must fail before parser, tempfile, or subprocess calls")
+        pytest.fail("invalid controls must fail before validation or planning")
 
-    monkeypatch.setattr(execution.yaml, "safe_load", unexpected_call)
-    monkeypatch.setattr(execution.tempfile, "NamedTemporaryFile", unexpected_call)
-    monkeypatch.setattr(execution.subprocess, "run", unexpected_call)
+    monkeypatch.setattr(execution, "_validate_yaml_only", unexpected_call)
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", unexpected_call)
 
     with pytest.raises(error_type):
         execution.test_pipeline(VALID_PIPELINE_YAML, **kwargs)
@@ -3093,11 +3313,10 @@ def test_execution_helper_rejects_invalid_controls_before_downstream_calls(
 
 def test_execution_helper_rejects_positional_mode_before_downstream_calls(monkeypatch):
     def unexpected_call(*args, **kwargs):
-        pytest.fail("positional ambiguity must fail before parser, tempfile, or subprocess calls")
+        pytest.fail("positional ambiguity must fail before validation or planning")
 
-    monkeypatch.setattr(execution.yaml, "safe_load", unexpected_call)
-    monkeypatch.setattr(execution.tempfile, "NamedTemporaryFile", unexpected_call)
-    monkeypatch.setattr(execution.subprocess, "run", unexpected_call)
+    monkeypatch.setattr(execution, "_validate_yaml_only", unexpected_call)
+    monkeypatch.setattr(planning, "plan_pipeline_yaml", unexpected_call)
 
     with pytest.raises(TypeError):
         execution.test_pipeline(VALID_PIPELINE_YAML, "dry-run")

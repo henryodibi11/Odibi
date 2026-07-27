@@ -128,9 +128,11 @@ TASK_GUIDANCE = {
                         "description": "Check YAML syntax and structure (instant)",
                     },
                     {
-                        "label": "Dry-run (recommended)",
+                        "label": "Immutable logical plan (recommended)",
                         "value": "dry-run",
-                        "description": "Invoke CLI --dry-run; catalog/bootstrap side effects remain possible (~5 sec)",
+                        "description": (
+                            "Return bounded planner schema 1.0; only status=planned is success"
+                        ),
                     },
                 ],
                 "default": "dry-run",

@@ -12,6 +12,8 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pydantic import BaseModel
 
+import odibi.planning as immutable_planning
+
 try:
     from odibi_mcp.contracts.access import (
         RUNTIME_DATA_ACTIONS,
@@ -39,6 +41,21 @@ except ImportError:  # Flat Databricks workspace deployment
         prepare_remote_pattern_render,
         render_remote_logical_lineage_projection,
         sanitize_runtime_result,
+    )
+
+try:
+    from odibi_mcp.tools.workflows import (
+        get_workflow as _get_workflow_definition,
+        list_workflows as _list_workflow_definitions,
+        resume_workflow as _resume_workflow_execution,
+        run_workflow as _run_workflow_execution,
+    )
+except ImportError:  # Flat Databricks workspace deployment
+    from tools.workflows import (
+        get_workflow as _get_workflow_definition,
+        list_workflows as _list_workflow_definitions,
+        resume_workflow as _resume_workflow_execution,
+        run_workflow as _run_workflow_execution,
     )
 
 
@@ -119,6 +136,14 @@ _REMOTE_DISABLED_RENDERING_ACTIONS = frozenset(
     {"create_ingestion_pipeline", "render_pipeline_yaml"}
 )
 _RUNTIME_CONTEXT_LOCK = RLock()
+
+
+def _validate_legacy_sample_size(sample_size: int) -> None:
+    """Validate the deprecated ignored direct-planner compatibility parameter."""
+    if type(sample_size) is not int:
+        raise TypeError("sample_size must be an integer")
+    if not 1 <= sample_size <= 1000:
+        raise ValueError("sample_size must be between 1 and 1000")
 
 
 class OdibiDispatcher:
@@ -632,8 +657,8 @@ class OdibiDispatcher:
                 },
                 {
                     "name": "test_pipeline",
-                    "signature": "pipeline, sample_size=100",
-                    "description": "Dry-run validation and execution plan; never performs ordinary pipeline execution",
+                    "signature": "pipeline",
+                    "description": "Immutable bounded logical plan (schema 1.0); only status=planned is success",
                 },
                 {
                     "name": "diagnose",
@@ -923,41 +948,21 @@ class OdibiDispatcher:
         self, workflow_name: str, params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Execute a named workflow."""
-        try:
-            from odibi_mcp.tools.workflows import run_workflow
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.workflows import run_workflow
-
-        return run_workflow(workflow_name, params or {})
+        return _run_workflow_execution(workflow_name, params or {})
 
     def _resume_workflow(
         self, resume_token: str, inputs: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Continue paused workflow."""
-        try:
-            from odibi_mcp.tools.workflows import resume_workflow
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.workflows import resume_workflow
-
-        return resume_workflow(resume_token, inputs or {})
+        return _resume_workflow_execution(resume_token, inputs or {})
 
     def _list_workflows(self) -> dict[str, Any]:
         """List available workflows."""
-        try:
-            from odibi_mcp.tools.workflows import list_workflows
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.workflows import list_workflows
-
-        return list_workflows()
+        return _list_workflow_definitions()
 
     def _get_workflow(self, workflow_name: str) -> dict[str, Any]:
         """Get workflow definition."""
-        try:
-            from odibi_mcp.tools.workflows import get_workflow
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.workflows import get_workflow
-
-        return get_workflow(workflow_name)
+        return _get_workflow_definition(workflow_name)
 
     # Discovery
     def _map_environment(
@@ -1120,16 +1125,10 @@ class OdibiDispatcher:
 
         return validate_pipeline(pipeline)
 
-    def _test_pipeline(self, pipeline: str, sample_size: int = 100) -> dict[str, Any]:
-        """Test a pipeline through the bounded MCP dry-run path."""
-        if type(sample_size) is not int:
-            raise TypeError("sample_size must be an integer")
-        if not 1 <= sample_size <= 1000:
-            raise ValueError("sample_size must be between 1 and 1000")
-
-        from tools.execution import test_pipeline
-
-        return test_pipeline(pipeline, mode="dry-run", max_rows=sample_size)
+    def _test_pipeline(self, pipeline: str, sample_size: int = 100) -> dict[str, object]:
+        """Return the shared immutable logical plan for supplied YAML text."""
+        _validate_legacy_sample_size(sample_size)
+        return immutable_planning.plan_pipeline_yaml(pipeline).to_dict()
 
     def _diagnose(self, pipeline: str, error_context: str | None = None) -> dict[str, Any]:
         """Diagnose pipeline issues."""

@@ -1,17 +1,5 @@
 """ODIBI - Explicit, Traceable, Simple Data Engineering Framework."""
 
-from importlib.metadata import version, PackageNotFoundError
-
-try:
-    __version__ = version("odibi")
-except PackageNotFoundError:
-    __version__ = "0.0.0.dev0"  # Fallback for editable installs without metadata
-
-# Core components (available now)
-import odibi.transformers  # noqa: F401 # Register built-in transformers
-from odibi.context import Context
-from odibi.registry import transform
-
 # Pipeline and other components will be imported when available
 __all__ = [
     "transform",
@@ -22,6 +10,24 @@ __all__ = [
 
 # Lazy imports for components not yet implemented
 def __getattr__(name):
+    """Resolve public runtime symbols without making package import effectful."""
+    if name == "__version__":
+        from importlib.metadata import PackageNotFoundError, version
+
+        try:
+            resolved_version = version("odibi")
+        except PackageNotFoundError:
+            resolved_version = "0.0.0.dev0"
+        globals()[name] = resolved_version
+        return resolved_version
+    if name == "Context":
+        from odibi.context import Context
+
+        return Context
+    if name == "transform":
+        from odibi.registry import transform
+
+        return transform
     if name == "Pipeline":
         from odibi.pipeline import Pipeline
 
