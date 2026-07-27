@@ -6,6 +6,7 @@ into a single dispatch surface. Based on the proven context_workbench architectu
 
 from __future__ import annotations
 
+import importlib
 from threading import RLock
 from typing import Any, Callable
 from dataclasses import asdict, is_dataclass
@@ -14,49 +15,35 @@ from pydantic import BaseModel
 
 import odibi.planning as immutable_planning
 
-try:
-    from odibi_mcp.contracts.access import (
-        RUNTIME_DATA_ACTIONS,
-        ActionEffect,
-        ApplicationIdentity,
-        ManagedProjectAccess,
-        PreparedRuntimeCall,
-        RemoteLogicalLineageProjection,
-        RemotePatternRenderProjection,
-        RuntimeAccessDenied,
-        prepare_remote_pattern_render,
-        render_remote_logical_lineage_projection,
-        sanitize_runtime_result,
-    )
-except ImportError:  # Flat Databricks workspace deployment
-    from contracts.access import (
-        RUNTIME_DATA_ACTIONS,
-        ActionEffect,
-        ApplicationIdentity,
-        ManagedProjectAccess,
-        PreparedRuntimeCall,
-        RemoteLogicalLineageProjection,
-        RemotePatternRenderProjection,
-        RuntimeAccessDenied,
-        prepare_remote_pattern_render,
-        render_remote_logical_lineage_projection,
-        sanitize_runtime_result,
-    )
 
-try:
-    from odibi_mcp.tools.workflows import (
-        get_workflow as _get_workflow_definition,
-        list_workflows as _list_workflow_definitions,
-        resume_workflow as _resume_workflow_execution,
-        run_workflow as _run_workflow_execution,
-    )
-except ImportError:  # Flat Databricks workspace deployment
-    from tools.workflows import (
-        get_workflow as _get_workflow_definition,
-        list_workflows as _list_workflow_definitions,
-        resume_workflow as _resume_workflow_execution,
-        run_workflow as _run_workflow_execution,
-    )
+def _import_dispatcher_module(relative_name: str):
+    """Import a dispatcher dependency package-first, with exact root fallback."""
+    try:
+        return importlib.import_module(f"odibi_mcp.{relative_name}")
+    except ModuleNotFoundError as error:
+        if error.name != "odibi_mcp":
+            raise
+        return importlib.import_module(relative_name)
+
+
+_access = _import_dispatcher_module("contracts.access")
+RUNTIME_DATA_ACTIONS = _access.RUNTIME_DATA_ACTIONS
+ActionEffect = _access.ActionEffect
+ApplicationIdentity = _access.ApplicationIdentity
+ManagedProjectAccess = _access.ManagedProjectAccess
+PreparedRuntimeCall = _access.PreparedRuntimeCall
+RemoteLogicalLineageProjection = _access.RemoteLogicalLineageProjection
+RemotePatternRenderProjection = _access.RemotePatternRenderProjection
+RuntimeAccessDenied = _access.RuntimeAccessDenied
+prepare_remote_pattern_render = _access.prepare_remote_pattern_render
+render_remote_logical_lineage_projection = _access.render_remote_logical_lineage_projection
+sanitize_runtime_result = _access.sanitize_runtime_result
+
+_workflows = _import_dispatcher_module("tools.workflows")
+_get_workflow_definition = _workflows.get_workflow
+_list_workflow_definitions = _workflows.list_workflows
+_resume_workflow_execution = _workflows.resume_workflow
+_run_workflow_execution = _workflows.run_workflow
 
 
 ACTION_EFFECTS: dict[str, ActionEffect] = {
@@ -407,29 +394,19 @@ class OdibiDispatcher:
     @staticmethod
     def _bind_runtime_context(prepared: PreparedRuntimeCall):
         """Bind the exact validated snapshot without initializing connections."""
-        try:
-            from odibi_mcp.context import (
-                MCPProjectContext,
-                get_project_context,
-                set_project_context,
-            )
-        except ImportError:  # Flat Databricks workspace deployment
-            from context import MCPProjectContext, get_project_context, set_project_context
-
-        current = get_project_context()
+        context = _import_dispatcher_module("context")
+        current = context.get_project_context()
         snapshot = prepared.validated_config_snapshot()
-        set_project_context(MCPProjectContext.from_config_snapshot(prepared.config_path, snapshot))
+        context.set_project_context(
+            context.MCPProjectContext.from_config_snapshot(prepared.config_path, snapshot)
+        )
         return current
 
     @staticmethod
     def _restore_runtime_context(previous_context) -> None:
         """Restore the process-global context while still holding the dispatcher lock."""
-        try:
-            from odibi_mcp.context import set_project_context
-        except ImportError:  # Flat Databricks workspace deployment
-            from context import set_project_context
-
-        set_project_context(previous_context)
+        context = _import_dispatcher_module("context")
+        context.set_project_context(previous_context)
 
     def help(self, category: str | None = None, action: str | None = None) -> dict[str, Any]:
         """Generate help documentation.
@@ -973,10 +950,7 @@ class OdibiDispatcher:
         limit: int = 500,
     ) -> dict[str, Any]:
         """List connections and environment info."""
-        try:
-            from odibi_mcp.tools.smart import map_environment
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.smart import map_environment
+        map_environment = getattr(_import_dispatcher_module("tools.smart"), "map_environment")
 
         return map_environment(
             connection=connection,
@@ -987,10 +961,7 @@ class OdibiDispatcher:
 
     def _profile_source(self, connection: str, path: str, max_rows: int = 100) -> dict[str, Any]:
         """Profile a data source."""
-        try:
-            from odibi_mcp.tools.smart import profile_source
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.smart import profile_source
+        profile_source = getattr(_import_dispatcher_module("tools.smart"), "profile_source")
 
         return profile_source(
             connection=connection,
@@ -1008,10 +979,7 @@ class OdibiDispatcher:
         max_files: int = 50,
     ) -> dict[str, Any]:
         """List files in a folder."""
-        try:
-            from odibi_mcp.tools.smart import profile_folder
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.smart import profile_folder
+        profile_folder = getattr(_import_dispatcher_module("tools.smart"), "profile_folder")
 
         return profile_folder(
             connection=connection,
@@ -1023,51 +991,41 @@ class OdibiDispatcher:
     # Inspection
     def _story_read(self, pipeline: str, run_id: str | None = None) -> dict[str, Any]:
         """Read pipeline execution story."""
-        try:
-            from odibi_mcp.tools.story import story_read
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.story import story_read
+        story_read = getattr(_import_dispatcher_module("tools.story"), "story_read")
 
         run_selector = {"run_id": run_id} if run_id is not None else None
         return story_read(pipeline=pipeline, run_selector=run_selector)
 
     def _node_sample(self, pipeline: str, node: str, limit: int = 10) -> dict[str, Any]:
         """Sample node output."""
-        try:
-            from odibi_mcp.tools.story import node_sample
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.story import node_sample
+        node_sample = getattr(_import_dispatcher_module("tools.story"), "node_sample")
 
         return node_sample(pipeline=pipeline, node=node, limit=limit)
 
     def _node_failed_rows(self, pipeline: str, node: str, limit: int = 10) -> dict[str, Any]:
         """Fetch quarantined rows."""
-        try:
-            from odibi_mcp.tools.story import node_failed_rows
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.story import node_failed_rows
+        node_failed_rows = getattr(_import_dispatcher_module("tools.story"), "node_failed_rows")
 
         return node_failed_rows(pipeline=pipeline, node=node, limit=limit)
 
     def _lineage_graph(self, pipeline: str) -> dict[str, Any]:
         """Generate lineage graph."""
-        try:
-            from odibi_mcp.tools.story import lineage_graph
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.story import lineage_graph
+        lineage_graph = getattr(_import_dispatcher_module("tools.story"), "lineage_graph")
 
         return lineage_graph(pipeline=pipeline)
 
     # Construction
     def _list_transformers(self, category: str | None = None) -> dict[str, Any]:
         """List available transformers."""
-        from tools.construction import list_transformers
+        list_transformers = getattr(
+            _import_dispatcher_module("tools.construction"), "list_transformers"
+        )
 
         return list_transformers(category)
 
     def _list_patterns(self) -> dict[str, Any]:
         """List pipeline patterns."""
-        from tools.construction import list_patterns
+        list_patterns = getattr(_import_dispatcher_module("tools.construction"), "list_patterns")
 
         return list_patterns()
 
@@ -1075,10 +1033,9 @@ class OdibiDispatcher:
         self, projection: RemotePatternRenderProjection
     ) -> dict[str, Any]:
         """Render only the data-free projection prepared at the dispatch boundary."""
-        try:
-            from odibi_mcp.tools.render import render_remote_pattern_projection
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.render import render_remote_pattern_projection
+        render_remote_pattern_projection = getattr(
+            _import_dispatcher_module("tools.render"), "render_remote_pattern_projection"
+        )
 
         return render_remote_pattern_projection(projection)
 
@@ -1086,16 +1043,17 @@ class OdibiDispatcher:
         self, pattern: str, table_name: str, connection: str, source_path: str
     ) -> dict[str, Any]:
         """Generate YAML from pattern."""
-        from tools.construction import apply_pattern_template
+        apply_pattern_template = getattr(
+            _import_dispatcher_module("tools.construction"), "apply_pattern_template"
+        )
 
         return apply_pattern_template(pattern, table_name, connection, source_path)
 
     def _suggest_pipeline(self, source_path: str, connection: str, intent: str) -> dict[str, Any]:
         """Suggest pipeline based on data."""
-        try:
-            from odibi_mcp.tools.phase3_smart import suggest_pipeline
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.phase3_smart import suggest_pipeline
+        suggest_pipeline = getattr(
+            _import_dispatcher_module("tools.phase3_smart"), "suggest_pipeline"
+        )
 
         return suggest_pipeline(
             source_path=source_path,
@@ -1108,20 +1066,26 @@ class OdibiDispatcher:
         self, source_path: str, connection: str, target_table: str
     ) -> dict[str, Any]:
         """Create ingestion pipeline."""
-        from tools.phase3_smart import create_ingestion_pipeline
+        create_ingestion_pipeline = getattr(
+            _import_dispatcher_module("tools.phase3_smart"), "create_ingestion_pipeline"
+        )
 
         return create_ingestion_pipeline(source_path, connection, target_table)
 
     # Validation
     def _validate_yaml(self, yaml_content: str) -> dict[str, Any]:
         """Validate YAML structure."""
-        from tools.yaml_builder import validate_odibi_config
+        validate_odibi_config = getattr(
+            _import_dispatcher_module("tools.yaml_builder"), "validate_odibi_config"
+        )
 
         return validate_odibi_config(yaml_content)
 
     def _validate_pipeline(self, pipeline: str) -> dict[str, Any]:
         """Validate pipeline config."""
-        from tools.validation import validate_pipeline
+        validate_pipeline = getattr(
+            _import_dispatcher_module("tools.validation"), "validate_pipeline"
+        )
 
         return validate_pipeline(pipeline)
 
@@ -1132,20 +1096,22 @@ class OdibiDispatcher:
 
     def _diagnose(self, pipeline: str, error_context: str | None = None) -> dict[str, Any]:
         """Diagnose pipeline issues."""
-        from tools.diagnose import diagnose
+        diagnose = getattr(_import_dispatcher_module("tools.diagnose"), "diagnose")
 
         return diagnose(pipeline, error_context)
 
     # Task Guidance
     def _get_task_guidance(self, task_type: str) -> dict[str, Any]:
         """Get structured task guidance."""
-        from tools.guidance import get_task_guidance
+        get_task_guidance = getattr(
+            _import_dispatcher_module("tools.guidance"), "get_task_guidance"
+        )
 
         return get_task_guidance(task_type)
 
     def _list_task_types(self) -> dict[str, Any]:
         """List available task types."""
-        from tools.guidance import list_task_types
+        list_task_types = getattr(_import_dispatcher_module("tools.guidance"), "list_task_types")
 
         return list_task_types()
 
@@ -1159,10 +1125,7 @@ class OdibiDispatcher:
         installs and as a bare import (``knowledge``) for flat Databricks
         workspace deployments.
         """
-        try:
-            from odibi_mcp.knowledge import get_knowledge
-        except ImportError:
-            from knowledge import get_knowledge
+        get_knowledge = getattr(_import_dispatcher_module("knowledge"), "get_knowledge")
         return get_knowledge
 
     def _onboard(self) -> dict[str, Any]:
@@ -1210,10 +1173,7 @@ class OdibiDispatcher:
         limit: int = 1000,
     ) -> dict[str, Any]:
         """Export a bounded SQL result."""
-        try:
-            from odibi_mcp.tools.smart import download_sql
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.smart import download_sql
+        download_sql = getattr(_import_dispatcher_module("tools.smart"), "download_sql")
 
         return download_sql(
             connection=connection,
@@ -1233,10 +1193,7 @@ class OdibiDispatcher:
         limit: int = 1000,
     ) -> dict[str, Any]:
         """Export a bounded table result."""
-        try:
-            from odibi_mcp.tools.smart import download_table
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.smart import download_table
+        download_table = getattr(_import_dispatcher_module("tools.smart"), "download_table")
 
         return download_table(
             connection=connection,
@@ -1255,10 +1212,7 @@ class OdibiDispatcher:
         output_path: str,
     ) -> dict[str, Any]:
         """Copy a bounded storage object to the controlled export root."""
-        try:
-            from odibi_mcp.tools.smart import download_file
-        except ImportError:  # Flat Databricks workspace deployment
-            from tools.smart import download_file
+        download_file = getattr(_import_dispatcher_module("tools.smart"), "download_file")
 
         return download_file(
             connection=connection,
@@ -1271,7 +1225,7 @@ class OdibiDispatcher:
     # Session Builder
     def _create_pipeline(self, pipeline_name: str, layer: str = "gold") -> dict[str, Any]:
         """Create a pipeline builder session. Returns a session_id for subsequent calls."""
-        from tools.builder import create_pipeline
+        create_pipeline = getattr(_import_dispatcher_module("tools.builder"), "create_pipeline")
 
         return create_pipeline(pipeline_name, layer)
 
@@ -1279,7 +1233,7 @@ class OdibiDispatcher:
         self, session_id: str, node_name: str, depends_on: list[str] | None = None
     ) -> dict[str, Any]:
         """Add a node to the pipeline session."""
-        from tools.builder import add_node
+        add_node = getattr(_import_dispatcher_module("tools.builder"), "add_node")
 
         return add_node(session_id, node_name, depends_on)
 
@@ -1295,7 +1249,7 @@ class OdibiDispatcher:
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Configure a node's read block."""
-        from tools.builder import configure_read
+        configure_read = getattr(_import_dispatcher_module("tools.builder"), "configure_read")
 
         return configure_read(
             session_id,
@@ -1322,7 +1276,7 @@ class OdibiDispatcher:
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Configure a node's write block."""
-        from tools.builder import configure_write
+        configure_write = getattr(_import_dispatcher_module("tools.builder"), "configure_write")
 
         return configure_write(
             session_id,
@@ -1341,30 +1295,36 @@ class OdibiDispatcher:
         self, session_id: str, node_name: str, steps: list[dict[str, Any]]
     ) -> dict[str, Any]:
         """Configure a node's transform steps."""
-        from tools.builder import configure_transform
+        configure_transform = getattr(
+            _import_dispatcher_module("tools.builder"), "configure_transform"
+        )
 
         return configure_transform(session_id, node_name, steps)
 
     def _get_pipeline_state(self, session_id: str) -> dict[str, Any]:
         """Get current pipeline builder session state."""
-        from tools.builder import get_pipeline_state
+        get_pipeline_state = getattr(
+            _import_dispatcher_module("tools.builder"), "get_pipeline_state"
+        )
 
         return get_pipeline_state(session_id)
 
     def _render_pipeline_yaml(self, session_id: str) -> dict[str, Any]:
         """Validate and render the session's pipeline YAML."""
-        from tools.builder import render_pipeline_yaml
+        render_pipeline_yaml = getattr(
+            _import_dispatcher_module("tools.builder"), "render_pipeline_yaml"
+        )
 
         return render_pipeline_yaml(session_id)
 
     def _list_sessions(self) -> dict[str, Any]:
         """List active sessions."""
-        from tools.builder import list_sessions
+        list_sessions = getattr(_import_dispatcher_module("tools.builder"), "list_sessions")
 
         return list_sessions()
 
     def _discard_pipeline(self, session_id: str) -> dict[str, Any]:
         """Discard a builder session without rendering."""
-        from tools.builder import discard_pipeline
+        discard_pipeline = getattr(_import_dispatcher_module("tools.builder"), "discard_pipeline")
 
         return discard_pipeline(session_id)
