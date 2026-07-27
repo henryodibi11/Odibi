@@ -8,6 +8,8 @@ asserts it returns real data, so that regression can't recur.
 """
 
 import base64
+import importlib.abc
+import importlib.util
 import io
 import json
 import sys
@@ -17,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
+from unittest.mock import ANY
 
 import pytest
 import yaml
@@ -36,6 +39,7 @@ from odibi_mcp.dispatcher import (
     _REMOTE_SAFE_WORKFLOWS,
     OdibiDispatcher,
 )
+from odibi_mcp import dispatcher as dispatcher_module
 from odibi_mcp.knowledge import OdibiKnowledge
 from odibi_mcp.tools import execution, smart, story
 
@@ -102,6 +106,431 @@ def _is_error(result):
 
 def _trusted_dispatch(action, **kwargs):
     return D.dispatch(action, application_identity=LOCAL_IDENTITY, **kwargs)
+
+
+def _raise_import(error):
+    raise error
+
+
+@pytest.mark.parametrize(
+    ("error"),
+    [
+        ModuleNotFoundError("missing dependency", name="pint"),
+        ModuleNotFoundError("missing target", name="odibi_mcp.tools.smart"),
+        ImportError("broken imported symbol"),
+    ],
+)
+def test_dispatcher_resolver_preserves_non_root_import_failure(monkeypatch, error):
+    attempts = []
+
+    def import_module(name):
+        attempts.append(name)
+        _raise_import(error)
+
+    monkeypatch.setattr(dispatcher_module.importlib, "import_module", import_module)
+    with pytest.raises(type(error)) as caught:
+        dispatcher_module._import_dispatcher_module("tools.smart")
+
+    assert caught.value is error
+    assert attempts == ["odibi_mcp.tools.smart"]
+    frames = []
+    traceback = caught.value.__traceback__
+    while traceback is not None:
+        frames.append(traceback.tb_frame.f_code.co_name)
+        traceback = traceback.tb_next
+    expected_tail = ["_import_dispatcher_module", "import_module", "_raise_import"]
+    assert frames[-len(expected_tail) :] == expected_tail
+    assert frames.count("_import_dispatcher_module") == 1
+    assert caught.value.__cause__ is None
+    assert caught.value.__suppress_context__ is False
+
+
+def test_dispatcher_resolver_package_success_is_single_attempt(monkeypatch):
+    selected = ModuleType("odibi_mcp.tools.smart")
+    attempts = []
+    monkeypatch.setattr(
+        dispatcher_module.importlib,
+        "import_module",
+        lambda name: attempts.append(name) or selected,
+    )
+
+    assert dispatcher_module._import_dispatcher_module("tools.smart") is selected
+    assert attempts == ["odibi_mcp.tools.smart"]
+
+
+def test_dispatcher_resolver_exact_root_absence_selects_flat_once(monkeypatch):
+    root_miss = ModuleNotFoundError("missing root", name="odibi_mcp")
+    selected = ModuleType("tools.smart")
+    attempts = []
+
+    def import_module(name):
+        attempts.append(name)
+        if len(attempts) == 1:
+            _raise_import(root_miss)
+        return selected
+
+    monkeypatch.setattr(dispatcher_module.importlib, "import_module", import_module)
+    assert dispatcher_module._import_dispatcher_module("tools.smart") is selected
+    assert attempts == ["odibi_mcp.tools.smart", "tools.smart"]
+
+
+def test_dispatcher_resolver_flat_failure_is_primary_with_root_context(monkeypatch):
+    root_miss = ModuleNotFoundError("missing root", name="odibi_mcp")
+    flat_miss = ModuleNotFoundError("missing flat dependency", name="pint")
+    attempts = []
+
+    def import_module(name):
+        attempts.append(name)
+        _raise_import(root_miss if len(attempts) == 1 else flat_miss)
+
+    monkeypatch.setattr(dispatcher_module.importlib, "import_module", import_module)
+    with pytest.raises(ModuleNotFoundError) as caught:
+        dispatcher_module._import_dispatcher_module("tools.smart")
+
+    assert caught.value is flat_miss
+    assert caught.value.__context__ is root_miss
+    assert caught.value.__cause__ is None
+    assert caught.value.__suppress_context__ is False
+    traceback_tail = caught.value.__traceback__
+    while traceback_tail.tb_next is not None:
+        traceback_tail = traceback_tail.tb_next
+    assert traceback_tail.tb_frame.f_code.co_name == "_raise_import"
+    assert attempts == ["odibi_mcp.tools.smart", "tools.smart"]
+
+
+def _load_isolated_dispatcher(name):
+    spec = importlib.util.spec_from_file_location(name, Path(dispatcher_module.__file__))
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_dispatcher_eager_startup_resolves_canonical_modules_and_binds_aliases(monkeypatch):
+    attempts = []
+    workflow_symbols = {
+        name: object()
+        for name in ("get_workflow", "list_workflows", "resume_workflow", "run_workflow")
+    }
+    workflows = SimpleNamespace(**workflow_symbols)
+    original_import = importlib.import_module
+
+    def controlled_import(name, package=None):
+        attempts.append(name)
+        if name == "odibi_mcp.contracts.access":
+            return sys.modules[name]
+        if name == "odibi_mcp.tools.workflows":
+            return workflows
+        pytest.fail(f"unexpected eager dispatcher import: {name}")
+
+    monkeypatch.setattr(importlib, "import_module", controlled_import)
+    selected = _load_isolated_dispatcher("_canonical_dispatcher_startup")
+
+    assert attempts == ["odibi_mcp.contracts.access", "odibi_mcp.tools.workflows"]
+    assert selected._get_workflow_definition is workflow_symbols["get_workflow"]
+    assert selected._list_workflow_definitions is workflow_symbols["list_workflows"]
+    assert selected._resume_workflow_execution is workflow_symbols["resume_workflow"]
+    assert selected._run_workflow_execution is workflow_symbols["run_workflow"]
+    assert len(selected.OdibiDispatcher()._actions) == 43
+    monkeypatch.setattr(importlib, "import_module", original_import)
+
+
+def test_dispatcher_eager_startup_supports_genuine_source_flat_imports(monkeypatch):
+    access = ModuleType("contracts.access")
+    access.__dict__.update(sys.modules["odibi_mcp.contracts.access"].__dict__)
+    access.__name__ = "contracts.access"
+    workflow_symbols = {
+        name: object()
+        for name in ("get_workflow", "list_workflows", "resume_workflow", "run_workflow")
+    }
+    workflows = ModuleType("tools.workflows")
+    workflows.__dict__.update(workflow_symbols)
+    contracts_package = ModuleType("contracts")
+    contracts_package.__path__ = []
+    tools_package = ModuleType("tools")
+    tools_package.__path__ = []
+    attempts = []
+
+    class FlatCompatibilityFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+        canonical = {
+            "odibi_mcp.contracts.access": "contracts.access",
+            "odibi_mcp.tools.workflows": "tools.workflows",
+        }
+        flat = {
+            "contracts": contracts_package,
+            "contracts.access": access,
+            "tools": tools_package,
+            "tools.workflows": workflows,
+        }
+
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname in self.canonical or fullname in self.flat:
+                return importlib.util.spec_from_loader(fullname, self)
+            return None
+
+        def create_module(self, spec):
+            if spec.name in self.canonical:
+                attempts.append(spec.name)
+                raise ModuleNotFoundError("isolated source-flat layout", name="odibi_mcp")
+            if "." in spec.name:
+                attempts.append(spec.name)
+            return self.flat[spec.name]
+
+        def exec_module(self, module):
+            return None
+
+    finder = FlatCompatibilityFinder()
+    hidden = {}
+    names = tuple(finder.canonical) + tuple(finder.flat)
+    for name in names:
+        if name in sys.modules:
+            hidden[name] = sys.modules.pop(name)
+    sys.meta_path.insert(0, finder)
+    try:
+        selected = _load_isolated_dispatcher("_flat_dispatcher_startup")
+    finally:
+        sys.meta_path.remove(finder)
+        for name in names:
+            sys.modules.pop(name, None)
+        sys.modules.update(hidden)
+
+    assert attempts == [
+        "odibi_mcp.contracts.access",
+        "contracts.access",
+        "odibi_mcp.tools.workflows",
+        "tools.workflows",
+    ]
+    assert len(selected.OdibiDispatcher()._actions) == 43
+    assert selected._get_workflow_definition is workflow_symbols["get_workflow"]
+    assert selected._list_workflow_definitions is workflow_symbols["list_workflows"]
+    assert selected._resume_workflow_execution is workflow_symbols["resume_workflow"]
+    assert selected._run_workflow_execution is workflow_symbols["run_workflow"]
+
+
+def test_selected_module_missing_symbol_is_attribute_error_without_fallback(monkeypatch):
+    attempts = []
+    selected = ModuleType("odibi_mcp.tools.construction")
+    monkeypatch.setattr(
+        dispatcher_module.importlib,
+        "import_module",
+        lambda name: attempts.append(name) or selected,
+    )
+
+    with pytest.raises(AttributeError):
+        OdibiDispatcher()._list_patterns()
+    assert attempts == ["odibi_mcp.tools.construction"]
+
+
+ACTION_RESOLUTION_INVENTORY = {
+    "run_workflow": ("tools.workflows", "run_workflow", ("wf",)),
+    "resume_workflow": ("tools.workflows", "resume_workflow", ("token",)),
+    "list_workflows": ("tools.workflows", "list_workflows", ()),
+    "get_workflow": ("tools.workflows", "get_workflow", ("wf",)),
+    "map_environment": ("tools.smart", "map_environment", ()),
+    "profile_source": ("tools.smart", "profile_source", ("conn", "path")),
+    "profile_folder": ("tools.smart", "profile_folder", ("conn", "path")),
+    "story_read": ("tools.story", "story_read", ("pipe",)),
+    "node_sample": ("tools.story", "node_sample", ("pipe", "node")),
+    "node_failed_rows": ("tools.story", "node_failed_rows", ("pipe", "node")),
+    "lineage_graph": ("tools.story", "lineage_graph", ("pipe",)),
+    "list_transformers": ("tools.construction", "list_transformers", ()),
+    "list_patterns": ("tools.construction", "list_patterns", ()),
+    "apply_pattern_template": (
+        "tools.construction",
+        "apply_pattern_template",
+        ("fact", "table", "conn", "path"),
+    ),
+    "suggest_pipeline": ("tools.phase3_smart", "suggest_pipeline", ("path", "conn", "intent")),
+    "create_ingestion_pipeline": (
+        "tools.phase3_smart",
+        "create_ingestion_pipeline",
+        ("path", "conn", "table"),
+    ),
+    "validate_yaml": ("tools.yaml_builder", "validate_odibi_config", ("project: test",)),
+    "validate_pipeline": ("tools.validation", "validate_pipeline", ("pipe",)),
+    "test_pipeline": ("planner", "plan_pipeline_yaml", ("project: test",)),
+    "diagnose": ("tools.diagnose", "diagnose", ("pipe",)),
+    "get_task_guidance": ("tools.guidance", "get_task_guidance", ("build",)),
+    "list_task_types": ("tools.guidance", "list_task_types", ()),
+    "onboard": ("knowledge", "onboard", ()),
+    "get_schema": ("knowledge", "get_schema", ()),
+    "search_docs": ("knowledge", "search_docs", ("query",)),
+    "get_doc": ("knowledge", "get_doc", ("doc",)),
+    "list_docs": ("knowledge", "list_docs", ()),
+    "list_examples": ("knowledge", "list_examples", ()),
+    "get_example": ("knowledge", "get_example", ("fact",)),
+    "list_skills": ("knowledge", "list_skills", ()),
+    "get_skill": ("knowledge", "get_skill", ("odibi",)),
+    "download_sql": ("tools.smart", "download_sql", ("conn", "select 1", "out")),
+    "download_table": ("tools.smart", "download_table", ("conn", "table", "out")),
+    "download_file": ("tools.smart", "download_file", ("conn", "source", "out")),
+    "create_pipeline": ("tools.builder", "create_pipeline", ("pipe",)),
+    "add_node": ("tools.builder", "add_node", ("session", "node")),
+    "configure_read": (
+        "tools.builder",
+        "configure_read",
+        ("session", "node", "conn", "csv"),
+    ),
+    "configure_write": (
+        "tools.builder",
+        "configure_write",
+        ("session", "node", "conn", "delta"),
+    ),
+    "configure_transform": (
+        "tools.builder",
+        "configure_transform",
+        ("session", "node", []),
+    ),
+    "get_pipeline_state": ("tools.builder", "get_pipeline_state", ("session",)),
+    "render_pipeline_yaml": ("tools.builder", "render_pipeline_yaml", ("session",)),
+    "list_sessions": ("tools.builder", "list_sessions", ()),
+    "discard_pipeline": ("tools.builder", "discard_pipeline", ("session",)),
+}
+
+for _action, (_module, _symbol, _args) in tuple(ACTION_RESOLUTION_INVENTORY.items()):
+    _sentinel = {"sentinel": _symbol}
+    _wrapper = {
+        "search_docs": "results",
+        "list_docs": "docs",
+        "list_examples": "examples",
+        "list_skills": "skills",
+    }.get(_action)
+    ACTION_RESOLUTION_INVENTORY[_action] = (
+        _module,
+        _symbol,
+        _args,
+        {_wrapper: _sentinel} if _wrapper else _sentinel,
+    )
+
+
+def test_all_actions_resolve_declared_package_module_and_delegate_provider_free(monkeypatch):
+    dispatcher = OdibiDispatcher()
+    assert len(dispatcher._actions) == 43
+    assert set(ACTION_RESOLUTION_INVENTORY) == set(dispatcher._actions)
+    calls = []
+
+    def sentinel(module, symbol, result):
+        def call(*args, **kwargs):
+            calls.append(("delegate", module, symbol, args, kwargs))
+            return result
+
+        return call
+
+    class KnowledgeSentinel:
+        def __getattr__(self, symbol):
+            return sentinel("knowledge", symbol, {"sentinel": symbol})
+
+    knowledge = KnowledgeSentinel()
+
+    def resolve(module):
+        calls.append(("resolve", module))
+        if module == "knowledge":
+
+            def get_knowledge():
+                calls.append(("knowledge_factory", "get_knowledge"))
+                return knowledge
+
+            return SimpleNamespace(get_knowledge=get_knowledge)
+        symbols = {
+            symbol
+            for expected_module, symbol, _, _ in ACTION_RESOLUTION_INVENTORY.values()
+            if expected_module == module
+        }
+        return SimpleNamespace(
+            **{symbol: sentinel(module, symbol, {"sentinel": symbol}) for symbol in symbols}
+        )
+
+    monkeypatch.setattr(dispatcher_module, "_import_dispatcher_module", resolve)
+    workflow_globals = {
+        "run_workflow": "_run_workflow_execution",
+        "resume_workflow": "_resume_workflow_execution",
+        "list_workflows": "_list_workflow_definitions",
+        "get_workflow": "_get_workflow_definition",
+    }
+    for action, global_name in workflow_globals.items():
+        monkeypatch.setattr(
+            dispatcher_module,
+            global_name,
+            sentinel("tools.workflows", action, {"sentinel": action}),
+        )
+
+    def plan_pipeline_yaml(*args, **kwargs):
+        calls.append(("planner", "plan_pipeline_yaml", args, kwargs))
+
+        def to_dict():
+            calls.append(("planner_to_dict", "to_dict"))
+            return {"sentinel": "plan_pipeline_yaml"}
+
+        return SimpleNamespace(to_dict=to_dict)
+
+    monkeypatch.setattr(
+        dispatcher_module.immutable_planning, "plan_pipeline_yaml", plan_pipeline_yaml
+    )
+
+    for action, (module, symbol, args, expected_result) in ACTION_RESOLUTION_INVENTORY.items():
+        calls.clear()
+        result = dispatcher.dispatch(action, *args, application_identity=LOCAL_IDENTITY)
+
+        assert result == expected_result, action
+
+        if module == "tools.workflows":
+            expected_calls = [("delegate", module, symbol, ANY, ANY)]
+        elif module == "planner":
+            expected_calls = [
+                ("planner", "plan_pipeline_yaml", ANY, ANY),
+                ("planner_to_dict", "to_dict"),
+            ]
+        elif module == "knowledge":
+            expected_calls = [
+                ("resolve", "knowledge"),
+                ("knowledge_factory", "get_knowledge"),
+                ("delegate", "knowledge", symbol, ANY, ANY),
+            ]
+        else:
+            expected_calls = [
+                ("resolve", module),
+                ("delegate", module, symbol, ANY, ANY),
+            ]
+        assert calls == expected_calls, action
+
+
+def test_non_action_context_and_projection_sites_use_resolver(monkeypatch):
+    calls = []
+    context = SimpleNamespace(
+        get_project_context=lambda: "old",
+        set_project_context=lambda value: calls.append(("set", value)),
+        MCPProjectContext=SimpleNamespace(
+            from_config_snapshot=lambda path, snapshot: (path, snapshot)
+        ),
+    )
+    projection = object()
+    modules = {
+        "context": context,
+        "tools.render": SimpleNamespace(
+            render_remote_pattern_projection=lambda value: ("rendered", value)
+        ),
+    }
+    monkeypatch.setattr(
+        dispatcher_module,
+        "_import_dispatcher_module",
+        lambda module: calls.append(("resolve", module)) or modules[module],
+    )
+    prepared = SimpleNamespace(
+        config_path="config",
+        validated_config_snapshot=lambda: {"project": "test"},
+    )
+
+    assert OdibiDispatcher._bind_runtime_context(prepared) == "old"
+    OdibiDispatcher._restore_runtime_context("old")
+    assert OdibiDispatcher()._render_remote_pattern_projection(projection) == (
+        "rendered",
+        projection,
+    )
+    assert [call for call in calls if call[0] == "resolve"] == [
+        ("resolve", "context"),
+        ("resolve", "context"),
+        ("resolve", "tools.render"),
+    ]
 
 
 @pytest.fixture
@@ -2468,11 +2897,11 @@ def test_projected_renderer_rejects_non_projection_without_echo():
 
 def test_trusted_local_pattern_template_retains_legacy_delegate(monkeypatch):
     calls = []
-    fake_construction = ModuleType("tools.construction")
+    fake_construction = ModuleType("odibi_mcp.tools.construction")
     fake_construction.apply_pattern_template = lambda *args: calls.append(args) or {
         "trusted_local": True
     }
-    monkeypatch.setitem(sys.modules, "tools.construction", fake_construction)
+    monkeypatch.setitem(sys.modules, "odibi_mcp.tools.construction", fake_construction)
 
     result = OdibiDispatcher().dispatch(
         "apply_pattern_template",
