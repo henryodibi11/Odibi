@@ -135,7 +135,7 @@ Need historical state?
 |------|---------|
 | Run pipeline | `odibi run config.yaml` |
 | Run specific node | `odibi run config.yaml --node name` |
-| Dry run (no writes) | `odibi run config.yaml --dry-run` |
+| Legacy late runtime simulation (not immutable/no-effect; see [planning](../features/planning.md)) | `odibi run config.yaml --dry-run` |
 | Validate config | `odibi validate config.yaml` |
 | View DAG | `odibi graph config.yaml` |
 | Check state | `odibi catalog state config.yaml` |

@@ -30,6 +30,10 @@ and must not be treated as a valid executable plan.
 See [Immutable Pipeline Planning](planning.md) for the schema, bounds, exit codes,
 security boundary, and package/MCP equivalents.
 
+Use the planning page's [five-rung operation safety ladder](planning.md#operation-safety-ladder)
+to distinguish inspect, validate, immutable plan, legacy late runtime simulation, and
+execution. In particular, `--dry-run` is not shorthand for safe or no-effect operation.
+
 ### odibi run
 
 Execute a pipeline from a YAML configuration file.

@@ -5,7 +5,8 @@
 | Command | Description |
 | :--- | :--- |
 | `odibi run odibi.yaml` | Run the pipeline. |
-| `odibi run odibi.yaml --dry-run` | Validate connections without moving data. |
+| `odibi run odibi.yaml --dry-run` | Legacy late runtime simulation; surrounding effects remain possible. |
+| `cat odibi.yaml \| odibi plan --stdin --format json` | Immutable logical plan; only `status == "planned"` succeeds. See [planning](../features/planning.md). |
 | `odibi validate odibi.yaml` | Validate YAML schema, pipeline logic, and transformer params. |
 | `odibi doctor` | Check environment and config health. |
 | `odibi story last` | Open the latest run report. |

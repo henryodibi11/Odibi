@@ -970,7 +970,10 @@ connections:
 
 ### SQL Injection Protection
 
-**Odibi uses DuckDB** for in-memory SQL on DataFrames — no injection risk.
+Do not interpolate untrusted SQL or identifiers, regardless of engine. Use supported
+parameter APIs where a connector implements them; neither DuckDB nor Odibi provides a
+universal injection-immunity guarantee. See the project
+[security policy](https://github.com/henryodibi11/Odibi/blob/main/SECURITY.md).
 
 For **Azure SQL**, use parameterized queries:
 

@@ -21,6 +21,15 @@ A complete **star schema** with:
 
 ### Run It
 
+**Effects before you run:** execution overwrites
+`docs/examples/canonical/runnable/data/gold/dim_customer.parquet`,
+`dim_product.parquet`, `dim_date.parquet`, and `fact_sales.parquet`; creates timestamped
+Stories under `data/gold/stories/{build_dimensions|build_facts}/YYYY-MM-DD/run_HH-MM-SS.{html,json}`;
+and initializes or updates `data/gold/_system/meta_*` catalog assets. A repeat replaces
+the four outputs and creates timestamped Story/catalog history. Source files under
+`../sample_data/` are read and left untouched. If `data/gold/` was created solely for
+this example, remove only `docs/examples/canonical/runnable/data/gold/` to clean up.
+
 ```bash
 cd docs/examples/canonical/runnable
 odibi run 04_fact_table.yaml

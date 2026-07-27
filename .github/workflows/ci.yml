@@ -135,6 +135,8 @@ jobs:
           cp tests/unit/mcp/test_access.py "$RUNNER_TEMP/mcp-tests/"
           cp tests/unit/test_odibi_dispatcher.py "$RUNNER_TEMP/mcp-tests/"
           cp tests/unit/mcp/test_mcp_smoke.py "$RUNNER_TEMP/mcp-tests/"
+          cp tests/unit/mcp/test_agent_safety_docs.py "$RUNNER_TEMP/mcp-tests/"
+          cp tests/fixtures/agent_safety_contract.json "$RUNNER_TEMP/mcp-tests/"
 
       - name: Require the FastMCP HTTP request API
         working-directory: ${{ runner.temp }}
@@ -149,7 +151,8 @@ jobs:
           python -m pytest -q \
             test_access.py \
             test_odibi_dispatcher.py \
-            test_mcp_smoke.py
+            test_mcp_smoke.py \
+            test_agent_safety_docs.py
 
   # EXTRAS JOB (OPTIONAL) - Tests optional dependencies (Spark, Azure)
   # This job can fail without breaking the build (experimental features)

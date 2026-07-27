@@ -60,6 +60,21 @@ Authorization remains separate from immutability:
   remains validation-only rather than planner schema `1.0`.
 - Trusted-local planning workflows branch to success only for `status == "planned"`.
 
+## Operation safety ladder
+
+| Rung | Exact current surfaces | Effect and decision rule |
+| --- | --- | --- |
+| **1. Inspect** | Static MCP reads such as `odibi_execute("search_docs", ...)`, `odibi_execute("get_schema", ...)`, `odibi_execute("list_patterns")`, and `odibi_execute("list_transformers")`; configured/runtime actions `map_environment`, `story_read`, `node_sample`, `node_failed_rows`, and `lineage_graph`; CLI `odibi graph CONFIG`, `odibi catalog ...`, and `odibi story last` when prerequisites are met. | There is no command named `odibi inspect`. Static reads differ from sensitive/runtime reads; remotely, named runtime-data actions also require managed-project preparation. Catalog and Story inspection is generally post-execution. `odibi graph CONFIG` is not immutable planning. Check `odibi_help(action=...)` and the action effect before MCP calls. |
+| **2. Validate** | CLI `odibi validate CONFIG --format json`; MCP `odibi_execute("validate_yaml", '{"yaml_content":"..."}')` and `odibi_execute("validate_pipeline", '{"pipeline":"..."}')`. | Checks accepted structure and rules for that validator. It is not execution, immutable planning, provider qualification, or proof of runtime success. |
+| **3. Plan** | `cat CONFIG \| odibi plan --stdin --format json`; package `plan_pipeline_yaml(text)` / `plan_pipeline_bytes(raw)`; MCP `odibi_execute("test_pipeline", '{"pipeline":"..."}')`; helper/workflow `test_pipeline(yaml_text, mode="dry-run")`. | Dedicated bounded logical planning. Only `status == "planned"` succeeds; `unresolved` and `invalid` fail closed. The registered MCP action remains `ActionEffect.EXECUTION`, so applicable identity/route authorization is still required even though its current implementation is immutable. |
+| **4. Legacy simulation** | CLI `odibi run CONFIG --dry-run`; package `PipelineManager.run(dry_run=True)`. | Compatibility-only late runtime simulation. It may load environment/project code, construct runtime facilities, and cause surrounding lifecycle effects. It is not immutable, no-write, read-only, validate-only, or a security boundary. There is no registered universal MCP `dry_run` action. |
+| **5. Execute** | CLI `odibi run CONFIG`; trusted/local MCP workflow actions `run_workflow` and `resume_workflow` only where current route policy permits. | Accept configured data writes, Story generation, catalog/state/logging/alert effects, and workflow/session behavior. Remote workflow policy is narrower than the effect class; consult the [MCP route guidance](../guides/mcp_guide.md#transport-routes), current effect help, and authorization. `run_workflow` is not a general remote arbitrary-pipeline executor. |
+
+Selection rule: inspect relevant information; validate syntax and declared constraints;
+use immutable planning before accepting runtime effects; use legacy simulation only when
+its initialization and lifecycle effects are acceptable; and execute only after
+reviewing configured outputs, repeat mode, privacy, and cleanup.
+
 ## Schema 1.0
 
 Every package, CLI, MCP direct, and trusted-local workflow planning result has exactly

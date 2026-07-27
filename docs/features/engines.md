@@ -473,7 +473,9 @@ See [Testing Guide](../guides/testing.md) for details.
 **Fixes:**
 - Use SQL transforms instead of Python where possible
 - Use `transform.steps` with SQL strings (engine-agnostic)
-- Test with `--dry-run` before switching engines
+- Use [immutable planning](planning.md) for bounded logical structure; qualify engine
+  and runtime semantics with controlled execution. Legacy `--dry-run` is late runtime
+  simulation, not an immutable or no-effect boundary.
 
 ### "Engine 'polars' not found"
 

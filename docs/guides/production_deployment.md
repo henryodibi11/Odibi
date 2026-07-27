@@ -36,8 +36,15 @@ connections:
 
 Then, set the environment variable `DB_PASSWORD` in your production environment (or `.env` file locally).
 
-### Automatic Redaction
-Odibi automatically detects values that look like secrets (keys, tokens, passwords) and replaces them with `[REDACTED]` in logs and Data Stories.
+### Bounded Redaction
+
+`StructuredLogger.register_secret(value)` replaces the exact registered string in
+messages and string keyword values passed through that logger. It does not detect all
+secret-looking values, recursively sanitize arbitrary objects, or govern third-party
+logs. Story samples use separate, opt-in controls: unmarked values can appear; set a
+node's `sensitive: true` (or an explicit column list), and use
+`story.max_sample_rows: 0` to disable ordinary node sample capture. See [Story sample
+privacy](../features/stories.md#sample-data-and-privacy).
 
 ---
 

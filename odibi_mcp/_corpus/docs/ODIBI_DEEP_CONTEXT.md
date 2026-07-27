@@ -1892,9 +1892,13 @@ odibi story last
 # 3. Inspect specific node
 odibi story last --node failing_node_name
 
-# 4. Run single node in isolation
-odibi run pipeline.yaml --node failing_node_name --dry-run
+# 4. Validate, then inspect an immutable logical plan
+odibi validate pipeline.yaml --format json
+cat pipeline.yaml | odibi plan --stdin --format json
 ```
+
+Single-node `--dry-run` is not isolated: it enters the late runtime and may cause
+surrounding lifecycle effects. See the [operation safety ladder](features/planning.md#operation-safety-ladder).
 
 **In Python:**
 ```python
@@ -2051,7 +2055,7 @@ odibi run pipeline.yaml --node node_a
 # Filter by tag
 odibi run pipeline.yaml --tag silver
 
-# Dry run (validate without execution)
+# Legacy late runtime simulation (surrounding lifecycle effects possible)
 odibi run pipeline.yaml --dry-run
 
 # Resume from failure
@@ -2063,6 +2067,10 @@ odibi run pipeline.yaml --parallel --workers 4
 # Error handling
 odibi run pipeline.yaml --on-error fail_later
 ```
+
+See the [operation safety ladder](features/planning.md#operation-safety-ladder) and the
+[legacy simulation boundary](features/planning.md#legacy-runtime-simulation-is-different)
+before using `--dry-run`.
 
 ### 17.2 Story Commands
 
@@ -2208,9 +2216,12 @@ params:
 | Error | Cause | Fix |
 |-------|-------|-----|
 | *"DataFrame 'X' not found in context"* | Missing `depends_on` | Add to `depends_on` list |
-| *"Column 'X' not found"* | Typo or missing column | Check schema, run `--dry-run` |
+| *"Column 'X' not found"* | Typo or missing column | Check the schema, validate, and inspect an immutable plan before controlled execution |
 | *"SCD2: provide either 'target' OR both 'connection' and 'path'"* | Invalid SCD2 config | Use one approach, not both |
 | *"Key Vault fetch timed out"* | Network/auth issue | Check VPN, credentials |
+
+For the exact distinction between validation, immutable planning, legacy simulation,
+and execution, use the [operation safety ladder](features/planning.md#operation-safety-ladder).
 
 ---
 
@@ -2571,12 +2582,17 @@ context.list_names()
 ### Debug Commands
 
 ```bash
-odibi run x.yaml --dry-run      # Validate only
+odibi run x.yaml --dry-run      # Legacy late runtime simulation; not immutable/no-effect
+cat x.yaml | odibi plan --stdin --format json  # Immutable; require status == "planned"
 odibi validate x.yaml              # Check config
 odibi story last                # View execution story
 odibi graph x.yaml              # View dependencies
 odibi doctor                    # Check environment
 ```
+
+See the [operation safety ladder](features/planning.md#operation-safety-ladder) and the
+[legacy simulation boundary](features/planning.md#legacy-runtime-simulation-is-different)
+for the effects and decision rules behind these commands.
 
 ### Validation Quick Reference
 

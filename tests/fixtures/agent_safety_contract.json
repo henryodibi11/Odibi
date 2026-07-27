@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "cli_selectors": {
+    "validate": "odibi validate CONFIG --format json",
+    "plan": "cat CONFIG | odibi plan --stdin --format json",
+    "legacy_simulation": "odibi run CONFIG --dry-run",
+    "execute": "odibi run CONFIG"
+  },
+  "planner_statuses": ["planned", "unresolved", "invalid"],
+  "planner_success_status": "planned",
+  "action_effects": {
+    "validate_yaml": "public_read",
+    "validate_pipeline": "public_read",
+    "test_pipeline": "execution",
+    "map_environment": "sensitive_read",
+    "story_read": "sensitive_read",
+    "node_sample": "sensitive_read",
+    "node_failed_rows": "sensitive_read",
+    "lineage_graph": "sensitive_read",
+    "run_workflow": "execution",
+    "resume_workflow": "execution"
+  },
+  "runtime_data_actions_source_derived": [
+    "diagnose", "download_file", "download_sql", "download_table",
+    "lineage_graph", "map_environment", "node_failed_rows", "node_sample",
+    "profile_folder", "profile_source", "story_read", "suggest_pipeline"
+  ],
+  "mirror_pairs": {
+    "docs/ODIBI_DEEP_CONTEXT.md": "odibi_mcp/_corpus/docs/ODIBI_DEEP_CONTEXT.md",
+    "docs/examples/canonical/THE_REFERENCE.md": "odibi_mcp/_corpus/docs/examples/canonical/THE_REFERENCE.md",
+    "docs/features/cli.md": "odibi_mcp/_corpus/docs/features/cli.md",
+    "docs/features/engines.md": "odibi_mcp/_corpus/docs/features/engines.md",
+    "docs/features/pipelines.md": "odibi_mcp/_corpus/docs/features/pipelines.md",
+    "docs/features/planning.md": "odibi_mcp/_corpus/docs/features/planning.md",
+    "docs/features/stories.md": "odibi_mcp/_corpus/docs/features/stories.md",
+    "docs/guides/cli_master_guide.md": "odibi_mcp/_corpus/docs/guides/cli_master_guide.md",
+    "docs/guides/mcp_guide.md": "odibi_mcp/_corpus/docs/guides/mcp_guide.md",
+    "docs/guides/production_deployment.md": "odibi_mcp/_corpus/docs/guides/production_deployment.md",
+    "docs/reference/cheatsheet.md": "odibi_mcp/_corpus/docs/reference/cheatsheet.md",
+    "docs/reference/developer_cheatsheet.md": "odibi_mcp/_corpus/docs/reference/developer_cheatsheet.md"
+  },
+  "dogfood": {
+    "docs/features/planning.md": ["Operation safety ladder", "status == \"planned\"", "unresolved", "invalid", "ActionEffect.EXECUTION"],
+    "docs/guides/mcp_guide.md": ["HTTP Bearer identity", "CORS browser policy", "Listener bind", "Action authorization", "Managed-project runtime-data scope"],
+    "docs/features/stories.md": ["max_sample_rows", "defaults to `10`", "sensitive: false", "may appear"],
+    "docs/guides/production_deployment.md": ["exact registered string", "does not detect all"],
+    "docs/examples/canonical/THE_REFERENCE.md": ["dim_customer.parquet", "fact_sales.parquet", "data/gold/_system/meta_*", "remove only"]
+  },
+  "forbidden_blanket_phrases": ["MCP never mutates data", "no injection risk", "automatically detects values that look like secrets"],
+  "selected_safety_pages": [
+    "docs/ODIBI_DEEP_CONTEXT.md",
+    "docs/features/pipelines.md",
+    "docs/guides/mcp_guide.md",
+    "docs/journeys/senior-data-engineer.md",
+    "docs/reference/developer_cheatsheet.md",
+    "docs/visuals/run_lifecycle.md",
+    "odibi_mcp/README.md"
+  ],
+  "stale_selected_dry_run_phrases": [
+    "simulate execution without performing actual read/write operations",
+    "run single node in isolation",
+    "check schema, run `--dry-run`"
+  ]
+}
