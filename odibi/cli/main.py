@@ -6,15 +6,31 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-from odibi import __version__
+from odibi.cli.plan import plan_command as immutable_plan_command
 
-try:
-    from rich.console import Console
-    from rich.table import Table
 
-    RICH_AVAILABLE = True
-except ImportError:
-    RICH_AVAILABLE = False
+# Preserve the existing patchable CLI presentation seam without importing Rich
+# before the immutable planner selector. ``None`` means not resolved yet.
+RICH_AVAILABLE = None
+Console = None
+Table = None
+
+
+def _build_immutable_plan_parser() -> argparse.ArgumentParser:
+    """Build the isolated planner parser before any runtime command import."""
+    parser = argparse.ArgumentParser(
+        prog="odibi", description="Odibi - Declarative Data Engineering Framework"
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    plan_only = subparsers.add_parser(
+        "plan", help="Build an immutable logical plan from bounded stdin YAML"
+    )
+    plan_only.add_argument("--stdin", action="store_true", required=True)
+    plan_only.add_argument("--format", choices=["json"], required=True)
+    return parser
+
+
+_IMMUTABLE_PLAN_PARSER = _build_immutable_plan_parser()
 
 
 def format_output(data: Any, format_type: str = "auto") -> str:
@@ -26,6 +42,18 @@ def format_output(data: Any, format_type: str = "auto") -> str:
 
 def print_table(data: Dict[str, str], title: str = "") -> None:
     """Print a key-value table."""
+    global RICH_AVAILABLE, Console, Table
+    if RICH_AVAILABLE is None:
+        try:
+            from rich.console import Console as RichConsole
+            from rich.table import Table as RichTable
+        except ImportError:
+            RICH_AVAILABLE = False
+        else:
+            Console = RichConsole
+            Table = RichTable
+            RICH_AVAILABLE = True
+
     if RICH_AVAILABLE:
         console = Console()
         table = Table(title=title, show_header=True, header_style="bold magenta")
@@ -244,12 +272,24 @@ def cmd_doctor_path(args: argparse.Namespace) -> int:
 
 def main() -> int:
     """Main CLI entry point."""
+    if len(sys.argv) > 1 and sys.argv[1] == "plan":
+        plan_args = _IMMUTABLE_PLAN_PARSER.parse_args()
+        return immutable_plan_command(plan_args)
+
+    from odibi import __version__
+
     parser = argparse.ArgumentParser(
         prog="odibi", description="Odibi - Declarative Data Engineering Framework"
     )
     parser.add_argument("--version", action="version", version=f"odibi {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    plan_parser = subparsers.add_parser(
+        "plan", help="Build an immutable logical plan from bounded stdin YAML"
+    )
+    plan_parser.add_argument("--stdin", action="store_true", required=True)
+    plan_parser.add_argument("--format", choices=["json"], required=True)
 
     # odibi run
     run_parser = subparsers.add_parser("run", help="Execute pipeline")
@@ -258,7 +298,12 @@ def main() -> int:
         "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
     )
     run_parser.add_argument(
-        "--dry-run", action="store_true", help="Simulate execution without running operations"
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Legacy late runtime simulation; may initialize runtime facilities and cause side "
+            "effects; use 'odibi plan --stdin --format json' for immutable logical planning"
+        ),
     )
     run_parser.add_argument(
         "--resume", action="store_true", help="Resume from last failure (skip successful nodes)"
@@ -409,7 +454,9 @@ def main() -> int:
         parser.print_help()
         return 1
 
-    if args.command == "run":
+    if args.command == "plan":
+        return immutable_plan_command(args)
+    elif args.command == "run":
         from odibi.cli.run import run_command
 
         return run_command(args)

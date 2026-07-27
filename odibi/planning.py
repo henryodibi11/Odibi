@@ -773,6 +773,8 @@ def _project_pipeline(
         )
         kind = _classify_node(raw_node)
         unresolved_codes = _node_unresolved_codes(document, raw_node)
+        if kind == "unknown" and "UNRESOLVED_EXTENSION_DEPENDENCY" not in unresolved_codes:
+            unresolved_codes = tuple(sorted((*unresolved_codes, "UNRESOLVED_EXTENSION_DEPENDENCY")))
         node_drafts.append((node_name, kind, dependencies, unresolved_codes))
 
     edge_count = 0
@@ -889,6 +891,7 @@ def _enforce_encoded_response_bound(
 ) -> PlanningResponse:
     """Replace an oversized or unserializable response with one fixed failure."""
     try:
+        pipelines = response.plan.pipelines if response.plan is not None else ()
         emitted_non_identifiers = (
             response.schema_version,
             response.status,
@@ -905,8 +908,7 @@ def _enforce_encoded_response_bound(
             ),
             *(
                 value
-                for pipeline in response.plan.pipelines
-                if response.plan is not None
+                for pipeline in pipelines
                 for node in pipeline.nodes
                 for value in (node.kind, node.resolution)
             ),

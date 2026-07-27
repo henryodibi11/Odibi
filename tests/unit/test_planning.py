@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 import ast
-import builtins
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, fields, is_dataclass
 import json
 import logging
 import os
 from pathlib import Path
-import socket
 import subprocess
 import sys
-import tempfile
 import threading
-from typing import Callable, ContextManager, Dict, Iterator, List
+from typing import Callable, ContextManager, Dict, List
 import warnings
 
 import pytest
@@ -147,81 +143,6 @@ def _state_snapshot() -> Dict[str, object]:
         "loggers": loggers,
         "threads": tuple((thread.ident, thread.name) for thread in threading.enumerate()),
     }
-
-
-@pytest.fixture
-def immutable_planning_tripwires() -> Callable[[], ContextManager[List[str]]]:
-    """Deny generic filesystem, process, network, import, and global mutations."""
-
-    @contextmanager
-    def installed() -> Iterator[List[str]]:
-        attempts: List[str] = []
-
-        def deny(name: str):
-            def blocked(*args: object, **kwargs: object) -> None:
-                attempts.append(name)
-                raise AssertionError("effect-tripwire-canary-e933")
-
-            return blocked
-
-        def guarded_open(file: object, mode: str = "r", *args: object, **kwargs: object) -> object:
-            attempts.append(f"open:{mode}")
-            raise AssertionError("effect-tripwire-canary-e933")
-
-        with pytest.MonkeyPatch.context() as monkeypatch:
-            monkeypatch.setattr(builtins, "open", guarded_open)
-            for owner, names in (
-                (
-                    os,
-                    (
-                        "open",
-                        "remove",
-                        "unlink",
-                        "rename",
-                        "replace",
-                        "mkdir",
-                        "makedirs",
-                        "chdir",
-                        "system",
-                        "popen",
-                    ),
-                ),
-                (subprocess, ("run", "Popen", "call", "check_call", "check_output")),
-                (socket, ("socket", "create_connection", "getaddrinfo")),
-                (
-                    tempfile,
-                    (
-                        "TemporaryFile",
-                        "NamedTemporaryFile",
-                        "TemporaryDirectory",
-                        "mkstemp",
-                        "mkdtemp",
-                    ),
-                ),
-                (
-                    Path,
-                    (
-                        "open",
-                        "read_text",
-                        "read_bytes",
-                        "write_text",
-                        "write_bytes",
-                        "touch",
-                        "mkdir",
-                        "unlink",
-                        "rename",
-                        "replace",
-                    ),
-                ),
-            ):
-                for name in names:
-                    if hasattr(owner, name):
-                        monkeypatch.setattr(owner, name, deny(f"{owner.__name__}.{name}"))
-            monkeypatch.setattr(logging, "basicConfig", deny("logging.basicConfig"))
-            monkeypatch.setattr(builtins, "__import__", deny("builtins.__import__"))
-            yield attempts
-
-    return installed
 
 
 def test_exact_planned_schema_and_canonical_serialization() -> None:
@@ -361,6 +282,24 @@ def test_inactive_runtime_fields_do_not_create_false_unresolved_meaning() -> Non
         for pipeline in response.plan.pipelines
         for node in pipeline.nodes
     )
+
+
+@pytest.mark.parametrize("field", ("extension", "plugin", "custom", "pattern"))
+@pytest.mark.parametrize("value", ("{}", "{name: custom_handler}"))
+def test_unknown_extension_nodes_always_fail_closed_as_unresolved(field: str, value: str) -> None:
+    """Unknown-kind extension forms never become resolved when their value is empty."""
+    payload = (
+        f"pipelines:\n  - pipeline: p\n    nodes:\n      - name: n\n        {field}: {value}\n"
+    )
+
+    response = plan_pipeline_yaml(payload)
+
+    assert response.status == "unresolved"
+    assert response.plan is not None
+    node = response.plan.pipelines[0].nodes[0]
+    assert node.kind == "unknown"
+    assert node.resolution == "unresolved"
+    assert {item.code for item in response.diagnostics} == {"UNRESOLVED_EXTENSION_DEPENDENCY"}
 
 
 @pytest.mark.parametrize(

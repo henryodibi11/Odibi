@@ -34,8 +34,10 @@ create_file("pipelines/pipeline_name.yaml", yaml_content)
 
 ### 6. Validate
 ```
-run_command("python -m odibi run pipelines/X.yaml --dry-run")
+test_pipeline(yaml_content, mode="dry-run")
 ```
+This returns immutable planning schema `1.0`. Continue only when `status` is
+`planned`; `unresolved` and `invalid` are non-success results.
 
 ### 7. Run
 ```
@@ -107,6 +109,7 @@ diagnose()
 ## DO
 
 - ✅ Use generate_bronze_node()
-- ✅ Always validate with --dry-run
+- ✅ Plan supplied YAML with `test_pipeline(..., mode="dry-run")`
+- ✅ Treat only `status == "planned"` as success
 - ✅ Fix errors and retry
 - ✅ Report success/failure

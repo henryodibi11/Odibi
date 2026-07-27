@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Immutable pipeline planning boundary** — `odibi.planning.plan_pipeline_yaml()` and
+  `plan_pipeline_bytes()` return deterministic bounded logical-only schema `1.0` without
+  runtime construction. The dedicated CLI route is
+  `odibi plan --stdin --format json`; authorized MCP direct and trusted-local planning
+  workflows use the same primitive.
+
 - **Agent Skills System** — 15 skill documents in `docs/skills/` providing structured AI agent guidance for every task type (#228):
   - 01 Think/Plan/Critique, 02 Odibi-First Lookup, 03 Write a Transformer, 04 Write a Pattern, 05 Pipeline YAML Authoring, 06 Add a Connection, 07 Testing, 08 Validation Workflow, 09 Code Review Standards, 10 Task Document Template, 11 Lessons Learned Protocol, 12 Databricks Notebook Protocol, 13 Testing Standards, 14 Code Standards, 15 Engine Parity Standards
   - Skill Router with automatic workflow chains per task type (e.g., "add transformer" → 01 → 02 → 14 → 03 → 15 → 13 → 07 → 09)
@@ -77,6 +83,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - #248 (SCD2 float/NaN comparison) triaged as known trap (T-009 in LESSONS_LEARNED.md)
 
 ### Changed
+
+- **MCP planning response security correction** — `test_pipeline` dry-run mode and
+  `validate_yaml_runnable` now return planner schema `1.0`, without legacy process
+  output, raw errors, or scratch/subprocess execution. The existing remote
+  `validate_yaml_simple` workflow remains validation-only, and transport authorization
+  is unchanged. Compatibility parameters `max_rows` and `sample_size` are accepted,
+  bounded, deprecated, and ignored for one compatibility cycle.
+- **Legacy dry-run migration** — `PipelineManager.run(dry_run=True)` and
+  `odibi run PATH --dry-run` remain legacy late runtime simulation. They can initialize
+  runtime facilities and surrounding lifecycle effects and are not an immutable
+  security boundary. Use `plan_pipeline_yaml(yaml_text)` or
+  `cat config.yaml | odibi plan --stdin --format json` for immutable logical planning.
 
 - **ROADMAP.md refreshed** — updated coverage milestone (80%), module-by-module coverage table matching AGENTS.md, bug audit completion status, engine parity marked as functionally complete
 - **AGENTS.md expanded** — comprehensive per-module coverage tracking with test file counts, coverage percentages, remaining work, known pre-existing failures, and 5-phase coverage roadmap showing progression from 66% → 80% (34,363 stmts, 6,854 missed)

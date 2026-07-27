@@ -9,10 +9,16 @@ Provides deterministic, step-by-step workflow execution with:
 
 from typing import Any, Dict, List, Optional, Callable
 from copy import deepcopy
+from importlib import import_module
 import re
 import time
 import base64
 import json
+
+try:
+    from odibi_mcp.tools.execution import test_pipeline, validate_yaml_runnable
+except ImportError:  # Flat Databricks workspace deployment
+    from tools.execution import test_pipeline, validate_yaml_runnable
 
 # ----------------------
 # State helpers
@@ -64,35 +70,43 @@ def _apply_templates(value: Any, state: Dict[str, Any]) -> Any:
 # ----------------------
 # Tool registry (Phase 2: + construction tools)
 # ----------------------
-# ruff: noqa: E402
 
-from odibi_mcp.tools.execution import test_pipeline, validate_yaml_runnable
-from odibi_mcp.tools.validation import validate_pipeline as validate_pipeline_enhanced
-from odibi_mcp.tools.construction import list_patterns, apply_pattern_template, list_transformers
-from odibi_mcp.tools.smart import map_environment, profile_source, profile_folder
-from odibi_mcp.tools.diagnose import diagnose
-from odibi_mcp.tools.story import story_read, node_sample, node_failed_rows, lineage_graph
+
+def _lazy_tool(module_name: str, function_name: str) -> Callable[..., Any]:
+    """Defer non-planning tool imports until the specific tool is invoked."""
+
+    def call(**kwargs: Any) -> Any:
+        module = import_module(module_name)
+        return getattr(module, function_name)(**kwargs)
+
+    return call
+
+
+_TOOLS_PACKAGE = __package__ or "tools"
+
 
 TOOL_REGISTRY: Dict[str, Callable[..., Dict[str, Any]]] = {
     # Validation
     "test_pipeline": test_pipeline,
     "validate_yaml_runnable": validate_yaml_runnable,
-    "validate_pipeline_enhanced": validate_pipeline_enhanced,
+    "validate_pipeline_enhanced": _lazy_tool(f"{_TOOLS_PACKAGE}.validation", "validate_pipeline"),
     # Construction
-    "list_patterns": list_patterns,
-    "apply_pattern_template": apply_pattern_template,
-    "list_transformers": list_transformers,
+    "list_patterns": _lazy_tool(f"{_TOOLS_PACKAGE}.construction", "list_patterns"),
+    "apply_pattern_template": _lazy_tool(
+        f"{_TOOLS_PACKAGE}.construction", "apply_pattern_template"
+    ),
+    "list_transformers": _lazy_tool(f"{_TOOLS_PACKAGE}.construction", "list_transformers"),
     # Discovery
-    "map_environment": map_environment,
-    "profile_source": profile_source,
-    "profile_folder": profile_folder,
+    "map_environment": _lazy_tool(f"{_TOOLS_PACKAGE}.smart", "map_environment"),
+    "profile_source": _lazy_tool(f"{_TOOLS_PACKAGE}.smart", "profile_source"),
+    "profile_folder": _lazy_tool(f"{_TOOLS_PACKAGE}.smart", "profile_folder"),
     # Diagnostics
-    "diagnose": diagnose,
+    "diagnose": _lazy_tool(f"{_TOOLS_PACKAGE}.diagnose", "diagnose"),
     # Story/Inspection (Phase 3)
-    "story_read": story_read,
-    "node_sample": node_sample,
-    "node_failed_rows": node_failed_rows,
-    "lineage_graph": lineage_graph,
+    "story_read": _lazy_tool(f"{_TOOLS_PACKAGE}.story", "story_read"),
+    "node_sample": _lazy_tool(f"{_TOOLS_PACKAGE}.story", "node_sample"),
+    "node_failed_rows": _lazy_tool(f"{_TOOLS_PACKAGE}.story", "node_failed_rows"),
+    "lineage_graph": _lazy_tool(f"{_TOOLS_PACKAGE}.story", "lineage_graph"),
 }
 
 
@@ -509,7 +523,7 @@ def _register(name: str, wf: Dict[str, Any]):
 _register(
     "validate_yaml_simple",
     {
-        "description": "Validate a pipeline YAML (structure + dry-run)",
+        "description": "Validate a pipeline YAML structure (validation only)",
         "steps": [
             {"type": "log", "message": "Validating YAML..."},
             {
@@ -528,7 +542,7 @@ _register(
 _register(
     "build_and_validate",
     {
-        "description": "Build pipeline YAML from pattern and validate with dry-run",
+        "description": "Build pipeline YAML from a pattern and create an immutable logical plan",
         "steps": [
             {"type": "log", "message": "Starting build_and_validate"},
             {"type": "set", "values": {"params.__workflow_name": "build_and_validate"}},
@@ -630,7 +644,28 @@ _register(
             },
             {
                 "type": "log",
-                "message": "Validation result: {results.validation.valid}",
+                "message": "Planning status: {results.validation.status}",
+            },
+            {
+                "type": "branch",
+                "cases": [
+                    {
+                        "when": {"path": "results.validation.status", "equals": "planned"},
+                        "goto": "planning_succeeded",
+                    }
+                ],
+                "default": "planning_failed",
+            },
+            {
+                "label": "planning_failed",
+                "type": "log",
+                "message": "Immutable planning did not succeed: {results.validation.diagnostics}",
+            },
+            {"type": "goto", "label": "end"},
+            {
+                "label": "planning_succeeded",
+                "type": "log",
+                "message": "Immutable logical plan completed.",
             },
             {"label": "end", "type": "set", "values": {"results.done": True}},
         ],
@@ -659,26 +694,33 @@ _register(
             {
                 "type": "branch",
                 "cases": [
-                    {"when": {"path": "results.quick.valid", "equals": True}, "goto": "looks_ok"},
+                    {
+                        "when": {"path": "results.quick.status", "equals": "planned"},
+                        "goto": "looks_ok",
+                    },
+                    {
+                        "when": {"path": "results.quick.status", "equals": "unresolved"},
+                        "goto": "planning_unresolved",
+                    },
                 ],
-                "default": "deep_validate",
+                "default": "planning_invalid",
             },
             {
-                "label": "deep_validate",
-                "type": "call",
-                "tool": "validate_pipeline_enhanced",
-                "args": {"yaml_content": "{params.yaml}", "check_connections": True},
-                "assign": "results.enhanced",
-            },
-            {
+                "label": "planning_unresolved",
                 "type": "log",
-                "message": "Enhanced validation complete. See results.enhanced for details.",
+                "message": "Immutable planning is unresolved: {results.quick.diagnostics}",
+            },
+            {"type": "goto", "label": "end"},
+            {
+                "label": "planning_invalid",
+                "type": "log",
+                "message": "Immutable planning is invalid: {results.quick.diagnostics}",
             },
             {"type": "goto", "label": "end"},
             {
                 "label": "looks_ok",
                 "type": "log",
-                "message": "YAML structure looks OK. Use test_pipeline for execution plan.",
+                "message": "Immutable logical plan completed.",
             },
             {"label": "end", "type": "set", "values": {"results.done": True}},
         ],

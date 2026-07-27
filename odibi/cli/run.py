@@ -1,4 +1,6 @@
-"""Run command implementation."""
+"""Runtime execution command, including legacy late runtime simulation."""
+
+import sys
 
 from pathlib import Path
 
@@ -9,8 +11,23 @@ from odibi.utils.extensions import load_extensions
 from odibi.utils.logging import logger
 
 
+LEGACY_DRY_RUN_WARNING = (
+    "Warning: odibi run --dry-run is legacy late runtime simulation; may initialize runtime "
+    "facilities and cause side effects; use `odibi plan --stdin --format json` for immutable "
+    "logical planning."
+)
+
+
 def run_command(args):
-    """Execute pipeline from config file."""
+    """Execute a pipeline, optionally using legacy late runtime simulation.
+
+    The ``dry_run`` route can load ``.env``, project or installed code,
+    providers and credentials, engines, catalogs and state, logging,
+    telemetry, stories, lineage, alerts, and surrounding lifecycle effects.
+    It is not an immutable planning or security boundary.
+    """
+    if args.dry_run:
+        print(LEGACY_DRY_RUN_WARNING, file=sys.stderr)
     try:
         config_path = Path(args.config).resolve()
         project_root = config_path.parent
