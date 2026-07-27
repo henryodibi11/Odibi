@@ -46,7 +46,7 @@ engine: pandas
 connections:
   output:
     type: local
-    base_path: ./data
+    base_path: ./odibi-quickstart-output
 story:
   connection: output
   path: stories/
@@ -92,22 +92,55 @@ pipelines:
           mode: overwrite
 ```
 
-Run it:
+Validate, plan, then run it. Continue only when the planner response has
+`status == "planned"`:
+```bash
+odibi validate sim.yaml --format json
+cat sim.yaml | odibi plan --stdin --format json
+```
+
+**Effects before you run:** relative to the directory containing `sim.yaml`, execution
+overwrites `odibi-quickstart-output/bronze/sensors.parquet`; creates timestamped
+`odibi-quickstart-output/stories/demo/YYYY-MM-DD/run_HH-MM-SS.{html,json}` Stories; and
+initializes or updates `odibi-quickstart-output/_odibi_system/` `meta_*` catalog assets.
+A repeat replaces the sensor target, normally creates a later Story pair subject to
+retention, and updates run/catalog metadata. To clean up, delete only
+`odibi-quickstart-output/` and the `sim.yaml` created for this example; do not do so if
+either path was repurposed.
+
+Run:
 ```bash
 python -c "from odibi.pipeline import PipelineManager; PipelineManager.from_yaml('sim.yaml').run()"
 ```
 
-Output: `data/bronze/sensors.parquet` — 300 rows of realistic sensor data with memory, drift, and mean reversion. No database needed.
+Output: `odibi-quickstart-output/bronze/sensors.parquet` contains simulated sensor data
+with memory, drift, and mean reversion. No database needed.
 
 **Option 2: Build a star schema from CSV**
+
+**Effects before init:** `odibi init` creates `my_project/`; it replaces an existing
+directory only when explicitly forced, and this command does not use `--force`.
 ```bash
 odibi init my_project --template star-schema
 cd my_project
+```
+
+**Effects before you run:** execution overwrites `data/gold/dim_customer.parquet`,
+`dim_product.parquet`, `dim_date.parquet`, and `fact_sales.parquet`; writes timestamped
+Stories below `data/gold/stories/{build_dimensions|build_facts}/YYYY-MM-DD/run_HH-MM-SS.{html,json}`;
+and initializes or updates `data/gold/_system/meta_*`. Repeats replace the four data
+targets, create later Stories, and update catalog metadata. The generated `sample_data/`
+is inside the project. Cleanup is removal of the newly generated `my_project/` only;
+never delete a reused project.
+```bash
 odibi run odibi.yaml
 odibi story last          # View the audit report
 ```
 
 **Option 3: Clone the reference example**
+
+Review the canonical reference's [exact effects, repeat behavior, and cleanup](docs/examples/canonical/THE_REFERENCE.md#run-it)
+before execution.
 ```bash
 git clone https://github.com/henryodibi11/Odibi.git
 cd Odibi/docs/examples/canonical/runnable

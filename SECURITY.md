@@ -65,10 +65,23 @@ When using ODIBI:
 
 ## Known Security Considerations
 
-- **YAML Loading**: ODIBI uses safe YAML loading (no code execution)
-- **SQL Injection**: Use parameterized queries (provided by SQLAlchemy)
-- **Path Traversal**: Connection paths are validated and sandboxed
-- **Secrets in Logs**: ODIBI redacts common secret patterns from logs
+- **YAML Loading**: The configuration loader uses safe YAML loading. This claim does not
+  extend to imported Python, plugins, runtime extensions, or arbitrary execution.
+- **SQL**: Use supported parameter APIs where a connector provides them. Never
+  interpolate untrusted identifiers or SQL fragments; Odibi and its engines do not
+  promise universal injection immunity.
+- **Managed remote access**: Named managed runtime-data actions enforce their canonical
+  path, connection, strict SQL/identifier, cap, and export policies. This is not a
+  universal sandbox for all Odibi connection paths.
+- **Secrets in logs**: `StructuredLogger.register_secret(value)` replaces that exact
+  registered string in messages and string keyword values passed through that logger.
+  It does not discover secret patterns, recursively sanitize arbitrary objects, cover
+  third-party logs, or govern Story samples.
+
+See the [MCP trust boundaries](docs/guides/mcp_guide.md), [Story privacy
+contract](docs/features/stories.md#sample-data-and-privacy), and [immutable planning
+boundary](docs/features/planning.md). Environment-variable placeholders are examples,
+not proof that every connector resolves or redacts them identically.
 
 ## Security Updates
 
