@@ -153,8 +153,8 @@ def cmd_scaffold_sql_pipeline(args: argparse.Namespace) -> int:
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
-    """Validate YAML file."""
-    from odibi.validate.pipeline import validate_yaml
+    """Validate YAML without constructing runtime resources."""
+    from odibi.validate import validate_config_file
 
     try:
         yaml_file = Path(args.file)
@@ -162,22 +162,20 @@ def cmd_validate(args: argparse.Namespace) -> int:
             print(f"Error: File not found: {yaml_file}", file=sys.stderr)
             return 1
 
-        yaml_content = yaml_file.read_text()
-        result = validate_yaml(yaml_content)
+        result = validate_config_file(yaml_file, env=getattr(args, "env", None))
 
         if args.format == "json":
             print(json.dumps(result, indent=2))
         else:
             if result.get("valid"):
                 print(f"✓ {yaml_file} is valid")
-                return 0
             else:
                 print(f"✗ {yaml_file} has errors:")
                 for error in result.get("errors", []):
                     print(f"  - {error.get('field_path', 'unknown')}: {error.get('message', '')}")
-                return 1
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        return 0 if result.get("valid") else 1
+    except Exception:
+        print("Error: Validation failed unexpectedly", file=sys.stderr)
         return 1
 
 
@@ -361,6 +359,7 @@ def main() -> int:
 
     validate_parser = subparsers.add_parser("validate", help="Validate YAML file")
     validate_parser.add_argument("file", help="YAML file to validate")
+    validate_parser.add_argument("--env", help="Environment overlay name")
     validate_parser.add_argument("--format", choices=["auto", "json"], default="auto")
 
     doctor_parser = subparsers.add_parser("doctor", help="Run environment diagnostics")

@@ -165,7 +165,7 @@ class TestCmdValidate:
         yaml_file = tmp_path / "valid.yaml"
         yaml_file.write_text("key: value")
         args = _make_args(file=str(yaml_file), format="auto")
-        with patch("odibi.validate.pipeline.validate_yaml", return_value={"valid": True}):
+        with patch("odibi.validate.validate_config_file", return_value={"valid": True}):
             result = cmd_validate(args)
         assert result == 0
         captured = capsys.readouterr()
@@ -179,7 +179,7 @@ class TestCmdValidate:
             "valid": False,
             "errors": [{"field_path": "x", "message": "bad"}],
         }
-        with patch("odibi.validate.pipeline.validate_yaml", return_value=mock_result):
+        with patch("odibi.validate.validate_config_file", return_value=mock_result):
             result = cmd_validate(args)
         assert result == 1
         captured = capsys.readouterr()
@@ -190,7 +190,7 @@ class TestCmdValidate:
         yaml_file.write_text("key: value")
         args = _make_args(file=str(yaml_file), format="json")
         mock_result = {"valid": True}
-        with patch("odibi.validate.pipeline.validate_yaml", return_value=mock_result):
+        with patch("odibi.validate.validate_config_file", return_value=mock_result):
             cmd_validate(args)
         captured = capsys.readouterr()
         parsed = json.loads(captured.out)
@@ -200,11 +200,12 @@ class TestCmdValidate:
         yaml_file = tmp_path / "err.yaml"
         yaml_file.write_text("key: value")
         args = _make_args(file=str(yaml_file), format="auto")
-        with patch("odibi.validate.pipeline.validate_yaml", side_effect=RuntimeError("boom")):
+        with patch("odibi.validate.validate_config_file", side_effect=RuntimeError("boom")):
             result = cmd_validate(args)
         assert result == 1
         captured = capsys.readouterr()
-        assert "boom" in captured.err
+        assert "unexpectedly" in captured.err
+        assert "boom" not in captured.err
 
     def test_invalid_yaml_shows_field_path(self, tmp_path, capsys):
         yaml_file = tmp_path / "bad2.yaml"
@@ -214,7 +215,7 @@ class TestCmdValidate:
             "valid": False,
             "errors": [{"field_path": "connections.db", "message": "missing"}],
         }
-        with patch("odibi.validate.pipeline.validate_yaml", return_value=mock_result):
+        with patch("odibi.validate.validate_config_file", return_value=mock_result):
             result = cmd_validate(args)
         assert result == 1
         captured = capsys.readouterr()
