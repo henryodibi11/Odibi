@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import importlib.metadata
+import importlib.util
 import inspect
 import json
 from pathlib import Path
@@ -17,7 +19,6 @@ from odibi_mcp.contracts.access import RUNTIME_DATA_ACTIONS
 from odibi_mcp.corpus import corpus_root
 from odibi_mcp.dispatcher import ACTION_EFFECTS
 from odibi_mcp.knowledge import OdibiKnowledge
-from odibi_mcp.mcp_server import odibi_execute
 
 HERE = Path(__file__).resolve()
 
@@ -103,6 +104,28 @@ def _contract() -> dict[str, object]:
         data["stale_selected_dry_run_phrases"], name="stale_selected_dry_run_phrases"
     )
     return data
+
+
+def _odibi_execute_parameters() -> list[str]:
+    if importlib.util.find_spec("fastmcp") is not None:
+        from odibi_mcp.mcp_server import odibi_execute
+
+        return list(inspect.signature(odibi_execute).parameters)
+    assert REPO is not None
+    source = (REPO / "odibi_mcp/mcp_server.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "odibi_execute"
+    ]
+    assert len(functions) == 1
+    function = functions[0]
+    assert len(function.args.defaults) == 1
+    assert isinstance(function.args.defaults[0], ast.Constant)
+    assert function.args.defaults[0].value is None
+    return [argument.arg for argument in function.args.args]
 
 
 def test_fixture_matches_live_safety_constants():
@@ -242,7 +265,7 @@ def test_selected_pages_reject_stale_safety_and_transport_spelling():
         assert phrase.casefold() not in selected
     assert "params_json" not in selected
     assert selected.count("odibi_execute(action, args_json=none)") == 2
-    assert list(inspect.signature(odibi_execute).parameters) == ["action", "args_json"]
+    assert _odibi_execute_parameters() == ["action", "args_json"]
 
 
 def test_installed_corpus_and_readme_metadata():
