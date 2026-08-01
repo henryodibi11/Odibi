@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+cd "$repo_root"
+
+if [ ! -x .venv/bin/python ]; then
+    python3 -m venv .venv
+fi
+
+.venv/bin/python -m pip install -e . pytest
+.venv/bin/python -m pip check
+.venv/bin/python -m pytest --collect-only -q tests/test_config.py
+.venv/bin/python -m pytest -q tests/test_config.py::TestReadConfig::test_valid_read_config_with_path
