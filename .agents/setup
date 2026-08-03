@@ -23,10 +23,12 @@ case "$1" in
 esac
 SH
             chmod 700 "$askpass"
-            GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+            GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \
+                GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
                 .venv/bin/python -m pip install -e . pytest \
                 "context-workbench[mcp] @ $cw_source_url"
-            GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+            GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \
+                GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
                 .venv/bin/python -m pip install --force-reinstall --no-deps \
                 "context-workbench[mcp] @ $cw_source_url"
         )
