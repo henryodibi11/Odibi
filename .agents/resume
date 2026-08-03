@@ -5,19 +5,20 @@ repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 cw_commit=6051fcc0a1084a4e96d9880703a3e84955fee42a
 cw_home=$(dirname -- "$repo_root")/.odibi-context-workbench-state
+cw_venv=$(dirname -- "$repo_root")/.odibi-context-workbench-venv
 
 is_healthy() {
     [ -x .venv/bin/python ] || return 1
+    [ -x "$cw_venv/bin/python" ] || return 1
+    .venv/bin/python -c 'import odibi, pytest' >/dev/null 2>&1 || return 1
     CW_REVISION="$cw_commit" CW_PROJECT_ROOT="$repo_root" CW_HOME="$cw_home" \
-        .venv/bin/python - <<'PY' >/dev/null 2>&1
+        "$cw_venv/bin/python" - <<'PY' >/dev/null 2>&1
 import json
 import os
 from importlib.metadata import distribution
 from pathlib import Path
 
 import context_workbench.mcp_server
-import odibi
-import pytest
 from context_workbench.bootstrap import init
 
 metadata = distribution("context-workbench").read_text("direct_url.json")

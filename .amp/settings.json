@@ -1,7 +1,7 @@
 {
   "amp.mcpServers": {
     "context-workbench": {
-      "command": "${AMP_WORKING_DIRECTORY}/.venv/bin/python",
+      "command": "${AMP_WORKING_DIRECTORY}/../.odibi-context-workbench-venv/bin/python",
       "args": [
         "-m",
         "context_workbench.mcp_server"
