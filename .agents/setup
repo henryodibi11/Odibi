@@ -6,6 +6,7 @@ cd "$repo_root"
 
 cw_commit=6051fcc0a1084a4e96d9880703a3e84955fee42a
 cw_home=$(dirname -- "$repo_root")/.odibi-context-workbench-state
+cw_venv=$(dirname -- "$repo_root")/.odibi-context-workbench-venv
 cw_repository_url=https://github.com/henryodibi11/context_workbench.git
 cw_source_url="git+https://github.com/henryodibi11/context_workbench.git@$cw_commit"
 
@@ -25,11 +26,11 @@ SH
             chmod 700 "$askpass"
             GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \
                 GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
-                .venv/bin/python -m pip install -e . pytest \
+                "$cw_venv/bin/python" -m pip install \
                 "context-workbench[mcp] @ $cw_source_url"
             GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \
                 GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
-                .venv/bin/python -m pip install --force-reinstall --no-deps \
+                "$cw_venv/bin/python" -m pip install --force-reinstall --no-deps \
                 "context-workbench[mcp] @ $cw_source_url"
         )
         return
@@ -40,9 +41,9 @@ SH
         echo "Configure CW_GITHUB_TOKEN as an Amp Project secret or authenticate Git locally." >&2
         return 1
     fi
-    GIT_TERMINAL_PROMPT=0 .venv/bin/python -m pip install -e . pytest \
+    GIT_TERMINAL_PROMPT=0 "$cw_venv/bin/python" -m pip install \
         "context-workbench[mcp] @ $cw_source_url"
-    GIT_TERMINAL_PROMPT=0 .venv/bin/python -m pip install --force-reinstall --no-deps \
+    GIT_TERMINAL_PROMPT=0 "$cw_venv/bin/python" -m pip install --force-reinstall --no-deps \
         "context-workbench[mcp] @ $cw_source_url"
 }
 
@@ -55,13 +56,17 @@ PY
 if [ ! -x .venv/bin/python ]; then
     python3 -m venv .venv
 fi
+if [ ! -x "$cw_venv/bin/python" ]; then
+    python3 -m venv "$cw_venv"
+fi
 
+.venv/bin/python -m pip install -e . pytest
 install_context_workbench
 .venv/bin/python -m pip check
 .venv/bin/python -m pytest --collect-only -q tests/test_config.py
 .venv/bin/python -m pytest -q tests/test_config.py::TestReadConfig::test_valid_read_config_with_path
 CW_REVISION="$cw_commit" CW_PROJECT_ROOT="$repo_root" CW_HOME="$cw_home" \
-    .venv/bin/python - <<'PY'
+    "$cw_venv/bin/python" - <<'PY'
 import json
 import os
 from importlib.metadata import distribution
@@ -76,6 +81,9 @@ if direct_url.get("vcs_info", {}).get("commit_id") != os.environ["CW_REVISION"]:
     raise RuntimeError("Context Workbench revision does not match the Odibi project pin")
 project_root = Path(os.environ["CW_PROJECT_ROOT"]).resolve()
 cw_home = Path(os.environ["CW_HOME"]).resolve()
+distribution_root = Path(distribution("context-workbench").locate_file("")).resolve()
+if project_root == distribution_root or project_root in distribution_root.parents:
+    raise RuntimeError("Context Workbench runtime must remain outside the Odibi checkout")
 cw, root, _ = init(root=str(project_root))
 status = cw("status", output_format="dict")
 assert Path(root).resolve() == project_root
