@@ -4,9 +4,47 @@ set -eu
 repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
-cw_commit=a4f2f645569081af4bc9ef2907fa45f3ef87455d
+cw_commit=6051fcc0a1084a4e96d9880703a3e84955fee42a
 cw_home=$(dirname -- "$repo_root")/.odibi-context-workbench-state
+cw_repository_url=https://github.com/henryodibi11/context_workbench.git
 cw_source_url="git+https://github.com/henryodibi11/context_workbench.git@$cw_commit"
+
+install_context_workbench() {
+    if [ -n "${CW_GITHUB_TOKEN:-}" ]; then
+        (
+            askpass=$(mktemp)
+            trap 'rm -f "$askpass"' 0 1 2 15
+            cat >"$askpass" <<'SH'
+#!/bin/sh
+case "$1" in
+    *Username*) printf '%s\n' x-access-token ;;
+    *Password*) printf '%s\n' "$CW_GITHUB_TOKEN" ;;
+    *) exit 1 ;;
+esac
+SH
+            chmod 700 "$askpass"
+            GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \
+                GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+                .venv/bin/python -m pip install -e . pytest \
+                "context-workbench[mcp] @ $cw_source_url"
+            GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \
+                GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+                .venv/bin/python -m pip install --force-reinstall --no-deps \
+                "context-workbench[mcp] @ $cw_source_url"
+        )
+        return
+    fi
+
+    if ! GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code "$cw_repository_url" HEAD >/dev/null 2>&1; then
+        echo "Cannot read the private Context Workbench repository." >&2
+        echo "Configure CW_GITHUB_TOKEN as an Amp Project secret or authenticate Git locally." >&2
+        return 1
+    fi
+    GIT_TERMINAL_PROMPT=0 .venv/bin/python -m pip install -e . pytest \
+        "context-workbench[mcp] @ $cw_source_url"
+    GIT_TERMINAL_PROMPT=0 .venv/bin/python -m pip install --force-reinstall --no-deps \
+        "context-workbench[mcp] @ $cw_source_url"
+}
 
 python3 - <<'PY'
 import sys
@@ -18,8 +56,7 @@ if [ ! -x .venv/bin/python ]; then
     python3 -m venv .venv
 fi
 
-.venv/bin/python -m pip install -e . pytest \
-    "context-workbench[mcp] @ $cw_source_url"
+install_context_workbench
 .venv/bin/python -m pip check
 .venv/bin/python -m pytest --collect-only -q tests/test_config.py
 .venv/bin/python -m pytest -q tests/test_config.py::TestReadConfig::test_valid_read_config_with_path

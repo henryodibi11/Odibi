@@ -3,7 +3,7 @@ set -eu
 
 repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
-cw_commit=a4f2f645569081af4bc9ef2907fa45f3ef87455d
+cw_commit=6051fcc0a1084a4e96d9880703a3e84955fee42a
 cw_home=$(dirname -- "$repo_root")/.odibi-context-workbench-state
 
 is_healthy() {
