@@ -1,5 +1,20 @@
 # Odibi - Agent Guide
 
+## Amp Delegation Reliability
+
+- `.agents/setup` is the authority for fresh-orb project, pytest, and Context Workbench
+  availability; run it rather than inventing a parallel bootstrap path. `.agents/resume`
+  is the fast readiness check after an orb resumes.
+- For substantive delegated or source work, automatically use Context Workbench through
+  the configured Amp MCP in proportion to the task. Gather only evidence that can affect
+  the decision; trivial edits do not require ceremony.
+- Keep tests bounded to the changed behavior and focused neighboring contracts. Do not run
+  the full suite unless the delegation explicitly requires it.
+- Do not access Databricks, cloud resources, or other external systems by default. Such
+  access requires explicit task authority; local source and fixture evidence comes first.
+- Return explicit `status`, `commit`, `changed files`, `checks/evidence`, and
+  `limitations/blockers` fields. Never imply that an unperformed check passed.
+
 ## AI Quick Start
 
 **Read [docs/THREAD_QUICK_START.md](docs/THREAD_QUICK_START.md) FIRST** — it has the full source layout with line counts, environment facts, test rules, and coverage commands. This saves 5-10 minutes of exploration per thread.

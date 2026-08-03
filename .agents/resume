@@ -3,40 +3,26 @@ set -eu
 
 repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
-
 cw_commit=a4f2f645569081af4bc9ef2907fa45f3ef87455d
 cw_home=$(dirname -- "$repo_root")/.odibi-context-workbench-state
-cw_source_url="git+https://github.com/henryodibi11/context_workbench.git@$cw_commit"
 
-python3 - <<'PY'
-import sys
-if sys.version_info < (3, 11):
-    raise SystemExit("Odibi Amp integration requires Python 3.11 or newer")
-PY
-
-if [ ! -x .venv/bin/python ]; then
-    python3 -m venv .venv
-fi
-
-.venv/bin/python -m pip install -e . pytest \
-    "context-workbench[mcp] @ $cw_source_url"
-.venv/bin/python -m pip check
-.venv/bin/python -m pytest --collect-only -q tests/test_config.py
-.venv/bin/python -m pytest -q tests/test_config.py::TestReadConfig::test_valid_read_config_with_path
-CW_REVISION="$cw_commit" CW_PROJECT_ROOT="$repo_root" CW_HOME="$cw_home" \
-    .venv/bin/python - <<'PY'
+is_healthy() {
+    [ -x .venv/bin/python ] || return 1
+    CW_REVISION="$cw_commit" CW_PROJECT_ROOT="$repo_root" CW_HOME="$cw_home" \
+        .venv/bin/python - <<'PY' >/dev/null 2>&1
 import json
 import os
 from importlib.metadata import distribution
 from pathlib import Path
 
 import context_workbench.mcp_server
+import odibi
+import pytest
 from context_workbench.bootstrap import init
 
 metadata = distribution("context-workbench").read_text("direct_url.json")
 direct_url = json.loads(metadata or "{}")
-if direct_url.get("vcs_info", {}).get("commit_id") != os.environ["CW_REVISION"]:
-    raise RuntimeError("Context Workbench revision does not match the Odibi project pin")
+assert direct_url.get("vcs_info", {}).get("commit_id") == os.environ["CW_REVISION"]
 project_root = Path(os.environ["CW_PROJECT_ROOT"]).resolve()
 cw_home = Path(os.environ["CW_HOME"]).resolve()
 cw, root, _ = init(root=str(project_root))
@@ -45,3 +31,10 @@ assert Path(root).resolve() == project_root
 assert Path(status["runtime"]["artifact_root"]).resolve() == cw_home
 assert Path(status["runtime"]["target_root"]).resolve() == project_root
 PY
+}
+
+if ! is_healthy; then
+    exec "$repo_root/.agents/setup"
+fi
+
+printf '%s\n' "Odibi project, pytest, and Context Workbench MCP are ready."

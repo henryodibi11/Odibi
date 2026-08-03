@@ -1,0 +1,20 @@
+{
+  "amp.mcpServers": {
+    "context-workbench": {
+      "command": "${AMP_WORKING_DIRECTORY}/.venv/bin/python",
+      "args": [
+        "-m",
+        "context_workbench.mcp_server"
+      ],
+      "env": {
+        "CW_HOME": "${AMP_WORKING_DIRECTORY}/../.odibi-context-workbench-state",
+        "CW_MCP_GATEWAY_ONLY": "1",
+        "CW_PROJECT_ROOT": "${AMP_WORKING_DIRECTORY}"
+      },
+      "includeTools": [
+        "cw_execute",
+        "cw_help"
+      ]
+    }
+  }
+}
