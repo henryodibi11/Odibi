@@ -5,6 +5,93 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [3.15.0] — 2026-08-11
+
+### Added
+
+- **Immutable pipeline planning** (#340) — Added deterministic, bounded logical planning
+  through `plan_pipeline_yaml()`, `plan_pipeline_bytes()`, and
+  `odibi plan --stdin --format json`. Planning returns schema `1.0` without constructing
+  runtime resources and is shared by the CLI and authorized MCP workflows.
+- **Safe remote MCP projections** (#337, #338) — Added typed, bounded projections for
+  logical lineage and the fixed local-file fact pattern template while continuing to deny
+  caller-controlled rendering and effectful inputs.
+- **File-aware configuration validation** (#345) — Added
+  `validate_config_file(path, env=None)` and `odibi validate --env`, both backed by the
+  same normalized project-loading authority used before runtime construction.
+
+### Security
+
+- **Application identity for MCP effects** (#331) — Restricted MCP actions now require a
+  valid Bearer token over HTTP or an explicit trusted in-process identity. Anonymous and
+  stdio callers retain only the reviewed public-read action set.
+- **Contained package-content reads** (#333) — Canonically confined `get_doc`,
+  `get_example`, and `get_skill` to their action-specific corpus roots, rejecting path
+  traversal, absolute paths, unsupported targets, directories, and symlink escapes.
+- **Hardened managed-project runtime data** (#336) — Enforced exact project and config
+  authority, immutable validated snapshots, configured resource membership, bounded
+  responses, controlled export names, and serialized context restoration for remote MCP
+  runtime-data actions.
+- **Exact MCP CORS policy** (#339) — Replaced wildcard credentialed CORS with a bounded
+  exact-origin allowlist from `ODIBI_MCP_CORS_ORIGINS`. Malformed or unlisted origins fail
+  closed, independently of Bearer authentication.
+- **HTTP API-key safety** (#344) — Added strict API-key configuration, safe template and
+  header validation, secret-safe model errors, and persistent logging redaction.
+- **Agent safety contract** (#342) — Synchronized operational safety, privacy, and security
+  guidance across source documentation and the packaged MCP corpus, with installed-package
+  contract tests.
+
+### Changed
+
+- **Bounded MCP pipeline testing** (#329, #340) — MCP dry-run and runnable-validation
+  routes now return the immutable planner response instead of process output, raw errors,
+  scratch-file execution, or subprocess effects. Compatibility parameters `max_rows` and
+  `sample_size` remain accepted, bounded, deprecated, and ignored for one compatibility
+  cycle.
+- **Unified configuration loading** (#345) — Runtime and validation now share path-aware
+  loading, recursive imports, environment overlays, and recipe expansion. Validation no
+  longer executes project transforms, initializes connections, or mutates `os.environ`;
+  project transforms are reported as unverified.
+- **Lazy package imports** (#340) — Reduced import-time side effects for `__version__`,
+  `Context`, and `transform`, allowing logical planning to be selected before runtime
+  modules are imported.
+- **Legacy dry-run clarified** (#340) — `PipelineManager.run(dry_run=True)` and
+  `odibi run PATH --dry-run` remain late runtime simulations and may initialize runtime
+  facilities. Use the immutable planner when a side-effect-free logical boundary is
+  required.
+- **HWM buffering retired** (#334) — `Pipeline.buffer_hwm_update()` now fails loudly rather
+  than acknowledging an uncommitted checkpoint. Commit through `StateManager.set_hwm()` or
+  the explicit batch APIs.
+
+### Fixed
+
+- **HWM durability and acknowledgement ordering** (#334) — Node success and cache state are
+  published only after checkpoint commit. Post-write HWM failures now preserve truthful
+  failure metadata without replaying the executor, and operational Delta/SQL errors no
+  longer masquerade as first runs or trigger destructive fallback writes.
+- **Spark missing-state classification** (#335) — Only accessor-derived `PATH_NOT_FOUND` is
+  treated as absent HWM state; table, view, query, and probe failures now propagate. MERGE
+  errors also remain authoritative over cleanup failures.
+- **Installed MCP package startup** (#332) — Made the root `odibi[mcp]` wheel canonical,
+  corrected package-qualified imports outside the checkout, and preserved startup failures
+  instead of replacing them with traceback-bearing fallback responses.
+- **MCP import provenance** (#343) — Flat-layout fallback now occurs only when the
+  `odibi_mcp` package root is genuinely absent; transitive import failures retain their
+  original cause.
+- **Planner test identifiers** (#341) — Bounded generated pytest IDs to avoid excessive CI
+  output and runtime.
+
+### Infrastructure
+
+- **Release-grade CI** (#330–#332) — Added pinned Ruff quality checks, changed-MCP format
+  enforcement, installed-wheel MCP security tests, isolated import checks, and a required
+  final build-status gate across Python 3.9–3.12.
+- **Reliable Amp orb setup** (#346–#349) — Added fresh-orb setup and resume contracts,
+  Context Workbench integration, private dependency authentication, and runtime isolation
+  outside the Odibi checkout.
+
 ## [3.14.0] — 2026-07-04
 
 ### Fixed
@@ -33,85 +120,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pydantic-driven connection docs** — `list_connections()`, `explain()` (MCP), and CLI `odibi list connections` / `odibi explain <connection>` now pull descriptions and field metadata directly from Pydantic model docstrings and `model_fields` instead of hardcoded dicts. Adding a new connection type only requires the Pydantic model — all help surfaces update automatically.
 - **Schema tip nudges** — Builder and validator responses include `schema_tip` hints pointing agents to `get_schema()` for exact field references.
 - **UC write routing tests** — 8 new tests in `tests/unit/engine/test_uc_write_routing.py` covering bare name promotion, FQN passthrough, Volume path preservation, non-UC connection fallback, and explicit table kwarg behavior.
-
-## [Unreleased]
-
-### Added
-
-- **Immutable pipeline planning boundary** — `odibi.planning.plan_pipeline_yaml()` and
-  `plan_pipeline_bytes()` return deterministic bounded logical-only schema `1.0` without
-  runtime construction. The dedicated CLI route is
-  `odibi plan --stdin --format json`; authorized MCP direct and trusted-local planning
-  workflows use the same primitive.
-
-- **Agent Skills System** — 15 skill documents in `docs/skills/` providing structured AI agent guidance for every task type (#228):
-  - 01 Think/Plan/Critique, 02 Odibi-First Lookup, 03 Write a Transformer, 04 Write a Pattern, 05 Pipeline YAML Authoring, 06 Add a Connection, 07 Testing, 08 Validation Workflow, 09 Code Review Standards, 10 Task Document Template, 11 Lessons Learned Protocol, 12 Databricks Notebook Protocol, 13 Testing Standards, 14 Code Standards, 15 Engine Parity Standards
-  - Skill Router with automatic workflow chains per task type (e.g., "add transformer" → 01 → 02 → 14 → 03 → 15 → 13 → 07 → 09)
-  - `docs/skills/README.md` — skill index and loading guide
-
-- **CUSTOM_INSTRUCTIONS.md** — comprehensive AI agent system prompt (#228):
-  - Pre-Code Gate: mandatory checklist before any code change (read context → think/plan/critique → odibi-first check → scope check)
-  - Correctness Verification Protocol: prevents batch-read-and-confirm failure mode — requires concrete value assertions, negative tests, edge cases, and Verification Report
-  - Automatic Workflows: session start/end, before/after code change, delivery protocols
-  - Output Contract: every code response must include THINK → PLAN → CRITIQUE → CODE → VERIFY → LESSONS
-  - 8 workflow loops triggered by task type with full skill chains
-  - Critical rules codified: standalone functions, return-don't-write, Pydantic for config, engine parity, YAML field names, test conventions
-
-- **Lessons Learned System** (`docs/LESSONS_LEARNED.md`):
-  - 4 searchable categories: Decisions (D-001 – D-007), Traps (T-001 – T-013+), Patterns (P-001+), Discoveries (V-001+)
-  - Captures knowledge that previously was buried in AGENTS.md's "Testing Gotchas" blob
-  - Key decisions documented: SQL-first transformers (D-001), Pydantic for config (D-002), no %run on Databricks (D-003), coverage via `coverage run` not `pytest --cov` (D-004), test batching required (D-005)
-  - Key traps documented: caplog vs structured logging (T-001), mock PySpark import order (T-002), Spark Connect temp view lifecycle (T-011), `bool(LazyFrame)` TypeError (T-012), Polars SQL dialect gaps (T-013)
-  - Auto-update protocol: every agent session adds new entries
-
-- **Agent Hardening Campaign** (`docs/AGENT_CAMPAIGN.md`):
-  - 35 tasks across 8 phases: Foundation, Spark Reality, Polars Parity, Validation E2E, Pattern Stress, Bug Fixes, New Features, Docs & Polish
-  - Detailed prompts with exact file paths, success criteria, and branch naming conventions
-  - Estimated 3–5 weeks with daily agent sessions
-  - Pre-campaign setup protocol linking to CUSTOM_INSTRUCTIONS.md, LESSONS_LEARNED.md, and skills
-
-- **Databricks Campaign Workspace** (`campaign/`):
-  - `lib/` bootstrap pattern: `setup.py` (auto-installs deps, exports odibi API), `config.py` (paths, UC settings), `__init__.py`
-  - `01_smoke_test.py` — verifies odibi imports, SparkEngine/PandasEngine/PolarsEngine creation, basic transforms on all 3 engines, Unity Catalog read/write
-  - `02_engine_matrix.py` — runs `filter_rows`, `derive_columns`, `deduplicate` on a 100-row DataFrame across Pandas, Spark, and Polars; asserts identical output shapes and values (9 tests, all passing)
-  - Follows Skill 12 (Databricks Notebook Protocol) — no `%run` anywhere, each notebook self-contained via `from lib.setup import *`
-
-- **Bug Audit documentation** — comprehensive triage of all open issues (Feb 2026):
-  - 46 bug issues filed (#238–#280)
-  - **43 bugs fixed and closed** — all critical and high-priority bugs resolved
-  - 3 remaining open: #268 and #265 (MCP security — deferred, MCP not in use), #199 (aggregation multi-format support, low-pri)
-  - #248 (SCD2 float/NaN comparison) triaged as known trap (T-009 in LESSONS_LEARNED.md)
-
-### Changed
-
-- **MCP planning response security correction** — `test_pipeline` dry-run mode and
-  `validate_yaml_runnable` now return planner schema `1.0`, without legacy process
-  output, raw errors, or scratch/subprocess execution. The existing remote
-  `validate_yaml_simple` workflow remains validation-only, and transport authorization
-  is unchanged. Compatibility parameters `max_rows` and `sample_size` are accepted,
-  bounded, deprecated, and ignored for one compatibility cycle.
-- **Legacy dry-run migration** — `PipelineManager.run(dry_run=True)` and
-  `odibi run PATH --dry-run` remain legacy late runtime simulation. They can initialize
-  runtime facilities and surrounding lifecycle effects and are not an immutable
-  security boundary. Use `plan_pipeline_yaml(yaml_text)` or
-  `cat config.yaml | odibi plan --stdin --format json` for immutable logical planning.
-
-- **ROADMAP.md refreshed** — updated coverage milestone (80%), module-by-module coverage table matching AGENTS.md, bug audit completion status, engine parity marked as functionally complete
-- **AGENTS.md expanded** — comprehensive per-module coverage tracking with test file counts, coverage percentages, remaining work, known pre-existing failures, and 5-phase coverage roadmap showing progression from 66% → 80% (34,363 stmts, 6,854 missed)
-- **Coverage target reached: 80%** — the culmination of a multi-week campaign spanning versions 2.18.0 through 3.9.0, starting from 62% baseline and adding 2,000+ new tests across 60+ test files
-
-### Documentation
-
-- **Databricks Notebook Protocol** (Skill 12) — `lib/` pattern replacing `%run` (which hangs on Databricks), self-contained notebooks via `sys.path.insert` + `from lib.setup import *`, project structure template
-- **Engine Parity Standards** (Skill 15) — guidelines for maintaining Pandas/Spark/Polars parity, SQL-first approach, engine-specific branch conventions
-- **Testing Standards** (Skill 13) — comprehensive test-writing conventions: naming, structure, assertion patterns, coverage measurement, anti-patterns to avoid
-- **Code Standards** (Skill 14) — coding conventions for all odibi contributors: standalone functions, type hints, logging, error handling
-- **Code Review Standards** (Skill 09) — self-review checklist for PR quality
-- **Transformer/Pattern/Connection authoring guides** (Skills 03, 04, 06) — step-by-step guides for extending the framework
-- **Pipeline YAML Authoring** (Skill 05) — correct YAML field usage, common mistakes, validation
-- **Validation Workflow** (Skill 08) — data quality pipeline design and test type selection
-- **Task Document Template** (Skill 10) — multi-phase project planning template
-- **Think/Plan/Critique** (Skill 01) and **Odibi-First Lookup** (Skill 02) — foundational agent reasoning protocols
 
 ## [3.13.6] - 2026-07-03
 
