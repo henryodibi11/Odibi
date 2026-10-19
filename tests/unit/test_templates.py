@@ -141,7 +141,7 @@ class TestShowTransformer:
         assert "keys" in result
         assert "track_cols" in result
         assert "## Example YAML" in result
-        assert "- operation: scd2" in result
+        assert "- function: scd2" in result
 
     def test_fluid_properties_transformer(self):
         from odibi.tools.templates import show_transformer

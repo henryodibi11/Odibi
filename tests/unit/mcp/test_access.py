@@ -359,8 +359,9 @@ def test_runtime_privacy_limits_reject_non_positive_exact_integers(
 def test_runtime_privacy_limit_caps(managed_project, action, limit_name, maximum, kwargs):
     _, _, access = managed_project
     assert _prepare(access, action, **kwargs, **{limit_name: maximum}).kwargs[limit_name] == maximum
-    with pytest.raises(RuntimeAccessDenied, match="PRIVACY_LIMIT_REQUIRED"):
+    with pytest.raises(RuntimeAccessDenied, match="PRIVACY_LIMIT_REQUIRED") as denied:
         _prepare(access, action, **kwargs, **{limit_name: maximum + 1})
+    assert denied.value.detail == f"{limit_name} must be an integer from 1 to {maximum}"
 
 
 @pytest.mark.parametrize(

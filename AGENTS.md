@@ -409,6 +409,14 @@ Validate the complete `scheme://host[:port]` grammar first, then normalize and c
 Suppress parser exception chaining for operator-supplied values, and permit `OPTIONS` past the outer
 origin boundary only when `Access-Control-Request-Method` proves it is a CORS preflight.
 
+### MCP Denial Details Must Be Server-Authored
+
+Remote runtime denials keep their fixed `code` and base message. `RuntimeAccessDenied.detail`
+may add guidance such as `max_rows must be an integer from 1 to 100`, but build it only from
+server constants (argument names and bounds), never from caller-supplied or host values.
+Likewise, `ParamValidationError.detail` (transformer params) names fields only, so safe
+file validation can show it without leaking configuration values.
+
 ### Mock PySpark Setup (Critical Order)
 PySpark 4.1.1 IS installed in this environment, so `catalog.py`'s try/except imports succeed and the fallback type stubs (lines 22-137) are NOT defined. These stubs are NOT dead code — they're essential for Pandas-only deployments. **Do not remove them.**
 

@@ -2,10 +2,70 @@
 
 import inspect
 import logging
+import re
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Union
 
 logger = logging.getLogger(__name__)
+
+_PARAM_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
+
+
+class ParamValidationError(ValueError):
+    """Transformer parameters failed their Pydantic model.
+
+    ``detail`` names the offending fields without echoing any parameter values,
+    for example ``"condition: field required; where: unexpected field"``.
+    """
+
+    def __init__(self, message: str, detail: Optional[str] = None):
+        super().__init__(message)
+        self.detail = detail
+
+
+def _describe_param_errors(model: Any, params: Any, exc: Exception) -> Optional[str]:
+    """Summarize a parameter-model failure by field name only (never by value)."""
+    raw_errors = getattr(exc, "errors", None)
+    if not callable(raw_errors):
+        return None
+
+    def field_name(loc: Any) -> str:
+        parts = [str(part) for part in loc]
+        if parts and all(_PARAM_NAME_RE.fullmatch(part) or part.isdigit() for part in parts):
+            return ".".join(parts)
+        return "params"
+
+    issues: list[str] = []
+    for err in raw_errors():
+        etype = err.get("type", "")
+        if etype == "missing":
+            problem = "field required"
+        elif etype == "extra_forbidden":
+            problem = "unexpected field"
+        else:
+            problem = (
+                f"invalid value ({etype})" if _PARAM_NAME_RE.fullmatch(etype) else "invalid value"
+            )
+        issue = f"{field_name(err.get('loc', ()))}: {problem}"
+        if issue not in issues:
+            issues.append(issue)
+
+    # Keys the model silently ignores are a common cause of a "field required" error
+    # (e.g. ``where:`` instead of ``condition:``), so name them alongside it.
+    if isinstance(params, dict) and getattr(model, "model_config", {}).get("extra") != "allow":
+        known = set()
+        for fname, finfo in getattr(model, "model_fields", {}).items():
+            known.update(
+                name
+                for name in (fname, finfo.alias, finfo.validation_alias)
+                if isinstance(name, str)
+            )
+        for key in params:
+            if isinstance(key, str) and key not in known and _PARAM_NAME_RE.fullmatch(key):
+                issue = f"{key}: unexpected field"
+                if issue not in issues:
+                    issues.append(issue)
+    return "; ".join(issues) or None
 
 
 class FunctionRegistry:
@@ -114,7 +174,10 @@ class FunctionRegistry:
                 model(**params)
                 return  # Validated successfully
             except Exception as e:
-                raise ValueError(f"Validation failed for '{name}': {e}")
+                detail = _describe_param_errors(model, params, e)
+                message = f"Validation failed for '{name}': "
+                message += f"{detail}\n{e}" if detail else str(e)
+                raise ParamValidationError(message, detail) from e
 
         # Fallback: Check function signature (Legacy)
         sig = cls._signatures[name]

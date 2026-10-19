@@ -184,6 +184,31 @@ def test_project_override_of_shipped_name_remains_unverified(tmp_path, monkeypat
     assert FunctionRegistry.get_function("filter_rows") is project_filter_rows
 
 
+def test_invalid_transformer_params_name_fields_without_values(tmp_path):
+    sentinel = "SECRET_SENTINEL_where_5c1d"
+    project = _project(
+        tmp_path,
+        f"""pipelines:
+  - pipeline: p
+    nodes:
+      - name: n
+        transform:
+          steps:
+            - function: filter_rows
+              params:
+                where: "{sentinel} > 1"
+""",
+    )
+    (tmp_path / ".env").write_text(f"ROOT_PATH={tmp_path}\n")
+    result = validate_config_file(project)
+    error = result["errors"][0]
+    assert error["code"] == "INVALID_TRANSFORMER_PARAMS"
+    assert error["message"] == (
+        "Transformer parameters are invalid: condition: field required; where: unexpected field."
+    )
+    assert sentinel not in json.dumps(result)
+
+
 def test_semantic_exception_is_bounded_and_redacted(tmp_path):
     sentinel = "SECRET_SENTINEL_semantic_48b2"
     project = _project(tmp_path)
