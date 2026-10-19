@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.1] — 2026-10-19
+
+### Fixed
+
+- **Agent-facing error and help messages** (#351, #352) — These changes affect only what
+  Odibi tells callers. Limits, allowed inputs, and error codes are unchanged.
+  - Remote MCP privacy-limit denials keep `PRIVACY_LIMIT_REQUIRED` and add server-authored
+    guidance such as `max_rows must be an integer from 1 to 100`. `odibi_help` now states the
+    `profile_source` maximum.
+  - `odibi explain <transformer>` lists the fields of the transformer's Pydantic parameter
+    model and shows a valid `transform.steps` example. `odibi templates transformer`
+    examples use `function:`.
+  - Transformer parameter validation names missing, invalid, and unrecognized fields
+    without echoing their values. Both `odibi validate` and `odibi run` show messages
+    such as `condition: field required; where: unexpected field`.
+
 ## [3.15.0] — 2026-08-11
 
 ### Added
