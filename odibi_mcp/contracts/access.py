@@ -157,9 +157,11 @@ _LINEAGE_RESPONSE_BYTE_LIMIT = 64 * 1024
 class RuntimeAccessDenied(Exception):
     """A sanitized remote runtime-data access denial."""
 
-    def __init__(self, code: str):
+    def __init__(self, code: str, detail: Optional[str] = None):
         super().__init__(code)
         self.code = code
+        # Server-authored guidance only (argument names and bounds); never caller values.
+        self.detail = detail
 
 
 @dataclass(frozen=True)
@@ -363,7 +365,7 @@ class ManagedProjectAccess:
         if action in {"node_sample", "node_failed_rows"}:
             if not _is_safe_component(prepared.get("node")):
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
-            prepared["limit"] = _positive_int(prepared.get("limit", 10), 100)
+            prepared["limit"] = _positive_int(prepared.get("limit", 10), 100, "limit")
         if action == "story_read":
             run_id = prepared.get("run_id")
             if run_id is not None and not _is_safe_component(run_id):
@@ -380,13 +382,13 @@ class ManagedProjectAccess:
             if not isinstance(pattern, str):
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
             prepared["pattern"] = pattern
-            prepared["limit"] = _positive_int(prepared.get("limit", 100), 100)
+            prepared["limit"] = _positive_int(prepared.get("limit", 100), 100, "limit")
         elif action == "profile_source":
             path = prepared.get("path")
             if not isinstance(path, str):
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
             prepared["path"] = _relative_path(path, project_root)
-            prepared["max_rows"] = _positive_int(prepared.get("max_rows", 100), 100)
+            prepared["max_rows"] = _positive_int(prepared.get("max_rows", 100), 100, "max_rows")
         elif action == "profile_folder":
             folder_path = prepared.get("folder_path")
             if not isinstance(folder_path, str):
@@ -396,7 +398,7 @@ class ManagedProjectAccess:
             if not isinstance(pattern, str) or _GLOB_RE.fullmatch(pattern) is None:
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
             prepared["pattern"] = pattern
-            prepared["max_files"] = _positive_int(prepared.get("max_files", 20), 50)
+            prepared["max_files"] = _positive_int(prepared.get("max_files", 20), 50, "max_files")
         elif action == "suggest_pipeline":
             source_path = prepared.get("source_path")
             if not isinstance(source_path, str):
@@ -417,13 +419,13 @@ class ManagedProjectAccess:
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
             assert isinstance(query, str)
             prepared["query"] = query.strip()
-            prepared["limit"] = _positive_int(prepared.get("limit", 1000), 1000)
+            prepared["limit"] = _positive_int(prepared.get("limit", 1000), 1000, "limit")
             prepared["filename"] = _download_filename(prepared.get("filename"))
         elif action == "download_table":
             table = prepared.get("table")
             if not isinstance(table, str) or _SQL_IDENTIFIER_RE.fullmatch(table) is None:
                 raise RuntimeAccessDenied("INVALID_RUNTIME_ARGUMENT")
-            prepared["limit"] = _positive_int(prepared.get("limit", 1000), 1000)
+            prepared["limit"] = _positive_int(prepared.get("limit", 1000), 1000, "limit")
             prepared["filename"] = _download_filename(prepared.get("filename"))
         elif action == "download_file":
             source_path = prepared.get("source_path")
@@ -740,9 +742,11 @@ def _is_safe_component(value: object) -> bool:
     return isinstance(value, str) and _COMPONENT_RE.fullmatch(value) is not None
 
 
-def _positive_int(value: object, maximum: int) -> int:
+def _positive_int(value: object, maximum: int, name: str) -> int:
     if type(value) is not int or not 1 <= value <= maximum:
-        raise RuntimeAccessDenied("PRIVACY_LIMIT_REQUIRED")
+        raise RuntimeAccessDenied(
+            "PRIVACY_LIMIT_REQUIRED", f"{name} must be an integer from 1 to {maximum}"
+        )
     return value
 
 

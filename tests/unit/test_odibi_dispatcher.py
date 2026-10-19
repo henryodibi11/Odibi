@@ -1377,6 +1377,35 @@ def test_remote_profile_source_preserves_exact_bounded_helper_kwargs(
     }
 
 
+def test_remote_profile_source_over_limit_names_argument_and_bound(managed_dispatcher):
+    dispatcher, _ = managed_dispatcher
+    dispatcher._actions["profile_source"] = lambda **kwargs: pytest.fail(
+        "an over-limit request must not reach the helper"
+    )
+
+    result = dispatcher.dispatch(
+        "profile_source",
+        project="managed",
+        connection="local",
+        path="folder/input.csv",
+        max_rows=4321,
+        application_identity=REMOTE_IDENTITY,
+    )
+
+    assert result == {
+        "error": (
+            "A valid bounded privacy limit is required for this action: "
+            "max_rows must be an integer from 1 to 100"
+        ),
+        "code": "PRIVACY_LIMIT_REQUIRED",
+        "action": "profile_source",
+    }
+    max_rows_help = next(
+        arg for arg in dispatcher.help(action="profile_source")["args"] if arg["name"] == "max_rows"
+    )
+    assert max_rows_help["maximum"] == 100
+
+
 def test_remote_profile_folder_preserves_exact_bounded_helper_kwargs(
     managed_dispatcher, monkeypatch
 ):

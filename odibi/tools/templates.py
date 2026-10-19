@@ -815,7 +815,7 @@ def show_transformer(
 
         ## Example YAML
         ```yaml
-        - operation: fluid_properties
+        - function: fluid_properties
           params:
             pressure_col: pressure
             temperature_col: temperature
@@ -864,7 +864,7 @@ def show_transformer(
     if show_example:
         lines.append("## Example YAML")
         lines.append("```yaml")
-        lines.append(f"- operation: {transformer_name}")
+        lines.append(f"- function: {transformer_name}")
         lines.append("  params:")
 
         if param_model and isinstance(param_model, type) and issubclass(param_model, BaseModel):

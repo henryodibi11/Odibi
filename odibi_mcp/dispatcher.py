@@ -312,7 +312,7 @@ class OdibiDispatcher:
                     kwargs = prepared.kwargs
                 prepared_runtime_call = prepared
             except RuntimeAccessDenied as error:
-                return self._runtime_access_error(action, error.code)
+                return self._runtime_access_error(action, error.code, error.detail)
             except Exception:
                 code = (
                     "LOGICAL_PROJECTION_UNAVAILABLE"
@@ -381,12 +381,17 @@ class OdibiDispatcher:
             }
 
     @staticmethod
-    def _runtime_access_error(action: str, code: str) -> dict[str, Any]:
-        """Return a stable denial without echoing caller or host values."""
+    def _runtime_access_error(action: str, code: str, detail: str | None = None) -> dict[str, Any]:
+        """Return a stable denial without echoing caller or host values.
+
+        ``detail`` is server-authored guidance (an argument name and its bound) and
+        never contains caller-supplied or host values.
+        """
+        message = _RUNTIME_ACCESS_MESSAGES.get(
+            code, "Runtime data access is unavailable for this action"
+        )
         return {
-            "error": _RUNTIME_ACCESS_MESSAGES.get(
-                code, "Runtime data access is unavailable for this action"
-            ),
+            "error": f"{message}: {detail}" if detail else message,
             "code": code,
             "action": action,
         }
@@ -563,7 +568,7 @@ class OdibiDispatcher:
                 },
                 {
                     "name": "profile_source",
-                    "signature": "connection, path, max_rows=100",
+                    "signature": "connection, path, max_rows=100 (remote max 100)",
                     "description": "Schema, stats, nulls, cardinality, sample data",
                 },
                 {
@@ -791,7 +796,7 @@ class OdibiDispatcher:
         # Full action documentation with examples
         action_docs = {
             "profile_source": {
-                "signature": "connection, path, max_rows=100",
+                "signature": "connection, path, max_rows=100 (remote max 100)",
                 "description": "Profile a data source (CSV/Parquet/JSON/Delta). Returns schema, stats, nulls, cardinality, sample data.",
                 "args": [
                     {
@@ -811,7 +816,8 @@ class OdibiDispatcher:
                         "type": "int",
                         "required": False,
                         "default": 100,
-                        "description": "Sample size for profiling",
+                        "maximum": 100,
+                        "description": "Sample size for profiling. Remote MCP calls accept an integer from 1 to 100.",
                     },
                 ],
                 "returns": {
@@ -824,7 +830,7 @@ class OdibiDispatcher:
                 "examples": [
                     {
                         "description": "Profile a CSV file",
-                        "code": 'odibi_execute(\'profile_source\', \'{"connection": "s3_raw", "path": "orders.csv", "max_rows": 1000}\')',
+                        "code": 'odibi_execute(\'profile_source\', \'{"connection": "s3_raw", "path": "orders.csv", "max_rows": 100}\')',
                     },
                     {
                         "description": "Profile a Delta table",

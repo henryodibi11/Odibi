@@ -6,6 +6,8 @@ import inspect
 import json
 from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel
+
 from odibi.connections.factory import register_builtins
 from odibi.patterns import _PATTERNS
 from odibi.plugins import _CONNECTION_FACTORIES
@@ -153,24 +155,44 @@ def explain_command(args) -> int:
         if info.get("docstring"):
             print(info["docstring"])
             print()
+        # Prefer the Pydantic params model: its fields are what YAML `params:` accepts.
+        param_model = FunctionRegistry.get_param_model(name)
+        if isinstance(param_model, type) and issubclass(param_model, BaseModel):
+            params = []
+            for fname, field in param_model.model_fields.items():
+                required = field.is_required()
+                params.append(
+                    {
+                        "name": field.alias or fname,
+                        "required": required,
+                        "default": None
+                        if required
+                        else field.get_default(call_default_factory=True),
+                        "description": field.description,
+                    }
+                )
+        else:
+            params = [
+                {"name": pname, **pinfo}
+                for pname, pinfo in info.get("parameters", {}).items()
+                if pname != "current"
+            ]
         print("Parameters:")
-        for pname, pinfo in info.get("parameters", {}).items():
-            if pname == "current":
-                continue
-            required = "required" if pinfo.get("required") else "optional"
-            default = pinfo.get("default")
+        for param in params:
+            required = "required" if param.get("required") else "optional"
+            default = param.get("default")
             default_str = f" (default: {default})" if default is not None else ""
-            print(f"  - {pname}: {required}{default_str}")
+            desc = f" — {param['description']}" if param.get("description") else ""
+            print(f"  - {param['name']}: {required}{default_str}{desc}")
         print()
         print("Example YAML:")
-        print("  transforms:")
-        print(f"    - function: {name}")
-        print("      params:")
-        for pname, pinfo in info.get("parameters", {}).items():
-            if pname == "current":
-                continue
-            if pinfo.get("required"):
-                print(f"        {pname}: <value>")
+        print("  transform:")
+        print("    steps:")
+        print(f"      - function: {name}")
+        print("        params:")
+        for param in params:
+            if param.get("required"):
+                print(f"          {param['name']}: <value>")
 
     # Check patterns
     if name in _PATTERNS:

@@ -115,9 +115,14 @@ def _safe_semantic_result(result: Dict[str, Any]) -> Dict[str, Any]:
     }
     for kind in ("errors", "warnings"):
         for diagnostic in result.get(kind, []):
-            diagnostic["message"] = messages.get(
+            message = messages.get(
                 diagnostic.get("code"), "Configuration semantic validation failed."
             )
+            # ``detail`` names offending fields only (never values), so it is safe to keep.
+            detail = diagnostic.get("detail")
+            if detail:
+                message = f"{message.rstrip('.')}: {detail}."
+            diagnostic["message"] = message
             diagnostic.pop("fix", None)
     return result
 
@@ -762,6 +767,7 @@ def _validate_transformer_params(
                                 "field_path": f"pipelines[{pipeline_idx}].nodes[{node_idx}].transform.steps[{step_idx}].params",
                                 "message": str(e),
                                 "fix": f"Check required params for '{step.function}'",
+                                "detail": getattr(e, "detail", None),
                             }
                         )
 
@@ -784,5 +790,6 @@ def _validate_transformer_params(
                         "field_path": f"pipelines[{pipeline_idx}].nodes[{node_idx}].params",
                         "message": str(e),
                         "fix": f"Check required params for '{node.transformer}'",
+                        "detail": getattr(e, "detail", None),
                     }
                 )

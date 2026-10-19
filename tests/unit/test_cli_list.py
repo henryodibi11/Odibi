@@ -194,6 +194,16 @@ class TestExplainCommand:
         assert "Parameters:" in captured.out
         assert "Example YAML:" in captured.out
 
+    def test_explain_transformer_lists_param_model_fields(self, capsys):
+        """Explain shows the Pydantic params fields, not the wrapper `params` argument."""
+        result = explain_command(Namespace(name="filter_rows"))
+
+        assert result == 0
+        out = capsys.readouterr().out
+        assert "  - condition: required — SQL WHERE clause" in out
+        assert "params: required" not in out
+        assert "      - function: filter_rows\n        params:\n          condition: <value>" in out
+
     def test_explain_pattern(self, capsys):
         """Explain a pattern."""
         args = Namespace(name="dimension")
