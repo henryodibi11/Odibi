@@ -61,6 +61,21 @@ def _extract_spark_error_message(error: Exception) -> str:
     return error_str[:200] + "..." if len(error_str) > 200 else error_str
 
 
+def _configure_delta_session(builder: Any) -> Any:
+    """Add the Delta SQL extension and catalog to a SparkSession builder.
+
+    ``configure_spark_with_delta_pip`` only adds the Delta jars
+    (``spark.jars.packages``); a locally built session also needs these two
+    settings, or the first Delta operation fails with
+    DELTA_CONFIGURE_SPARK_SESSION_WITH_EXTENSION_AND_CATALOG (issue #357).
+    """
+    builder = builder.config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+    builder = builder.config(
+        "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    )
+    return builder
+
+
 class SparkEngine(Engine):
     """Spark execution engine with PySpark backend.
 
@@ -127,6 +142,10 @@ class SparkEngine(Engine):
                 builder = SparkSession.builder.appName("odibi").config(
                     "spark.sql.sources.partitionOverwriteMode", "dynamic"
                 )
+
+                # Delta needs the SQL extension and catalog, not just the jars
+                # configure_spark_with_delta_pip adds (issue #357).
+                builder = _configure_delta_session(builder)
 
                 # Performance Optimizations
                 builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
