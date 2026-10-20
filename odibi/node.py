@@ -1577,13 +1577,14 @@ class NodeExecutor:
                 if isinstance(schema_before, dict):
                     metrics.schema_before = schema_before
 
-                is_pattern = False
+                from odibi.patterns import get_pattern_class
+
                 try:
-                    from odibi.patterns import get_pattern_class
-
                     pattern_cls = get_pattern_class(config.transformer)
-                    is_pattern = True
+                except ValueError:
+                    pattern_cls = None
 
+                if pattern_cls is not None:
                     # Inject delta_table_properties into config.params for patterns that write Delta
                     pattern_config = config
                     delta_patterns = ("merge", "scd2", "dimension", "aggregation", "fact")
@@ -1619,11 +1620,7 @@ class NodeExecutor:
                             configuration=str(config.params),
                             compliance_score=1.0,
                         )
-
-                except ValueError:
-                    pass
-
-                if not is_pattern:
+                else:
                     result_df = self._execute_transformer_node(config, result_df, pii_meta)
                     self._execution_steps.append(f"Applied transformer '{config.transformer}'")
 

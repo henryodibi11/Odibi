@@ -1,7 +1,7 @@
 """Tests targeting specific uncovered execution paths in odibi/node.py (non-Spark)."""
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -797,3 +797,55 @@ class TestGenerateIncrementalSqlFilterStateful:
         executor._generate_incremental_sql_filter(inc, config)
 
         executor.state_manager.get_hwm.assert_called_with("custom_key")
+
+
+# ===========================================================================
+# Target 8: Pattern failure propagation (issue #354)
+# ===========================================================================
+
+
+class TestPatternFailurePropagation:
+    """Issue #354: a failing pattern must fail the node, not be swallowed."""
+
+    def test_dimension_validation_failure_fails_node_and_skips_write(self):
+        executor = _make_executor()
+        executor.engine.read.return_value = pd.DataFrame({"id": [1]})
+        config = _simple_config(
+            transformer="dimension",
+            params={
+                "natural_key": "id",
+                "surrogate_key": "id_sk",
+                "scd_type": 2,  # scd_type=2 without 'target' -> DimensionPattern.validate() raises
+            },
+            write={"connection": "dst", "format": "csv", "path": "out.csv"},
+        )
+
+        result = executor.execute(config)
+
+        assert not result.success
+        assert isinstance(result.error, NodeExecutionError)
+        assert "'target' parameter is required for scd_type=2" in result.error.message
+        executor.engine.write.assert_not_called()
+
+    @patch("odibi.patterns.get_pattern_class")
+    def test_pattern_execute_failure_fails_node(self, mock_get_pattern):
+        pattern_cls = MagicMock()
+        pattern_instance = MagicMock()
+        pattern_instance.execute.side_effect = ValueError("pattern execution exploded")
+        pattern_cls.return_value = pattern_instance
+        mock_get_pattern.return_value = pattern_cls
+
+        executor = _make_executor()
+        executor.engine.read.return_value = pd.DataFrame({"id": [1]})
+        config = _simple_config(
+            transformer="dimension",
+            params={"natural_key": "id", "surrogate_key": "id_sk"},
+            write={"connection": "dst", "format": "csv", "path": "out.csv"},
+        )
+
+        result = executor.execute(config)
+
+        assert not result.success
+        assert isinstance(result.error, NodeExecutionError)
+        assert "pattern execution exploded" in result.error.message
+        executor.engine.write.assert_not_called()
