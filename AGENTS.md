@@ -21,10 +21,10 @@
 
 **For deep framework documentation, read [docs/ODIBI_DEEP_CONTEXT.md](docs/ODIBI_DEEP_CONTEXT.md) only when you need feature-level details.**
 
-This 2,200+ line document covers:
+This document covers:
 - Runtime behavior (Spark temp views, Pandas/DuckDB, Polars)
-- All 6 patterns (Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension)
-- 52+ transformers with examples
+- All patterns (Dimension, Fact, SCD2, Merge, Aggregation, Date Dimension)
+- Transformers with examples
 - Validation, quarantine, quality gates
 - Connections (Local, ADLS, Azure SQL, HTTP, DBFS, Unity Catalog)
 - Delta Lake features (partitioning, Z-ordering, VACUUM, schema evolution)
@@ -77,7 +77,7 @@ python scripts/run_test_campaign.py # End-to-end pattern validation
 
 ### Test Coverage Notes
 
-**Do NOT flag Spark engine coverage as a problem.** The 4% coverage is misleading:
+**Do NOT flag Spark engine coverage as a problem.** Its coverage number is misleading:
 - Spark is tested via mock-based tests in `tests/integration/test_patterns_spark_mock.py`
 - Spark is **formally validated on Databricks Serverless** (Spark 4.1.0) — see `SPARK_VALIDATION.md`
 - CI skips real Spark tests (no JVM available)
@@ -100,146 +100,144 @@ Set `spark=MagicMock()` and wire up chained return values (e.g., `spark.read.for
 This ensures all conditional branches are exercised in CI.
 
 ### Current Coverage Status (April 2026)
-- `catalog.py` — **85% covered** (126 tests across 5 files). Both Pandas and Spark branches tested via mocks. Remaining uncovered: SQL Server queries, cleanup_orphans Spark paths, parquet fallback in _ensure_table. Not worth covering further (diminishing returns).
-- ~25 pre-existing test failures in older catalog test files due to caplog logging capture issues (logger.warning → stderr, caplog doesn't capture). NOT caused by recent changes.
+- `catalog.py` — Both Pandas and Spark branches tested via mocks. Remaining uncovered: SQL Server queries, cleanup_orphans Spark paths, parquet fallback in _ensure_table. Not worth covering further (diminishing returns).
 
-- `engine/pandas_engine.py` — **74% covered** (118 new tests across 3 files + existing tests). Covers read/write core, CSV retries, Excel patterns, generic upsert, write-to-target, all utility methods (anonymize, harmonize_schema, validate_schema/data, filter_greater_than, filter_coalesce, etc.). Remaining uncovered: Excel fastexcel/openpyxl closures, simulation reading, Delta maintenance ops (vacuum/history/restore/maintain), execute_sql, execute_operation. Diminishing returns.
-  - `tests/unit/engine/test_pe_readwrite.py` (42 tests) — read(), write(), _write_iterator(), _handle_generic_upsert(), _write_to_target()
-  - `tests/unit/engine/test_pe_utilities.py` (59 tests) — add_write_metadata, harmonize_schema, anonymize, count_nulls, validate_schema, _infer_avro_schema, validate_data, get_source_files, profile_nulls, filter_greater_than, filter_coalesce
-  - `tests/unit/engine/test_pe_format_handling.py` (17 tests) — CSV retries, parquet list-of-files, JSON glob, Delta→DuckDB fallback, avro local/remote, Excel sheet patterns
-- ~94 pre-existing test failures across `test_pandas_engine_core.py` and `test_pandas_engine_full_coverage.py` due to logging context pollution (tests pass individually but fail when run together). NOT caused by recent changes.
+- `engine/pandas_engine.py` — Covers read/write core, CSV retries, Excel patterns, generic upsert, write-to-target, all utility methods (anonymize, harmonize_schema, validate_schema/data, filter_greater_than, filter_coalesce, etc.). Remaining uncovered: Excel fastexcel/openpyxl closures, simulation reading, Delta maintenance ops (vacuum/history/restore/maintain), execute_sql, execute_operation. Diminishing returns.
+  - `tests/unit/engine/test_pe_readwrite.py` — read(), write(), _write_iterator(), _handle_generic_upsert(), _write_to_target()
+  - `tests/unit/engine/test_pe_utilities.py` — add_write_metadata, harmonize_schema, anonymize, count_nulls, validate_schema, _infer_avro_schema, validate_data, get_source_files, profile_nulls, filter_greater_than, filter_coalesce
+  - `tests/unit/engine/test_pe_format_handling.py` — CSV retries, parquet list-of-files, JSON glob, Delta→DuckDB fallback, avro local/remote, Excel sheet patterns
 
-- `validation/engine.py` — **67% covered** (76 tests). Bug fixed: `isinstance(df, pyspark.sql.DataFrame)` → `except (ImportError, AttributeError)`. All 11 test types tested for both Pandas and Polars (eager + lazy). Remaining: Spark `_validate_spark` path (lines 366-570).
-  - `tests/unit/validation/test_validation_engine.py` (76 tests) — NOT_NULL, UNIQUE, ACCEPTED_VALUES, ROW_COUNT, RANGE, REGEX_MATCH, CUSTOM_SQL, SCHEMA, FRESHNESS × Pandas + Polars, fail_fast, warn severity, edge cases
-- `validation/quarantine.py` — **69% covered** (49 tests). All Pandas + Polars mask evaluation, split_valid_invalid, add_quarantine_metadata, _apply_sampling, write_quarantine, has_quarantine_tests. Remaining: Spark paths.
-  - `tests/unit/validation/test_quarantine_coverage.py` (49 tests) — _evaluate_test_mask Pandas/Polars, split_valid_invalid, metadata columns, sampling, write_quarantine
-- `validation/gate.py` — **94% covered** (32 tests). evaluate_gate, _check_row_count, _get_previous_row_count all covered. Remaining: Spark detection branch (3 lines).
-  - `tests/unit/validation/test_gate_coverage.py` (32 tests) — pass rates, thresholds, row count checks, on_fail actions, catalog mocks
+- `validation/engine.py` — Bug fixed: `isinstance(df, pyspark.sql.DataFrame)` → `except (ImportError, AttributeError)`. All validation test types tested for both Pandas and Polars (eager + lazy). Remaining: Spark `_validate_spark` path.
+  - `tests/unit/validation/test_validation_engine.py` — NOT_NULL, UNIQUE, ACCEPTED_VALUES, ROW_COUNT, RANGE, REGEX_MATCH, CUSTOM_SQL, SCHEMA, FRESHNESS × Pandas + Polars, fail_fast, warn severity, edge cases
+- `validation/quarantine.py` — All Pandas + Polars mask evaluation, split_valid_invalid, add_quarantine_metadata, _apply_sampling, write_quarantine, has_quarantine_tests. Remaining: Spark paths.
+  - `tests/unit/validation/test_quarantine_coverage.py` — _evaluate_test_mask Pandas/Polars, split_valid_invalid, metadata columns, sampling, write_quarantine
+- `validation/gate.py` — evaluate_gate, _check_row_count, _get_previous_row_count all covered. Remaining: Spark detection branch.
+  - `tests/unit/validation/test_gate_coverage.py` — pass rates, thresholds, row count checks, on_fail actions, catalog mocks
 
-- `testing/source_pool.py` — **100% covered** (44 tests). All Pydantic models, enums, validators fully tested.
-  - `tests/unit/testing/test_source_pool_coverage.py` (44 tests) — all enums, schemas, validators, SourcePoolIndex methods
+- `testing/source_pool.py` — All Pydantic models, enums, validators fully tested.
+  - `tests/unit/testing/test_source_pool_coverage.py` — all enums, schemas, validators, SourcePoolIndex methods
 
-- `cli/graph.py` — **66% covered** (16 tests). _generate_dot and _generate_mermaid fully covered. Remaining: graph_command (needs PipelineManager).
-  - `cli/test.py` — **97% covered** (10+31 tests). load_test_files, slugify, run_test_case core + edge cases, test_command loop (path not found, no files, pass/fail, YAML errors, snapshot, parent traversal). Remaining: ~5 lines.
-    - `tests/unit/cli/test_cli_test_coverage.py` (31 tests) — slugify, load_test_files edge cases, run_test_case (CSV, missing transforms, TypeError, snapshots), test_command full loop
-  - `cli/init_pipeline.py` — **97% covered** (38 tests). Nearly fully covered including interactive prompts, force overwrite, all generated files.
-  - `cli/secrets.py` — **63% covered** (15 tests). extract_env_vars, init_command, SimpleConnection, secrets_command dispatcher. Remaining: check_keyvault_access, validate_command Key Vault paths.
-  - `cli/lineage.py` — **100% covered** (10+17 tests). All functions fully tested: _get_catalog_manager (all error paths + success), _lineage_upstream/downstream/impact (no data, json format, tree format, with affected tables/pipelines).
-    - `tests/unit/cli/test_cli_lineage_coverage.py` (17 tests) — _get_catalog_manager, upstream, downstream, impact
-  - `cli/schema.py` — **100% covered** (5+22 tests). All functions fully tested: _get_catalog_manager, _schema_history (no config, no catalog, no history, table/json format), _schema_diff (no versions, additions/removals/type changes).
-    - `tests/unit/cli/test_cli_schema_coverage.py` (22 tests) — _get_catalog_manager, _schema_history, _schema_diff
+- `cli/graph.py` — _generate_dot and _generate_mermaid fully covered. Remaining: graph_command (needs PipelineManager).
+  - `cli/test.py` — load_test_files, slugify, run_test_case core + edge cases, test_command loop (path not found, no files, pass/fail, YAML errors, snapshot, parent traversal).
+    - `tests/unit/cli/test_cli_test_coverage.py` — slugify, load_test_files edge cases, run_test_case (CSV, missing transforms, TypeError, snapshots), test_command full loop
+  - `cli/init_pipeline.py` — Nearly fully covered including interactive prompts, force overwrite, all generated files.
+  - `cli/secrets.py` — extract_env_vars, init_command, SimpleConnection, secrets_command dispatcher. Remaining: check_keyvault_access, validate_command Key Vault paths.
+  - `cli/lineage.py` — All functions fully tested: _get_catalog_manager (all error paths + success), _lineage_upstream/downstream/impact (no data, json format, tree format, with affected tables/pipelines).
+    - `tests/unit/cli/test_cli_lineage_coverage.py` — _get_catalog_manager, upstream, downstream, impact
+  - `cli/schema.py` — All functions fully tested: _get_catalog_manager, _schema_history (no config, no catalog, no history, table/json format), _schema_diff (no versions, additions/removals/type changes).
+    - `tests/unit/cli/test_cli_schema_coverage.py` — _get_catalog_manager, _schema_history, _schema_diff
   - All CLI test files:
-    - `tests/unit/cli/test_cli_test_graph.py` (35 tests)
-    - `tests/unit/cli/test_cli_schema_secrets_lineage.py` (45 tests)
-    - `tests/unit/cli/test_cli_init_pipeline.py` (38 tests)
+    - `tests/unit/cli/test_cli_test_graph.py`
+    - `tests/unit/cli/test_cli_schema_secrets_lineage.py`
+    - `tests/unit/cli/test_cli_init_pipeline.py`
 
-- `cli/main.py` — **98% covered** (37+13+20 tests). format_output, print_table, cmd_validate, cmd_doctor, cmd_doctor_path, cmd_discover, cmd_scaffold_project, cmd_scaffold_sql_pipeline, scaffold dispatch, all deferred-import command branches. Remaining: ~6 lines.
-  - `tests/unit/cli/test_cli_main_coverage.py` (37 tests) — all pure functions, mock-based command tests
-  - `tests/unit/cli/test_cli_main_remaining_coverage.py` (13 tests) — cmd_discover, cmd_scaffold_project, cmd_scaffold_sql_pipeline
-  - `tests/unit/cli/test_cli_main_scaffold_coverage.py` (20 tests) — scaffold dispatch + deferred import branches
-- `cli/catalog.py` — **94% covered** (51+26 tests). _format_table, _format_output, catalog_command dispatcher, all 7 query commands + _stats_command + _sync_command, _sync_status_command, _sync_purge_command. Remaining: ~27 lines (error paths in query commands).
-  - `tests/unit/cli/test_cli_catalog_coverage.py` (51 tests) — formatters, dispatcher, all catalog queries with mock DataFrames
-  - `tests/unit/cli/test_cli_catalog_sync_coverage.py` (26 tests) — sync (no system/sync_to, invalid tables, mode override, dry run, success, partial failure), sync-status, sync-purge
-- `cli/system.py` — **89% covered** (42 tests). system_command dispatcher, _sync_command, _rebuild_summaries_command, _optimize_command, _cleanup_command, _count_records_to_delete, _count_records_pandas, _count_records_sql_server, _delete_old_records, _delete_records_pandas, _delete_records_sql_server.
-  - `tests/unit/cli/test_cli_system_coverage.py` (42 tests) — dispatcher, all 4 commands, all 6 helper functions
-- `cli/list_cmd.py` — **97% covered** (41 tests). _get_first_line, _serialize_default, _extract_pattern_params (docstring parsing + all fallback patterns), _ensure_initialized, list_command dispatcher, list_transformers/patterns/connections/recipes (table + json), explain_command (transformer, pattern, connection, recipe, not found).
-  - `tests/unit/cli/test_cli_list_cmd_coverage.py` (41 tests)
-- `cli/story.py` — **96% covered** (44 tests). story_command dispatcher, generate_command (YAML loading, DocStoryGenerator, themes, error paths), diff_command (basic + detailed with node comparison, time/row diffs, status changes), list_command (directory listing, size formatting, limits), last_command (file search, browser opening, node filtering), show_command (HTML/JSON/other), add_story_parser. Remaining: diff verbose traceback, list error path.
-  - `tests/unit/cli/test_cli_story_coverage.py` (44 tests) — all commands with mock args, file I/O via tmp_path
-- `story/generator.py` — **83% covered** (100 tests). StoryGenerator init, _infer_layer, _compute_anomalies, _convert_result, _get_error_*, _build_graph_data, _compare_with_last_success, generate (local + remote), cleanup (local + remote), retention, _write_remote (fsspec + dbutils fallback), _cleanup_remote (count/time retention, empty dirs), _generate_pipeline_index (full local flow), _render_index_html, _find_last_successful_run_remote, _clean_config_for_dump, _get_git_info, get_alert_summary, _generate_docs. Remaining: some fallback graph building paths, config snapshot diff paths.
-  - `tests/unit/story/test_story_generator_coverage.py` (100 tests) — all pure logic, graph building, anomaly detection, cross-run comparison, full generate integration, remote write/cleanup/index
+- `cli/main.py` — format_output, print_table, cmd_validate, cmd_doctor, cmd_doctor_path, cmd_discover, cmd_scaffold_project, cmd_scaffold_sql_pipeline, scaffold dispatch, all deferred-import command branches.
+  - `tests/unit/cli/test_cli_main_coverage.py` — all pure functions, mock-based command tests
+  - `tests/unit/cli/test_cli_main_remaining_coverage.py` — cmd_discover, cmd_scaffold_project, cmd_scaffold_sql_pipeline
+  - `tests/unit/cli/test_cli_main_scaffold_coverage.py` — scaffold dispatch + deferred import branches
+- `cli/catalog.py` — _format_table, _format_output, catalog_command dispatcher, all 7 query commands + _stats_command + _sync_command, _sync_status_command, _sync_purge_command. Remaining: error paths in query commands.
+  - `tests/unit/cli/test_cli_catalog_coverage.py` — formatters, dispatcher, all catalog queries with mock DataFrames
+  - `tests/unit/cli/test_cli_catalog_sync_coverage.py` — sync (no system/sync_to, invalid tables, mode override, dry run, success, partial failure), sync-status, sync-purge
+- `cli/system.py` — system_command dispatcher, _sync_command, _rebuild_summaries_command, _optimize_command, _cleanup_command, _count_records_to_delete, _count_records_pandas, _count_records_sql_server, _delete_old_records, _delete_records_pandas, _delete_records_sql_server.
+  - `tests/unit/cli/test_cli_system_coverage.py` — dispatcher, all 4 commands, all 6 helper functions
+- `cli/list_cmd.py` — _get_first_line, _serialize_default, _extract_pattern_params (docstring parsing + all fallback patterns), _ensure_initialized, list_command dispatcher, list_transformers/patterns/connections/recipes (table + json), explain_command (transformer, pattern, connection, recipe, not found).
+  - `tests/unit/cli/test_cli_list_cmd_coverage.py`
+- `cli/story.py` — story_command dispatcher, generate_command (YAML loading, DocStoryGenerator, themes, error paths), diff_command (basic + detailed with node comparison, time/row diffs, status changes), list_command (directory listing, size formatting, limits), last_command (file search, browser opening, node filtering), show_command (HTML/JSON/other), add_story_parser. Remaining: diff verbose traceback, list error path.
+  - `tests/unit/cli/test_cli_story_coverage.py` — all commands with mock args, file I/O via tmp_path
+- `story/generator.py` — StoryGenerator init, _infer_layer, _compute_anomalies, _convert_result, _get_error_*, _build_graph_data, _compare_with_last_success, generate (local + remote), cleanup (local + remote), retention, _write_remote (fsspec + dbutils fallback), _cleanup_remote (count/time retention, empty dirs), _generate_pipeline_index (full local flow), _render_index_html, _find_last_successful_run_remote, _clean_config_for_dump, _get_git_info, get_alert_summary, _generate_docs. Remaining: some fallback graph building paths, config snapshot diff paths.
+  - `tests/unit/story/test_story_generator_coverage.py` — all pure logic, graph building, anomaly detection, cross-run comparison, full generate integration, remote write/cleanup/index
 
-- `story/lineage_utils.py` — **100% covered** (62 tests). All 4 functions fully tested: get_full_stories_path (all 9 conn types + edge cases), get_storage_options (all auth modes — direct, nested, dict, MSI, key_vault), get_write_file (all cloud closures with mock fsspec), generate_lineage (mock LineageGenerator).
-  - `tests/unit/story/test_lineage_utils_coverage.py` (62 tests) — get_full_stories_path, get_storage_options, get_write_file, write closure bodies, generate_lineage
-- `story/lineage.py` — **98% covered** (70 new tests). LineageGenerator: generate (all node types, edge formats, layer inference), save (local + remote + write_file), render_json/html, _find_story_files (local), _find_remote_story_files (mock fsspec), _load_story (local + remote with retry), _extract_layer_info (all statuses), _stitch_cross_layer_edges, _inherit_layers_from_matches, _generate_mermaid_diagram, _generate_layers_table, _get_layer_class, all helper methods. Remaining: 6 lines (retry sleep paths).
-  - `tests/unit/story/test_lineage_coverage.py` (70 tests) — all LineageGenerator methods, dataclass serialization, edge cases
-- `lineage.py` — **96% covered** (71 tests). OpenLineageAdapter disabled paths, enabled paths (mock OL types injected at module level), _create_dataset_from_config, init with URL. LineageTracker: record_lineage, record_dependency_lineage, _resolve_table_path, get_upstream/downstream, get_impact_analysis. Remaining uncovered: lines 9-28 (OpenLineage import block — not installed), lines 51-52/58-59 (init config early-return branches already covered by disabled tests).
-  - `tests/unit/test_lineage_coverage.py` (71 tests) — all OpenLineageAdapter + LineageTracker paths
-- `story/doc_generator.py` — **90% covered** (92 new tests + 25 existing). All rendering helpers, node cards, readme, technical details, run memo, pipeline state. Remaining: _write_remote, _read_remote (fsspec/dbutils paths).
-  - `tests/unit/story/test_doc_generator_coverage.py` (92 tests)
-- `utils/progress.py` — **100% covered** (60 tests). All Rich and plain text paths, phase timing reports.
-  - `tests/unit/utils/test_progress_coverage.py` (60 tests)
-- `connections/api_fetcher.py` — **94% covered** (88 new tests + 38 existing). All pagination strategies, response extractor, date variables, rate limiter, factory. Remaining: HTTP retry paths.
-  - `tests/unit/connections/test_api_fetcher_coverage.py` (88 tests)
+- `story/lineage_utils.py` — All 4 functions fully tested: get_full_stories_path (all 9 conn types + edge cases), get_storage_options (all auth modes — direct, nested, dict, MSI, key_vault), get_write_file (all cloud closures with mock fsspec), generate_lineage (mock LineageGenerator).
+  - `tests/unit/story/test_lineage_utils_coverage.py` — get_full_stories_path, get_storage_options, get_write_file, write closure bodies, generate_lineage
+- `story/lineage.py` — LineageGenerator: generate (all node types, edge formats, layer inference), save (local + remote + write_file), render_json/html, _find_story_files (local), _find_remote_story_files (mock fsspec), _load_story (local + remote with retry), _extract_layer_info (all statuses), _stitch_cross_layer_edges, _inherit_layers_from_matches, _generate_mermaid_diagram, _generate_layers_table, _get_layer_class, all helper methods. Remaining: retry sleep paths.
+  - `tests/unit/story/test_lineage_coverage.py` — all LineageGenerator methods, dataclass serialization, edge cases
+- `lineage.py` — OpenLineageAdapter disabled paths, enabled paths (mock OL types injected at module level), _create_dataset_from_config, init with URL. LineageTracker: record_lineage, record_dependency_lineage, _resolve_table_path, get_upstream/downstream, get_impact_analysis. Remaining uncovered: OpenLineage import block — not installed, init config early-return branches already covered by disabled tests.
+  - `tests/unit/test_lineage_coverage.py` — all OpenLineageAdapter + LineageTracker paths
+- `story/doc_generator.py` — All rendering helpers, node cards, readme, technical details, run memo, pipeline state. Remaining: _write_remote, _read_remote (fsspec/dbutils paths).
+  - `tests/unit/story/test_doc_generator_coverage.py`
+- `utils/progress.py` — All Rich and plain text paths, phase timing reports.
+  - `tests/unit/utils/test_progress_coverage.py`
+- `connections/api_fetcher.py` — All pagination strategies, response extractor, date variables, rate limiter, factory. Remaining: HTTP retry paths.
+  - `tests/unit/connections/test_api_fetcher_coverage.py`
 
-- `patterns/aggregation.py` — **63% covered** (32 tests). validate(), _aggregate_pandas() with DuckDB SQL, incremental merge strategies (replace/sum/min/max), audit columns, end-to-end. Remaining: Spark paths, error handling in execute().
-  - `tests/unit/patterns/test_aggregation_coverage.py` (32 tests) — validate, aggregate, incremental merge, audit, end-to-end
-- `patterns/fact.py` — **74% covered** (47 tests). validate(), _deduplicate(), dimension lookups (unknown/reject/quarantine), _apply_measures(), _is_expression(), _validate_grain(), quarantine metadata + write (CSV/JSON/parquet). Remaining: Spark paths.
-  - `tests/unit/patterns/test_fact_coverage.py` (47 tests) — validate, dedup, dimension lookup, measures, grain validation, quarantine, audit, end-to-end
-- `patterns/dimension.py` — **70% covered** (41 tests). validate(), _get_max_sk(), _generate_surrogate_keys(), SCD0/SCD1 full Pandas paths, SCD2 (mocked scd2 transformer), audit columns (dimension override), _ensure_unknown_member(). Remaining: Spark paths, _load_existing_spark.
-  - `tests/unit/patterns/test_dimension_coverage.py` (41 tests) — validate, SK generation, SCD0/1/2, audit, unknown member
+- `patterns/aggregation.py` — validate(), _aggregate_pandas() with DuckDB SQL, incremental merge strategies (replace/sum/min/max), audit columns, end-to-end. Remaining: Spark paths, error handling in execute().
+  - `tests/unit/patterns/test_aggregation_coverage.py` — validate, aggregate, incremental merge, audit, end-to-end
+- `patterns/fact.py` — validate(), _deduplicate(), dimension lookups (unknown/reject/quarantine), _apply_measures(), _is_expression(), _validate_grain(), quarantine metadata + write (CSV/JSON/parquet). Remaining: Spark paths.
+  - `tests/unit/patterns/test_fact_coverage.py` — validate, dedup, dimension lookup, measures, grain validation, quarantine, audit, end-to-end
+- `patterns/dimension.py` — validate(), _get_max_sk(), _generate_surrogate_keys(), SCD0/SCD1 full Pandas paths, SCD2 (mocked scd2 transformer), audit columns (dimension override), _ensure_unknown_member(). Remaining: Spark paths, _load_existing_spark.
+  - `tests/unit/patterns/test_dimension_coverage.py` — validate, SK generation, SCD0/1/2, audit, unknown member
 
-- `writers/sql_server_writer.py` — **67% covered** (208 tests). All non-Spark paths: dataclasses, helpers, hash (Pandas+Polars), filter changed rows, validate keys, schema/DDL, schema_evolution (all modes), merge_pandas (auto-create PK/index, audit, incremental, schema evo, cleanup), merge_polars (all paths), overwrite_pandas/polars (all strategies + batch), bulk_copy helpers (_execute_bulk_insert, _validate_bulk_insert_schema, _is_azure_sql_database, setup_bulk_copy_external_source, credentials, cleanup). Remaining: Spark-only paths (~466 stmts).
-  - `tests/unit/writers/test_sql_server_writer_coverage.py` (208 tests)
-- `derived_updater.py` — **74% covered** (109 tests). All utility functions, DerivedUpdater dispatch, full Pandas claim lifecycle, apply_derived_update (fail-safe wrapper), apply_derived_updates_batch (batch mode), SQL Server claim lifecycle + derived updaters, **Pandas derived updater methods** (_update_daily_stats_pandas, _update_pipeline_health_pandas, _update_sla_status_pandas) with full coverage of cost source logic, window metrics, SLA met/violated, run cache, existing row replacement. Remaining: Spark paths (~200 lines).
-  - `tests/unit/test_derived_updater_coverage.py` (109 tests) — utilities, dispatch, Pandas Delta claim/mark/reclaim, apply_derived_update, batch mode, SQL Server claim lifecycle + derived updaters, Pandas daily stats/pipeline health/SLA status
-- `introspect.py` — **88% covered** (34+21 tests). FieldDoc, ModelDoc, clean_type_str, format_type_hint, get_docstring, get_summary, get_pydantic_fields, discover_modules, scan_module_for_models, constants, render_markdown (empty/core/connection/transformation groups, cross-linking, type alias expansion, used_in, code fence handling), generate_docs pipeline. Remaining: some edge paths in transformation rendering.
-  - `tests/unit/test_introspect_coverage.py` (34 tests) — data models, type formatting, docstring extraction, module discovery, model scanning
-  - `tests/unit/test_introspect_render_coverage.py` (21 tests) — render_markdown all groups, cross-linking, generate_docs
+- `writers/sql_server_writer.py` — All non-Spark paths: dataclasses, helpers, hash (Pandas+Polars), filter changed rows, validate keys, schema/DDL, schema_evolution (all modes), merge_pandas (auto-create PK/index, audit, incremental, schema evo, cleanup), merge_polars (all paths), overwrite_pandas/polars (all strategies + batch), bulk_copy helpers (_execute_bulk_insert, _validate_bulk_insert_schema, _is_azure_sql_database, setup_bulk_copy_external_source, credentials, cleanup). Remaining: Spark-only paths.
+  - `tests/unit/writers/test_sql_server_writer_coverage.py`
+- `derived_updater.py` — All utility functions, DerivedUpdater dispatch, full Pandas claim lifecycle, apply_derived_update (fail-safe wrapper), apply_derived_updates_batch (batch mode), SQL Server claim lifecycle + derived updaters, **Pandas derived updater methods** (_update_daily_stats_pandas, _update_pipeline_health_pandas, _update_sla_status_pandas) with full coverage of cost source logic, window metrics, SLA met/violated, run cache, existing row replacement. Remaining: Spark paths.
+  - `tests/unit/test_derived_updater_coverage.py` — utilities, dispatch, Pandas Delta claim/mark/reclaim, apply_derived_update, batch mode, SQL Server claim lifecycle + derived updaters, Pandas daily stats/pipeline health/SLA status
+- `introspect.py` — FieldDoc, ModelDoc, clean_type_str, format_type_hint, get_docstring, get_summary, get_pydantic_fields, discover_modules, scan_module_for_models, constants, render_markdown (empty/core/connection/transformation groups, cross-linking, type alias expansion, used_in, code fence handling), generate_docs pipeline. Remaining: some edge paths in transformation rendering.
+  - `tests/unit/test_introspect_coverage.py` — data models, type formatting, docstring extraction, module discovery, model scanning
+  - `tests/unit/test_introspect_render_coverage.py` — render_markdown all groups, cross-linking, generate_docs
 
-- `tools/adf_profiler.py` — **99% covered** (70 tests). All REST API methods, pagination, caching, all activity types, all trigger types, full_profile orchestration, parallel run stats, markdown report, JSON output, Excel output (10 sheets), lineage, _auto_fit_columns. Remaining: 1 line (secret redaction edge case).
-  - `tests/unit/tools/test_adf_profiler_coverage.py` (70 tests) — all AdfProfiler methods with mocked requests/credentials
-- `utils/setup_helpers.py` — **94% covered** (22 tests). KeyVaultFetchResult, fetch_keyvault_secret (success/ImportError/exception), fetch_keyvault_secrets_parallel (kv/non-kv connections, verbose), configure_connections_parallel (prefetch on/off, cache injection, errors), validate_databricks_environment. Remaining: Spark active session check, IPython dbutils check.
-  - `tests/unit/utils/test_setup_helpers_coverage.py` (22 tests)
-- `connections/factory.py` — **81% covered** (25+5 tests). All factory functions: create_local/http/azure_blob/delta/sql_server/postgres/unity_catalog connections. Auth auto-detection for all modes. Missing host/account/database validation errors. register_builtins.
-  - `tests/unit/connections/test_connection_factory_coverage.py` (25 tests)
-- `connections/unity_catalog.py` — **~95% covered** (27 tests). UnityCatalogConnection: get_path, validate (schema creation, no-spark, exceptions), discover_catalog (tables, pattern, limit, no-spark, errors), list_tables, get_freshness (history, empty, errors), pandas_storage_options, BaseConnection subclass. Factory: basic, defaults, missing catalog. register_builtins includes UC.
-  - `tests/unit/connections/test_unity_catalog_coverage.py` (27 tests)
-- `catalog.py` UC mode — (22 tests). UC detection (_is_uc, is_unity_catalog_mode), table name resolution (18 UC-qualified names), _table_exists (catalog.tableExists), _ensure_table (saveAsTable), _spark_read_table (spark.table), _spark_write_append (saveAsTable), _merge_target_ref (table name vs delta.\`path\`), bootstrap (creates all 18 tables, skips existing).
-  - `tests/unit/test_catalog_uc_mode.py` (22 tests)
-- `patterns/date_dimension.py` — **57% covered** (17 tests). _calc_fiscal_year, _calc_fiscal_quarter, _generate_pandas, _add_unknown_member Pandas, _get_row_count, execute Pandas path with/without unknown_member. Remaining: Spark paths.
-  - `tests/unit/patterns/test_date_dimension_coverage.py` (17 tests)
-- CLI small commands — **35 tests** covering cli/templates.py (list/show/transformer/schema/dispatch), cli/validate.py (valid/invalid/exception), cli/ui.py (import error, parser), cli/export.py (airflow/dagster/errors), cli/run.py (success/failure/exception), cli/deploy.py (success/no catalog/exception).
-  - `tests/unit/cli/test_cli_small_commands_coverage.py` (35 tests)
-- `pipeline.py` — **20% covered** (16+69 tests). PipelineResults (debug_summary, to_dict, get_node_result, defaults), Pipeline utility methods (_cleanup_connections, flush_stories, flush_sync, _send_alerts, buffer_lineage/asset/hwm, _get_databricks_*_id, _flush_batch_writes, _sync_catalog_if_configured, context manager), PipelineManager (_build_connections, register_outputs). Remaining: Pipeline.run() execution paths, PipelineManager.from_yaml, __init__, validate, run_node (~1000 lines, mostly integration-level).
-  - `tests/unit/test_pipeline_coverage.py` (16 tests) — _build_connections, register_outputs, PipelineResults basics
-  - `tests/unit/test_pipeline_extended_coverage.py` (69 tests) — debug_summary, to_dict, cleanup, flush, alerts, buffers, databricks IDs, batch writes, sync
-- `node.py` — **81% covered** (50+39 utility/execution tests). PhaseTimer, _clean_spark_traceback, _calculate_pii, _count_rows, _get_column_max, _generate_suggestions, _get_config_snapshot, _get_connection_health, _get_delta_table_state, _check_target_exists, _execute_dry_run, _generate_incremental_sql_filter (rolling window + stateful + watermark_lag), NodeResult. **Plus execution paths**: error handling (NodeExecutionError wrapping, traceback capture, suggestions, error metadata), first_run_query, archive_options, incremental SQL pushdown, sql_file resolution with incremental filter wrapping, simulation state capture (HWM, random walk, scheduled events), stateful incremental filter with watermark_lag/fallback_column.
-  - `tests/unit/test_node_utilities_coverage.py` (50 tests)
-  - `tests/unit/test_node_execution_coverage.py` (39 tests) — error handling, first_run_query, archive_options, incremental SQL pushdown, sql_file, simulation state, stateful filter
+- `tools/adf_profiler.py` — All REST API methods, pagination, caching, all activity types, all trigger types, full_profile orchestration, parallel run stats, markdown report, JSON output, Excel output (10 sheets), lineage, _auto_fit_columns. Remaining: secret redaction edge case.
+  - `tests/unit/tools/test_adf_profiler_coverage.py` — all AdfProfiler methods with mocked requests/credentials
+- `utils/setup_helpers.py` — KeyVaultFetchResult, fetch_keyvault_secret (success/ImportError/exception), fetch_keyvault_secrets_parallel (kv/non-kv connections, verbose), configure_connections_parallel (prefetch on/off, cache injection, errors), validate_databricks_environment. Remaining: Spark active session check, IPython dbutils check.
+  - `tests/unit/utils/test_setup_helpers_coverage.py`
+- `connections/factory.py` — All factory functions: create_local/http/azure_blob/delta/sql_server/postgres/unity_catalog connections. Auth auto-detection for all modes. Missing host/account/database validation errors. register_builtins.
+  - `tests/unit/connections/test_connection_factory_coverage.py`
+- `connections/unity_catalog.py` — UnityCatalogConnection: get_path, validate (schema creation, no-spark, exceptions), discover_catalog (tables, pattern, limit, no-spark, errors), list_tables, get_freshness (history, empty, errors), pandas_storage_options, BaseConnection subclass. Factory: basic, defaults, missing catalog. register_builtins includes UC.
+  - `tests/unit/connections/test_unity_catalog_coverage.py`
+- `catalog.py` UC mode — UC detection (_is_uc, is_unity_catalog_mode), table name resolution (UC-qualified names), _table_exists (catalog.tableExists), _ensure_table (saveAsTable), _spark_read_table (spark.table), _spark_write_append (saveAsTable), _merge_target_ref (table name vs delta.\`path\`), bootstrap (creates the system tables, skips existing).
+  - `tests/unit/test_catalog_uc_mode.py`
+- `patterns/date_dimension.py` — _calc_fiscal_year, _calc_fiscal_quarter, _generate_pandas, _add_unknown_member Pandas, _get_row_count, execute Pandas path with/without unknown_member. Remaining: Spark paths.
+  - `tests/unit/patterns/test_date_dimension_coverage.py`
+- CLI small commands — covering cli/templates.py (list/show/transformer/schema/dispatch), cli/validate.py (valid/invalid/exception), cli/ui.py (import error, parser), cli/export.py (airflow/dagster/errors), cli/run.py (success/failure/exception), cli/deploy.py (success/no catalog/exception).
+  - `tests/unit/cli/test_cli_small_commands_coverage.py`
+- `pipeline.py` — PipelineResults (debug_summary, to_dict, get_node_result, defaults), Pipeline utility methods (_cleanup_connections, flush_stories, flush_sync, _send_alerts, buffer_lineage/asset/hwm, _get_databricks_*_id, _flush_batch_writes, _sync_catalog_if_configured, context manager), PipelineManager (_build_connections, register_outputs). Remaining: Pipeline.run() execution paths, PipelineManager.from_yaml, __init__, validate, run_node.
+  - `tests/unit/test_pipeline_coverage.py` — _build_connections, register_outputs, PipelineResults basics
+  - `tests/unit/test_pipeline_extended_coverage.py` — debug_summary, to_dict, cleanup, flush, alerts, buffers, databricks IDs, batch writes, sync
+- `node.py` — PhaseTimer, _clean_spark_traceback, _calculate_pii, _count_rows, _get_column_max, _generate_suggestions, _get_config_snapshot, _get_connection_health, _get_delta_table_state, _check_target_exists, _execute_dry_run, _generate_incremental_sql_filter (rolling window + stateful + watermark_lag), NodeResult. **Plus execution paths**: error handling (NodeExecutionError wrapping, traceback capture, suggestions, error metadata), first_run_query, archive_options, incremental SQL pushdown, sql_file resolution with incremental filter wrapping, simulation state capture (HWM, random walk, scheduled events), stateful incremental filter with watermark_lag/fallback_column.
+  - `tests/unit/test_node_utilities_coverage.py`
+  - `tests/unit/test_node_execution_coverage.py` — error handling, first_run_query, archive_options, incremental SQL pushdown, sql_file, simulation state, stateful filter
 
-- `state/__init__.py` — **80% covered** (86 tests). LocalJSONStateBackend (init/load/save/get/set all paths), CatalogStateBackend (local Delta read/write for runs+HWM, Spark dispatch, set_hwm merge+fallback, batch operations), SqlServerSystemBackend (_ensure_tables, get_last_run_info, get/set HWM, log_run, log_runs_batch), StateManager (init, delegation), create_state_backend factory (local JSON fallback, local/azure_blob/sql_server types), create_sync_source_backend factory, sync_system_data + _sync_runs + _sync_state. Remaining: Spark HWM batch paths, _retry_delta_operation, some sync edge cases.
-  - `tests/unit/test_state_coverage.py` (86 tests) — all backends, manager, factories, sync operations
+- `state/__init__.py` — LocalJSONStateBackend (init/load/save/get/set all paths), CatalogStateBackend (local Delta read/write for runs+HWM, Spark dispatch, set_hwm merge+fallback, batch operations), SqlServerSystemBackend (_ensure_tables, get_last_run_info, get/set HWM, log_run, log_runs_batch), StateManager (init, delegation), create_state_backend factory (local JSON fallback, local/azure_blob/sql_server types), create_sync_source_backend factory, sync_system_data + _sync_runs + _sync_state. Remaining: Spark HWM batch paths, _retry_delta_operation, some sync edge cases.
+  - `tests/unit/test_state_coverage.py` — all backends, manager, factories, sync operations
 
-- `catalog_sync.py` — **81% covered** (88 tests). CatalogSyncer init, _get_target_type (all detection paths), get_tables_to_sync, sync dispatch (SQL Server + Delta), sync_async, _sync_to_sql_server (full/incremental/env injection/empty/error), _sync_to_delta (spark/engine/error/path validation), _read_source_table, _get_time_column, _normalize_tz, _apply_incremental_filter (last_sync/sync_last_days/date), _get_last_sync_timestamp (spark/engine/error), _update_sync_state (spark/engine/append/update), _ensure_sql_schema/table/dim_tables/views, _apply_column_mappings, _df_to_records, _sanitize_value (all types), _insert_to_sql_server (MERGE/INSERT/deadlock retry), purge_sql_tables. Remaining: Spark _apply_incremental_filter_spark, some _sync_to_delta Spark paths.
-  - `tests/unit/test_catalog_sync_coverage.py` (88 tests)
-- `connections/azure_adls.py` — **89% covered** (61 new + 65 existing = 126 total tests). All discovery methods (list_files, list_folders, discover_catalog recursive/non-recursive, get_schema, profile, preview, detect_partitions, get_freshness), get_storage_key edge cases (cached/key_vault/timeout/ImportError), validate edge cases (unsupported auth_mode, production warning, sas/sp failures), _get_fs, get_client_secret. Remaining: configure_spark internal paths (~100 lines).
-  - `tests/unit/connections/test_azure_adls_coverage.py` (61 tests)
-  - `tests/unit/connections/test_azure_adls.py` (65 tests)
-- `connections/local.py` — **98% covered** (64 tests). All init/get_path/validate paths, list_files/folders (including error paths), discover_catalog (recursive/non-recursive/pattern/limit/error/formats), get_schema (parquet/csv/json/unsupported/error), profile (all cardinalities/candidate keys+watermarks/columns filter/empty df/sample cap), preview (all formats/columns/cap), detect_partitions (URI/subpath/error), get_freshness (URI/exists/missing/error). Remaining: 5 lines (edge cases).
-  - `tests/unit/connections/test_local_coverage.py` (64 tests)
-- `connections/postgres.py` — **96% covered** (85 tests). All methods: init, get_path, validate, get_engine (cached/new/ImportError/connection error), read_sql, read_table, read_sql_query, write_table, execute/execute_sql, SQL helpers (quote_identifier, qualify_table, build_select_query), list_schemas, list_tables, get_table_info, discover_catalog (path/pattern/limit/include_schema), profile (all cardinalities), preview, relationships, get_freshness (data/metadata/1970/error), get_spark_options (sslmode), close, _sanitize_error, _get_error_suggestions (all patterns). Remaining: ~15 lines (edge cases in profile/discover).
-  - `tests/unit/connections/test_postgres_coverage.py` (85 tests)
-- `connections/azure_sql.py` — **93% covered** (87 tests). All methods: init, get_password (direct/cached/key_vault/ImportError/no-password), odbc_dsn (sql/aad_msi/aad_sp), get_path, validate (all paths), get_engine (cached/new/error), read_sql, read_table, read_sql_query, write_table, execute/execute_sql, SQL helpers, list_schemas, list_tables, get_table_info, discover_catalog, profile, preview, relationships, get_freshness, close, _sanitize_error, _get_error_suggestions, get_spark_options (all auth modes). Remaining: ~30 lines (ImportError in get_engine, get_spark_options edge paths).
-  - `tests/unit/connections/test_azure_sql_coverage.py` (87 tests)
+- `catalog_sync.py` — CatalogSyncer init, _get_target_type (all detection paths), get_tables_to_sync, sync dispatch (SQL Server + Delta), sync_async, _sync_to_sql_server (full/incremental/env injection/empty/error), _sync_to_delta (spark/engine/error/path validation), _read_source_table, _get_time_column, _normalize_tz, _apply_incremental_filter (last_sync/sync_last_days/date), _get_last_sync_timestamp (spark/engine/error), _update_sync_state (spark/engine/append/update), _ensure_sql_schema/table/dim_tables/views, _apply_column_mappings, _df_to_records, _sanitize_value (all types), _insert_to_sql_server (MERGE/INSERT/deadlock retry), purge_sql_tables. Remaining: Spark _apply_incremental_filter_spark, some _sync_to_delta Spark paths.
+  - `tests/unit/test_catalog_sync_coverage.py`
+- `connections/azure_adls.py` — All discovery methods (list_files, list_folders, discover_catalog recursive/non-recursive, get_schema, profile, preview, detect_partitions, get_freshness), get_storage_key edge cases (cached/key_vault/timeout/ImportError), validate edge cases (unsupported auth_mode, production warning, sas/sp failures), _get_fs, get_client_secret. Remaining: configure_spark internal paths.
+  - `tests/unit/connections/test_azure_adls_coverage.py`
+  - `tests/unit/connections/test_azure_adls.py`
+- `connections/local.py` — All init/get_path/validate paths, list_files/folders (including error paths), discover_catalog (recursive/non-recursive/pattern/limit/error/formats), get_schema (parquet/csv/json/unsupported/error), profile (all cardinalities/candidate keys+watermarks/columns filter/empty df/sample cap), preview (all formats/columns/cap), detect_partitions (URI/subpath/error), get_freshness (URI/exists/missing/error). Remaining: edge cases.
+  - `tests/unit/connections/test_local_coverage.py`
+- `connections/postgres.py` — All methods: init, get_path, validate, get_engine (cached/new/ImportError/connection error), read_sql, read_table, read_sql_query, write_table, execute/execute_sql, SQL helpers (quote_identifier, qualify_table, build_select_query), list_schemas, list_tables, get_table_info, discover_catalog (path/pattern/limit/include_schema), profile (all cardinalities), preview, relationships, get_freshness (data/metadata/1970/error), get_spark_options (sslmode), close, _sanitize_error, _get_error_suggestions (all patterns). Remaining: edge cases in profile/discover.
+  - `tests/unit/connections/test_postgres_coverage.py`
+- `connections/azure_sql.py` — All methods: init, get_password (direct/cached/key_vault/ImportError/no-password), odbc_dsn (sql/aad_msi/aad_sp), get_path, validate (all paths), get_engine (cached/new/error), read_sql, read_table, read_sql_query, write_table, execute/execute_sql, SQL helpers, list_schemas, list_tables, get_table_info, discover_catalog, profile, preview, relationships, get_freshness, close, _sanitize_error, _get_error_suggestions, get_spark_options (all auth modes). Remaining: ImportError in get_engine, get_spark_options edge paths.
+  - `tests/unit/connections/test_azure_sql_coverage.py`
 
 - `transformers/` module coverage:
-  - `__init__.py` — **100%** (register_standard_library fully tested)
-  - `validation.py` — **100%**
-  - `advanced.py` — **80%** (Pandas paths for sessionize, split_events_by_period all covered. Remaining: Spark SQL paths — diminishing returns)
-  - `units.py` — **78%** (Pandas + Polars paths covered, _convert_value, _parse_gauge_offset, error handlers. Remaining: Spark UDF lines 276-325)
-  - `thermodynamics.py` — **71%** (CoolProp installed, fluid_properties + psychrometrics Pandas/Polars tested. Remaining: Spark UDF paths)
-  - `manufacturing.py` — **67%** (Polars paths fully covered. Cross-engine parity verified on Databricks (Campaign 11). Remaining: Spark paths lines 549-946)
-  - `delete_detection.py` — **58%** (76 tests across 2 files, all Pandas + Polars paths covered — Spark paths skipped)
-  - `relational.py` — **67%** (30 tests). Join full/right/cross, union by_name/by_position/missing dataset, pivot all agg funcs, unsupported engine errors. Remaining: Spark paths.
-    - `tests/unit/transformers/test_relational_coverage.py` (30 tests) — join types, union variants, pivot/unpivot engine errors
-  - `sql_core.py` — **93%** (31+14 tests). extract_date_parts, normalize_schema, sort, limit, sample, distinct, fill_nulls, split_part, date_add, date_trunc, date_diff, case_when, convert_timezone, concat_columns, normalize_column_names, coalesce_columns drop_source, **row_number** (Task 27). Remaining: Spark-only paths.
-    - `tests/unit/transformers/test_sql_core_coverage.py` (31 tests) — all 16 previously uncovered SQL transformers
-    - `tests/unit/transformers/test_row_number.py` (14 tests) — row_number: basic, partition_by, order_by, combined, edge cases, registration
-    - `tests/unit/transformers/test_flatten_struct.py` (17 tests) — flatten_struct: single/nested/depth-3, null structs, prefix/separator, drop_source, registration
-    - `tests/unit/transformers/test_apply_mapping.py` (14 tests) — apply_mapping: single/nested/depth-3, null structs, prefix/separator, drop_source, registration
-  - `merge_transformer.py` — **61%** (Pandas + DuckDB merge paths fully covered. Remaining: _merge_spark lines 424-631)
-  - `scd.py` — **49%** (36 tests, all Pandas + DuckDB paths covered. Remaining: _scd2_spark and Delta MERGE lines 289-719)
+  - `__init__.py` — register_standard_library fully tested
+  - `validation.py`
+  - `advanced.py` — Pandas paths for sessionize, split_events_by_period all covered. Remaining: Spark SQL paths — diminishing returns
+  - `units.py` — Pandas + Polars paths covered, _convert_value, _parse_gauge_offset, error handlers. Remaining: Spark UDF paths
+  - `thermodynamics.py` — CoolProp installed, fluid_properties + psychrometrics Pandas/Polars tested. Remaining: Spark UDF paths
+  - `manufacturing.py` — Polars paths fully covered. Cross-engine parity verified on Databricks (Campaign 11). Remaining: Spark paths
+  - `delete_detection.py` — all Pandas + Polars paths covered — Spark paths skipped
+  - `relational.py` — Join full/right/cross, union by_name/by_position/missing dataset, pivot all agg funcs, unsupported engine errors. Remaining: Spark paths.
+    - `tests/unit/transformers/test_relational_coverage.py` — join types, union variants, pivot/unpivot engine errors
+  - `sql_core.py` — extract_date_parts, normalize_schema, sort, limit, sample, distinct, fill_nulls, split_part, date_add, date_trunc, date_diff, case_when, convert_timezone, concat_columns, normalize_column_names, coalesce_columns drop_source, **row_number** (Task 27). Remaining: Spark-only paths.
+    - `tests/unit/transformers/test_sql_core_coverage.py` — all previously uncovered SQL transformers
+    - `tests/unit/transformers/test_row_number.py` — row_number: basic, partition_by, order_by, combined, edge cases, registration
+    - `tests/unit/transformers/test_flatten_struct.py` — flatten_struct: single/nested/depth-3, null structs, prefix/separator, drop_source, registration
+    - `tests/unit/transformers/test_apply_mapping.py` — apply_mapping: single/nested/depth-3, null structs, prefix/separator, drop_source, registration
+  - `merge_transformer.py` — Pandas + DuckDB merge paths fully covered. Remaining: _merge_spark
+  - `scd.py` — all Pandas + DuckDB paths covered. Remaining: _scd2_spark and Delta MERGE
   - Test files:
-    - `tests/unit/transformers/test_delete_detect.py` (52 tests)
-    - `tests/unit/transformers/test_delete_detect_polars.py` (24 tests) — Polars branches + parity
-    - `tests/unit/transformers/test_transformer_registration.py` (95 tests)
-    - `tests/unit/transformers/test_advanced_coverage.py` (20 tests) — sessionize Pandas, split_by_day/hour/shift Pandas
-    - `tests/unit/transformers/test_merge_pandas_deep.py` (18 tests) — DuckDB merge, Pandas fallback, connection resolution
-    - `tests/unit/transformers/test_units_coverage.py` (37 tests) — Polars conversion, _convert_value, _parse_gauge_offset, error paths, list_units, unit_convert
-    - `tests/unit/transformers/test_scd_coverage.py` (36 tests) — SCD2 Pandas + DuckDB paths, _safe_isna, params validation, bug fix test
-    - `tests/unit/transformers/test_thermodynamics_coverage.py` (60 tests) — fluid_properties, saturation_properties, psychrometrics with real CoolProp
-    - `tests/unit/transformers/test_manufacturing_coverage.py` (30 tests) — Polars phase detection, status tracking, metadata extraction, fill_null
+    - `tests/unit/transformers/test_delete_detect.py`
+    - `tests/unit/transformers/test_delete_detect_polars.py` — Polars branches + parity
+    - `tests/unit/transformers/test_transformer_registration.py`
+    - `tests/unit/transformers/test_advanced_coverage.py` — sessionize Pandas, split_by_day/hour/shift Pandas
+    - `tests/unit/transformers/test_merge_pandas_deep.py` — DuckDB merge, Pandas fallback, connection resolution
+    - `tests/unit/transformers/test_units_coverage.py` — Polars conversion, _convert_value, _parse_gauge_offset, error paths, list_units, unit_convert
+    - `tests/unit/transformers/test_scd_coverage.py` — SCD2 Pandas + DuckDB paths, _safe_isna, params validation, bug fix test
+    - `tests/unit/transformers/test_thermodynamics_coverage.py` — fluid_properties, saturation_properties, psychrometrics with real CoolProp
+    - `tests/unit/transformers/test_manufacturing_coverage.py` — Polars phase detection, status tracking, metadata extraction, fill_null
 
 ### 🎯 Coverage Roadmap: 66% → 80% (April–May 2026)
 
@@ -362,8 +360,8 @@ The docstrings in `odibi/config.py` are the source of truth for documentation.
 
 ### Introspection (AI-Friendly CLI)
 ```bash
-odibi list transformers             # List all 54 transformers
-odibi list patterns                 # List all 6 patterns
+odibi list transformers             # List all transformers
+odibi list patterns                 # List all patterns
 odibi list connections              # List all connection types
 odibi explain <name>                # Get detailed docs for any feature
 odibi list transformers --format json  # JSON output for parsing
@@ -375,7 +373,7 @@ Use these commands to discover available features before generating YAML configs
 odibi templates list                # List all template types
 odibi templates show azure_blob     # Show YAML template with all auth options
 odibi templates show sql_server     # Show connection template
-odibi templates show validation     # Show all 11 validation test types
+odibi templates show validation     # Show all validation test types
 odibi templates transformer scd2    # Show transformer params + example YAML
 odibi templates schema              # Generate JSON schema for VS Code
 ```
@@ -418,7 +416,7 @@ Likewise, `ParamValidationError.detail` (transformer params) names fields only, 
 file validation can show it without leaking configuration values.
 
 ### Mock PySpark Setup (Critical Order)
-PySpark 4.1.1 IS installed in this environment, so `catalog.py`'s try/except imports succeed and the fallback type stubs (lines 22-137) are NOT defined. These stubs are NOT dead code — they're essential for Pandas-only deployments. **Do not remove them.**
+PySpark 4.1.1 IS installed in this environment, so `catalog.py`'s try/except imports succeed and the fallback type stubs are NOT defined. These stubs are NOT dead code — they're essential for Pandas-only deployments. **Do not remove them.**
 
 When mocking PySpark for Spark branch testing:
 1. **ALWAYS `import odibi.catalog` (or `CatalogManager`) FIRST**, then install mock pyspark modules in `sys.modules`. If you install mocks before importing, the fallback type stubs never get defined, and all Spark-branch code breaks silently.
@@ -621,16 +619,16 @@ Seed data with `write_deltalake` + PyArrow, read with `DeltaTable(path).to_panda
 ### What to capture
 - **Gotchas/pitfalls** that took more than one attempt to figure out
 - **Mock/test patterns** that work (or don't) for specific modules
-- **Coverage updates** — when you add tests, update the "Current Coverage Status" section with new percentages and what's covered
+- **Coverage updates** — when you add tests, update the "Current Coverage Status" section with what's covered (no counts or percentages — they drift)
 - **Import order issues**, silent failures, or environment-specific quirks
 - **Naming constraints** (e.g., conftest skip filters, reserved words)
 - **Working code patterns** that future threads should reuse rather than reinvent
 
 ### How to capture
 1. Add gotchas to the **"Testing Gotchas & Lessons Learned"** section (or create a new subsection if it's not test-related)
-2. Update **"Current Coverage Status"** with new numbers when you add tests
+2. Update **"Current Coverage Status"** with what's covered when you add tests (no counts or percentages)
 3. Keep entries **concise and actionable** — state the problem, the wrong approach, and the fix
-4. **Do NOT remove existing entries** — only append or update percentages
+4. **Do NOT remove existing entries** — only append or update entries
 
 ### Why this matters
 Each lesson captured here saves ~10-30 minutes and real money on future threads. The compounding effect is significant. If you hit a wall, solved it, and think "another agent would hit this too" — write it down.
