@@ -31,9 +31,14 @@ from odibi.catalog import (  # noqa: E402
     TimestampType,
 )
 
-# Reuse existing mock functions if already installed (e.g., by reads file),
-# otherwise create a fresh MagicMock.
-_mock_functions = sys.modules.get("pyspark.sql.functions") or MagicMock()
+# Reuse an existing mock functions module if one is already installed (e.g. by the
+# reads file); never reuse the real pyspark.sql.functions module, because importing
+# odibi.catalog above loads the real one and its calls need a live SparkContext.
+_installed_functions = sys.modules.get("pyspark.sql.functions")
+if isinstance(_installed_functions, MagicMock):
+    _mock_functions = _installed_functions
+else:
+    _mock_functions = MagicMock()
 _mock_types = types.ModuleType("pyspark.sql.types")
 _mock_types.StringType = StringType
 _mock_types.LongType = LongType
