@@ -601,11 +601,11 @@ cat = CatalogManager(
 Seed data with `write_deltalake` + PyArrow, read with `DeltaTable(path).to_pandas()`.
 
 ### Catalog Test Files Reference
-- `test_catalog_outputs_and_config.py` (22 tests) — get_node_output, register_outputs_from_config, _extract_node_output_info, _get_all_outputs_cached
-- `test_catalog_pipeline_run_and_optimize.py` (26 tests) — get_pipeline_run, optimize, _bootstrapped guard, _prepare_pipeline_record, _prepare_node_record
-- `test_catalog_deprecated_skip.py` (19 tests) — register_pipeline/register_node skip_if_unchanged, _get_storage_options, _table_exists cloud paths
-- `test_catalog_mock_engine_reads.py` (27 tests) — Spark read branches via mock
-- `test_catalog_mock_engine_writes.py` (32 tests) — Spark write branches via mock
+- `test_catalog_outputs_and_config.py` — get_node_output, register_outputs_from_config, _extract_node_output_info, _get_all_outputs_cached
+- `test_catalog_pipeline_run_and_optimize.py` — get_pipeline_run, optimize, _bootstrapped guard, _prepare_pipeline_record, _prepare_node_record
+- `test_catalog_deprecated_skip.py` — register_pipeline/register_node skip_if_unchanged, _get_storage_options, _table_exists cloud paths
+- `test_catalog_mock_engine_reads.py` — Spark read branches via mock
+- `test_catalog_mock_engine_writes.py` — Spark write branches via mock
 
 ## Key Patterns
 
