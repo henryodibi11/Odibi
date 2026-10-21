@@ -424,7 +424,7 @@ When mocking PySpark for Spark branch testing:
 1. **ALWAYS `import odibi.catalog` (or `CatalogManager`) FIRST**, then install mock pyspark modules in `sys.modules`. If you install mocks before importing, the fallback type stubs never get defined, and all Spark-branch code breaks silently.
 2. **Use `sys.modules["pyspark"] = mock_module`** (direct assignment), NOT `sys.modules.setdefault(...)`. `setdefault` won't override the real pyspark that's already loaded.
 3. **Mock `pyspark.sql.types` must use the real fallback classes** from `odibi.catalog` (e.g., `StringType`, `StructField`, `StructType`), NOT `MagicMock()`. Otherwise `StructType(fields)` creates a MagicMock where `.fields` is auto-generated garbage.
-4. **When multiple test files install mock pyspark at module level**, the last file loaded wins. The writes file should reuse the reads file's `_MockFunctions` via `sys.modules.get("pyspark.sql.functions")` to avoid clobbering `col()`, `avg()`, etc.
+4. **When multiple test files install mock pyspark at module level**, the last file loaded wins. The writes file may reuse the reads file's `_MockFunctions` to avoid clobbering `col()`, `avg()`, etc., but **only when the value found in `sys.modules` is actually a mock** (e.g. `isinstance(module, MagicMock)`). Importing `odibi.catalog` loads the REAL `pyspark.sql.functions` first, so a bare `sys.modules.get("pyspark.sql.functions") or MagicMock()` returns the real module, whose `F.current_timestamp()`/`F.col()` need a live SparkContext and make the file fail when run alone (issue #358 defect 1, fixed in `test_catalog_mock_engine_writes.py` by 9df012f). Install a fresh `MagicMock()` when the found value is not a mock.
 
 ### CI: Guard Top-Level pyspark Imports in Test Files
 GitHub Actions CI installs PySpark but `pyspark.sql.types` symbols (e.g. `IntegerType`, `StringType`, `StructType`) may be unimportable in some runners (`ImportError: cannot import name 'IntegerType' from 'pyspark.sql.types' (unknown location)`). A bare `from pyspark.sql.types import StructType` at module level breaks **collection** for the entire test file. Use this guard pattern in every transformer test file that touches Spark:
@@ -553,7 +553,7 @@ Most documented failures have been resolved:
 - **~94 batch failures** in `test_pandas_engine_core.py` — ✅ RESOLVED. 67/67 pass.
 - **~70-93 failures** in `test_adf_profiler_coverage.py` — ✅ RESOLVED. 70/70 pass.
 - **~127 failures** in catalog tests — ✅ RESOLVED (Task 26). Removed deprecated `engine="rust"` from `write_deltalake()` calls (16 occurrences, 8 files). deltalake >=1.0 removed this parameter.
-- **16 failures** in `test_catalog_mock_engine_writes.py` — ⚠️ OPEN. Stale Spark mock expectations. Requires mock rewrite to match current catalog write paths.
+- **16 failures** in `test_catalog_mock_engine_writes.py` — ✅ RESOLVED (issue #358 defect 1, commit `9df012f`). The file's mock setup reused the real `pyspark.sql.functions` module that `import odibi.catalog` loads; it now reuses an installed functions module only when it is a `MagicMock` and otherwise installs a fresh one, so the file passes standalone (35/35) and combined with the reads file (71/71).
 
 ### Pattern Test Construction
 When testing patterns (AggregationPattern, FactPattern, DimensionPattern), NodeConfig's Pydantic validation checks required params at construction time. For tests that intentionally pass invalid/empty params to test pattern-level validation, **use a MagicMock config instead of NodeConfig**:
