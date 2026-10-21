@@ -61,6 +61,46 @@ def _extract_spark_error_message(error: Exception) -> str:
     return error_str[:200] + "..." if len(error_str) > 200 else error_str
 
 
+def _configure_delta_session(builder: Any) -> Any:
+    """Add the Delta SQL extension and catalog to a SparkSession builder.
+
+    ``configure_spark_with_delta_pip`` only adds the Delta jars
+    (``spark.jars.packages``); a locally built session also needs these two
+    settings, or the first Delta operation fails with
+    DELTA_CONFIGURE_SPARK_SESSION_WITH_EXTENSION_AND_CATALOG (issue #357).
+    """
+    builder = builder.config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+    builder = builder.config(
+        "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    )
+    return builder
+
+
+def _build_delta_session_builder(SparkSession: Any) -> Any:
+    """Build the builder for a locally started, Delta-enabled Spark session.
+
+    The Delta SQL extension and catalog are applied here (issue #357): without
+    them a session odibi starts itself fails every Delta operation with
+    DELTA_CONFIGURE_SPARK_SESSION_WITH_EXTENSION_AND_CATALOG.
+    """
+    builder = SparkSession.builder.appName("odibi").config(
+        "spark.sql.sources.partitionOverwriteMode", "dynamic"
+    )
+
+    # Delta needs the SQL extension and catalog, not just the jars
+    # configure_spark_with_delta_pip adds (issue #357).
+    builder = _configure_delta_session(builder)
+
+    # Performance Optimizations
+    builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
+    builder = builder.config("spark.sql.adaptive.enabled", "true")
+
+    # Reduce Verbosity
+    builder = builder.config("spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR")
+    builder = builder.config("spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR")
+    return builder
+
+
 class SparkEngine(Engine):
     """Spark execution engine with PySpark backend.
 
@@ -124,21 +164,7 @@ class SparkEngine(Engine):
             try:
                 from delta import configure_spark_with_delta_pip
 
-                builder = SparkSession.builder.appName("odibi").config(
-                    "spark.sql.sources.partitionOverwriteMode", "dynamic"
-                )
-
-                # Performance Optimizations
-                builder = builder.config("spark.sql.execution.arrow.pyspark.enabled", "true")
-                builder = builder.config("spark.sql.adaptive.enabled", "true")
-
-                # Reduce Verbosity
-                builder = builder.config(
-                    "spark.driver.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
-                )
-                builder = builder.config(
-                    "spark.executor.extraJavaOptions", "-Dlog4j.rootCategory=ERROR"
-                )
+                builder = _build_delta_session_builder(SparkSession)
 
                 self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
                 try:
