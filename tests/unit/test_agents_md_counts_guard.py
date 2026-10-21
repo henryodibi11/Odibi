@@ -22,6 +22,8 @@ DRIFT_PATTERNS = [
     re.compile(r"\(\d[\d+]* tests?\)"),
     # '(126 tests across 5 files)'
     re.compile(r"\(\d[\d+]* tests? across \d+ files?\)"),
+    # '(50+39 utility/execution tests)'
+    re.compile(r"\(\d[\d+]*\+\d[\d+]* [^()]*tests?\)"),
     # '70 new tests', '118 new tests across 3 files'
     re.compile(r"\b\d[\d+]* new tests?\b"),
     # '**85% covered**', '**~95% covered**'
@@ -32,8 +34,20 @@ DRIFT_PATTERNS = [
     re.compile(r"\b\d+% coverage\b"),
     # '**35 tests**'
     re.compile(r"\*\*\d[\d+]* tests?\*\*"),
-    # 'Remaining: ~466 stmts', 'Remaining: lines 366-570', 'Remaining: (3 lines)'
+    # 'Remaining: ~466 stmts', 'Remaining: ~5 lines'
     re.compile(r"Remaining:[^\n]*?~?\d[\d,]* (?:lines?|stmts)\b"),
+    # 'Remaining: (lines 366-570)', 'Remaining: _merge_spark lines 424-631'
+    re.compile(r"Remaining:[^\n]*?\blines? \d+-\d+"),
+    # '(lines 22-137)' in any line
+    re.compile(r"\(lines \d+-\d+\)"),
+    # 'This 2,200+ line document'
+    re.compile(r"\b\d[\d,]*\+ line document\b"),
+    # 'All 6 patterns', 'List all 6 patterns'
+    re.compile(r"\ball \d+ patterns\b", re.IGNORECASE),
+    # '52+ transformers', 'List all 54 transformers'
+    re.compile(r"\b\d+\+? transformers\b"),
+    # 'all 11 validation test types'
+    re.compile(r"all \d+ validation test types", re.IGNORECASE),
 ]
 
 
@@ -44,7 +58,9 @@ def _scannable_lines() -> list[tuple[int, str]]:
     skipping = False
     for lineno, line in enumerate(lines, start=1):
         if skipping:
-            if line.startswith("### ") and ROADMAP_MARKER not in line:
+            # Any heading of level <= 3 ends the skipped section (level 4+ headings
+            # belong to it).
+            if (line.startswith("## ") or line.startswith("### ")) and ROADMAP_MARKER not in line:
                 skipping = False
             else:
                 continue
