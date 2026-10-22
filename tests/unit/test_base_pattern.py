@@ -7,7 +7,8 @@ import pandas as pd
 import pytest
 
 from odibi.config import NodeConfig
-from odibi.context import EngineContext, PandasContext
+from odibi.context import EngineContext, PandasContext, SparkContext
+from odibi.engine.spark_engine import SparkEngine
 from odibi.enums import EngineType
 from odibi.patterns.base import Pattern
 
@@ -263,6 +264,244 @@ class TestLoadExistingPandas:
         )
 
         result = pattern._load_existing_pandas(context, str(path))
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Issue #363: Spark multi-format regression tests for Pattern._load_existing_spark
+# Mirrors TestLoadExistingPandas (test_base_pattern.py:185).
+# Mocked tests run on Windows / test-base (no pyspark needed).
+# Real-Spark tests are gated and run in test-extras.
+# ---------------------------------------------------------------------------
+
+try:
+    from pyspark.sql import SparkSession
+
+    PYSPARK_AVAILABLE = True
+except ImportError:  # pragma: no cover - Windows / CI without pyspark
+    PYSPARK_AVAILABLE = False
+    SparkSession = None  # type: ignore[assignment]
+
+
+pytestmark_spark = pytest.mark.skipif(
+    not PYSPARK_AVAILABLE, reason="pyspark not importable in this environment"
+)
+
+
+def _make_spark_context(spark_session, engine):
+    """Build an EngineContext whose .spark returns spark_session (Spark engine)."""
+    spark_ctx = SparkContext(spark_session)
+    return EngineContext(
+        context=spark_ctx,
+        df=pd.DataFrame(),
+        engine_type=EngineType.SPARK,
+        engine=engine,
+    )
+
+
+class TestLoadExistingSparkMock:
+    """Mocked SparkSession: covers every branch of _load_existing_spark (base.py:133-176).
+
+    Runs on Windows and in test-base (-m "not extras") because base.py and odibi.context
+    do not import pyspark at module load and SparkContext falls back when pyspark is absent.
+    """
+
+    def test_catalog_table_exists_returns_table(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        spark.catalog.tableExists.return_value = True
+        table_df = MagicMock()
+        spark.table.return_value = table_df
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "gold.dim_customer")
+
+        assert result is table_df
+        spark.catalog.tableExists.assert_called_once_with("gold.dim_customer")
+        spark.table.assert_called_once_with("gold.dim_customer")
+
+    def test_catalog_table_missing_returns_none(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        spark.catalog.tableExists.return_value = False
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "gold.dim_customer")
+
+        assert result is None
+        spark.catalog.tableExists.assert_called_once_with("gold.dim_customer")
+        spark.table.assert_not_called()
+
+    def test_path_parquet(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        out = MagicMock()
+        spark.read.parquet.return_value = out
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "s3://bucket/t.parquet")
+
+        assert result is out
+        spark.read.parquet.assert_called_once_with("s3://bucket/t.parquet")
+
+    def test_path_csv(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        out = MagicMock()
+        spark.read.option.return_value = spark.read  # chained .option().option().csv()
+        spark.read.csv.return_value = out
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "s3://bucket/t.csv")
+
+        assert result is out
+        spark.read.option.assert_any_call("header", "true")
+        spark.read.option.assert_any_call("inferSchema", "true")
+        spark.read.csv.assert_called_once_with("s3://bucket/t.csv")
+
+    def test_path_json(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        out = MagicMock()
+        spark.read.json.return_value = out
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "s3://bucket/t.json")
+
+        assert result is out
+        spark.read.json.assert_called_once_with("s3://bucket/t.json")
+
+    def test_path_orc(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        out = MagicMock()
+        spark.read.orc.return_value = out
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "s3://bucket/t.orc")
+
+        assert result is out
+        spark.read.orc.assert_called_once_with("s3://bucket/t.orc")
+
+    def test_path_extensionless_uses_delta_fallback(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        out = MagicMock()
+        spark.read.format.return_value = spark.read
+        spark.read.load.return_value = out
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "s3://bucket/t")
+
+        assert result is out
+        spark.read.format.assert_called_once_with("delta")
+        spark.read.load.assert_called_once_with("s3://bucket/t")
+
+    def test_path_read_failure_returns_none(self, mock_engine, mock_config):
+        pattern = ConcretePattern(mock_engine, mock_config)
+        spark = MagicMock()
+        spark.read.parquet.side_effect = Exception("read failed")
+        ctx = _make_spark_context(spark, mock_engine)
+
+        result = pattern._load_existing_spark(ctx, "s3://bucket/t.parquet")
+
+        assert result is None
+
+
+@pytest.mark.extras
+@pytestmark_spark
+class TestLoadExistingSparkReal:
+    """Real-Spark format loading (needs a JVM; skips on Windows / CI base).
+
+    Mirrors TestLoadExistingPandas using real files in tmp_path. The `spark`
+    fixture reuses an active session or builds a Delta-configured one through
+    SparkEngine() (issue #357). Runs in test-extras (ci.yml:205; `-k "extras"`
+    selects marker names), skips on Windows/CI base.
+    """
+
+    @pytest.fixture(scope="module")
+    def spark(self):
+        """Module-scoped real SparkSession for the format tests.
+
+        Reuses an active session, or builds one through SparkEngine() so the
+        session carries the Delta spark.sql.extensions / spark.sql.catalog.spark_catalog
+        config (issue #357); a session built here is stopped again.
+        """
+        pytest.importorskip("delta")  # the Delta fallback test needs a Delta-capable session
+        if not hasattr(SparkSession, "builder"):
+            pytest.skip("SparkSession is not usable in this process")
+        built = None
+        try:
+            spark = SparkSession.getActiveSession()
+            if spark is None:
+                spark = SparkEngine().spark
+                built = spark
+        except Exception:
+            pytest.skip("SparkSession not available (CI or subprocess)")
+        yield spark
+        if built is not None:
+            built.stop()
+
+    def _make_context(self, spark):
+        spark_ctx = SparkContext(spark)
+        engine = SparkEngine(spark_session=spark)
+        return EngineContext(
+            context=spark_ctx,
+            df=spark.createDataFrame([], "id string, val int"),
+            engine_type=EngineType.SPARK,
+            engine=engine,
+        )
+
+    def _write_frame(self, spark, tmp_path, name):
+        df = spark.createDataFrame([("A", 1), ("B", 2)], ["id", "val"])
+        path = str(tmp_path / name)
+        return path, df
+
+    def test_load_parquet_real(self, spark, tmp_path):
+        path, df = self._write_frame(spark, tmp_path, "t.parquet")
+        df.write.parquet(path)
+        ctx = self._make_context(spark)
+        result = ConcretePattern(MagicMock(), MagicMock())._load_existing_spark(ctx, path)
+        assert result is not None
+        assert result.count() == 2
+
+    def test_load_csv_real(self, spark, tmp_path):
+        path, df = self._write_frame(spark, tmp_path, "t.csv")
+        df.write.csv(path, header=True)
+        ctx = self._make_context(spark)
+        result = ConcretePattern(MagicMock(), MagicMock())._load_existing_spark(ctx, path)
+        assert result is not None
+        assert result.count() == 2
+
+    def test_load_json_real(self, spark, tmp_path):
+        path, df = self._write_frame(spark, tmp_path, "t.json")
+        df.write.json(path)
+        ctx = self._make_context(spark)
+        result = ConcretePattern(MagicMock(), MagicMock())._load_existing_spark(ctx, path)
+        assert result is not None
+        assert result.count() == 2
+
+    def test_load_orc_real(self, spark, tmp_path):
+        path, df = self._write_frame(spark, tmp_path, "t.orc")
+        df.write.orc(path)
+        ctx = self._make_context(spark)
+        result = ConcretePattern(MagicMock(), MagicMock())._load_existing_spark(ctx, path)
+        assert result is not None
+        assert result.count() == 2
+
+    def test_load_delta_fallback_real(self, spark, tmp_path):
+        path, df = self._write_frame(spark, tmp_path, "t")  # extensionless -> Delta
+        df.write.format("delta").save(path)
+        ctx = self._make_context(spark)
+        result = ConcretePattern(MagicMock(), MagicMock())._load_existing_spark(ctx, path)
+        assert result is not None
+        assert result.count() == 2
+
+    def test_load_missing_path_returns_none_real(self, spark, tmp_path):
+        ctx = self._make_context(spark)
+        result = ConcretePattern(MagicMock(), MagicMock())._load_existing_spark(
+            ctx, str(tmp_path / "does-not-exist")
+        )
         assert result is None
 
 
