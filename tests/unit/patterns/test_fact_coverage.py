@@ -8,10 +8,13 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
+from odibi.config import NodeConfig, PipelineConfig, ReadConfig
+from odibi.connections.local import LocalConnection
 from odibi.context import EngineContext, PandasContext
 from odibi.engine.pandas_engine import PandasEngine
 from odibi.enums import EngineType
 from odibi.patterns.fact import FactPattern
+from odibi.pipeline import Pipeline
 
 
 # ---------------------------------------------------------------------------
@@ -716,3 +719,34 @@ class TestEndToEnd:
         assert "total" in result.columns
         assert result["total"].iloc[0] == 10.0
         assert result["total"].iloc[1] == 30.0
+
+
+# ---------------------------------------------------------------------------
+# Pipeline wiring (regression for #371)
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineEngineConnections:
+    """The non-Spark engine must receive its connections from Pipeline."""
+
+    def test_pipeline_populates_engine_connections(self, tmp_path):
+        """Regression for #371: the non-Spark engine must receive its connections so
+        _write_quarantine_pandas can resolve quarantine_store.base_path for
+        extensionless quarantine outputs instead of falling back to the process CWD.
+        """
+        pipeline_config = PipelineConfig(
+            pipeline="test_conn",
+            nodes=[
+                NodeConfig(
+                    name="n",
+                    read=ReadConfig(connection="local", format="csv", path="input.csv"),
+                )
+            ],
+        )
+        conn = LocalConnection(base_path=str(tmp_path / "output" / "quarantine"))
+        pipeline = Pipeline(
+            pipeline_config,
+            connections={"quarantine_store": conn},
+            story_config={"output_path": str(tmp_path / "stories")},
+        )
+        assert "quarantine_store" in pipeline.engine.connections
