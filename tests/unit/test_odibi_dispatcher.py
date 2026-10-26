@@ -533,6 +533,23 @@ def test_non_action_context_and_projection_sites_use_resolver(monkeypatch):
     ]
 
 
+def _write_trap_if_supported(path: Path, content: str) -> None:
+    """Create a fallback tripwire file, tolerating the shapes Windows cannot keep.
+
+    Windows drops the "C:" segment of a drive-prefixed name and reads the colon of an
+    alternate data stream as a separator, so these traps lose their POSIX shape there
+    and a name may be rejected outright. Only Windows tolerates that, because its
+    denial tests exercise the resolver's containment rule rather than the presence of
+    the trap file; every other platform still fails loudly, exactly as before.
+    """
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    except OSError:
+        if sys.platform != "win32":
+            raise
+
+
 @pytest.fixture
 def corpus_dispatcher(tmp_path, monkeypatch):
     """Dispatcher backed by a minimal configured-root-shaped corpus."""
@@ -552,14 +569,15 @@ def corpus_dispatcher(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    drive_trap = tmp_path / "docs" / "patterns" / "C:" / "outside.md"
-    drive_trap.parent.mkdir(parents=True)
-    drive_trap.write_text("drive-prefixed fallback trap", encoding="utf-8")
-    relative_drive_trap = tmp_path / "docs" / "guides" / "C:outside.md"
-    relative_drive_trap.parent.mkdir(parents=True, exist_ok=True)
-    relative_drive_trap.write_text("relative-drive fallback trap", encoding="utf-8")
-    ads_trap = tmp_path / "docs" / "guides" / "guide.md:secret.md"
-    ads_trap.write_text("alternate data stream trap", encoding="utf-8")
+    _write_trap_if_supported(
+        tmp_path / "docs" / "patterns" / "C:" / "outside.md", "drive-prefixed fallback trap"
+    )
+    _write_trap_if_supported(
+        tmp_path / "docs" / "guides" / "C:outside.md", "relative-drive fallback trap"
+    )
+    _write_trap_if_supported(
+        tmp_path / "docs" / "guides" / "guide.md:secret.md", "alternate data stream trap"
+    )
 
     skill = tmp_path / ".assistant" / "skills" / "safe-skill" / "SKILL.md"
     skill.parent.mkdir(parents=True)

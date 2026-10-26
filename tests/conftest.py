@@ -67,6 +67,20 @@ def _reset_logging_context():
     lc._global_context = original
 
 
+def _signal_snapshot():
+    """Snapshot signal handlers, skipping the signals a platform makes unstoppable.
+
+    Windows defines neither SIGKILL nor SIGSTOP, so they are resolved by name and
+    simply absent from the exclusion set where the platform does not provide them.
+    """
+    excluded = {getattr(signal, name) for name in ("SIGKILL", "SIGSTOP") if hasattr(signal, name)}
+    return tuple(
+        (number, signal.getsignal(number))
+        for number in sorted(signal.valid_signals())
+        if number not in excluded
+    )
+
+
 def _immutable_process_snapshot():
     """Capture process-global state that planning operations must preserve."""
 
@@ -126,11 +140,7 @@ def _immutable_process_snapshot():
         "locale": locale.setlocale(locale.LC_ALL),
         "timezone": (time.tzname, time.timezone, time.altzone, time.daylight),
         "random": random.getstate(),
-        "signals": tuple(
-            (number, signal.getsignal(number))
-            for number in sorted(signal.valid_signals())
-            if number not in {signal.SIGKILL, signal.SIGSTOP}
-        ),
+        "signals": _signal_snapshot(),
         "transform_functions": mapping_state("odibi.registry", "FunctionRegistry", "_functions"),
         "transform_signatures": mapping_state("odibi.registry", "FunctionRegistry", "_signatures"),
         "transform_models": mapping_state("odibi.registry", "FunctionRegistry", "_param_models"),
