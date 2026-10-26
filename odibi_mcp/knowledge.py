@@ -340,7 +340,7 @@ pm.run("pipeline_name")""",
                 for md in base.rglob("*.md"):
                     result.append(
                         {
-                            "path": str(md.relative_to(self.odibi_root)),
+                            "path": md.relative_to(self.odibi_root).as_posix(),
                             "name": md.stem,
                             "category": category,
                         }
@@ -394,7 +394,7 @@ pm.run("pipeline_name")""",
 
                     results.append(
                         {
-                            "path": str(md.relative_to(self.odibi_root)),
+                            "path": md.relative_to(self.odibi_root).as_posix(),
                             "matches": matches,
                         }
                     )
