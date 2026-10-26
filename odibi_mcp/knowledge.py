@@ -1924,7 +1924,7 @@ pipelines:
                         {
                             "name": py_file.stem,
                             "type": "python_file",
-                            "module": str(py_file.relative_to(self.odibi_root)),
+                            "module": py_file.relative_to(self.odibi_root).as_posix(),
                             "file": str(py_file),
                             "score": min(score / 10.0, 1.0),  # Normalize score
                             "content": "\n---\n".join(relevant_lines)[:1500],
