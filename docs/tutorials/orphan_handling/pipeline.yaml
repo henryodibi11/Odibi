@@ -1,0 +1,114 @@
+project: orphan_handling_tutorial
+engine: pandas
+
+connections:
+  raw:
+    type: local
+    base_path: ./data
+  warehouse:
+    type: local
+    base_path: ./output/warehouse
+  quarantine_store:
+    type: local
+    base_path: ./output/quarantine
+
+story:
+  connection: warehouse
+  path: stories/
+
+system:
+  connection: warehouse
+  path: _odibi_system
+
+pipelines:
+  - pipeline: build_fact_with_orphans
+    layer: silver
+    nodes:
+      - name: dim_customer
+        read:
+          connection: raw
+          format: csv
+          path: dim_customer.csv
+        transformer: dimension
+        params:
+          natural_key: customer_id
+          surrogate_key: customer_sk
+          scd_type: 1
+          track_cols: [customer_name, region]
+          unknown_member: true
+        write:
+          connection: warehouse
+          format: parquet
+          path: dim_customer
+          mode: overwrite
+
+      - name: dim_product
+        read:
+          connection: raw
+          format: csv
+          path: dim_product.csv
+        transformer: dimension
+        params:
+          natural_key: product_id
+          surrogate_key: product_sk
+          scd_type: 1
+          track_cols: [product_name, category]
+          unknown_member: true
+        write:
+          connection: warehouse
+          format: parquet
+          path: dim_product
+          mode: overwrite
+
+      - name: dim_date
+        read:
+          connection: raw
+          format: csv
+          path: dim_date.csv
+        transformer: dimension
+        params:
+          natural_key: date_id
+          surrogate_key: date_sk
+          scd_type: 1
+          track_cols: [full_date, month, year]
+          unknown_member: true
+        write:
+          connection: warehouse
+          format: parquet
+          path: dim_date
+          mode: overwrite
+
+      - name: fact_orders
+        depends_on: [dim_customer, dim_product, dim_date]
+        read:
+          connection: raw
+          format: csv
+          path: fact_orders.csv
+        transformer: fact
+        params:
+          grain: [order_id]
+          dimensions:
+            - source_column: customer_id
+              dimension_table: dim_customer
+              dimension_key: customer_id
+              surrogate_key: customer_sk
+            - source_column: product_id
+              dimension_table: dim_product
+              dimension_key: product_id
+              surrogate_key: product_sk
+          orphan_handling: quarantine
+          quarantine:
+            connection: quarantine_store
+            path: fact_orders_orphans
+            add_columns:
+              _rejection_reason: true
+              _rejected_at: true
+              _source_dimension: true
+          measures:
+            - quantity
+            - amount
+        write:
+          connection: warehouse
+          format: parquet
+          path: fact_orders
+          mode: overwrite
