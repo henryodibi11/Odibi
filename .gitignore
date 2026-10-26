@@ -101,6 +101,10 @@ data/
 !docs/tutorials/orphan_handling/data/
 docs/tutorials/walkthroughs/data/
 
+# Generated output from running the orphan_handling tutorial
+docs/tutorials/orphan_handling/output/
+docs/tutorials/orphan_handling/fact_orders_orphans
+
 # Exploration notebooks (temporary)
 test_exploration*.ipynb
 
