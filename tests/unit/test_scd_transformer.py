@@ -1,6 +1,7 @@
 """Unit tests for odibi.transformers.scd — SCD2 transformer."""
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -750,6 +751,34 @@ class TestSafeIsna:
         from odibi.transformers.scd import _safe_isna
 
         assert _safe_isna([1, 2, 3]) is False
+
+
+# ---------------------------------------------------------------------------
+# Checkout isolation  (issue #359 defect 5)
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _isolate_cwd(tmp_path, monkeypatch):
+    """Run every test inside tmp_path so relative targets never touch the checkout."""
+    original = Path.cwd()
+    monkeypatch.chdir(tmp_path)
+    return original
+
+
+def test_relative_target_writes_stay_under_tmp_path(tmp_path, _isolate_cwd):
+    """A relative SCD2 target is written under the isolated working directory."""
+    target_name = "wi20260010_scd2_relative.parquet"
+    source = pd.DataFrame(
+        {
+            "id": [1],
+            "status": ["active"],
+            "updated_at": [datetime(2024, 1, 1)],
+        }
+    )
+
+    scd2(_make_context(source), _base_params(target=target_name))
+
+    assert (tmp_path / target_name).exists()
+    assert not (_isolate_cwd / target_name).exists()
 
 
 class TestHasChangedFloatPrecision:
