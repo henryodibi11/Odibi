@@ -7,6 +7,7 @@ from io import BytesIO, StringIO
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -324,9 +325,26 @@ def test_external_python_module_emits_exact_one_line_without_writes(tmp_path: Pa
     )
 
     assert result.returncode == 0
-    assert result.stdout == plan_pipeline_bytes(PLANNED_YAML).to_json().encode() + b"\n"
+    normalized_stdout = result.stdout.replace(b"\r\n", b"\n")
+    assert normalized_stdout == plan_pipeline_bytes(PLANNED_YAML).to_json().encode() + b"\n"
     assert result.stderr == b""
     assert tuple(ambient.iterdir()) == before
+
+
+def test_tripwires_do_not_require_posix_only_signal_constants(
+    monkeypatch: pytest.MonkeyPatch,
+    immutable_planning_tripwires,
+) -> None:
+    """The tripwire snapshot tolerates a platform without SIGKILL and SIGSTOP.
+
+    Windows defines neither constant, so the snapshot has to resolve the unstoppable
+    signals by name instead of reading the attributes directly.
+    """
+    for name in ("SIGKILL", "SIGSTOP"):
+        monkeypatch.delattr(signal, name, raising=False)
+
+    with immutable_planning_tripwires() as attempts:
+        assert attempts == []
 
 
 @pytest.mark.parametrize(
