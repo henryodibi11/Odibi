@@ -283,3 +283,9 @@ project: test
         result = knowledge.diagnose_error("SomeRandomError: xyz happened")
         # Should still return something useful
         assert isinstance(result, dict)
+
+    def test_keyword_search_module_paths_are_posix(self, knowledge):
+        """Keyword-search module paths use forward slashes only (no backslashes on Windows)."""
+        results = knowledge._query_codebase_keyword_fallback("scd2", k=5)
+        for item in results:
+            assert "\\" not in item["module"], f"Backslash in module path: {item['module']}"
