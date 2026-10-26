@@ -3,6 +3,7 @@ import logging
 logging.getLogger("odibi").propagate = False
 
 from datetime import datetime  # noqa: E402
+from pathlib import Path  # noqa: E402
 from unittest.mock import MagicMock, patch  # noqa: E402
 
 import pandas as pd  # noqa: E402
@@ -949,3 +950,41 @@ class TestSCD2PandasBugs:
             # Exactly 1 closed row
             closed = result_df[result_df["is_current"] == False]  # noqa: E712
             assert len(closed) == 1
+
+
+@pytest.fixture(autouse=True)
+def _isolate_cwd(tmp_path, monkeypatch):
+    """Run every test inside tmp_path so relative targets never touch the checkout."""
+    original = Path.cwd()
+    monkeypatch.chdir(tmp_path)
+    return original
+
+
+def test_scd2_relative_target_writes_stay_under_tmp_path(tmp_path, _isolate_cwd):
+    """A relative SCD2 target lands under tmp_path, never in the checkout root."""
+    target_name = "wi20260010_scd2_dummy_relative.parquet"
+    source = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "status": ["active", "inactive"],
+            "updated_at": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+        }
+    )
+    ctx = EngineContext(
+        context=PandasContext(),
+        df=source,
+        engine_type=EngineType.PANDAS,
+    )
+    params = SCD2Params(
+        target=target_name,
+        keys=["id"],
+        track_cols=["status"],
+        effective_time_col="updated_at",
+        end_time_col="valid_to",
+        current_flag_col="is_current",
+    )
+
+    scd2(ctx, params)
+
+    assert (tmp_path / target_name).exists()
+    assert not (_isolate_cwd / target_name).exists()
