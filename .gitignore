@@ -98,6 +98,10 @@ stories/
 # Walkthrough generated data (from notebook execution)
 data/
 !examples/**/data/
+# NOTE: git's parent-directory exclusion rule means a negation pattern only
+# re-includes a path if the pattern is placed AFTER the excluding parent pattern.
+# `!docs/tutorials/orphan_handling/data/` works here because it follows line 99's
+# `data/` exclusion. If you move it, the unignore will silently fail.
 !docs/tutorials/orphan_handling/data/
 docs/tutorials/walkthroughs/data/
 
