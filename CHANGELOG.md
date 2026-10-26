@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Orphan handling tutorial** (#222) — Added `docs/tutorials/orphan_handling.md` with sample CSV data and a runnable pipeline YAML for the Fact Pattern's `orphan_handling: quarantine` strategy. Includes `odibi validate` and `odibi run` verification (7 source rows -> 5 valid + 2 quarantined orphans).
+
 ## [3.15.1] — 2026-10-19
 
 ### Fixed

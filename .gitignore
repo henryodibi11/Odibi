@@ -98,6 +98,7 @@ stories/
 # Walkthrough generated data (from notebook execution)
 data/
 !examples/**/data/
+!docs/tutorials/orphan_handling/data/
 docs/tutorials/walkthroughs/data/
 
 # Exploration notebooks (temporary)
