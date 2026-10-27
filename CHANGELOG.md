@@ -13,10 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Quarantine output resolves the connection `base_path`** (#371) — Extensionless quarantine
-  paths now land under the quarantine connection's `base_path` instead of the working directory.
-  Pandas and Polars connection-prefixed pattern targets and merge/SCD targets resolve on the same
-  change instead of falling back to the working directory or raising connection-not-found.
+- **SCD2 and dimension targets honor the declared write format** (#356) — The SCD2 pattern and
+  transformer now persist to the node's declared format (delta via deltalake when `format: delta`)
+  instead of always writing parquet, so a Delta target is no longer collided with by the node write.
+  An existing target that cannot be read raises `ValueError` naming the target instead of silently
+  restarting as a first run, and an unknown connection-like prefix (e.g. `nope.dim_customer`) raises
+  `ValueError` naming the prefix instead of writing a literal file in the working directory. The
+  Delta persist-back now includes audit columns so the schema is stable across runs.
 
 ## [3.15.1] — 2026-10-19
 

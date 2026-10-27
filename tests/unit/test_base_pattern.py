@@ -246,10 +246,10 @@ class TestLoadExistingPandas:
         assert len(result) == 2
         assert list(result.columns) == ["id", "val"]
 
-    def test_load_existing_pandas_unrecognized_format_unreadable_returns_none(
+    def test_load_existing_pandas_unrecognized_format_unreadable_raises(
         self, mock_engine, mock_config, tmp_path
     ):
-        """Bug #193: truly unreadable file with unrecognized extension returns None."""
+        """Issue #356: an existing target that cannot be read raises instead of returning None."""
         pattern = ConcretePattern(mock_engine, mock_config)
 
         path = tmp_path / "data.dat"
@@ -263,8 +263,41 @@ class TestLoadExistingPandas:
             engine=mock_engine,
         )
 
-        result = pattern._load_existing_pandas(context, str(path))
-        assert result is None
+        with pytest.raises(ValueError, match="could not be read"):
+            pattern._load_existing_pandas(context, str(path))
+
+    def test_existing_unreadable_target_raises(self, mock_engine, mock_config, tmp_path):
+        """Issue #356: an existing unreadable parquet target raises ValueError."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        path = tmp_path / "target.parquet"
+        path.write_bytes(b"not parquet")
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        with pytest.raises(ValueError, match="could not be read"):
+            pattern._load_existing_pandas(context, str(path))
+
+    def test_unknown_connection_prefix_raises(self, mock_engine, mock_config):
+        """Issue #356: an unknown connection-like prefix raises ValueError."""
+        pattern = ConcretePattern(mock_engine, mock_config)
+
+        pandas_context = PandasContext()
+        context = EngineContext(
+            context=pandas_context,
+            df=pd.DataFrame(),
+            engine_type=EngineType.PANDAS,
+            engine=mock_engine,
+        )
+
+        with pytest.raises(ValueError, match="unknown connection"):
+            pattern._resolve_pandas_target_path(context, "nope.dim_customer")
 
 
 # ---------------------------------------------------------------------------
@@ -397,15 +430,15 @@ class TestLoadExistingSparkMock:
         spark.read.format.assert_called_once_with("delta")
         spark.read.load.assert_called_once_with("s3://bucket/t")
 
-    def test_path_read_failure_returns_none(self, mock_engine, mock_config):
+    def test_path_read_failure_raises(self, mock_engine, mock_config):
+        """Issue #356: an existing-but-unreadable Spark target raises instead of returning None."""
         pattern = ConcretePattern(mock_engine, mock_config)
         spark = MagicMock()
         spark.read.parquet.side_effect = Exception("read failed")
         ctx = _make_spark_context(spark, mock_engine)
 
-        result = pattern._load_existing_spark(ctx, "s3://bucket/t.parquet")
-
-        assert result is None
+        with pytest.raises(ValueError, match="could not be read"):
+            pattern._load_existing_spark(ctx, "s3://bucket/t.parquet")
 
 
 @pytest.mark.extras

@@ -152,7 +152,25 @@ class Pattern(ABC):
                 )
                 return None
 
-        # Path-based target: check file extension for format detection
+        # Path-based target: check existence before reading so a genuinely absent
+        # path is still a first run, but an existing-but-unreadable target raises.
+        try:
+            fs = spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(
+                spark.sparkContext._jsc.hadoopConfiguration()
+            )
+            path_obj = spark.sparkContext._jvm.org.apache.hadoop.fs.Path(target)
+            if not fs.exists(path_obj):
+                ctx.debug(
+                    f"Target path '{target}' does not exist - treating as initial load.",
+                    pattern=pattern_name,
+                    target=target,
+                )
+                return None
+        except Exception:
+            # If we cannot probe existence (e.g. tests without a live JVM), fall
+            # through and let the read attempt decide.
+            pass
+
         target_lower = target.lower()
 
         try:
@@ -168,34 +186,52 @@ class Pattern(ABC):
                 # Try Delta format as fallback (for paths without extension)
                 return spark.read.format("delta").load(target)
         except Exception as e:
-            ctx.warning(
-                f"Could not load existing target '{target}': {e}. Treating as initial load.",
-                pattern=pattern_name,
-                target=target,
-            )
-            return None
+            raise ValueError(f"Existing target '{target}' could not be read: {e}") from e
 
-    def _load_existing_pandas(self, context: EngineContext, target: str):
-        """Load existing target table from Pandas with multi-format support."""
-        import os
+    def _resolve_target_path(self, context: EngineContext, target: str) -> str:
+        """Resolve a (possibly connection-prefixed) target into a filesystem path.
 
-        import pandas as pd
-
-        ctx = get_logging_context()
-        pattern_name = self.__class__.__name__
+        A dotted target is connection-prefixed only when the prefix is non-empty,
+        contains no path separator or colon, and the prefix is a known connection;
+        unknown connection-like prefixes raise ValueError naming the prefix and the
+        available connections. Absolute and relative filesystem paths are returned
+        unchanged.
+        """
         path = target
-
-        # Handle connection-prefixed paths
-        if hasattr(context, "engine") and context.engine:
-            if "." in path:
-                parts = path.split(".", 1)
-                conn_name = parts[0]
-                rel_path = parts[1]
+        if hasattr(context, "engine") and context.engine and "." in path:
+            conn_name, rel_path = path.split(".", 1)
+            is_connection_like = (
+                conn_name
+                and "/" not in conn_name
+                and "\\" not in conn_name
+                and ":" not in conn_name
+            )
+            if is_connection_like:
                 if conn_name in context.engine.connections:
                     try:
                         path = context.engine.connections[conn_name].get_path(rel_path)
                     except Exception:
                         pass
+                else:
+                    available = sorted(context.engine.connections.keys())
+                    raise ValueError(
+                        f"unknown connection prefix '{conn_name}' in target '{target}'. "
+                        f"Available connections: {available}"
+                    )
+        return path
+
+    def _load_existing_pandas(self, context: EngineContext, target: str):
+        """Load existing target table from Pandas with multi-format support.
+
+        Returns None only when the resolved path does not exist. An existing path that
+        matches no reader, or whose reader fails, raises ValueError so a broken target
+        is never silently treated as a first run.
+        """
+        import os
+
+        import pandas as pd
+
+        path = self._resolve_target_path(context, target)
 
         if not os.path.exists(path):
             return None
@@ -203,6 +239,11 @@ class Pattern(ABC):
         path_lower = str(path).lower()
 
         try:
+            # Delta table directory takes precedence over a plain parquet directory.
+            if os.path.isdir(path) and os.path.exists(os.path.join(path, "_delta_log")):
+                from deltalake import DeltaTable
+
+                return DeltaTable(path).to_pandas()
             # Parquet (file or directory)
             if path_lower.endswith(".parquet") or os.path.isdir(path):
                 return pd.read_parquet(path)
@@ -222,40 +263,24 @@ class Pattern(ABC):
             elif path_lower.endswith(".pickle") or path_lower.endswith(".pkl"):
                 return pd.read_pickle(path)
             else:
-                ctx.warning(
-                    f"Unrecognized file format for target '{target}'. "
-                    "Supported formats: parquet, csv, json, xlsx, xls, feather, arrow, pickle. "
-                    "Attempting to read as parquet.",
-                    pattern=pattern_name,
-                    target=target,
-                )
+                # Unrecognized extension: attempt a content-based parquet read, then
+                # raise so an unreadable existing target is never treated as a first run.
                 try:
                     return pd.read_parquet(path)
-                except Exception:
-                    return None
+                except Exception as e:
+                    raise ValueError(f"Existing target '{target}' could not be read: {e}") from e
+        except ValueError:
+            raise
         except Exception as e:
-            ctx.warning(
-                f"Could not load existing target '{target}': {e}. Treating as initial load.",
-                pattern=pattern_name,
-                target=target,
-            )
-            return None
+            raise ValueError(f"Existing target '{target}' could not be read: {e}") from e
 
     def _resolve_pandas_target_path(self, context: EngineContext, target: str) -> str:
         """Resolve a (possibly connection-prefixed) target into a filesystem path.
 
         Mirrors the resolution in ``_load_existing_pandas`` so reads and writes of
-        the same target land on the same path.
+        the same target land on the same path. Unknown connection-like prefixes raise.
         """
-        path = target
-        if hasattr(context, "engine") and context.engine and "." in path:
-            conn_name, rel_path = path.split(".", 1)
-            if conn_name in context.engine.connections:
-                try:
-                    path = context.engine.connections[conn_name].get_path(rel_path)
-                except Exception:
-                    pass
-        return path
+        return self._resolve_target_path(context, target)
 
     def _write_pandas_target(self, context: EngineContext, df, target: str) -> None:
         """Write a DataFrame back to a Pandas target path (parquet/csv).

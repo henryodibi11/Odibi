@@ -111,6 +111,12 @@ class SCD2Params(BaseModel):
         description="Hours to retain for VACUUM after SCD2 write (Spark only). "
         "Set to 168 for 7 days. None disables VACUUM.",
     )
+    target_format: Optional[str] = Field(
+        default=None,
+        description="Declared write format of the node (delta, parquet, ...). "
+        "When delta, the SCD2 history is persisted as Delta instead of parquet so the "
+        "pattern and the node write agree on the target format.",
+    )
 
     @model_validator(mode="after")
     def check_target_or_connection(self):
@@ -360,12 +366,25 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
         or params.target.startswith(".")
     )
     if is_path:
+        # Probe existence so a genuinely absent path is still a first run, while an
+        # existing-but-unreadable path raises instead of being treated as one.
+        try:
+            fs = spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(
+                spark.sparkContext._jsc.hadoopConfiguration()
+            )
+            path_obj = spark.sparkContext._jvm.org.apache.hadoop.fs.Path(params.target)
+            if not fs.exists(path_obj):
+                get_logging_context().debug(
+                    f"Target path '{params.target}' does not exist - assuming first run"
+                )
+        except Exception:
+            # If we cannot probe existence (e.g. tests without a live JVM), fall
+            # through and let the read attempt decide.
+            pass
         try:
             target_df = spark.read.format("delta").load(params.target)
         except Exception as e:
-            get_logging_context().debug(
-                f"Target '{params.target}' not found as Delta path - assuming first run: {type(e).__name__}: {e}"
-            )
+            raise ValueError(f"Existing target '{params.target}' could not be read: {e}") from e
     else:
         if spark.catalog.tableExists(params.target):
             target_df = spark.table(params.target)
@@ -600,10 +619,22 @@ def _scd2_spark_delta_merge(context: EngineContext, source_df, params: SCD2Param
         if is_path:
             target_exists = False
             try:
-                spark.read.format("delta").load(target)
-                target_exists = True
+                # Probe existence: an existing-but-unreadable Delta path raises rather
+                # than being treated as a first run.
+                fs = spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(
+                    spark.sparkContext._jsc.hadoopConfiguration()
+                )
+                path_obj = spark.sparkContext._jvm.org.apache.hadoop.fs.Path(target)
+                if fs.exists(path_obj):
+                    spark.read.format("delta").load(target)
+                    target_exists = True
             except Exception:
-                pass
+                # Cannot probe existence (no live JVM): fall back to read-based check.
+                try:
+                    spark.read.format("delta").load(target)
+                    target_exists = True
+                except Exception:
+                    target_exists = False
         else:
             target_exists = spark.catalog.tableExists(target)
 
@@ -767,20 +798,25 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
     # 1. Load Target
     path = params.target
 
-    # Resolve path if context has engine (EngineContext)
-    if hasattr(context, "engine") and context.engine:
-        # Try to resolve 'connection.path'
-        if "." in path:
-            parts = path.split(".", 1)
-            conn_name = parts[0]
-            rel_path = parts[1]
+    # Resolve connection-prefixed targets (raise on unknown prefix so a target is
+    # never silently written as a literal file in the working directory).
+    if hasattr(context, "engine") and context.engine and "." in path:
+        conn_name, rel_path = path.split(".", 1)
+        is_connection_like = (
+            conn_name and "/" not in conn_name and "\\" not in conn_name and ":" not in conn_name
+        )
+        if is_connection_like:
             if conn_name in context.engine.connections:
                 try:
                     path = context.engine.connections[conn_name].get_path(rel_path)
-                except Exception as e:
-                    get_logging_context().debug(
-                        f"Could not resolve connection path: {type(e).__name__}"
-                    )
+                except Exception:
+                    pass
+            else:
+                available = sorted(context.engine.connections.keys())
+                raise ValueError(
+                    f"Unknown connection prefix '{conn_name}' in target '{path}'. "
+                    f"Available connections: {available}"
+                )
 
     # Define Cols
     keys = params.keys
@@ -789,9 +825,15 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
     end_col = params.end_time_col
     flag_col = params.current_flag_col
     track = params.track_cols
+    target_format = params.target_format
 
     # --- DUCKDB IMPLEMENTATION ---
-    if HAS_DUCKDB and str(path).endswith(".parquet") and os.path.exists(path):
+    if (
+        HAS_DUCKDB
+        and target_format != "delta"
+        and str(path).endswith(".parquet")
+        and os.path.exists(path)
+    ):
         try:
             con = duckdb.connect(database=":memory:")
             con.register("source_df", source_df)
@@ -879,13 +921,29 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
     # Try loading if exists
     if os.path.exists(path):
         try:
-            # Naive format detection or try/except
-            if str(path).endswith(".parquet") or os.path.isdir(path):  # Parquet often directory
+            is_delta = target_format == "delta" or (
+                os.path.isdir(path) and os.path.exists(os.path.join(path, "_delta_log"))
+            )
+            if is_delta:
+                from deltalake import DeltaTable
+
+                target_df = DeltaTable(path).to_pandas()
+            elif str(path).lower().endswith(".parquet") or os.path.isdir(path):
                 target_df = pd.read_parquet(path)
-            elif str(path).endswith(".csv"):
+            elif str(path).lower().endswith(".csv"):
                 target_df = pd.read_csv(path)
+            elif str(path).lower().endswith(".json"):
+                target_df = pd.read_json(path)
+            elif str(path).lower().endswith(".xlsx") or str(path).lower().endswith(".xls"):
+                target_df = pd.read_excel(path)
+            elif str(path).lower().endswith(".feather") or str(path).lower().endswith(".arrow"):
+                target_df = pd.read_feather(path)
+            elif str(path).lower().endswith(".pickle") or str(path).lower().endswith(".pkl"):
+                target_df = pd.read_pickle(path)
+            else:
+                raise ValueError(f"Unrecognized file format for target '{path}'")
         except Exception as e:
-            get_logging_context().debug(f"Could not read target file: {type(e).__name__}")
+            raise ValueError(f"Existing target '{path}' could not be read: {e}") from e
 
     # Prepare Source: rename eff_col to start_col, add SCD metadata
     source_df = source_df.copy()
@@ -895,9 +953,16 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
 
     if target_df.empty:
         # First run: write directly to target
-        if str(path).endswith(".parquet") or os.path.isdir(path) or not os.path.exists(path):
+        is_delta = target_format == "delta" or (
+            os.path.isdir(path) and os.path.exists(os.path.join(path, "_delta_log"))
+        )
+        if is_delta:
+            from deltalake import write_deltalake
+
+            write_deltalake(path, source_df, mode="overwrite")
+        elif str(path).lower().endswith(".parquet") or not os.path.exists(path):
             source_df.to_parquet(path, index=False)
-        elif str(path).endswith(".csv"):
+        elif str(path).lower().endswith(".csv"):
             source_df.to_csv(path, index=False)
 
         get_logging_context().info(
@@ -1004,9 +1069,16 @@ def _scd2_pandas(context: EngineContext, source_df, params: SCD2Params) -> Engin
     result = pd.concat([final_target, all_inserts], ignore_index=True)
 
     # Write directly to target (self-contained, no external write: block needed)
-    if str(path).endswith(".parquet") or os.path.isdir(path):
+    is_delta = target_format == "delta" or (
+        os.path.isdir(path) and os.path.exists(os.path.join(path, "_delta_log"))
+    )
+    if is_delta:
+        from deltalake import write_deltalake
+
+        write_deltalake(path, result, mode="overwrite")
+    elif str(path).lower().endswith(".parquet") or os.path.isdir(path):
         result.to_parquet(path, index=False)
-    elif str(path).endswith(".csv"):
+    elif str(path).lower().endswith(".csv"):
         result.to_csv(path, index=False)
 
     get_logging_context().info(
