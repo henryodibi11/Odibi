@@ -206,7 +206,7 @@ odibi run odibi.yaml
 
 ```bash
 # Check quarantined rows
-odibi run odibi.yaml --node quarantine_report
+odibi run odibi.yaml --pipeline silver --node clean_orders
 ```
 
 Or query directly:
