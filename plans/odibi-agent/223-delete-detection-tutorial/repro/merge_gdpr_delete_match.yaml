@@ -1,0 +1,54 @@
+project: merge_gdpr_delete_match
+engine: pandas
+
+connections:
+  raw:
+    type: local
+    base_path: ./data
+  silver:
+    type: local
+    base_path: ./output/silver
+
+story:
+  connection: silver
+  path: stories
+
+system:
+  connection: silver
+  path: _odibi_system
+
+pipelines:
+  - pipeline: gdpr_forget
+    layer: silver
+    nodes:
+      - name: load_customers
+        read:
+          connection: raw
+          path: day1_customers.csv
+          format: csv
+        write:
+          connection: silver
+          path: customers
+          format: parquet
+          mode: overwrite
+          add_metadata: false
+      - name: forget_customers
+        depends_on: [load_customers]
+        read:
+          connection: raw
+          path: forgotten_ids.csv
+          format: csv
+        transform:
+          steps:
+            - function: merge
+              params:
+                strategy: delete_match
+                keys: [customer_id]
+                connection: silver
+                path: customers
+        write:
+          connection: silver
+          path: customers
+          format: parquet
+          mode: overwrite
+          add_metadata: false

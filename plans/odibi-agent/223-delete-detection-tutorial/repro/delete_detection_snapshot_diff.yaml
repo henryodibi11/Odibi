@@ -1,0 +1,60 @@
+project: delete_detection_snapshot_diff
+engine: pandas
+
+connections:
+  raw:
+    type: local
+    base_path: ./data
+  silver:
+    type: local
+    base_path: ./output/silver
+
+story:
+  connection: silver
+  path: stories
+
+system:
+  connection: silver
+  path: _odibi_system
+
+pipelines:
+  - pipeline: customer_deletes
+    layer: silver
+    nodes:
+      - name: load_day1
+        read:
+          connection: raw
+          path: day1_customers.csv
+          format: csv
+        transform:
+          steps:
+            - sql: "SELECT *, FALSE AS _is_deleted FROM df"
+        write:
+          connection: silver
+          path: customers
+          format: delta
+          mode: overwrite
+          add_metadata: false
+      - name: detect_customer_deletes
+        depends_on: [load_day1]
+        read:
+          connection: raw
+          path: day2_customers.csv
+          format: csv
+        transform:
+          steps:
+            - function: detect_deletes
+              params:
+                mode: snapshot_diff
+                keys: [customer_id]
+                connection: silver
+                path: customers
+                soft_delete_col: _is_deleted
+                on_first_run: skip
+                max_delete_percent: 50.0
+        write:
+          connection: silver
+          path: customers
+          format: delta
+          mode: overwrite
+          add_metadata: false
