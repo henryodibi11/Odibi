@@ -269,8 +269,6 @@ class Pattern(ABC):
                     return pd.read_parquet(path)
                 except Exception as e:
                     raise ValueError(f"Existing target '{target}' could not be read: {e}") from e
-        except ValueError:
-            raise
         except Exception as e:
             raise ValueError(f"Existing target '{target}' could not be read: {e}") from e
 
