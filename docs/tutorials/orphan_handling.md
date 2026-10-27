@@ -194,7 +194,7 @@ pipelines:
 ### How it works
 
 1. **Dimension nodes** (`dim_customer`, `dim_product`, `dim_date`) read CSVs from the `raw` connection (`./data`) and write to the `warehouse` connection (`./output/warehouse`). Each uses `unknown_member: true` so the dimension includes a catch-all unknown row.
-2. **Fact node** (`fact_orders`) reads `fact_orders.csv`, looks up each dimension by foreign key, and writes valid rows to `fact_orders` in the warehouse. Orphan rows are written to `fact_orders_orphans` with metadata columns (observed output location: `./fact_orders_orphans` at the tutorial root; the `quarantine_store` connection in the YAML is configured with `base_path: ./output/quarantine` but the pandas quarantine writer does not resolve it for extensionless outputs).
+2. **Fact node** (`fact_orders`) reads `fact_orders.csv`, looks up each dimension by foreign key, and writes valid rows to `fact_orders` in the warehouse. Orphan rows are written to `fact_orders_orphans` with metadata columns, resolved against the `quarantine_store` connection's `base_path` (`./output/quarantine`), so the file lands at `./output/quarantine/fact_orders_orphans`.
 3. **`depends_on: [dim_customer, dim_product, dim_date]`** ensures dimensions are built before the fact table, so their outputs are available for lookup.
 
 ### Important: where to run from
@@ -220,7 +220,7 @@ When `orphan_handling: quarantine` is set, the Fact Pattern splits the fact rows
 
 ### Quarantine output
 
-The quarantine path `fact_orders_orphans` has no file extension, so odibi writes it as Parquet to `./fact_orders_orphans` at the tutorial root (the observed output location when running `odibi run pipeline.yaml` from this folder). The output includes all original fact columns plus the metadata columns from `quarantine.add_columns`:
+The quarantine path `fact_orders_orphans` has no file extension, so odibi writes it as Parquet to `./output/quarantine/fact_orders_orphans`, resolved from the `quarantine_store` connection's `base_path` (`./output/quarantine`). The output includes all original fact columns plus the metadata columns from `quarantine.add_columns`:
 
 | Column | Description |
 |---|---|
@@ -243,7 +243,7 @@ After a run, inspect the quarantine output to decide how to handle orphans:
 import pandas as pd
 
 # Read the quarantine output
-quarantined = pd.read_parquet("./fact_orders_orphans")
+quarantined = pd.read_parquet("./output/quarantine/fact_orders_orphans")
 print(quarantined)
 ```
 
@@ -260,10 +260,10 @@ The quarantine output path `fact_orders_orphans` has no extension, so odibi's qu
 To get the expected `7 → 5 + 2` count on a re-run, clear the quarantine output first:
 
 ```bash
-rm ./fact_orders_orphans
+rm ./output/quarantine/fact_orders_orphans
 ```
 
-or delete `./fact_orders_orphans` before re-running.
+or delete `./output/quarantine/fact_orders_orphans` before re-running.
 
 ---
 

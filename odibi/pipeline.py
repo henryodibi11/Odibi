@@ -242,7 +242,7 @@ class Pipeline:
             # We might need to pass connections to it for ADLS auth config
             self.engine = EngineClass(connections=connections, config=engine_config)
         else:
-            self.engine = EngineClass(config=engine_config)
+            self.engine = EngineClass(config=engine_config, connections=connections)
 
         self._ctx.debug(f"Engine initialized: {engine}")
 
