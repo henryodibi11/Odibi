@@ -963,6 +963,13 @@ def _isolate_cwd(tmp_path, monkeypatch):
 def test_scd2_relative_target_writes_stay_under_tmp_path(tmp_path, _isolate_cwd):
     """A relative SCD2 target lands under tmp_path, never in the checkout root."""
     target_name = "wi20260010_scd2_dummy_relative.parquet"
+    # Issue #368 item 2: a stale artefact of this name left in the pytest invocation directory
+    # would fail the assertion below although the SCD2 write is correct, so simulate one and
+    # clear it first; the not-exists assertion then measures only what this run wrote.
+    stale = _isolate_cwd / target_name
+    stale.write_bytes(b"stale")
+    stale.unlink(missing_ok=True)
+    assert not stale.exists(), "stale invocation-directory artefact was not cleared"
     source = pd.DataFrame(
         {
             "id": [1, 2],
