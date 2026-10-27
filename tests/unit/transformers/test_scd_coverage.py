@@ -251,10 +251,13 @@ class TestScd2PandasFirstRun:
 
     def test_first_run_csv(self, tmp_path):
         path = str(tmp_path / "target.csv")
-        # Pre-create an empty CSV so the file exists (otherwise the code
-        # falls through to the parquet writer because ``not os.path.exists``
-        # matches before the ``.csv`` check).
-        pd.DataFrame().to_csv(path, index=False)
+        # Pre-create a valid CSV with the source columns so the file exists
+        # and is readable (otherwise the code falls through to the parquet
+        # writer because ``not os.path.exists`` matches before the ``.csv``
+        # check). An existing target that cannot be read now raises per #356.
+        pd.DataFrame({"customer_id": [], "name": [], "city": [], "txn_date": []}).to_csv(
+            path, index=False
+        )
         source = self._source()
         ctx = _make_ctx(source)
         _scd2_pandas(ctx, source, self._params(path))

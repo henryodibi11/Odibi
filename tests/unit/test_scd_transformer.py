@@ -82,6 +82,14 @@ class TestSCD2ParamsValidation:
                 effective_time_col="updated_at",
             )
 
+    def test_target_format_default_none(self):
+        p = _base_params()
+        assert p.target_format is None
+
+    def test_target_format_delta(self):
+        p = _base_params(target_format="delta")
+        assert p.target_format == "delta"
+
 
 # ---------------------------------------------------------------------------
 # scd2 entry-point

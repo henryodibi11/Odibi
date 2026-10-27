@@ -484,8 +484,15 @@ class DimensionPattern(Pattern):
 
         temp_context = context.with_df(source_with_time)
 
+        # Derive the declared write format from the node's write config so the SCD2
+        # transformer persists the same format the node writes (delta targets are no
+        # longer written as parquet and then collided with by the node write).
+        target_format = None
+        if getattr(self.config, "write", None) is not None:
+            target_format = self.config.write.format
         scd_params = SCD2Params(
             target=target,
+            target_format=target_format,
             keys=[natural_key],
             track_cols=track_cols,
             effective_time_col=valid_from_col,
@@ -565,6 +572,9 @@ class DimensionPattern(Pattern):
             # path, which carries the existing SK forward (NULL for new rows) — those
             # NULLs are what the `surrogate_key in columns` branch above fills.
             if full_target is not None:
+                result_df = self._add_audit_columns(
+                    context, result_df, self.params.get("audit", {})
+                )
                 self._write_pandas_target(context, result_df, target)
 
         return result_df
