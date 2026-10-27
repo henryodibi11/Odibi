@@ -377,6 +377,7 @@ def _scd2_spark(context: EngineContext, source_df: Any, params: SCD2Params) -> E
                 get_logging_context().debug(
                     f"Target path '{params.target}' does not exist - assuming first run"
                 )
+                return None
         except Exception:
             # If we cannot probe existence (e.g. tests without a live JVM), fall
             # through and let the read attempt decide.

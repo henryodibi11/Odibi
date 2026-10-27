@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   restarting as a first run, and an unknown connection-like prefix (e.g. `nope.dim_customer`) raises
   `ValueError` naming the prefix instead of writing a literal file in the working directory. The
   Delta persist-back now includes audit columns so the schema is stable across runs.
+- **Quarantine output resolves the connection `base_path`** (#371) — Extensionless quarantine
+  paths now land under the quarantine connection's `base_path` instead of the working directory.
+  Pandas and Polars connection-prefixed pattern targets and merge/SCD targets resolve on the same
+  change instead of falling back to the working directory or raising connection-not-found.
 
 ## [3.15.1] — 2026-10-19
 
