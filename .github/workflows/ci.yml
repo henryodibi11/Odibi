@@ -51,7 +51,9 @@ jobs:
   # This job MUST pass for the build to be considered successful
   test-base:
     name: Test Base (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    # Python 3.9 has no build on the current ubuntu-latest image (Ubuntu 26.04),
+    # so keep the 3.9 cell on 22.04 while pyproject still declares >=3.9.
+    runs-on: ${{ matrix.python-version == '3.9' && 'ubuntu-22.04' || 'ubuntu-latest' }}
 
     strategy:
       # Test on multiple Python versions
@@ -208,7 +210,8 @@ jobs:
   # This job verifies SQL dependencies install correctly
   test-sql:
     name: Test SQL Dependencies (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    # Same 3.9 image constraint as test-base.
+    runs-on: ${{ matrix.python-version == '3.9' && 'ubuntu-22.04' || 'ubuntu-latest' }}
     # This job is allowed to fail without failing the entire build
     continue-on-error: true
 
