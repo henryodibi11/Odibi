@@ -1,6 +1,17 @@
-project: merge_gdpr_delete_match
+# =============================================================================
+# Delete Detection Example — GDPR Right-to-be-Forgotten (merge delete_match)
+# =============================================================================
+# Erases customers listed in forgotten_ids.csv from the Silver table using
+# the merge transformer's delete_match strategy.
+# Run with: odibi run merge_gdpr_delete_match.yaml
+# See docs/tutorials/delete_detection.md for the full tutorial.
+
+project: gdpr_delete_match
 engine: pandas
 
+# ---------------------------------------------------------------------------
+# Connections
+# ---------------------------------------------------------------------------
 connections:
   raw:
     type: local
@@ -9,17 +20,24 @@ connections:
     type: local
     base_path: ./output/silver
 
+# ---------------------------------------------------------------------------
+# Story & System (required by ProjectConfig)
+# ---------------------------------------------------------------------------
 story:
   connection: silver
-  path: stories
+  path: stories/
 
 system:
   connection: silver
   path: _odibi_system
 
+# ---------------------------------------------------------------------------
+# Pipelines
+# ---------------------------------------------------------------------------
 pipelines:
   - pipeline: gdpr_forget
     layer: silver
+
     nodes:
       - name: load_customers
         read:
@@ -32,6 +50,7 @@ pipelines:
           format: parquet
           mode: overwrite
           add_metadata: false
+
       - name: forget_customers
         depends_on: [load_customers]
         read:
