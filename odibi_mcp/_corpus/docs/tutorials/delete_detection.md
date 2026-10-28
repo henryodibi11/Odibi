@@ -1,3 +1,13 @@
+---
+title: Delete Detection
+roles: [jr-de, sr-de]
+tags: [tutorial:medallion, layer:silver, topic:delete-detection]
+prereqs: [bronze_layer.md, ../guides/medallion_architecture.md]
+next: [gold_layer.md, ../patterns/scd2.md]
+related: [bronze_layer.md, gold_layer.md, ../patterns/dimension.md, ../reference/yaml_schema.md#Deletedetectionconfig]
+time: 35m
+---
+
 # Tutorial: Delete Detection
 
 > **"Records are deleted in our source, but our Silver tables still show them."**
@@ -220,7 +230,7 @@ pipelines:
       - name: detect_customer_deletes
         read:
           connection: raw
-          path: day2.csv
+          path: day2_customers.csv
           format: csv
         transform:
           steps:
@@ -261,6 +271,62 @@ guard. Set thresholds based on your data's normal churn rate.
 
 `soft_delete_col: null` removes rows permanently. Always use soft delete
 during development and testing.
+
+---
+
+## GDPR Right-to-be-Forgotten recipe (merge delete_match)
+
+In addition to CDC delete detection (`detect_deletes`), odibi supports
+GDPR-style erasure with the `merge` transformer using the `delete_match`
+strategy.
+
+`delete_match` physically removes rows from the target that match the source
+keys. It is **irreversible** — deleted rows are gone, with no soft-delete flag
+to restore them.
+
+Unlike `detect_deletes`, `delete_match` has **no row-count /
+max-delete-percent guard**. There is no `max_delete_percent` safety threshold,
+so a malformed source can wipe the target without warning. Review the source
+carefully before running.
+
+**Two-stage dependency:** `delete_match` is a no-op when the target table is
+missing. You must load the customers table into Silver first (stage 1), then
+run the forget job (stage 2). Do not run the forget job before the target
+exists.
+
+```yaml
+transform:
+  steps:
+    - function: merge
+      params:
+        strategy: delete_match
+        keys: [customer_id]
+        connection: silver
+        path: customers
+```
+
+`detect_deletes` and `delete_match` are distinct features — do not conflate
+them:
+- `detect_deletes` flags deleted rows (CDC, soft or hard delete)
+- `delete_match` physically erases matching rows (GDPR Right-to-be-Forgotten)
+
+---
+
+## Sample data
+
+The tutorial uses before/after customer CSVs to illustrate soft-delete and
+GDPR deletion:
+
+- `day1_customers.csv` — initial load (100 customers)
+- `day2_customers.csv` — 5 customers deleted (IDs 12, 27, 45, 68, 91)
+- `day3_customers.csv` — 2 came back (IDs 12, 45) + 3 new (IDs 101, 102, 103)
+- `forgotten_ids.csv` — customer IDs to erase under GDPR
+
+Files live at `docs/tutorials/data/delete_detection/`. The runnable versions
+ship with the example pipelines in
+[`examples/delete_detection/`](../../examples/delete_detection/): `config.yaml`
+for snapshot-diff delete detection and `merge_gdpr_delete_match.yaml` for the
+GDPR `delete_match` recipe.
 
 ---
 
