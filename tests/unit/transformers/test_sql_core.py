@@ -265,6 +265,65 @@ def test_cast_columns_empty_casts(sample_df):
     pd.testing.assert_frame_equal(result, sample_df)
 
 
+def test_cast_columns_hyphenated_pass_through_columns():
+    """Test cast_columns quotes pass-through columns with hyphens (issue #386).
+
+    Columns not in the casts spec (e.g. price-units, revenue-units) must pass
+    through unchanged and be double-quoted so DuckDB does not parse them as
+    arithmetic expressions.
+    """
+    df = pd.DataFrame(
+        {
+            "price": [10.0, 20.0, 30.0],
+            "revenue": [100.0, 200.0, 300.0],
+            "price-units": ["A", "B", "C"],
+            "revenue-units": ["X", "Y", "Z"],
+        }
+    )
+    context = setup_context(df)
+    params = CastColumnsParams(casts={"price": "double", "revenue": "double"})
+    result_ctx = cast_columns(context, params)
+    result = result_ctx.df
+
+    # Casted columns changed type (double -> float64)
+    assert result["price"].dtype == float
+    assert result["revenue"].dtype == float
+    # Hyphenated pass-through columns preserved unchanged
+    assert list(result["price-units"]) == ["A", "B", "C"]
+    assert list(result["revenue-units"]) == ["X", "Y", "Z"]
+    # All columns still present
+    assert list(result.columns) == [
+        "price",
+        "revenue",
+        "price-units",
+        "revenue-units",
+    ]
+
+
+def test_cast_columns_hyphenated_casted_column():
+    """Test cast_columns casts a column whose own name has a hyphen (issue #386).
+
+    A column listed in params.casts whose name contains a hyphen must also be
+    double-quoted in both the CAST target and the alias.
+    """
+    df = pd.DataFrame(
+        {
+            "price-units": ["1.0", "2.0", "3.0"],
+            "revenue-units": ["4.0", "5.0", "6.0"],
+        }
+    )
+    context = setup_context(df)
+    params = CastColumnsParams(
+        casts={"price-units": "double", "revenue-units": "double"}
+    )
+    result_ctx = cast_columns(context, params)
+    result = result_ctx.df
+
+    # Both hyphenated columns were cast to float
+    assert result["price-units"].dtype in [int, "int32", "int64", "Int64", float]
+    assert result["revenue-units"].dtype in [int, "int32", "int64", "Int64", float]
+
+
 # -------------------------------------------------------------------------
 # Test clean_text
 # -------------------------------------------------------------------------

@@ -244,9 +244,9 @@ def cast_columns(context: EngineContext, params: CastColumnsParams) -> EngineCon
                 raw_type_str = str(raw_type)
 
             target_type = type_map.get(raw_type_str.lower(), raw_type_str)
-            projection.append(f"CAST({col} AS {target_type}) AS {col}")
+            projection.append(f'CAST("{col}" AS {target_type}) AS "{col}"')
         else:
-            projection.append(col)
+            projection.append(f'"{col}"')
 
     sql_query = f"SELECT {', '.join(projection)} FROM df"
     return context.sql(sql_query)
