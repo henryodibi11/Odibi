@@ -15,6 +15,18 @@
 - Return explicit `status`, `commit`, `changed files`, `checks/evidence`, and
   `limitations/blockers` fields. Never imply that an unperformed check passed.
 
+## Release preparation
+
+Follow [docs/RELEASE_PREPARATION.md](docs/RELEASE_PREPARATION.md) to batch merged fixes
+into a local release draft with `python scripts/prepare_release.py --version X.Y.Z`.
+The standard-library helper requires Python 3.11+, a clean committed candidate and
+complete local tag history. It never publishes or claims tests passed; publishing a
+GitHub release triggers PyPI, so exact-SHA CI, installed-wheel smoke and explicit owner
+publication approval remain separate gates. Do not bump versions or update the separate
+harness merely to generate a draft.
+`tests/unit/test_prepare_release_cli.py` covers read-only drafts, exact annotated-tag
+ranges, exclusive output creation, and rejection of inconsistent/dirty/reused candidates.
+
 ## AI Quick Start
 
 **Read [docs/THREAD_QUICK_START.md](docs/THREAD_QUICK_START.md) FIRST** — it has the full source layout with line counts, environment facts, test rules, and coverage commands. This saves 5-10 minutes of exploration per thread.
