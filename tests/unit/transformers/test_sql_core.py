@@ -313,9 +313,7 @@ def test_cast_columns_hyphenated_casted_column():
         }
     )
     context = setup_context(df)
-    params = CastColumnsParams(
-        casts={"price-units": "double", "revenue-units": "double"}
-    )
+    params = CastColumnsParams(casts={"price-units": "double", "revenue-units": "double"})
     result_ctx = cast_columns(context, params)
     result = result_ctx.df
 
