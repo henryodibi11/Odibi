@@ -112,6 +112,32 @@ sink. Transform privacy is also separate: `columns.<name>.pii: true` together wi
 node execution. PII metadata alone does nothing without a privacy method; these
 transforms are not the same as Story display redaction.
 
+### Diagnostic Output Contract
+
+Stories, documentation, catalog/run diagnostics, alerts, optional OpenLineage payloads
+and nested structured logs use a shared, nonmutating diagnostic projection. It masks
+credential-named fields, registered credential values, authentication assignments,
+URL userinfo and non-allowlisted URL query values. Request bodies, headers, parameters
+and unrecognized configuration options keep their structure but not arbitrary values.
+Generated SQL diagnostics mask string literals; they are not deployment/replay scripts.
+Schema names, counts, durations, safe options and original version hashes remain useful.
+This policy does not detect arbitrary PII or unknown secret strings in business data;
+the sample controls above still apply. Third-party logging is outside this boundary.
+
+Execution uses original models, requests, SQL, credentials, watermarks and hashes.
+Provenance columns such as `_source_file` carry diagnostic identities, not authentication
+material. Local filename punctuation and Azure container authorities are preserved.
+Catalog output/asset identities no longer store signed credentials: current-process
+resolution retains the original locator in memory. In a fresh process, use a named
+connection with a credential-free resource path, or re-register the current source
+configuration before resolving a signed output. A redacted historical locator cannot
+be replayed as a credential and produces an explicit resolution error.
+
+Direct rendering and comparison also project supplied older snapshots before emitting
+new artifacts. This does **not** rewrite old files, Delta versions, replicas, logs or
+backups. Existing artifacts require a separate authorized assessment; updating Odibi
+alone does not remove previously persisted credentials.
+
 ### Schema Changes
 
 Stories track schema evolution:

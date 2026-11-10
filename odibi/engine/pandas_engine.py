@@ -21,6 +21,7 @@ from odibi.engine.base import Engine
 from odibi.enums import EngineType
 from odibi.exceptions import TransformError
 from odibi.connections.sql_utils import is_sql_format
+from odibi.utils.artifacts import safe_identity
 from odibi.utils.logging_context import get_logging_context
 
 __all__ = ["PandasEngine", "LazyDataset"]
@@ -2179,7 +2180,7 @@ class PandasEngine(Engine):
 
         # _source_file: only for file sources
         if config.source_file and is_file_source and source_path:
-            df["_source_file"] = source_path
+            df["_source_file"] = safe_identity(source_path)
 
         # _source_connection: all sources
         if config.source_connection and source_connection:
@@ -2187,7 +2188,7 @@ class PandasEngine(Engine):
 
         # _source_table: SQL sources only
         if config.source_table and source_table:
-            df["_source_table"] = source_table
+            df["_source_table"] = safe_identity(source_table)
 
         return df
 

@@ -21,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -120,6 +121,7 @@ class LineageGenerator:
         """
         self.stories_path = stories_path
         self.storage_options = storage_options or {}
+        register_config_secrets({"storage_options": self.storage_options})
         self.is_remote = "://" in stories_path
         self._result: Optional[LineageResult] = None
 
@@ -303,7 +305,7 @@ class LineageGenerator:
             result = self._result
         if result is None:
             raise ValueError("No lineage result. Call generate() first.")
-        return json.dumps(result.to_dict(), indent=2)
+        return json.dumps(safe_artifact(result.to_dict()), indent=2)
 
     def render_html(self, result: Optional[LineageResult] = None) -> str:
         """Render lineage as interactive HTML with Mermaid diagram."""
@@ -312,6 +314,7 @@ class LineageGenerator:
         if result is None:
             raise ValueError("No lineage result. Call generate() first.")
 
+        result = safe_artifact(result)
         mermaid_code = self._generate_mermaid_diagram(result)
         layers_html = self._generate_layers_table(result)
 

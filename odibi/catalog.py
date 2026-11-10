@@ -7,6 +7,8 @@ import time
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from odibi.utils.artifacts import safe_artifact, safe_identity
+
 try:
     from pyspark.sql import SparkSession
     from pyspark.sql.types import (
@@ -208,6 +210,8 @@ class CatalogManager:
         self._pipelines_cache: Optional[Dict[str, Dict[str, Any]]] = None
         self._nodes_cache: Optional[Dict[str, Dict[str, str]]] = None
         self._outputs_cache: Optional[Dict[str, Dict[str, Any]]] = None
+        self._runtime_outputs: Dict[str, Dict[str, Any]] = {}
+        self._runtime_assets: Dict[str, str] = {}
         self._cache_lock = threading.Lock()
 
         # Bootstrap guard: skip re-checking 18 tables after first successful bootstrap
@@ -1213,6 +1217,7 @@ class CatalogManager:
             records: List of dicts with keys: pipeline_name, version_hash, description,
                      layer, schedule, tags_json
         """
+        records = safe_artifact(records)
         if not self.spark and not self.engine:
             return
 
@@ -1311,6 +1316,7 @@ class CatalogManager:
             records: List of dicts with keys: pipeline_name, node_name, version_hash,
                      type, config_json
         """
+        records = safe_artifact(records)
         if not self.spark and not self.engine:
             return
 
@@ -1419,6 +1425,13 @@ class CatalogManager:
                 - last_run: datetime (execution timestamp)
                 - row_count: int (nullable)
         """
+        # Keep live execution locators separate from persisted diagnostic identity.
+        # A fresh process must re-register its current project config, not replay
+        # credentials from catalog history.
+        for record in records:
+            key = f"{record['pipeline_name']}.{record['node_name']}"
+            self._runtime_outputs[key] = dict(record)
+        records = safe_artifact(records)
         if not self.spark and not self.engine:
             return
 
@@ -1576,7 +1589,13 @@ class CatalogManager:
         """
         outputs_cache = self._get_all_outputs_cached()
         key = f"{pipeline_name}.{node_name}"
-        return outputs_cache.get(key)
+        record = self._runtime_outputs.get(key) or outputs_cache.get(key)
+        if record and "[REDACTED]" in str(record.get("path", "")):
+            raise ValueError(
+                "Output requires current credentials: register its source configuration "
+                "or use a named connection with a credential-free output path."
+            )
+        return dict(record) if record else None
 
     def register_outputs_from_config(
         self,
@@ -1783,7 +1802,7 @@ class CatalogManager:
             "node_name": node_config.name,
             "version_hash": version_hash,
             "type": node_type,
-            "config_json": json.dumps(dump),
+            "config_json": json.dumps(safe_artifact(dump, config=True)),
         }
 
     def register_node(
@@ -1854,6 +1873,7 @@ class CatalogManager:
 
         Note: For better performance with multiple nodes, use log_runs_batch() instead.
         """
+        metrics_json = safe_artifact({"metrics_json": metrics_json})["metrics_json"]
         environment = getattr(self.config, "environment", None)
         project = self._project
 
@@ -1988,6 +2008,7 @@ class CatalogManager:
             records: List of dicts with keys: run_id, pipeline_name, node_name,
                      status, rows_processed, duration_ms, metrics_json
         """
+        records = safe_artifact(records)
         if not records:
             return
 
@@ -2096,6 +2117,7 @@ class CatalogManager:
                 nodes_skipped, rows_processed, error_summary, terminal_nodes,
                 environment, created_at
         """
+        pipeline_run = safe_artifact(pipeline_run)
         if self.is_sql_server_mode:
             self._log_pipeline_run_sql_server(pipeline_run)
             return
@@ -2335,6 +2357,7 @@ class CatalogManager:
                 run_start_at, run_end_at, duration_ms, rows_processed,
                 metrics_json, environment, created_at
         """
+        node_results = safe_artifact(node_results)
         if not node_results:
             return
 
@@ -2526,6 +2549,7 @@ class CatalogManager:
             error_message: Error message (max 1000 chars)
             stack_trace: Stack trace (max 2000 chars)
         """
+        error_message, stack_trace = safe_artifact((error_message, stack_trace))
         if self.is_sql_server_mode:
             self._log_failure_sql_server(
                 failure_id, run_id, pipeline_name, node_name, error_type, error_message, stack_trace
@@ -2859,6 +2883,8 @@ class CatalogManager:
         """
         Logs pattern usage to meta_patterns.
         """
+        table_name = safe_identity(table_name)
+        configuration = safe_artifact({"config_json": configuration})["config_json"]
         if not self.spark and not self.engine:
             return
 
@@ -2915,6 +2941,8 @@ class CatalogManager:
         """
         Registers/Upserts a physical asset to meta_tables.
         """
+        self._runtime_assets[table_name] = path
+        path = safe_identity(path)
         if not self.spark and not self.engine:
             return
 
@@ -3004,6 +3032,9 @@ class CatalogManager:
         """
         Resolves logical table name (e.g. 'gold.orders') to physical path.
         """
+        if table_name in self._runtime_assets:
+            return self._runtime_assets[table_name]
+        path = None
         if self.spark:
             try:
                 from pyspark.sql import functions as F
@@ -3012,7 +3043,7 @@ class CatalogManager:
                 # Filter
                 row = df.filter(F.col("table_name") == table_name).select("path").first()
 
-                return row.path if row else None
+                path = row.path if row else None
             except Exception:
                 return None
         elif self.engine:
@@ -3026,10 +3057,14 @@ class CatalogManager:
 
             row = df[df["table_name"] == table_name]
             if not row.empty:
-                return row.iloc[0]["path"]
-            return None
+                path = row.iloc[0]["path"]
 
-        return None
+        if path and "[REDACTED]" in path:
+            raise ValueError(
+                "Asset requires current credentials: register its source configuration "
+                "or use a named connection with a credential-free path."
+            )
+        return path
 
     def get_pipeline_hash(self, pipeline_name: str) -> Optional[str]:
         """
@@ -3215,6 +3250,7 @@ class CatalogManager:
 
     def _get_latest_schema(self, table_path: str) -> Optional[Dict[str, Any]]:
         """Get the most recent schema record for a table."""
+        table_path = safe_identity(table_path)
         if self.spark:
             try:
                 from pyspark.sql import functions as F
@@ -3272,6 +3308,7 @@ class CatalogManager:
             - columns_removed: list of removed columns
             - columns_type_changed: list of columns with type changes
         """
+        table_path = safe_identity(table_path)
         if not self.spark and not self.engine:
             return {"changed": False, "version": 0}
 
@@ -3373,6 +3410,7 @@ class CatalogManager:
         Returns:
             List of schema version records, most recent first
         """
+        table_path = safe_identity(table_path)
         if not self.spark and not self.engine:
             return []
 
@@ -3433,6 +3471,8 @@ class CatalogManager:
             source_node: Source node name (if known)
             relationship: Type of relationship ("feeds" or "derived_from")
         """
+        source_table = safe_identity(source_table)
+        target_table = safe_identity(target_table)
         if not self.spark and not self.engine:
             return
 
@@ -3509,6 +3549,7 @@ class CatalogManager:
                      target_node, run_id, source_pipeline (optional), source_node (optional),
                      relationship (optional, defaults to "feeds")
         """
+        records = safe_artifact(records)
         if not self.spark and not self.engine:
             return
 
@@ -3605,6 +3646,9 @@ class CatalogManager:
             records: List of dicts with keys: project, table_name, path, format,
                      pattern_type, schema_hash (optional, defaults to "")
         """
+        for record in records:
+            self._runtime_assets[record["table_name"]] = record["path"]
+        records = safe_artifact(records)
         if not self.spark and not self.engine:
             return
 
@@ -3928,6 +3972,8 @@ class CatalogManager:
             dimensions: List of dimension columns
             source_table: Source table for the metric
         """
+        definition_sql = safe_artifact({"definition_sql": definition_sql})["definition_sql"]
+        source_table = safe_identity(source_table)
         if not self.spark and not self.engine:
             return
 

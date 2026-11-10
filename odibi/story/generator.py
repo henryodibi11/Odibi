@@ -11,6 +11,7 @@ from odibi.config import DocsConfig
 from odibi.node import NodeResult
 from odibi.story.metadata import DeltaWriteInfo, NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.story.renderers import HTMLStoryRenderer, JSONStoryRenderer
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.error_suggestions import ErrorContext, get_suggestions
 from odibi.utils.logging_context import get_logging_context
 
@@ -63,6 +64,7 @@ class StoryGenerator:
         self.output_path_str = output_path  # Store original string
         self.is_remote = "://" in output_path
         self.storage_options = storage_options or {}
+        register_config_secrets({"storage_options": self.storage_options})
         self.catalog_manager = catalog_manager
         self.docs_config = docs_config
         self.workspace_root = workspace_root
@@ -545,6 +547,7 @@ class StoryGenerator:
             ctx.debug("No previous successful run found for comparison")
             return
 
+        last_success = safe_artifact(last_success)
         metadata.compared_to_run_id = last_success.get("run_id")
 
         # Build lookup for previous run's nodes
@@ -1064,7 +1067,9 @@ class StoryGenerator:
         node_meta.calculate_row_change()  # Needs rows_in
         # schema changes are already in metadata from Node logic
 
-        return node_meta
+        # Project once, with the raw snapshot still present, so its credentials
+        # also protect error/suggestion strings supplied through the public API.
+        return safe_artifact(node_meta)
 
     def _get_error_suggestions(
         self, result: NodeResult, node_name: str, meta: Dict[str, Any]
@@ -1558,6 +1563,7 @@ class StoryGenerator:
 
     def _render_index_html(self, runs: List[Dict[str, Any]]) -> str:
         """Render the pipeline history index HTML."""
+        runs = safe_artifact(runs)
         rows_html = ""
         for run in runs:
             status_class = "success" if run["status"] == "success" else "failed"

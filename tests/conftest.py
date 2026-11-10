@@ -67,6 +67,19 @@ def _reset_logging_context():
     lc._global_context = original
 
 
+@pytest.fixture(autouse=True)
+def _isolate_artifact_secret_registry():
+    """Keep credentials registered by one synthetic application out of another."""
+    from odibi.utils import artifacts
+
+    with artifacts._lock:
+        original = artifacts._secrets.copy()
+    yield
+    with artifacts._lock:
+        artifacts._secrets.clear()
+        artifacts._secrets.update(original)
+
+
 def _signal_snapshot():
     """Snapshot signal handlers, skipping the signals a platform makes unstoppable.
 

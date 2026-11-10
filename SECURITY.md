@@ -73,10 +73,13 @@ When using ODIBI:
 - **Managed remote access**: Named managed runtime-data actions enforce their canonical
   path, connection, strict SQL/identifier, cap, and export policies. This is not a
   universal sandbox for all Odibi connection paths.
-- **Secrets in logs**: `StructuredLogger.register_secret(value)` replaces that exact
-  registered string in messages and string keyword values passed through that logger.
-  It does not discover secret patterns, recursively sanitize arbitrary objects, cover
-  third-party logs, or govern Story samples.
+- **Diagnostic credentials**: Odibi's shared artifact policy projects credentials out
+  of stories, catalog/run diagnostics, generated documentation, alerts and lineage.
+  Both structured loggers apply it to nested values and stringified objects;
+  `StructuredLogger.register_secret(value)` also registers values with that policy.
+  It does not cover third-party logs or detect arbitrary secrets/PII in business data.
+  See the [diagnostic output contract](docs/features/stories.md#diagnostic-output-contract)
+  for compatibility and historical-artifact limitations.
 
 See the [MCP trust boundaries](docs/guides/mcp_guide.md), [Story privacy
 contract](docs/features/stories.md#sample-data-and-privacy), and [immutable planning

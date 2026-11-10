@@ -11,6 +11,7 @@ from typing import Optional
 
 import odibi
 from odibi.story.metadata import PipelineStoryMetadata
+from odibi.utils.artifacts import safe_artifact
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -50,6 +51,7 @@ class HTMLStoryRenderer:
         Returns:
             HTML string
         """
+        metadata = safe_artifact(metadata)
         ctx = get_logging_context()
         ctx.debug(
             "Rendering HTML story",
@@ -203,6 +205,7 @@ class MarkdownStoryRenderer:
         Returns:
             Markdown string
         """
+        metadata = safe_artifact(metadata)
         ctx = get_logging_context()
         ctx.debug(
             "Rendering Markdown story",
@@ -396,6 +399,7 @@ class JSONStoryRenderer:
         Returns:
             JSON string
         """
+        metadata = safe_artifact(metadata)
         ctx = get_logging_context()
         ctx.debug(
             "Rendering JSON story",

@@ -23,6 +23,7 @@ import yaml
 
 from odibi.config import DocsConfig
 from odibi.story.metadata import NodeExecutionMetadata, PipelineStoryMetadata
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -67,6 +68,7 @@ class DocGenerator:
         self.config = config
         self.pipeline_name = pipeline_name
         self.storage_options = storage_options or {}
+        register_config_secrets({"storage_options": self.storage_options})
         self.write_file_callback = write_file
 
         # Detect if output is remote (cloud storage)
@@ -105,6 +107,7 @@ class DocGenerator:
 
     def _write_file(self, path: str, content: str) -> None:
         """Write content to file, handling remote storage if configured."""
+        content = safe_artifact(content)
         ctx = get_logging_context()
 
         # Use callback if provided
@@ -190,7 +193,7 @@ class DocGenerator:
         content = self._read_file(state_path)
         if content:
             try:
-                return json.loads(content)
+                return safe_artifact(json.loads(content))
             except json.JSONDecodeError:
                 return {"pipelines": {}, "project": None}
         return {"pipelines": {}, "project": None}
@@ -259,6 +262,7 @@ class DocGenerator:
         Returns:
             Dictionary of artifact name -> output path
         """
+        metadata = safe_artifact(metadata)
         ctx = get_logging_context()
 
         if not self.config.enabled:

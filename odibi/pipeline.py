@@ -32,6 +32,7 @@ from odibi.story import StoryGenerator
 from odibi.story.lineage_utils import generate_lineage
 from odibi.transformers import register_standard_library
 from odibi.utils.alerting import send_alert
+from odibi.utils.artifacts import safe_artifact
 from odibi.utils.logging import configure_logging, logger
 from odibi.utils.logging_context import (
     create_logging_context,
@@ -102,7 +103,7 @@ class PipelineResults:
         for node_name in self.failed:
             node_res = self.node_results.get(node_name)
             if node_res and node_res.error:
-                error_msg = str(node_res.error)[:200]
+                error_msg = safe_artifact(str(node_res.error))[:200]
                 lines.append(f"  • {node_name}: {error_msg}")
             else:
                 lines.append(f"  • {node_name}")
@@ -124,7 +125,7 @@ class PipelineResults:
         lines.append("     odibi doctor")
         lines.append("")
 
-        return "\n".join(lines)
+        return safe_artifact("\n".join(lines))
 
 
 class Pipeline:
@@ -968,7 +969,8 @@ class Pipeline:
             output_records = []
             for node_result in results.node_results.values():
                 if node_result.metadata and "_output_record" in node_result.metadata:
-                    output_records.append(node_result.metadata.pop("_output_record"))
+                    diagnostic_record = node_result.metadata.pop("_output_record")
+                    output_records.append(node_result._output_record or diagnostic_record)
             if output_records:
                 try:
                     t0 = time.time()
@@ -2772,7 +2774,7 @@ class PipelineManager:
                                 "node_name": node.name,
                                 "version_hash": node_hash,
                                 "type": node_type,
-                                "config_json": json.dumps(node_dump),
+                                "config_json": json.dumps(safe_artifact(node_dump, config=True)),
                             }
                         )
 

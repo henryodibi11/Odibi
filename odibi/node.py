@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from odibi.config import IncrementalConfig, IncrementalMode, NodeConfig, RetryConfig, WriteMode
 from odibi.connections.sql_utils import is_sql_format
@@ -24,6 +24,7 @@ from odibi.state import (
     CatalogStateBackend,
     StateManager,
 )
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.duration import parse_duration
 from odibi.utils.error_suggestions import get_suggestions_for_transform
 from odibi.utils.logging_context import (
@@ -92,6 +93,9 @@ class NodeResult(BaseModel):
     result_schema: Optional[Any] = Field(default=None, alias="schema")  # Renamed to avoid shadowing
     error: Optional[Exception] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    # Execution-only locator: never part of stories, state or model serialization.
+    _output_record: Optional[Dict[str, Any]] = PrivateAttr(default=None)
+    _hwm_update: Optional[Dict[str, Any]] = PrivateAttr(default=None)
 
 
 @contextmanager
@@ -135,6 +139,8 @@ class NodeExecutor:
         self.context = context
         self.engine = engine
         self.connections = connections
+        for connection in connections.values():
+            register_config_secrets(getattr(connection, "__dict__", {}))
         self.catalog_manager = catalog_manager
         self.config_file = config_file
         self.max_sample_rows = max_sample_rows
@@ -192,6 +198,7 @@ class NodeExecutor:
         Returns:
             NodeResult
         """
+        register_config_secrets(config)
         self._current_pipeline = current_pipeline
         start_time = time.time()
 
@@ -380,7 +387,7 @@ class NodeExecutor:
                     phase_timings_ms=phase_timer.summary_ms(),
                 )
 
-                return NodeResult(
+                result = NodeResult(
                     node_name=config.name,
                     success=True,
                     duration=duration,
@@ -388,8 +395,20 @@ class NodeExecutor:
                     rows_read=metadata.get("rows_read"),
                     rows_written=metadata.get("rows_written"),
                     schema=metadata.get("schema"),
-                    metadata=metadata,
                 )
+                # Coerce engine counters through the result contract, not the
+                # diagnostic serializer (which stringifies unknown objects).
+                for key, count in (
+                    ("rows", result.rows_processed),
+                    ("rows_read", result.rows_read),
+                    ("rows_written", result.rows_written),
+                ):
+                    if key in metadata:
+                        metadata[key] = count
+                result.metadata = safe_artifact(metadata)
+                result._output_record = metadata.get("_output_record")
+                result._hwm_update = metadata.get("hwm_update")
+                return result
 
             except Exception as e:
                 duration = time.time() - start_time
@@ -448,7 +467,7 @@ class NodeExecutor:
                     success=False,
                     duration=duration,
                     error=error,
-                    metadata=error_metadata,
+                    metadata=safe_artifact(error_metadata),
                 )
 
             finally:
@@ -3497,7 +3516,7 @@ class NodeExecutor:
             if config.depends_on:
                 snapshot["depends_on"] = config.depends_on
 
-            return snapshot
+            return safe_artifact(snapshot, config=True)
         except Exception:
             return None
 
@@ -3952,6 +3971,7 @@ class Node:
                     result_for_log.metadata["version_hash"] = self.get_version_hash()
 
                 try:
+                    result_for_log.metadata = safe_artifact(result_for_log.metadata)
                     metrics_json = json.dumps(result_for_log.metadata, default=safe_default)
                 except Exception:
                     metrics_json = "{}"
@@ -4039,7 +4059,7 @@ class Node:
 
                 if result.success:
                     if result.metadata.get("hwm_pending"):
-                        hwm_update = result.metadata.get("hwm_update")
+                        hwm_update = result._hwm_update or result.metadata.get("hwm_update")
                         if hwm_update:
                             hwm_commit_start = time.time()
                             try:

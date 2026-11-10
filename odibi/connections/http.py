@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 from odibi.connections.base import BaseConnection
+from odibi.utils.artifacts import register_config_secrets
 from odibi.utils.logging import logger
 
 
@@ -31,6 +32,7 @@ class HttpConnection(BaseConnection):
         """
         self.base_url = base_url.rstrip("/") + "/"
         self.headers = headers or {}
+        register_config_secrets({"headers": self.headers, "auth": auth})
 
         if auth:
             if "token" in auth:

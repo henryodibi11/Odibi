@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import odibi
 from odibi.config import NodeConfig, PipelineConfig, ProjectConfig
+from odibi.utils.artifacts import safe_artifact
 from odibi.validation import ExplanationLinter
 
 
@@ -252,6 +253,7 @@ class DocStoryGenerator:
         Returns:
             Path to generated file
         """
+        doc_data = safe_artifact(doc_data, config=True)
         try:
             from jinja2 import Template
         except ImportError:
@@ -444,6 +446,7 @@ class DocStoryGenerator:
         Returns:
             Path to generated file
         """
+        doc_data = safe_artifact(doc_data, config=True)
         lines = []
 
         # Title
@@ -545,6 +548,7 @@ class DocStoryGenerator:
         """
         import json
 
+        doc_data = safe_artifact(doc_data, config=True)
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 

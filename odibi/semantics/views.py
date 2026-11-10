@@ -25,6 +25,7 @@ from odibi.semantics.metrics import (
     ViewResult,
 )
 from odibi.utils.logging_context import get_logging_context
+from odibi.utils.artifacts import safe_artifact
 
 
 def generate_ensure_schema_sql(schema: str) -> str:
@@ -350,7 +351,7 @@ class ViewGenerator:
             if save_sql_to and write_file:
                 filename = f"{view_config.name}.sql"
                 sql_file_path = f"{save_sql_to.rstrip('/')}/{filename}"
-                write_file(sql_file_path, ddl)
+                write_file(sql_file_path, safe_artifact({"sql": ddl})["sql"])
                 ctx.info("Saved SQL file", path=sql_file_path)
 
             ctx.info("View created successfully", view=view_config.name)
