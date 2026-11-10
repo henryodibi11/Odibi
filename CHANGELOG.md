@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.2] — 2026-11-10
+
+### Security
+
+- **Safe diagnostic outputs** — Shared credential projection for run artifacts,
+  stories/documentation, catalog/state diagnostics, nested structured logs and optional
+  alert/lineage/semantic outputs. Execution inputs and change-detection hashes remain
+  unchanged. Generated SQL files are diagnostic, not replayable deployment scripts.
+  Signed output locators must be re-registered from current configuration after a
+  process restart; named connections with credential-free paths remain portable.
+  Historical artifacts are not rewritten. See the Story diagnostic output contract.
+
 ### Added
 
 - **Orphan handling tutorial** (#222) — Added `docs/tutorials/orphan_handling.md` with sample CSV data and a runnable pipeline YAML for the Fact Pattern's `orphan_handling: quarantine` strategy. Includes `odibi validate` and `odibi run` verification (7 source rows -> 5 valid + 2 quarantined orphans).
