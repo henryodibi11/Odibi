@@ -406,6 +406,8 @@ wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && py
 - Use `odibi.utils.artifacts.safe_artifact` at diagnostic serialization owners; keep original models, hashes, watermarks and resource locators for execution. Do not redact `model_dump` globally.
 - Azure `abfss://container@account/...` authority is a container identity, not URL credentials. Preserve it and legitimate local filename punctuation when testing provenance redaction.
 - `tests/unit/test_safe_artifact_contract.py` covers public local run/catalog/state/rendering, old snapshot re-ingestion, nested loggers and captured optional payloads. A normal failed `Node.execute()` drops the executor's snapshot; direct `NodeExecutor.execute()` retains it. Check both contracts without assuming identical metadata.
+- Build typed execution results before projecting diagnostics; the serializer stringifies unknown engine scalars. Carry operational watermark updates privately, not through redacted metadata.
+- Keep opaque-option masking separate from credential registration: schema/type names in engine options are not secrets. Request payload values and named credentials must still redact echoed errors. The shared registry is isolated between tests in `tests/conftest.py`.
 
 ### MCP Managed Context Must Bind a Validated Snapshot
 

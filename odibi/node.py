@@ -95,6 +95,7 @@ class NodeResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     # Execution-only locator: never part of stories, state or model serialization.
     _output_record: Optional[Dict[str, Any]] = PrivateAttr(default=None)
+    _hwm_update: Optional[Dict[str, Any]] = PrivateAttr(default=None)
 
 
 @contextmanager
@@ -394,9 +395,19 @@ class NodeExecutor:
                     rows_read=metadata.get("rows_read"),
                     rows_written=metadata.get("rows_written"),
                     schema=metadata.get("schema"),
-                    metadata=metadata,
                 )
-                result._output_record = self._create_output_record(config, metadata.get("rows"))
+                # Coerce engine counters through the result contract, not the
+                # diagnostic serializer (which stringifies unknown objects).
+                for key, count in (
+                    ("rows", result.rows_processed),
+                    ("rows_read", result.rows_read),
+                    ("rows_written", result.rows_written),
+                ):
+                    if key in metadata:
+                        metadata[key] = count
+                result.metadata = safe_artifact(metadata)
+                result._output_record = metadata.get("_output_record")
+                result._hwm_update = metadata.get("hwm_update")
                 return result
 
             except Exception as e:
@@ -3228,7 +3239,7 @@ class NodeExecutor:
         if output_record:
             metadata["_output_record"] = output_record
 
-        return safe_artifact(metadata)
+        return metadata
 
     def _get_redacted_sample(
         self, df: Any, sensitive_config: Any, engine: Any
@@ -4048,7 +4059,7 @@ class Node:
 
                 if result.success:
                     if result.metadata.get("hwm_pending"):
-                        hwm_update = result.metadata.get("hwm_update")
+                        hwm_update = result._hwm_update or result.metadata.get("hwm_update")
                         if hwm_update:
                             hwm_commit_start = time.time()
                             try:

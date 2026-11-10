@@ -138,9 +138,10 @@ def _collect(value, found, config=False, opaque=False, request=False):
     if isinstance(value, Mapping):
         for key, item in value.items():
             name = str(key).lower()
-            if _secret_name(key) or (
-                request and (opaque == 2 or (opaque and name not in _SAFE_OPTIONS))
-            ):
+            # Opaque diagnostics are not automatically credentials. Arbitrary
+            # engine options also contain schema/type names and business values.
+            # Only request payload containers and named credentials seed echoes.
+            if _secret_name(key) or (request and opaque == 2):
                 found.update(s for s in _strings(item) if s and s != REDACTED)
             if name in {"config_json", "metrics_json"} and isinstance(item, str):
                 try:
@@ -158,6 +159,8 @@ def _collect(value, found, config=False, opaque=False, request=False):
         for item in value:
             _collect(item, found, config, opaque, request)
     elif isinstance(value, str):
+        if request and opaque == 2 and value and value != REDACTED:
+            found.add(value)
         found.update(_url_secrets(value))
 
 

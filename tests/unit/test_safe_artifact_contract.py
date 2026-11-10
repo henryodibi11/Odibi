@@ -770,3 +770,63 @@ def test_identity_redacts_original_query_encoding_and_sibling_error(encoded):
     assert "opaque=[REDACTED]&part=west" in projected["source_path"]
     assert projected["error"] == "Credential echo [REDACTED]"
     assert safe_identity("local?opaque=" + encoded) == "local?opaque=" + encoded
+
+
+def test_engine_options_do_not_register_schema_values_as_credentials():
+    from odibi.utils.artifacts import register_config_secrets
+
+    config = {
+        "read": {
+            "options": {
+                "dtype": {"id": "int", "value": "string"},
+                "custom_setting": "active",
+                "request_body": [BODY],
+                "params": {"opaque": CANARY},
+            }
+        }
+    }
+    register_config_secrets(config)
+    projected = safe_artifact(
+        {"schema": ["id", "value", "int", "string", "active"], "error": BODY + CANARY}
+    )
+    assert projected["schema"] == ["id", "value", "int", "string", "active"]
+    assert_safe(projected)
+    assert config["read"]["options"]["request_body"] == [BODY]
+
+
+def test_typed_counters_and_operational_watermark_survive_projection(tmp_path, catalog):
+    import numpy as np
+
+    class Engine(PandasEngine):
+        def count_rows(self, df):
+            return np.int64(len(df))
+
+    HttpConnection(base_url="https://synthetic.invalid", auth={"token": BODY}, validate=False)
+    pd.DataFrame({"cursor": [BODY + "-a", BODY + "-b"], "id": [17, 29]}).to_csv(
+        tmp_path / "input.csv", index=False
+    )
+    cfg = NodeConfig(
+        name="watermark",
+        sensitive=True,
+        read={
+            "connection": "local",
+            "format": "csv",
+            "path": "input.csv",
+            "incremental": {"mode": "stateful", "column": "cursor"},
+        },
+    )
+    node = Node(
+        cfg,
+        create_context("pandas"),
+        Engine(config={}),
+        {"local": LocalConnection(base_path=str(tmp_path))},
+        catalog_manager=catalog,
+    )
+    result = node.execute()
+    assert result.success
+    assert result.rows_processed == 2
+    assert result.metadata["rows"] == 2
+    assert isinstance(result.metadata["rows"], int)
+    assert node.state_manager.get_hwm("watermark_hwm") == BODY + "-b"
+    assert_safe(result.metadata)
+    assert_safe(result.model_dump(mode="python"))
