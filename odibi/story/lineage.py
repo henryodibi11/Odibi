@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from odibi.utils.artifacts import safe_artifact
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -121,6 +121,7 @@ class LineageGenerator:
         """
         self.stories_path = stories_path
         self.storage_options = storage_options or {}
+        register_config_secrets({"storage_options": self.storage_options})
         self.is_remote = "://" in stories_path
         self._result: Optional[LineageResult] = None
 

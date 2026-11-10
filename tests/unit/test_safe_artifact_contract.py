@@ -101,15 +101,19 @@ def test_public_renderers_and_docs_reject_old_unsafe_inputs(tmp_path):
         content = renderer.render(original)
         assert_safe(content)
         assert "api_node" in content
+    storage_secret = "ODIBI_SYNTHETIC_DOC_STORAGE_62"
+    original.nodes[0].error_message += storage_secret
     captured = {}
     generator = DocGenerator(
         DocsConfig(enabled=True, output_path="memory://audit/docs"),
         "audit",
+        storage_options={"account_key": storage_secret},
         write_file=lambda path, content: captured.update({path: content}),
     )
     assert generator.generate(original)
     assert captured
     assert_safe(captured)
+    assert storage_secret not in json.dumps(captured)
     assert (
         original.nodes[0].config_snapshot["read"]["options"]["request_body"]["unclassified_field"]
         == BODY
@@ -473,7 +477,8 @@ def test_optional_openlineage_captured_events(monkeypatch):
     adapter.client = SimpleNamespace(emit=events.append)
     cfg = api_config()
     before = cfg.model_dump(mode="json")
-    run_id = adapter.emit_node_start(cfg, "parent")
+    # A resumed/direct completion must enforce its own output contract, not
+    # depend on a start event having populated process-local secret knowledge.
     adapter.emit_node_complete(
         cfg,
         NodeResult(
@@ -482,8 +487,10 @@ def test_optional_openlineage_captured_events(monkeypatch):
             duration=0.1,
             error=RuntimeError("Credential echo " + BODY),
         ),
-        run_id,
+        "synthetic-resumed-node-run",
     )
+    assert_safe([repr(event) for event in events])
+    adapter.emit_node_start(cfg, "parent")
     pipeline = PipelineConfig(pipeline="audit", description="Bearer " + CANARY, nodes=[cfg])
     adapter.emit_pipeline_start(pipeline)
     adapter.emit_pipeline_complete(pipeline, SimpleNamespace(failed=[cfg.name]))
@@ -526,6 +533,44 @@ def test_semantic_execution_sql_and_remote_story_captures():
     assert any(p.endswith(".html") for p in captured)
     assert_safe(captured)
     assert config.model_dump(mode="json") == original
+
+    storage_secret = "ODIBI_SYNTHETIC_SEMANTIC_STORAGE_63"
+    failed_generator = SemanticStoryGenerator(
+        config,
+        output_path="memory://audit/failed",
+        storage_options={"account_key": storage_secret},
+    )
+
+    def fail_locally(sql):
+        raise RuntimeError("Synthetic transport echo " + storage_secret)
+
+    failed = failed_generator.execute_with_story(fail_locally)
+    assert failed.views_failed == 1
+    assert failed_generator.save_story(write_file=lambda p, c: captured.update({p: c}))
+    assert storage_secret not in json.dumps(captured)
+    assert failed_generator.storage_options == {"account_key": storage_secret}
+
+
+def test_remote_lineage_storage_credentials_do_not_reappear_in_payloads():
+    from odibi.story.lineage import LayerInfo, LineageGenerator, LineageResult
+
+    storage_secret = "ODIBI_SYNTHETIC_LINEAGE_STORAGE_64"
+    options = {"account_key": storage_secret}
+    generator = LineageGenerator("memory://audit/stories", storage_options=options)
+    supplied = LineageResult(
+        generated_at="2026-01-01T00:00:00",
+        date="2026-01-01",
+        layers=[LayerInfo("gold", "echo-" + storage_secret, "success", 1)],
+        nodes=[],
+        edges=[],
+    )
+    captured = {}
+    assert generator.save(supplied, write_file=lambda p, c: captured.update({p: c}))
+    assert any(p.endswith(".json") for p in captured)
+    assert any(p.endswith(".html") for p in captured)
+    assert storage_secret not in json.dumps(captured)
+    assert storage_secret in supplied.layers[0].story_path
+    assert options == {"account_key": storage_secret}
 
 
 def test_explicit_and_automatic_manager_registration(tmp_path):
@@ -610,6 +655,8 @@ def test_pipeline_remote_payloads_are_safe(monkeypatch):
     import fsspec
 
     captured = {}
+    storage_secret = "ODIBI_SYNTHETIC_STORY_STORAGE_61"
+    storage_options = {"account_key": storage_secret}
 
     class Sink(io.StringIO):
         def __init__(self, path):
@@ -621,18 +668,24 @@ def test_pipeline_remote_payloads_are_safe(monkeypatch):
             return super().__exit__(*args)
 
     def local_open(path, mode, **kwargs):
+        assert kwargs["account_key"] == storage_secret
         if mode == "w":
             return Sink(path)
         raise FileNotFoundError(path)
 
     monkeypatch.setattr(fsspec, "open", local_open)
-    generator = StoryGenerator("audit", output_path="memory://audit/stories", retention_days=None)
+    generator = StoryGenerator(
+        "audit",
+        output_path="memory://audit/stories",
+        retention_days=None,
+        storage_options=storage_options,
+    )
     result = NodeResult(
         node_name="api_node",
         success=False,
         duration=0.1,
         metadata={"config_snapshot": api_config().model_dump(mode="json")},
-        error=RuntimeError("Synthetic opaque credential echo " + BODY),
+        error=RuntimeError("Synthetic opaque credential echo " + BODY + storage_secret),
     )
     generator.generate(
         {"api_node": result},
@@ -646,6 +699,8 @@ def test_pipeline_remote_payloads_are_safe(monkeypatch):
     assert any(p.endswith(".json") for p in captured)
     assert any(p.endswith(".html") for p in captured)
     assert_safe(captured)
+    assert storage_secret not in json.dumps(captured)
+    assert storage_options == {"account_key": storage_secret}
 
 
 def test_opaque_request_body_has_no_safe_key_escape():

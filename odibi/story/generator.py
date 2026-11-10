@@ -11,7 +11,7 @@ from odibi.config import DocsConfig
 from odibi.node import NodeResult
 from odibi.story.metadata import DeltaWriteInfo, NodeExecutionMetadata, PipelineStoryMetadata
 from odibi.story.renderers import HTMLStoryRenderer, JSONStoryRenderer
-from odibi.utils.artifacts import safe_artifact
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.error_suggestions import ErrorContext, get_suggestions
 from odibi.utils.logging_context import get_logging_context
 
@@ -64,6 +64,7 @@ class StoryGenerator:
         self.output_path_str = output_path  # Store original string
         self.is_remote = "://" in output_path
         self.storage_options = storage_options or {}
+        register_config_secrets({"storage_options": self.storage_options})
         self.catalog_manager = catalog_manager
         self.docs_config = docs_config
         self.workspace_root = workspace_root

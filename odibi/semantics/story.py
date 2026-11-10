@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from odibi.semantics.metrics import SemanticLayerConfig
 from odibi.semantics.views import ViewExecutionResult, ViewGenerator
-from odibi.utils.artifacts import safe_artifact
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -125,6 +125,7 @@ class SemanticStoryGenerator:
         self.output_path_str = output_path
         self.is_remote = "://" in output_path
         self.storage_options = storage_options or {}
+        register_config_secrets({"storage_options": self.storage_options})
 
         self._view_generator = ViewGenerator(config)
         self._metadata: Optional[SemanticStoryMetadata] = None

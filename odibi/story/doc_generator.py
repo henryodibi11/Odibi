@@ -23,7 +23,7 @@ import yaml
 
 from odibi.config import DocsConfig
 from odibi.story.metadata import NodeExecutionMetadata, PipelineStoryMetadata
-from odibi.utils.artifacts import safe_artifact
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -68,6 +68,7 @@ class DocGenerator:
         self.config = config
         self.pipeline_name = pipeline_name
         self.storage_options = storage_options or {}
+        register_config_secrets({"storage_options": self.storage_options})
         self.write_file_callback = write_file
 
         # Detect if output is remote (cloud storage)

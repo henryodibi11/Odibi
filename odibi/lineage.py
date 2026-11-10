@@ -246,6 +246,7 @@ class OpenLineageAdapter:
         if not self.enabled or not run_id:
             return
 
+        register_config_secrets(config)
         try:
             event_time = datetime.now(timezone.utc).isoformat()
             event_type = RunState.COMPLETE if result.success else RunState.FAIL
