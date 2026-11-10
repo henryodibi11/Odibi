@@ -78,6 +78,7 @@ _USERINFO = re.compile(r"([a-zA-Z][a-zA-Z0-9+.-]*://)[^\s/@]+@")
 _BEARER = re.compile(r"(?i)\b(Bearer|Basic)\s+[^\s\"'<>},)]+")
 _LITERAL = re.compile(r"'(?:''|[^'])*'")
 _URL = re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://[^\s\"'<>]+")
+_QUERY_VALUE = re.compile(r"([?&])([^=&?#]+)=([^&#]*)")
 _SAFE_QUERY = {"part", "revision", "version", "limit", "offset", "page", "date"}
 _CONTAINER_AUTHORITY = {"abfs", "abfss", "wasb", "wasbs"}
 
@@ -122,6 +123,9 @@ def _url_secrets(text):
             for key, value in parse_qsl(url.query, keep_blank_values=True):
                 if key.lower() not in _SAFE_QUERY and value:
                     yield value
+            for part in _QUERY_VALUE.finditer(match[0]):
+                if unquote(part[2]).lower() not in _SAFE_QUERY and part[3]:
+                    yield part[3]
         except ValueError:
             continue
 
@@ -178,6 +182,19 @@ def _text(value, secrets):
         text,
     )
     text = _BEARER.sub(r"\1 " + REDACTED, text)
+    # Redact values in the original URI too: percent-escape case and `+`
+    # encoding need not match urllib's canonical re-encoding of a secret.
+    text = _URL.sub(
+        lambda url: _QUERY_VALUE.sub(
+            lambda part: (
+                part[0]
+                if unquote(part[2]).lower() in _SAFE_QUERY
+                else part[1] + part[2] + "=" + REDACTED
+            ),
+            url[0],
+        ),
+        text,
+    )
     return _ASSIGNMENT.sub(lambda m: m[1] + REDACTED, text)
 
 

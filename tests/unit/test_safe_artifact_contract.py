@@ -241,6 +241,21 @@ def test_catalog_public_sinks_and_state_preserve_hashes(catalog, tmp_path):
     registered = records(catalog, "meta_nodes")[0]
     assert registered["version_hash"] == original_hash
     assert_safe(registered)
+    catalog.register_pipelines_batch(
+        [
+            {
+                "pipeline_name": "audit",
+                "version_hash": original_hash,
+                "description": "Bearer " + CANARY,
+                "layer": "gold",
+                "schedule": "",
+                "tags_json": json.dumps(["api_key=" + BODY]),
+            }
+        ]
+    )
+    pipelines = records(catalog, "meta_pipelines")
+    assert pipelines[0]["version_hash"] == original_hash
+    assert_safe(pipelines)
     cfg.read.options["params"]["api_key"] = CANARY + "changed"
     assert node.get_version_hash() != original_hash  # redaction must not flatten functional hashes
     supplied = {
@@ -743,3 +758,15 @@ def test_engine_provenance_is_diagnostic_not_authentication(engine_name, monkeyp
     assert_safe(values)
     assert values["id"] == [17]
     assert "warehouse" in str(values["_source_connection"])
+
+
+@pytest.mark.parametrize(
+    "encoded", ["SYNTHETIC%2fOPAQUE", "SYNTHETIC+OPAQUE", "SYNTHETIC%20OPAQUE"]
+)
+def test_identity_redacts_original_query_encoding_and_sibling_error(encoded):
+    uri = "https://synthetic.invalid/input?opaque=" + encoded + "&part=west"
+    projected = safe_artifact({"source_path": uri, "error": "Credential echo " + encoded})
+    assert encoded not in json.dumps(projected)
+    assert "opaque=[REDACTED]&part=west" in projected["source_path"]
+    assert projected["error"] == "Credential echo [REDACTED]"
+    assert safe_identity("local?opaque=" + encoded) == "local?opaque=" + encoded

@@ -1217,6 +1217,7 @@ class CatalogManager:
             records: List of dicts with keys: pipeline_name, version_hash, description,
                      layer, schedule, tags_json
         """
+        records = safe_artifact(records)
         if not self.spark and not self.engine:
             return
 
