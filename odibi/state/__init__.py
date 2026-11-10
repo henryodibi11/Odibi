@@ -8,6 +8,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from odibi.utils.artifacts import safe_artifact
+
 logger = logging.getLogger(__name__)
 
 _SPARK_MISSING_STATE_CONDITIONS = frozenset({"PATH_NOT_FOUND"})
@@ -177,7 +179,8 @@ class LocalJSONStateBackend(StateBackend):
             os.makedirs(dir_path, exist_ok=True)
         tmp_path = self.state_path + ".tmp"
         with open(tmp_path, "w") as f:
-            json.dump(self.state, f, indent=2, default=str)
+            persisted = {**self.state, "pipelines": safe_artifact(self.state.get("pipelines", {}))}
+            json.dump(persisted, f, indent=2, default=str)
         os.replace(tmp_path, self.state_path)
 
     def load_state(self) -> Dict[str, Any]:
@@ -186,7 +189,7 @@ class LocalJSONStateBackend(StateBackend):
     def save_pipeline_run(self, pipeline_name: str, pipeline_data: Dict[str, Any]) -> None:
         if "pipelines" not in self.state:
             self.state["pipelines"] = {}
-        self.state["pipelines"][pipeline_name] = pipeline_data
+        self.state["pipelines"][pipeline_name] = safe_artifact(pipeline_data)
         self._save_to_disk()
 
     def get_last_run_info(self, pipeline_name: str, node_name: str) -> Optional[Dict[str, Any]]:
@@ -794,6 +797,7 @@ class SqlServerSystemBackend(StateBackend):
         metrics_json: str = "{}",
     ) -> None:
         """Log a run to SQL Server meta_runs table."""
+        metrics_json = safe_artifact({"metrics_json": metrics_json})["metrics_json"]
         self._ensure_tables()
         try:
             sql = f"""
@@ -866,7 +870,7 @@ class StateManager:
             "nodes": node_status,
         }
 
-        self.backend.save_pipeline_run(pipeline_name, pipeline_data)
+        self.backend.save_pipeline_run(pipeline_name, safe_artifact(pipeline_data))
         self.state = self.backend.load_state()
 
     def get_last_run_info(self, pipeline_name: str, node_name: str) -> Optional[Dict[str, Any]]:

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, List
 
 from odibi.config import AlertConfig, AlertEvent, AlertType
+from odibi.utils.artifacts import register_config_secrets, safe_artifact
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,9 @@ def send_alert(
         if not _throttler.should_send(throttle_key, throttle_minutes, max_per_hour):
             return False
 
-    payload = _build_payload(config, message, context)
+    register_config_secrets(config)
+    inputs = safe_artifact({"message": message, "context": context, "config": config})
+    payload = safe_artifact(_build_payload(config, inputs["message"], inputs["context"]))
 
     try:
         headers = {"Content-Type": "application/json"}
@@ -124,7 +127,7 @@ def send_alert(
                 return False
         return True
     except Exception as e:
-        logger.error(f"Failed to send alert: {e}")
+        logger.error("Failed to send alert: %s", safe_artifact(e))
         # Don't let a failed delivery burn the throttle budget — free the slot
         # so the next attempt within the window can still get through.
         if throttle_key:
@@ -186,8 +189,12 @@ def _build_payload(
     owner = None
 
     if project_config:
-        project_name = getattr(project_config, "project", project_name)
-        owner = getattr(project_config, "owner", None)
+        if isinstance(project_config, dict):
+            project_name = project_config.get("project", project_name)
+            owner = project_config.get("owner")
+        else:
+            project_name = getattr(project_config, "project", project_name)
+            owner = getattr(project_config, "owner", None)
 
     color = _get_event_color(event_type, status)
     icon = _get_event_icon(event_type, status)

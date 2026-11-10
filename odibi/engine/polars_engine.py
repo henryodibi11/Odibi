@@ -20,6 +20,7 @@ from odibi.connections.sql_utils import is_sql_format
 from odibi.context import Context
 from odibi.engine.base import Engine
 from odibi.enums import EngineType
+from odibi.utils.artifacts import safe_identity
 
 
 class PolarsEngine(Engine):
@@ -1521,11 +1522,11 @@ class PolarsEngine(Engine):
         if config.extracted_at:
             columns.append(pl.lit(datetime.now(timezone.utc)).alias("_extracted_at"))
         if config.source_file and is_file_source and source_path:
-            columns.append(pl.lit(source_path).alias("_source_file"))
+            columns.append(pl.lit(safe_identity(source_path)).alias("_source_file"))
         if config.source_connection and source_connection:
             columns.append(pl.lit(source_connection).alias("_source_connection"))
         if config.source_table and source_table:
-            columns.append(pl.lit(source_table).alias("_source_table"))
+            columns.append(pl.lit(safe_identity(source_table)).alias("_source_table"))
 
         if columns:
             df = df.with_columns(columns)

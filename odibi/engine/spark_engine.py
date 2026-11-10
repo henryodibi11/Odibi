@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from odibi.enums import EngineType
 from odibi.exceptions import TransformError
 from odibi.connections.sql_utils import is_sql_format
+from odibi.utils.artifacts import safe_identity
 from odibi.utils.logging_context import get_logging_context
 
 from .base import Engine
@@ -2807,12 +2808,12 @@ class SparkEngine(Engine):
             df = df.withColumn("_extracted_at", F.current_timestamp())
 
         if config.source_file and is_file_source and source_path:
-            df = df.withColumn("_source_file", F.lit(source_path))
+            df = df.withColumn("_source_file", F.lit(safe_identity(source_path)))
 
         if config.source_connection and source_connection:
             df = df.withColumn("_source_connection", F.lit(source_connection))
 
         if config.source_table and source_table:
-            df = df.withColumn("_source_table", F.lit(source_table))
+            df = df.withColumn("_source_table", F.lit(safe_identity(source_table)))
 
         return df

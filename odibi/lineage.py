@@ -1,8 +1,11 @@
+import json
 import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
+
+from odibi.utils.artifacts import register_config_secrets, safe_artifact, safe_identity
 
 try:
     from openlineage.client import OpenLineageClient
@@ -57,13 +60,14 @@ class OpenLineageAdapter:
             self.enabled = False
             return
 
+        register_config_secrets({"url": url})
         try:
             self.client = OpenLineageClient(url=url)
             self.namespace = config.namespace
             self.pipeline_run_id = None
             self.pipeline_name = None
         except Exception as e:
-            logger.warning(f"Failed to initialize OpenLineage client: {e}", exc_info=True)
+            logger.warning("Failed to initialize OpenLineage client: %s", safe_artifact(e))
             self.enabled = False
 
     def emit_pipeline_start(self, pipeline_config: PipelineConfig) -> str:
@@ -71,6 +75,7 @@ class OpenLineageAdapter:
         if not self.enabled:
             return str(uuid.uuid4())
 
+        register_config_secrets(pipeline_config)
         try:
             self.pipeline_run_id = str(uuid.uuid4())
             self.pipeline_name = pipeline_config.pipeline
@@ -96,7 +101,7 @@ class OpenLineageAdapter:
                 name=pipeline_config.pipeline,
                 facets={
                     "documentation": DocumentationJobFacet(
-                        description=pipeline_config.description or "Odibi Pipeline"
+                        description=safe_artifact(pipeline_config.description or "Odibi Pipeline")
                     )
                 },
             )
@@ -115,7 +120,7 @@ class OpenLineageAdapter:
             return self.pipeline_run_id
 
         except Exception as e:
-            logger.warning(f"Failed to emit OpenLineage pipeline start: {e}", exc_info=True)
+            logger.warning("Failed to emit OpenLineage pipeline start: %s", safe_artifact(e))
             return str(uuid.uuid4())
 
     def emit_pipeline_complete(self, pipeline_config: PipelineConfig, results: Any):
@@ -133,7 +138,7 @@ class OpenLineageAdapter:
             run_facets = {}
             if not success:
                 run_facets["errorMessage"] = ErrorMessageRunFacet(
-                    message=f"Pipeline failed with nodes: {results.failed}",
+                    message=safe_artifact(f"Pipeline failed with nodes: {results.failed}"),
                     programmingLanguage="python",
                 )
 
@@ -154,13 +159,14 @@ class OpenLineageAdapter:
             self.client.emit(event)
 
         except Exception as e:
-            logger.warning(f"Failed to emit OpenLineage pipeline complete: {e}", exc_info=True)
+            logger.warning("Failed to emit OpenLineage pipeline complete: %s", safe_artifact(e))
 
     def emit_node_start(self, config: NodeConfig, parent_run_id: str):
         """Emit node start event."""
         if not self.enabled:
             return str(uuid.uuid4())
 
+        register_config_secrets(config)
         try:
             run_id = str(uuid.uuid4())
             event_time = datetime.now(timezone.utc).isoformat()
@@ -194,16 +200,21 @@ class OpenLineageAdapter:
             job_facets = {
                 "sourceCode": SourceCodeJobFacet(
                     language="python",
-                    sourceCode=(
-                        str(config.model_dump_json())
-                        if hasattr(config, "model_dump_json")
-                        else str(config.model_dump())
+                    sourceCode=json.dumps(
+                        safe_artifact(
+                            json.loads(config.model_dump_json())
+                            if hasattr(config, "model_dump_json")
+                            else config.model_dump(),
+                            config=True,
+                        )
                     ),
                 )
             }
 
             if config.description:
-                job_facets["documentation"] = DocumentationJobFacet(description=config.description)
+                job_facets["documentation"] = DocumentationJobFacet(
+                    description=safe_artifact(config.description)
+                )
 
             run = Run(runId=run_id, facets=run_facets)
 
@@ -227,7 +238,7 @@ class OpenLineageAdapter:
             return run_id
 
         except Exception as e:
-            logger.warning(f"Failed to emit OpenLineage node start: {e}")
+            logger.warning("Failed to emit OpenLineage node start: %s", safe_artifact(e))
             return str(uuid.uuid4())
 
     def emit_node_complete(self, config: NodeConfig, result: NodeResult, run_id: str):
@@ -250,7 +261,7 @@ class OpenLineageAdapter:
             run_facets = {}
             if not result.success and result.error:
                 run_facets["errorMessage"] = ErrorMessageRunFacet(
-                    message=str(result.error), programmingLanguage="python"
+                    message=safe_artifact(str(result.error)), programmingLanguage="python"
                 )
 
             run = Run(runId=run_id, facets=run_facets)
@@ -270,7 +281,7 @@ class OpenLineageAdapter:
             self.client.emit(event)
 
         except Exception as e:
-            logger.warning(f"Failed to emit OpenLineage node complete: {e}")
+            logger.warning("Failed to emit OpenLineage node complete: %s", safe_artifact(e))
 
     def _create_dataset_from_config(
         self, config_op: Any, is_input: bool, schema: Any = None
@@ -279,7 +290,7 @@ class OpenLineageAdapter:
         # Best effort naming
         try:
             conn_name = config_op.connection
-            name = config_op.path or config_op.table or "unknown"
+            name = safe_identity(config_op.path or config_op.table or "unknown")
 
             # Namespace strategy: connection name usually maps to a storage account/container
             namespace = f"{self.namespace}.{conn_name}"

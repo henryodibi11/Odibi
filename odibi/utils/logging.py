@@ -15,6 +15,8 @@ import logging
 import sys
 from datetime import datetime, timezone
 
+from odibi.utils.artifacts import register_secret, safe_artifact
+
 try:
     from rich.console import Console
     from rich.logging import RichHandler
@@ -120,6 +122,7 @@ class StructuredLogger:
         """
         if secret and isinstance(secret, str) and len(secret.strip()) > 0:
             self._secrets.add(secret)
+            register_secret(secret)
 
     def _redact(self, text: str) -> str:
         """Redact registered secrets from text.
@@ -166,16 +169,9 @@ class StructuredLogger:
         if level_val < self.level:
             return
 
-        message = self._redact(str(message))
-
-        redacted_kwargs = {}
-        for k, v in kwargs.items():
-            if isinstance(v, str):
-                redacted_kwargs[k] = self._redact(v)
-            elif v is None:
-                continue
-            else:
-                redacted_kwargs[k] = v
+        payload = safe_artifact({"message": str(message), **kwargs}, secrets=self._secrets)
+        message = payload.pop("message")
+        redacted_kwargs = {k: v for k, v in payload.items() if v is not None}
 
         if self.structured:
             log_entry = {

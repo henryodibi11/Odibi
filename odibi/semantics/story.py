@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from odibi.semantics.metrics import SemanticLayerConfig
 from odibi.semantics.views import ViewExecutionResult, ViewGenerator
+from odibi.utils.artifacts import safe_artifact
 from odibi.utils.logging_context import get_logging_context
 
 
@@ -177,6 +178,7 @@ class SemanticStoryGenerator:
             sql_files_saved=execution_result.sql_files_saved,
             graph_data=graph_data,
         )
+        self._metadata = safe_artifact(self._metadata)
 
         ctx.info(
             "Semantic layer execution complete",
@@ -309,14 +311,14 @@ class SemanticStoryGenerator:
         """Render story as JSON string."""
         if not self._metadata:
             raise ValueError("No story metadata. Call execute_with_story first.")
-        return json.dumps(self._metadata.to_dict(), indent=2)
+        return json.dumps(safe_artifact(self._metadata).to_dict(), indent=2)
 
     def render_html(self) -> str:
         """Render story as HTML string."""
         if not self._metadata:
             raise ValueError("No story metadata. Call execute_with_story first.")
 
-        meta = self._metadata
+        meta = safe_artifact(self._metadata)
 
         status_class = "success" if meta.views_failed == 0 else "warning"
         status_text = "Success" if meta.views_failed == 0 else "Partial Failure"
