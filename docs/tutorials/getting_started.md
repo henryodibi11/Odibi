@@ -31,7 +31,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install odibi
 ```
 
-*Note: If you plan to use Spark or Azure later, you can install `pip install "odibi[spark,azure]"`, but for this tutorial, the base package is enough.*
+*For this local tutorial, base Odibi is enough. Before adding Spark or cloud integrations, choose the appropriate environment and extras in the [installation guide](../guides/installation.md); Databricks Connect and managed Databricks should not use the standalone Spark extras.*
 
 ---
 

@@ -274,7 +274,7 @@
       "path": "docs/guides/ai-assistant-setup.md",
       "title": "AI Assistant Setup Guide",
       "section": "guides",
-      "summary": "This guide explains how to set up AI coding assistants (Continue, Cline, Amp) to work with odibi using MCP (Model Context Protocol) servers."
+      "summary": "This guide explains how to set up AI coding assistants (OpenCode, Continue, Cline, Amp) to work with odibi using MCP (Model Context Protocol) servers."
     },
     {
       "path": "docs/guides/api_data_sources.md",
@@ -370,7 +370,7 @@
       "path": "docs/guides/installation.md",
       "title": "Installation Guide",
       "section": "guides",
-      "summary": "This guide covers all installation options for odibi, from minimal setups to full-featured installations."
+      "summary": "Choose an installation for the environment that will run Odibi. A local Python process, a Databricks Connect client and a managed Databricks runtime need different Spark dependencies; `[all]` is not a"
     },
     {
       "path": "docs/guides/local_spark_download.md",

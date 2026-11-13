@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Environment-specific installation guidance** — Separate local processing,
+  standalone Spark, Databricks Connect and managed Databricks setup. Generated
+  starter Docker/CI installs use base Odibi instead of `[all]`; agent onboarding
+  and packaged documentation point to the appropriate environment requirements.
+
 ## [3.17.0] — 2026-11-13
 
 ### Added

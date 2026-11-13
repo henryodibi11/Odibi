@@ -129,8 +129,8 @@ WORKDIR /app
 # Install system dependencies if needed (e.g., for pyodbc)
 # RUN apt-get update && apt-get install -y unixodbc-dev
 
-# Install Odibi
-RUN pip install odibi[all]
+# Local Pandas starter; add only the extras required by your pipeline.
+RUN python -m pip install odibi
 
 # Copy project files
 COPY . /app
@@ -164,7 +164,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install odibi[all] pytest
+        python -m pip install odibi pytest
 
     - name: Check Health (Doctor)
       run: odibi doctor
@@ -246,6 +246,15 @@ audit:
         readme_content = f"""# {project_name}
 
 A data engineering project built with [Odibi](https://github.com/henryodibi11/Odibi).
+
+## Installation
+
+The generated Dockerfile and CI use base Odibi for local Pandas pipelines. Add only
+the extras your pipeline needs; `[all]` is not a universal environment setup.
+See the [installation guide](https://henryodibi11.github.io/Odibi/guides/installation/)
+to choose local processing, standalone Spark, Databricks Connect, or managed Databricks.
+For Connect, use a runtime-matched environment without Odibi's `[spark]`, `[all]`
+or `[dev]` extras. Inside Databricks, reuse its provided Spark runtime.
 
 ## Quick Start (Golden Path)
 

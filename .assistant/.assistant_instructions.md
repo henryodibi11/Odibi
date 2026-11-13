@@ -14,6 +14,10 @@ strict models that hard-error on unknown/misspelled keys, so guessing field name
 2. Then load the step-specific skill when you reach it (`pipeline-yaml-authoring`,
    `add-a-connection`, `validation-workflow`, `engine-parity`, `databricks-notebook-protocol`).
 
+## Setting up a consumer repository
+
+Choose dependencies for the intended execution environment before installing: local Pandas/Polars, standalone Spark, a Databricks Connect client, or managed Databricks. Use `get_doc("docs/guides/installation.md")` for that choice; `[all]` is not a universal default. For Connect, also load `docs/setup_databricks_connect.md` and, when saving snapshots locally, `docs/guides/local_spark_download.md`. Inspect the existing interpreter and packages before proposing installation changes; preserve working environments and credentials. Framework development extras are not required to make a consumer repo Odibi-ready.
+
 ## The canonical workflow
 
 `discover → profile source → author YAML → validate → test/run → inspect`
