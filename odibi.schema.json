@@ -1134,6 +1134,23 @@
       "title": "LocalConnectionConfig",
       "type": "object"
     },
+    "LocalDownloadConfig": {
+      "additionalProperties": false,
+      "description": "Download a bounded Spark result to the client's local Delta storage.\n\nSpark still performs upstream transformations remotely. The complete result\nmust fit in client memory; max_rows rejects oversized results without writing.\nRequires a Spark client with toArrow() and the optional Polars dependency.",
+      "properties": {
+        "max_rows": {
+          "description": "Maximum rows to download, never truncate",
+          "exclusiveMinimum": 0,
+          "title": "Max Rows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_rows"
+      ],
+      "title": "LocalDownloadConfig",
+      "type": "object"
+    },
     "LogLevel": {
       "description": "Logging levels.",
       "enum": [
@@ -7133,6 +7150,18 @@
           "description": "Format-specific options",
           "title": "Options",
           "type": "object"
+        },
+        "download": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalDownloadConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Explicit Spark-to-client local Delta download; requires max_rows and Polars"
         },
         "auto_optimize": {
           "anyOf": [

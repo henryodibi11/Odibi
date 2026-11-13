@@ -18,6 +18,8 @@ For comprehensive AI context, read this file first:
 - AGENTS.md - Agent-specific instructions and commands
 - docs/ODIBI_DEEP_CONTEXT.md - Complete framework reference
 - odibi/config.py - All configuration classes (source of truth)
+- docs/setup_databricks_connect.md - OAuth M2M remote Spark compute, separate from Unity Catalog storage
+- docs/guides/local_spark_download.md - Explicit bounded write.download from Spark to client-local Delta using Polars
 
 ## Key Concepts
 

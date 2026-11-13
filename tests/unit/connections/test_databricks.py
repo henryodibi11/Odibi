@@ -1,5 +1,6 @@
 """Remote session wiring, tested offline without Databricks credentials."""
 
+import os
 import sys
 import traceback
 from types import ModuleType, SimpleNamespace
@@ -148,3 +149,26 @@ def test_manager_does_not_fall_back_to_local_catalog(sdk):
     config.lineage = None
     with pytest.raises(ConnectionError, match="session setup failed"):
         PipelineManager(config, {"remote": DatabricksConnection(**settings())})
+
+
+def test_explicit_credentials_ignore_missing_ambient_profile(tmp_path, monkeypatch):
+    """Exercise real SDK config loading without network or an actual session."""
+    core = pytest.importorskip("databricks.sdk.core")
+    profile_file = tmp_path / "databrickscfg"
+    profile_file.write_text("[DEFAULT]\nhost = https://unrelated.example.com\n")
+    monkeypatch.setenv("DATABRICKS_CONFIG_FILE", str(profile_file))
+    monkeypatch.setenv("DATABRICKS_CONFIG_PROFILE", "missing-profile")
+    # Only suppress network/auth boundaries, not environment or file loading.
+    monkeypatch.setattr(core.Config, "_resolve_host_metadata", lambda self: None, raising=False)
+    monkeypatch.setattr(core.Config, "init_auth", lambda self: None)
+    connect = ModuleType("databricks.connect")
+    connect.DatabricksSession = MagicMock()
+    monkeypatch.setitem(sys.modules, "databricks.connect", connect)
+    builder = connect.DatabricksSession.builder
+    session = builder.sdkConfig.return_value.getOrCreate.return_value
+    assert DatabricksConnection(**settings()).get_spark_session() is session
+    config = builder.sdkConfig.call_args.args[0]
+    assert config.host == "https://workspace.example.com"
+    assert config.client_id == "test-principal"
+    assert config.auth_type == "oauth-m2m"
+    assert os.environ["DATABRICKS_CONFIG_PROFILE"] == "missing-profile"

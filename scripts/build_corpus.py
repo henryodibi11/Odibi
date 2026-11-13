@@ -39,6 +39,7 @@ DOC_TOP_FILES = [
     "golden_path.md",
     "troubleshooting.md",
     "index.md",
+    "setup_databricks_connect.md",
 ]
 
 

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.0] — 2026-11-13
+
+### Added
+
+- **Client-local Delta snapshots from Spark** — Explicit `write.download.max_rows`
+  collects a bounded Spark result through Arrow and reuses the local Polars Delta
+  writer. Supports overwrite, append, partitioning and schema evolution while
+  retaining local commit/row metadata. Oversized results fail before modifying the
+  destination; ordinary Spark writes are unchanged. Requires Polars and a Spark
+  client exposing `toArrow()`. This is an in-memory snapshot transfer, not a batched
+  full-table replication service. See [the guide](docs/guides/local_spark_download.md).
+
+### Fixed
+
+- **Polars Delta rereads** — Use the lazy Arrow dataset scanner for compatibility
+  with Odibi's supported delta-rs versions, preserving local snapshot rereads,
+  partitioned tables and version selection.
+- **Explicit Databricks credentials take precedence** — An unrelated ambient
+  `DATABRICKS_CONFIG_PROFILE` no longer blocks YAML-configured OAuth M2M session
+  setup when that profile is missing. Shell/profile settings remain unchanged.
+- **Databricks discovery for humans and AI** — Expanded compute/UC/storage setup
+  guidance, bundled the Databricks setup page and snapshot guide into the MCP corpus,
+  exposed Databricks connection fields through MCP schemas/explanations, and linked
+  both capabilities from human navigation and priority documentation.
+
 ## [3.16.0] — 2026-11-13
 
 ### Added

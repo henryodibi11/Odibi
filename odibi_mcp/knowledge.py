@@ -118,6 +118,8 @@ pm.run("pipeline_name")""",
         "docs/troubleshooting.md",  # Common issues
         "docs/guides/best_practices.md",  # Best practices
         "docs/golden_path.md",  # Recommended workflow
+        "docs/setup_databricks_connect.md",  # Remote compute authentication and setup
+        "docs/guides/local_spark_download.md",  # Explicit client-local Delta snapshots
         ".clinerules",  # AI rules
         "AGENTS.md",  # Agent instructions
     ]
@@ -574,6 +576,7 @@ pm.run("pipeline_name")""",
         # -- connection types (returned as a group) --------------------------------
         connection_models: dict[str, type] = {
             "local": cfg.LocalConnectionConfig,
+            "databricks": cfg.DatabricksConnectionConfig,
             "azure_blob": cfg.AzureBlobConnectionConfig,
             "delta": cfg.DeltaConnectionConfig,
             "unity_catalog": cfg.UnityCatalogConnectionConfig,
@@ -2035,6 +2038,7 @@ pipelines:
 
         _map: dict[str, type] = {
             "local": cfg.LocalConnectionConfig,
+            "databricks": cfg.DatabricksConnectionConfig,
             "azure_blob": cfg.AzureBlobConnectionConfig,
             "azure_adls": cfg.AzureBlobConnectionConfig,
             "delta": cfg.DeltaConnectionConfig,

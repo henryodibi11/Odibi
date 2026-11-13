@@ -118,7 +118,16 @@ def test_get_schema_connections_returns_all_types():
     res = KB.get_schema("connections")
     assert res["section"] == "connections"
     assert "schemas" in res
-    expected = {"local", "azure_blob", "delta", "unity_catalog", "sql_server", "http", "custom"}
+    expected = {
+        "local",
+        "databricks",
+        "azure_blob",
+        "delta",
+        "unity_catalog",
+        "sql_server",
+        "http",
+        "custom",
+    }
     assert set(res["schemas"].keys()) == expected
     for name, schema in res["schemas"].items():
         assert schema.get("title"), f"connection {name} has no title"
@@ -142,6 +151,23 @@ def test_search_and_get_doc():
     assert hits, "search_docs found nothing for scd2"
     doc = KB.get_doc(hits[0]["path"])
     assert "content" in doc and doc["content"]
+
+
+@pytest.mark.parametrize("root", [REPO, REPO / "odibi_mcp" / "_corpus"])
+def test_remote_compute_and_download_docs_discoverable(root):
+    knowledge = OdibiKnowledge(odibi_root=root)
+    docs = {
+        "docs/setup_databricks_connect.md": "OAuth",
+        "docs/guides/local_spark_download.md": "write.download",
+    }
+    listed = {item.get("path") for item in knowledge.list_docs()}
+    for path, term in docs.items():
+        assert path in listed
+        assert term in knowledge.get_doc(path)["content"]
+        assert path in {item["path"] for item in knowledge.search_docs(term)}
+    schema = knowledge.get_schema("write")["schema"]
+    assert "download" in schema["properties"]
+    assert schema["$defs"]["LocalDownloadConfig"]["required"] == ["max_rows"]
 
 
 def test_list_examples_nonempty():

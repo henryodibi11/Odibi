@@ -405,7 +405,12 @@ wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && py
 
 - Install a runtime/Python-matched `databricks-connect` separately from `odibi[spark]`, `[all]` and `[dev]`; those extras install conflicting PySpark packages. See `docs/setup_databricks_connect.md` for compatible environment examples.
 - SDK `Config` fills omitted compute targets from environment/profile defaults. Remove the unused target with `config.as_dict().pop(...)` after construction; assigning `None` stringifies it to `"None"` rather than clearing it.
+- Explicit OAuth configuration must pass `profile=""` to SDK `Config`; omitting it (or passing `None`) lets a missing ambient `DATABRICKS_CONFIG_PROFILE` block setup before session creation. Test real SDK file/env loading with only network/auth boundaries stubbed; leave the caller's environment unchanged.
 - `tests/unit/connections/test_databricks.py` covers typed YAML/env loading, lazy factories, session reuse/precedence, invalid targets and sanitized setup failures without remote credentials. Keep remote session tests offline unless workspace access is explicitly authorized.
+- `write.download` is an explicit Arrow-to-Polars client-local Delta handoff; a local connection alone does not relocate Spark writes. Keep node restore and post-write Spark diagnostics away from downloaded snapshots. `tests/unit/engine/test_local_download.py` covers values/schema, bounds, write modes and YAML-node integration.
+- Polars 1.36's native `scan_delta` expects an iterable schema unavailable in delta-rs 0.25.5. Use public `scan_delta(..., use_pyarrow=True)` for the supported delta-rs range; verify lazy rereads, partitions, empty tables and `versionAsOf`, not only successful writes.
+- Check the actual Connect client for `toArrow()`: Databricks Connect 15.4.10 exposes it even though upstream Spark introduced it in 4.0. Use public collection APIs, not private transport internals. Decimal values can survive pandas conversion while declared precision changes; compare schemas as well as rows.
+- New top-level docs must be included in `scripts/build_corpus.py` to ship through installed MCP. Regenerate the corpus and test discovery with both repository and packaged roots; human MkDocs navigation alone does not establish MCP availability.
 
 ### Safe Diagnostics Are Not Execution Inputs
 
