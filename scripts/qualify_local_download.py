@@ -38,13 +38,26 @@ def main():
         # imports, custom functions, storage validation or schema creation from YAML.
         with Path(args.config).open(encoding="utf-8") as handle:
             raw = yaml.safe_load(handle)
-        compute = [v for v in raw["connections"].values() if v.get("type") == "databricks"]
+        if not isinstance(raw, dict):
+            raise ValueError("Expected a connection mapping")
+        if raw.get("type") == "databricks":
+            candidates = [raw]
+        else:
+            mapping = raw.get("connections", raw)
+            if not isinstance(mapping, dict):
+                raise ValueError("Expected named connections")
+            candidates = mapping.values()
+        compute = [
+            value
+            for value in candidates
+            if isinstance(value, dict) and value.get("type") == "databricks"
+        ]
         if len(compute) != 1:
             raise ValueError("Expected exactly one Databricks connection")
         values = dict(compute[0])
         values.pop("type")
         connection = DatabricksConnection(**values)
-        del raw, compute, values
+        del raw, candidates, compute, values
         stage = "session"
         engine = SparkEngine(connections={"compute": connection})
         writer = PolarsEngine()  # Fail before queries if Polars is missing.
