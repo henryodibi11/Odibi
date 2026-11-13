@@ -4205,6 +4205,17 @@ class StreamingWriteConfig(BaseModel):
     )
 
 
+class LocalDownloadConfig(StrictModel):
+    """Download a bounded Spark result to the client's local Delta storage.
+
+    Spark still performs upstream transformations remotely. The complete result
+    must fit in client memory; max_rows rejects oversized results without writing.
+    Requires a Spark client with toArrow() and the optional Polars dependency.
+    """
+
+    max_rows: int = Field(gt=0, strict=True, description="Maximum rows to download, never truncate")
+
+
 class WriteConfig(StrictModel):
     """
     Configuration for writing data from a node.
@@ -4298,6 +4309,10 @@ class WriteConfig(StrictModel):
         ),
     )
     options: Dict[str, Any] = Field(default_factory=dict, description="Format-specific options")
+    download: Optional[LocalDownloadConfig] = Field(
+        default=None,
+        description="Explicit Spark-to-client local Delta download; requires max_rows and Polars",
+    )
     auto_optimize: Optional[Union[bool, AutoOptimizeConfig]] = Field(
         default=None,
         description="Auto-run OPTIMIZE and VACUUM after write (Delta only)",
@@ -4364,6 +4379,39 @@ class WriteConfig(StrictModel):
             raise ValueError("Either 'table' or 'path' must be provided for write config")
         if self.table and self.path:
             raise ValueError("WriteConfig: 'table' and 'path' are mutually exclusive.")
+        return self
+
+    @model_validator(mode="after")
+    def check_download(self):
+        if self.download is not None:
+            if (
+                self.format != "delta"
+                or not self.path
+                or self.mode
+                not in (
+                    WriteMode.OVERWRITE,
+                    WriteMode.APPEND,
+                )
+            ):
+                raise ValueError(
+                    "download requires Delta path output with overwrite or append mode"
+                )
+            if (
+                self.options
+                or self.register_table
+                or self.auto_optimize
+                or self.zorder_by
+                or self.table_properties
+                or self.streaming
+                or self.skip_if_unchanged
+                or self.first_run_query
+                or self.merge_options
+                or self.overwrite_options
+            ):
+                raise ValueError(
+                    "download supports partition_by, merge_schema, overwrite_schema and add_metadata, "
+                    "not options, remote registration, maintenance, streaming or stateful writes"
+                )
         return self
 
     @model_validator(mode="after")
@@ -4992,6 +5040,17 @@ class NodeConfig(StrictModel):
             raise ValueError(
                 f"Node '{self.name}' must have at least one of: read, inputs, transform, write, transformer"
             )
+        return self
+
+    @model_validator(mode="after")
+    def check_download_node(self):
+        if self.write and self.write.download is not None:
+            if self.schema_policy or self.materialized or (self.read and self.read.incremental):
+                raise ValueError(
+                    "write.download does not support schema_policy, materialized or incremental nodes"
+                )
+            if self.streaming or (self.read and self.read.streaming):
+                raise ValueError("write.download supports batch reads only")
         return self
 
     @model_validator(mode="after")

@@ -153,9 +153,13 @@ connections:
     base_url: "https://api.example.com"
     auth:
       mode: api_key
+      api_key: "${MY_API_KEY}"
       header_name: "X-API-Key"                 # Default is Authorization
-      value_template: "${MY_API_KEY}"          # Use environment variable
+      value_template: "{token}"                # Raw key; default is "Bearer {token}"
 ```
+
+`value_template` must contain exactly one literal `{token}`. Omit `header_name` and
+`value_template` for the default `Authorization: Bearer <key>` behavior.
 
 #### Bearer Token
 ```yaml

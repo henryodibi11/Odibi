@@ -87,14 +87,18 @@ connections:
     base_url: "https://api.fda.gov"
 ```
 
-### API Key in Header (CORRECT METHOD)
+### API Key in Header
 ```yaml
 connections:
   api_with_key:
     type: http
     base_url: "https://api.example.com"
+    auth:
+      mode: api_key
+      api_key: "${MY_API_KEY}"
+      header_name: X-API-Key
+      value_template: "{token}"
     headers:
-      X-API-Key: "${MY_API_KEY}"  # Put API key in headers
       User-Agent: "odibi-pipeline/1.0"
 ```
 
@@ -327,14 +331,16 @@ pipelines:
 
 ## Common Mistakes to Avoid
 
-❌ **Wrong: API key auth with mode**
+✅ **API key auth mode (recommended)**
 ```yaml
 auth:
   mode: api_key
-  api_key: "${MY_API_KEY}"  # This won't work!
+  api_key: "${MY_API_KEY}"
+  header_name: X-API-Key
+  value_template: "{token}"
 ```
 
-✅ **Correct: API key in headers**
+✅ **Manual headers remain supported**
 ```yaml
 headers:
   X-API-Key: "${MY_API_KEY}"

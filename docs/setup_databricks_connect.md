@@ -6,6 +6,12 @@ Your Python orchestration runs locally; Spark DataFrame/SQL work runs on Databri
 This is separate from ADLS service-principal authentication and from the
 `unity_catalog` connection, which resolves table names but does not log in.
 
+Use this connection to explore remote data declaratively and exercise custom
+PySpark transformations from your IDE. Python imports/orchestration run on the
+client; cluster-installed Python libraries are not automatically installed locally.
+For bounded laptop-local Delta snapshots, see
+[download remote Spark results](guides/local_spark_download.md).
+
 ## 1. Create a dedicated environment
 
 Choose Python and Databricks Connect to match your compute. For example, for a
@@ -129,6 +135,36 @@ Session setup errors never fall back to local Spark or a local system catalog.
 Errors deliberately omit raw SDK exception text because it can contain secrets.
 Check permissions, network access, runtime/Python compatibility and credentials
 without printing secrets or enabling unsafe SDK HTTP debug logging.
+
+The SDK also reads ambient configuration. If `DATABRICKS_CONFIG_PROFILE` names a
+missing profile, even explicit credentials can fail during SDK configuration.
+Remove that unused variable from the current test shell or select a valid profile;
+do not print the configuration file or credentials to diagnose it. Python 3.14 is
+not an appropriate replacement for the runtime-matched interpreter above: Odibi's
+constrained PyArrow versions may lack wheels and fall back to an unsupported build.
+
+## Unity Catalog tables, volumes and writes
+
+Use `type: unity_catalog` for addressing data, alongside the `databricks` compute
+connection. For reads, use a fully qualified table name, for example
+`read: {connection: warehouse, format: delta, table: main.development.orders}`.
+For a volume, use `path: /Volumes/main/development/incoming/orders.parquet` with
+`format: parquet`. These paths are read by remote Spark, not local Python `open()`.
+Data access still requires the service principal's UC table/volume permissions.
+
+Unity Catalog writes are supported through Spark `saveAsTable`; ADLS writes use
+the configured remote storage path when compute access allows it. These writes
+execute remotely. To save a result on the client instead, explicitly configure
+[`write.download`](guides/local_spark_download.md). Spark/UC authentication does
+not grant storage access and does not make an arbitrary pipeline read-only.
+
+## AI and MCP discovery
+
+The setup page is bundled in the installed MCP documentation corpus. Use
+`odibi("search_docs", query="Databricks Connect")`,
+`odibi("get_doc", doc_path="docs/setup_databricks_connect.md")`, or `list_docs`.
+For the local snapshot capability search for `write.download` and retrieve
+`docs/guides/local_spark_download.md`.
 
 This feature covers **session setup**, not universal Spark Connect parity for
 every Odibi transformer, Delta maintenance API or JVM-dependent operation. Check

@@ -2339,6 +2339,9 @@ class NodeExecutor:
         if connection is None:
             raise ValueError(f"Connection '{write_config.connection}' not found.")
 
+        if write_config.download is not None and self.engine.name != "spark":
+            raise ValueError("write.download requires engine: spark")
+
         # For Delta writes, defer row count to avoid double DAG execution.
         # We'll extract row count from Delta commit metadata after write.
         # For non-Delta formats, count upfront as before.
@@ -2387,6 +2390,9 @@ class NodeExecutor:
             write_options = write_config.options.copy() if write_config.options else {}
             deep_diag = write_options.pop("deep_diagnostics", False)
             diff_keys = write_options.pop("diff_keys", None)
+
+            if write_config.download is not None:
+                write_options["local_download"] = write_config.download.model_dump()
 
             # Extract partition_by from WriteConfig and add to write_options
             if write_config.partition_by:
@@ -2501,8 +2507,10 @@ class NodeExecutor:
 
             if write_config.format == "delta":
                 merged_props = {}
-                if self.performance_config and hasattr(
-                    self.performance_config, "delta_table_properties"
+                if (
+                    write_config.download is None
+                    and self.performance_config
+                    and hasattr(self.performance_config, "delta_table_properties")
                 ):
                     merged_props.update(self.performance_config.delta_table_properties or {})
                 if write_config.table_properties:
@@ -2613,9 +2621,10 @@ class NodeExecutor:
 
             if delta_info:
                 self._delta_write_info = delta_info
-                self._calculate_delta_diagnostics(
-                    delta_info, connection, write_config, deep_diag, diff_keys
-                )
+                if write_config.download is None:
+                    self._calculate_delta_diagnostics(
+                        delta_info, connection, write_config, deep_diag, diff_keys
+                    )
 
             # Store row count from write phase to avoid redundant counting in metadata
             if self._delta_write_info is None:
@@ -3772,6 +3781,9 @@ class Node:
             return False
 
         write_config = self.config.write
+        if write_config.download is not None:
+            # A client-local snapshot cannot restore a remote Spark dependency.
+            return False
         connection = self.connections.get(write_config.connection)
 
         if connection is None:

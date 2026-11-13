@@ -1348,6 +1348,7 @@ write:
 | **overwrite_schema** | bool | No | `False` | Allow schema overwrite on mode=overwrite (overwriteSchema option in Delta). Use when the incoming schema differs from the existing table schema. |
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
+| **download** | Optional[[LocalDownloadConfig](#localdownloadconfig)] | No | - | Explicit Spark-to-client local Delta download; requires max_rows and Polars |
 | **auto_optimize** | bool \| [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
 | **add_metadata** | bool \| [WriteMetadataConfig](#writemetadataconfig) | No | - | Add metadata columns for Bronze layer lineage. Set to `true` to add all applicable columns, or provide a WriteMetadataConfig for selective columns. Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources). |
 | **skip_if_unchanged** | bool | No | `False` | Skip write if DataFrame content is identical to previous write. Computes SHA256 hash of entire DataFrame and compares to stored hash in Delta table metadata. Useful for snapshot tables without timestamps to avoid redundant appends. Only supported for Delta format. |
@@ -1357,6 +1358,20 @@ write:
 | **merge_keys** | Optional[List[str]] | No | - | Key columns for SQL Server MERGE operations. Required when mode='merge'. These columns form the ON clause of the MERGE statement. |
 | **merge_options** | Optional[[SqlServerMergeOptions](#sqlservermergeoptions)] | No | - | Options for SQL Server MERGE operations (conditions, staging, audit cols) |
 | **overwrite_options** | Optional[[SqlServerOverwriteOptions](#sqlserveroverwriteoptions)] | No | - | Options for SQL Server overwrite operations (strategy, audit cols) |
+
+---
+### `LocalDownloadConfig`
+> *Used in: [WriteConfig](#writeconfig)*
+
+Download a bounded Spark result to the client's local Delta storage.
+
+Spark still performs upstream transformations remotely. The complete result
+must fit in client memory; max_rows rejects oversized results without writing.
+Requires a Spark client with toArrow() and the optional Polars dependency.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **max_rows** | int | Yes | - | Maximum rows to download, never truncate |
 
 ---
 ### `WriteMetadataConfig`

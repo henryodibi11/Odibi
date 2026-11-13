@@ -43,7 +43,7 @@ alerts:
 | --- | --- | --- | --- | --- |
 | **project** | str | Yes | - | Project name |
 | **engine** | EngineType | No | `EngineType.PANDAS` | Execution engine |
-| **connections** | Dict[str, [ConnectionConfig](#connections)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [UnityCatalogConnectionConfig](#unitycatalogconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig), [CustomConnectionConfig](#customconnectionconfig) |
+| **connections** | Dict[str, [ConnectionConfig](#connections)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [UnityCatalogConnectionConfig](#unitycatalogconnectionconfig), [DatabricksConnectionConfig](#databricksconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig), [CustomConnectionConfig](#customconnectionconfig) |
 | **pipelines** | List[[PipelineConfig](#pipelineconfig)] | Yes | - | Pipeline definitions (at least one required) |
 | **story** | [StoryConfig](#storyconfig) | Yes | - | Story generation configuration (mandatory) |
 | **system** | [SystemConfig](#systemconfig) | Yes | - | System Catalog configuration (mandatory) |
@@ -630,6 +630,26 @@ adls_msi:
 | **account_name** | str | Yes | - | - |
 | **container** | str | Yes | - | - |
 | **auth** | AzureBlobAuthConfig | No | `PydanticUndefined` | Authentication configuration. Choose one mode: 'account_key' (storage key), 'sas' (SAS token), 'connection_string', 'key_vault' (Azure Key Vault), or 'aad_msi' (Managed Identity, default). For production, prefer key_vault or aad_msi to avoid storing secrets in config.<br>**Options:** [AzureBlobKeyVaultAuth](#azureblobkeyvaultauth), [AzureBlobAccountKeyAuth](#azureblobaccountkeyauth), [AzureBlobSasAuth](#azureblobsasauth), [AzureBlobConnectionStringAuth](#azureblobconnectionstringauth), [AzureBlobMsiAuth](#azureblobmsiauth) |
+
+---
+### `DatabricksConnectionConfig`
+> *Used in: [ProjectConfig](#projectconfig)*
+
+Remote Spark session using Databricks Connect and OAuth M2M.
+
+Use environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.
+Choose exactly one compute target: ``cluster_id`` or ``serverless: true``.
+Install a runtime-matched databricks-connect separately, not odibi[spark].
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['databricks'] | No | `ConnectionType.DATABRICKS` | - |
+| **validation_mode** | ValidationMode | No | `ValidationMode.LAZY` | - |
+| **host** | str | Yes | - | Workspace HTTPS URL, not an account URL |
+| **client_id** | str | Yes | - | Databricks service principal application ID |
+| **client_secret** | SecretStr | Yes | - | Databricks OAuth secret (not an Azure secret) |
+| **cluster_id** | Optional[str] | No | - | - |
+| **serverless** | bool | No | `False` | - |
 
 ---
 ### `SQLServerConnectionConfig`
@@ -1328,6 +1348,7 @@ write:
 | **overwrite_schema** | bool | No | `False` | Allow schema overwrite on mode=overwrite (overwriteSchema option in Delta). Use when the incoming schema differs from the existing table schema. |
 | **first_run_query** | Optional[str] | No | - | SQL query for full-load on first run (High Water Mark pattern). If set, uses this query when target table doesn't exist, then switches to incremental. Only applies to SQL reads. |
 | **options** | Dict[str, Any] | No | `PydanticUndefined` | Format-specific options |
+| **download** | Optional[[LocalDownloadConfig](#localdownloadconfig)] | No | - | Explicit Spark-to-client local Delta download; requires max_rows and Polars |
 | **auto_optimize** | bool \| [AutoOptimizeConfig](#autooptimizeconfig) | No | - | Auto-run OPTIMIZE and VACUUM after write (Delta only) |
 | **add_metadata** | bool \| [WriteMetadataConfig](#writemetadataconfig) | No | - | Add metadata columns for Bronze layer lineage. Set to `true` to add all applicable columns, or provide a WriteMetadataConfig for selective columns. Columns: _extracted_at, _source_file (file sources), _source_connection, _source_table (SQL sources). |
 | **skip_if_unchanged** | bool | No | `False` | Skip write if DataFrame content is identical to previous write. Computes SHA256 hash of entire DataFrame and compares to stored hash in Delta table metadata. Useful for snapshot tables without timestamps to avoid redundant appends. Only supported for Delta format. |
@@ -1337,6 +1358,20 @@ write:
 | **merge_keys** | Optional[List[str]] | No | - | Key columns for SQL Server MERGE operations. Required when mode='merge'. These columns form the ON clause of the MERGE statement. |
 | **merge_options** | Optional[[SqlServerMergeOptions](#sqlservermergeoptions)] | No | - | Options for SQL Server MERGE operations (conditions, staging, audit cols) |
 | **overwrite_options** | Optional[[SqlServerOverwriteOptions](#sqlserveroverwriteoptions)] | No | - | Options for SQL Server overwrite operations (strategy, audit cols) |
+
+---
+### `LocalDownloadConfig`
+> *Used in: [WriteConfig](#writeconfig)*
+
+Download a bounded Spark result to the client's local Delta storage.
+
+Spark still performs upstream transformations remotely. The complete result
+must fit in client memory; max_rows rejects oversized results without writing.
+Requires a Spark client with toArrow() and the optional Polars dependency.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **max_rows** | int | Yes | - | Maximum rows to download, never truncate |
 
 ---
 ### `WriteMetadataConfig`
@@ -3737,6 +3772,7 @@ On Pandas, writes directly to the target file (parquet or CSV).
 | **use_delta_merge** | bool | No | `True` | Use Delta Lake MERGE for Spark engine (faster for large tables). Falls back to full overwrite if target is not Delta format. |
 | **register_table** | Optional[str] | No | - | Register as Unity Catalog/metastore table after write (e.g., 'silver.dim_customers'). Spark only. |
 | **vacuum_hours** | Optional[int] | No | - | Hours to retain for VACUUM after SCD2 write (Spark only). Set to 168 for 7 days. None disables VACUUM. |
+| **target_format** | Optional[str] | No | - | Declared write format of the node (delta, parquet, ...). When delta, the SCD2 history is persisted as Delta instead of parquet so the pattern and the node write agree on the target format. |
 
 ---
 ### 📂 Manufacturing & IoT

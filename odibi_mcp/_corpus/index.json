@@ -373,6 +373,12 @@
       "summary": "This guide covers all installation options for odibi, from minimal setups to full-featured installations."
     },
     {
+      "path": "docs/guides/local_spark_download.md",
+      "title": "Download remote Spark results to local Delta",
+      "section": "guides",
+      "summary": "Use `write.download` to run Spark transformations on Databricks and save a bounded"
+    },
+    {
       "path": "docs/guides/mcp_guide.md",
       "title": "Odibi MCP Universal Gateway",
       "section": "guides",
@@ -713,6 +719,12 @@
       "title": "Odibi Configuration Reference",
       "section": "reference",
       "summary": "This manual details the YAML configuration schema for Odibi projects."
+    },
+    {
+      "path": "docs/setup_databricks_connect.md",
+      "title": "Local development with remote Databricks Spark",
+      "section": "docs",
+      "summary": "Odibi can create a remote Spark session using **Databricks Connect** and a"
     },
     {
       "path": "docs/simulation/advanced_features.md",
@@ -1067,6 +1079,12 @@
       "title": "Gold Layer Tutorial",
       "section": "tutorials",
       "summary": "title: Gold Layer Tutorial"
+    },
+    {
+      "path": "docs/tutorials/orphan_handling.md",
+      "title": "Orphan Handling Tutorial — Fact Pattern `orphan_handling`",
+      "section": "tutorials",
+      "summary": "> **GitHub Issue:** #222"
     },
     {
       "path": "docs/tutorials/quarantine_workflow.md",

@@ -5,6 +5,7 @@ Status: Phase 2B implemented - Delta Lake read/write, VACUUM, history, restore
 
 import re
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from odibi.enums import EngineType
@@ -943,6 +944,83 @@ class SparkEngine(Engine):
             ctx.error("Either path or table must be provided")
             raise ValueError("Either path or table must be provided")
 
+    def _write_local_download(
+        self, df, connection, format, table, path, register_table, mode, options, streaming_config
+    ):
+        """Collect one bounded result and reuse the client-local Polars Delta writer."""
+        from odibi.config import LocalDownloadConfig
+        from odibi.connections.local import LocalConnection
+
+        download = LocalDownloadConfig.model_validate(options["local_download"])
+        if not isinstance(connection, LocalConnection) or connection.is_uri:
+            raise ValueError("download requires a local filesystem connection, not a storage URI")
+        if (
+            format != "delta"
+            or not path
+            or table
+            or register_table
+            or mode not in ("overwrite", "append")
+        ):
+            raise ValueError("download requires Delta path output with overwrite or append mode")
+        if streaming_config or getattr(df, "isStreaming", False) is True:
+            raise ValueError("download supports batch DataFrames only")
+        allowed = {
+            "local_download",
+            "partition_by",
+            "mergeSchema",
+            "overwriteSchema",
+            "overwrite_schema",
+        }
+        if set(options) - allowed:
+            raise ValueError("Unsupported write options for local download")
+        if not callable(getattr(df, "toArrow", None)):
+            raise NotImplementedError(
+                "download requires a Spark client supporting public toArrow()"
+            )
+
+        from odibi.engine.polars_engine import PolarsEngine
+
+        writer = PolarsEngine()  # Check the optional dependency before collecting.
+        import polars as pl
+        from deltalake import DeltaTable
+        from importlib.metadata import version
+
+        if tuple(int(part) for part in version("deltalake").split(".")[:2]) < (0, 25):
+            raise ImportError(
+                "download requires deltalake>=0.25,<0.30; upgrade the client environment"
+            )
+
+        arrow = df.limit(download.max_rows + 1).toArrow()
+        if arrow.num_rows > download.max_rows:
+            raise ValueError("download exceeds max_rows; local destination was not modified")
+        local_options = {}
+        delta_options = {}
+        if options.get("partition_by"):
+            delta_options["partition_by"] = options["partition_by"]
+        if options.get("overwriteSchema") or options.get("overwrite_schema"):
+            delta_options["schema_mode"] = "overwrite"
+        elif options.get("mergeSchema"):
+            delta_options["schema_mode"] = "merge"
+        if delta_options:
+            local_options["delta_write_options"] = delta_options
+        writer.write(
+            pl.from_arrow(arrow),
+            connection,
+            format="delta",
+            path=path,
+            mode=mode,
+            options=local_options,
+        )
+        delta = DeltaTable(connection.get_path(path))
+        latest = delta.history(limit=1)[0]
+        return {
+            "version": delta.version(),
+            "timestamp": datetime.fromtimestamp(latest["timestamp"] / 1000, tz=timezone.utc),
+            "operation": latest.get("operation"),
+            "operation_metrics": latest.get("operationMetrics", {}),
+            "_cached_row_count": arrow.num_rows,
+        }
+
     def write(
         self,
         df: Any,
@@ -975,6 +1053,11 @@ class SparkEngine(Engine):
         ctx = get_logging_context().with_context(engine="spark")
         start_time = time.time()
         options = options or {}
+
+        if "local_download" in options:
+            return self._write_local_download(
+                df, connection, format, table, path, register_table, mode, options, streaming_config
+            )
 
         if getattr(df, "isStreaming", False) is True:
             return self._write_streaming(
