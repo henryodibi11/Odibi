@@ -4,6 +4,7 @@ from odibi.connections.api_fetcher import ApiFetcher, FetchResult, create_api_fe
 from odibi.connections.azure_adls import AzureADLS
 from odibi.connections.azure_sql import AzureSQL
 from odibi.connections.base import BaseConnection
+from odibi.connections.databricks import DatabricksConnection
 from odibi.connections.local import LocalConnection
 from odibi.connections.local_dbfs import LocalDBFS
 from odibi.connections.postgres import PostgreSQLConnection
@@ -12,6 +13,7 @@ from odibi.connections.unity_catalog import UnityCatalogConnection
 
 __all__ = [
     "BaseConnection",
+    "DatabricksConnection",
     "LocalConnection",
     "AzureADLS",
     "AzureSQL",

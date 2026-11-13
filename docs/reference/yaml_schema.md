@@ -43,7 +43,7 @@ alerts:
 | --- | --- | --- | --- | --- |
 | **project** | str | Yes | - | Project name |
 | **engine** | EngineType | No | `EngineType.PANDAS` | Execution engine |
-| **connections** | Dict[str, [ConnectionConfig](#connections)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [UnityCatalogConnectionConfig](#unitycatalogconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig), [CustomConnectionConfig](#customconnectionconfig) |
+| **connections** | Dict[str, [ConnectionConfig](#connections)] | Yes | - | Named connections (at least one required)<br>**Options:** [LocalConnectionConfig](#localconnectionconfig), [AzureBlobConnectionConfig](#azureblobconnectionconfig), [DeltaConnectionConfig](#deltaconnectionconfig), [UnityCatalogConnectionConfig](#unitycatalogconnectionconfig), [DatabricksConnectionConfig](#databricksconnectionconfig), [SQLServerConnectionConfig](#sqlserverconnectionconfig), [HttpConnectionConfig](#httpconnectionconfig), [CustomConnectionConfig](#customconnectionconfig) |
 | **pipelines** | List[[PipelineConfig](#pipelineconfig)] | Yes | - | Pipeline definitions (at least one required) |
 | **story** | [StoryConfig](#storyconfig) | Yes | - | Story generation configuration (mandatory) |
 | **system** | [SystemConfig](#systemconfig) | Yes | - | System Catalog configuration (mandatory) |
@@ -630,6 +630,26 @@ adls_msi:
 | **account_name** | str | Yes | - | - |
 | **container** | str | Yes | - | - |
 | **auth** | AzureBlobAuthConfig | No | `PydanticUndefined` | Authentication configuration. Choose one mode: 'account_key' (storage key), 'sas' (SAS token), 'connection_string', 'key_vault' (Azure Key Vault), or 'aad_msi' (Managed Identity, default). For production, prefer key_vault or aad_msi to avoid storing secrets in config.<br>**Options:** [AzureBlobKeyVaultAuth](#azureblobkeyvaultauth), [AzureBlobAccountKeyAuth](#azureblobaccountkeyauth), [AzureBlobSasAuth](#azureblobsasauth), [AzureBlobConnectionStringAuth](#azureblobconnectionstringauth), [AzureBlobMsiAuth](#azureblobmsiauth) |
+
+---
+### `DatabricksConnectionConfig`
+> *Used in: [ProjectConfig](#projectconfig)*
+
+Remote Spark session using Databricks Connect and OAuth M2M.
+
+Use environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.
+Choose exactly one compute target: ``cluster_id`` or ``serverless: true``.
+Install a runtime-matched databricks-connect separately, not odibi[spark].
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **type** | Literal['databricks'] | No | `ConnectionType.DATABRICKS` | - |
+| **validation_mode** | ValidationMode | No | `ValidationMode.LAZY` | - |
+| **host** | str | Yes | - | Workspace HTTPS URL, not an account URL |
+| **client_id** | str | Yes | - | Databricks service principal application ID |
+| **client_secret** | SecretStr | Yes | - | Databricks OAuth secret (not an Azure secret) |
+| **cluster_id** | Optional[str] | No | - | - |
+| **serverless** | bool | No | `False` | - |
 
 ---
 ### `SQLServerConnectionConfig`
@@ -3737,6 +3757,7 @@ On Pandas, writes directly to the target file (parquet or CSV).
 | **use_delta_merge** | bool | No | `True` | Use Delta Lake MERGE for Spark engine (faster for large tables). Falls back to full overwrite if target is not Delta format. |
 | **register_table** | Optional[str] | No | - | Register as Unity Catalog/metastore table after write (e.g., 'silver.dim_customers'). Spark only. |
 | **vacuum_hours** | Optional[int] | No | - | Hours to retain for VACUUM after SCD2 write (Spark only). Set to 168 for 7 days. None disables VACUUM. |
+| **target_format** | Optional[str] | No | - | Declared write format of the node (delta, parquet, ...). When delta, the SCD2 history is persisted as Delta instead of parquet so the pattern and the node write agree on the target format. |
 
 ---
 ### 📂 Manufacturing & IoT

@@ -18,6 +18,7 @@ from pydantic import (
     ConfigDict,
     Discriminator,
     Field,
+    SecretStr,
     Tag,
     field_validator,
     model_validator,
@@ -85,6 +86,7 @@ class ConnectionType(str, Enum):
     SQL_SERVER = "sql_server"
     HTTP = "http"
     UNITY_CATALOG = "unity_catalog"
+    DATABRICKS = "databricks"
 
 
 class WriteMode(str, Enum):
@@ -701,6 +703,48 @@ class DeltaConnectionConfig(BaseConnectionConfig):
     )
 
 
+class DatabricksConnectionConfig(BaseConnectionConfig):
+    """Remote Spark session using Databricks Connect and OAuth M2M.
+
+    Use environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.
+    Choose exactly one compute target: ``cluster_id`` or ``serverless: true``.
+    Install a runtime-matched databricks-connect separately, not odibi[spark].
+    """
+
+    type: Literal[ConnectionType.DATABRICKS] = ConnectionType.DATABRICKS
+    host: str = Field(min_length=1, description="Workspace HTTPS URL, not an account URL")
+    client_id: str = Field(min_length=1, description="Databricks service principal application ID")
+    client_secret: SecretStr = Field(description="Databricks OAuth secret (not an Azure secret)")
+    cluster_id: Optional[str] = Field(default=None, min_length=1)
+    serverless: bool = False
+
+    @model_validator(mode="after")
+    def validate_remote_settings(self):
+        from urllib.parse import urlsplit
+
+        try:
+            url = urlsplit(self.host)
+            valid = (
+                url.scheme == "https"
+                and url.hostname
+                and not url.username
+                and not url.password
+                and url.path in ("", "/")
+                and not url.query
+                and not url.fragment
+                and not any(c.isspace() for c in self.host)
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError("Databricks host must be a workspace HTTPS URL without credentials")
+        if bool(self.cluster_id) == self.serverless:
+            raise ValueError("Set exactly one of cluster_id or serverless: true")
+        if not self.client_secret.get_secret_value().strip():
+            raise ValueError("Databricks client_secret must not be empty")
+        return self
+
+
 class UnityCatalogConnectionConfig(BaseConnectionConfig):
     """
     Unity Catalog connection for Databricks managed tables.
@@ -1035,6 +1079,7 @@ ConnectionConfig = Annotated[
         Annotated[AzureBlobConnectionConfig, Tag(ConnectionType.AZURE_BLOB.value)],
         Annotated[DeltaConnectionConfig, Tag(ConnectionType.DELTA.value)],
         Annotated[UnityCatalogConnectionConfig, Tag(ConnectionType.UNITY_CATALOG.value)],
+        Annotated[DatabricksConnectionConfig, Tag(ConnectionType.DATABRICKS.value)],
         Annotated[SQLServerConnectionConfig, Tag(ConnectionType.SQL_SERVER.value)],
         Annotated[HttpConnectionConfig, Tag(ConnectionType.HTTP.value)],
         Annotated[CustomConnectionConfig, Tag(_CUSTOM_CONNECTION_TAG)],

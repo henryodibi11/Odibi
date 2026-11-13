@@ -131,6 +131,21 @@ class SparkEngine(Engine):
         ctx = get_logging_context().with_context(engine="spark")
         ctx.debug("Initializing SparkEngine", connections_count=len(connections or {}))
 
+        # An explicit compute connection must win over an unrelated active session.
+        # Resolve it before importing PySpark so missing Connect gives useful guidance.
+        if spark_session is None:
+            from odibi.connections.databricks import DatabricksConnection
+
+            remote = [
+                conn
+                for conn in (connections or {}).values()
+                if isinstance(conn, DatabricksConnection)
+            ]
+            if len(remote) > 1:
+                raise ValueError("Configure only one Databricks compute connection per project")
+            if remote:
+                spark_session = remote[0].get_spark_session()
+
         try:
             from pyspark.sql import SparkSession
         except ImportError as e:

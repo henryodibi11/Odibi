@@ -86,6 +86,7 @@ GROUP_MAPPING = {
     "LocalConnectionConfig": "Connection",
     "AzureBlobConnectionConfig": "Connection",
     "DeltaConnectionConfig": "Connection",
+    "DatabricksConnectionConfig": "Connection",
     "SQLServerConnectionConfig": "Connection",
     "HttpConnectionConfig": "Connection",
     "StoryConfig": "Setting",
@@ -209,6 +210,7 @@ CUSTOM_ORDER = [
     "LocalConnectionConfig",
     "DeltaConnectionConfig",
     "AzureBlobConnectionConfig",
+    "DatabricksConnectionConfig",
     "SQLServerConnectionConfig",
     "HttpConnectionConfig",
     # Simulation

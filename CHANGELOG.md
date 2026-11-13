@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.16.0] — 2026-11-13
+
+### Added
+
+- **Local development with remote Databricks Spark** — A typed `databricks`
+  compute connection creates/reuses a Databricks Connect session with OAuth M2M
+  service-principal authentication and a cluster or serverless target. SparkEngine
+  uses it without changing existing local/notebook behavior; explicit sessions
+  retain precedence. Setup failures do not silently fall back to local compute or
+  catalog state. Install a runtime-matched Connect version in a dedicated environment,
+  not alongside the `spark`, `all` or `dev` extras. See
+  [setup instructions](docs/setup_databricks_connect.md). Remote execution remains
+  unverified without workspace credentials; this adds session setup, not blanket
+  Spark Connect compatibility for all operations.
+
 ## [3.15.2] — 2026-11-10
 
 ### Security
