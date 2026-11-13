@@ -126,6 +126,7 @@
       "type": "object"
     },
     "AzureBlobAccountKeyAuth": {
+      "additionalProperties": false,
       "description": "Authentication using storage account key directly.\n\n**When to Use:** Development/testing or when Key Vault is not available.\n\nAttributes:\n    mode: Set to \"account_key\"\n    account_key: Storage account access key (typically from environment variable)",
       "properties": {
         "mode": {
@@ -146,6 +147,7 @@
       "type": "object"
     },
     "AzureBlobConnectionConfig": {
+      "additionalProperties": false,
       "description": "Azure Blob Storage / ADLS Gen2 connection.\n\n**When to Use:** Azure-based data lakes, landing zones, raw data storage.\n\n**See Also:** [DeltaConnectionConfig](#deltaconnectionconfig) for Delta-specific options\n\nScenario 1: Prod with Key Vault-managed key\n```yaml\nadls_bronze:\n  type: \"azure_blob\"\n  account_name: \"myaccount\"\n  container: \"bronze\"\n  auth:\n    mode: \"key_vault\"\n    key_vault: \"kv-data\"\n    secret: \"adls-account-key\"\n```\n\nScenario 2: Local dev with inline account key\n```yaml\nadls_dev:\n  type: \"azure_blob\"\n  account_name: \"devaccount\"\n  container: \"sandbox\"\n  auth:\n    mode: \"account_key\"\n    account_key: \"${ADLS_ACCOUNT_KEY}\"\n```\n\nScenario 3: MSI (no secrets)\n```yaml\nadls_msi:\n  type: \"azure_blob\"\n  account_name: \"myaccount\"\n  container: \"bronze\"\n  auth:\n    mode: \"aad_msi\"\n    # optional: client_id for user-assigned identity\n    client_id: \"00000000-0000-0000-0000-000000000000\"\n```",
       "properties": {
         "type": {
@@ -206,6 +208,7 @@
       "type": "object"
     },
     "AzureBlobConnectionStringAuth": {
+      "additionalProperties": false,
       "description": "Authentication using Azure Storage connection string.\n\n**When to Use:** Simple local development or when a connection string is provided.\n\nAttributes:\n    mode: Set to \"connection_string\"\n    connection_string: Full Azure Storage connection string",
       "properties": {
         "mode": {
@@ -226,6 +229,7 @@
       "type": "object"
     },
     "AzureBlobKeyVaultAuth": {
+      "additionalProperties": false,
       "description": "Authentication using Azure Key Vault to retrieve storage account key.\n\n**When to Use:** Production environments where secrets are managed in Key Vault.\n\nAttributes:\n    mode: Set to \"key_vault\"\n    key_vault: Name of the Azure Key Vault\n    secret: Name of the secret containing the storage account key",
       "properties": {
         "mode": {
@@ -251,6 +255,7 @@
       "type": "object"
     },
     "AzureBlobMsiAuth": {
+      "additionalProperties": false,
       "description": "Authentication using Azure Active Directory Managed Service Identity.\n\n**When to Use:** Running in Azure (VM, App Service, Databricks) with managed identity enabled.\n\nAttributes:\n    mode: Set to \"aad_msi\"\n    client_id: Optional client ID for user-assigned managed identity",
       "properties": {
         "mode": {
@@ -276,6 +281,7 @@
       "type": "object"
     },
     "AzureBlobSasAuth": {
+      "additionalProperties": false,
       "description": "Authentication using Shared Access Signature (SAS) token.\n\n**When to Use:** Temporary, limited-scope access or sharing data with external parties.\n\nAttributes:\n    mode: Set to \"sas\"\n    sas_token: Shared Access Signature token string",
       "properties": {
         "mode": {
@@ -412,7 +418,68 @@
       "title": "CustomSQLTest",
       "type": "object"
     },
+    "DatabricksConnectionConfig": {
+      "additionalProperties": false,
+      "description": "Remote Spark session using Databricks Connect and OAuth M2M.\n\nUse environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.\nChoose exactly one compute target: ``cluster_id`` or ``serverless: true``.\nInstall a runtime-matched databricks-connect separately, not odibi[spark].",
+      "properties": {
+        "type": {
+          "const": "databricks",
+          "default": "databricks",
+          "title": "Type",
+          "type": "string"
+        },
+        "validation_mode": {
+          "$ref": "#/$defs/ValidationMode",
+          "default": "lazy"
+        },
+        "host": {
+          "description": "Workspace HTTPS URL, not an account URL",
+          "minLength": 1,
+          "title": "Host",
+          "type": "string"
+        },
+        "client_id": {
+          "description": "Databricks service principal application ID",
+          "minLength": 1,
+          "title": "Client Id",
+          "type": "string"
+        },
+        "client_secret": {
+          "description": "Databricks OAuth secret (not an Azure secret)",
+          "format": "password",
+          "title": "Client Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "cluster_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cluster Id"
+        },
+        "serverless": {
+          "default": false,
+          "title": "Serverless",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host",
+        "client_id",
+        "client_secret"
+      ],
+      "title": "DatabricksConnectionConfig",
+      "type": "object"
+    },
     "DeltaConnectionConfig": {
+      "additionalProperties": false,
       "description": "Delta Lake connection for ACID-compliant data lakes.\n\n**When to Use:**\n- Production data lakes on Azure/AWS/GCP\n- Need time travel, ACID transactions, schema evolution\n- Upsert/merge operations\n\n**See Also:** [WriteConfig](#writeconfig) for Delta write options\n\nScenario 1: Delta via metastore\n```yaml\ndelta_silver:\n  type: \"delta\"\n  catalog: \"spark_catalog\"\n  schema: \"silver_db\"\n```\n\nScenario 2: Direct path + Node usage\n```yaml\ndelta_local:\n  type: \"local\"\n  base_path: \"dbfs:/mnt/delta\"\n\n# In pipeline:\n# read:\n#   connection: \"delta_local\"\n#   format: \"delta\"\n#   path: \"bronze/orders\"\n```",
       "properties": {
         "type": {
@@ -733,12 +800,18 @@
       "type": "object"
     },
     "HttpApiKeyAuth": {
-      "description": "Custom API key authentication with configurable header.\n\n**When to Use:** APIs requiring custom header-based authentication (e.g., X-API-Key).\n\nAttributes:\n    mode: Set to \"api_key\"\n    header_name: Name of the header (default: \"Authorization\")\n    value_template: Template for header value with {token} placeholder (default: \"Bearer {token}\")",
+      "additionalProperties": false,
+      "description": "Custom header authentication using one safely rendered API key.\n\n**When to Use:** APIs requiring custom header-based authentication (e.g., X-API-Key).\n\nAttributes:\n    mode: Set to \"api_key\"\n    api_key: Required non-empty API key\n    header_name: Name of the header (default: \"Authorization\")\n    value_template: Template for header value with {token} placeholder (default: \"Bearer {token}\")",
       "properties": {
         "mode": {
           "const": "api_key",
           "default": "api_key",
           "title": "Mode",
+          "type": "string"
+        },
+        "api_key": {
+          "minLength": 1,
+          "title": "Api Key",
           "type": "string"
         },
         "header_name": {
@@ -752,10 +825,14 @@
           "type": "string"
         }
       },
+      "required": [
+        "api_key"
+      ],
       "title": "HttpApiKeyAuth",
       "type": "object"
     },
     "HttpBasicAuth": {
+      "additionalProperties": false,
       "description": "HTTP Basic authentication with username and password.\n\n**When to Use:** APIs requiring HTTP Basic Auth (RFC 7617).\n\nAttributes:\n    mode: Set to \"basic\"\n    username: Username for Basic authentication\n    password: Password for Basic authentication",
       "properties": {
         "mode": {
@@ -781,6 +858,7 @@
       "type": "object"
     },
     "HttpBearerAuth": {
+      "additionalProperties": false,
       "description": "Bearer token authentication (OAuth 2.0 style).\n\n**When to Use:** APIs using OAuth 2.0 or similar bearer token schemes.\n\nAttributes:\n    mode: Set to \"bearer\"\n    token: Bearer token string (typically from environment variable)",
       "properties": {
         "mode": {
@@ -801,6 +879,7 @@
       "type": "object"
     },
     "HttpConnectionConfig": {
+      "additionalProperties": false,
       "description": "HTTP connection.\n\nScenario: Bearer token via env var\n```yaml\napi_source:\n  type: \"http\"\n  base_url: \"https://api.example.com\"\n  headers:\n    User-Agent: \"odibi-pipeline\"\n  auth:\n    mode: \"bearer\"\n    token: \"${API_TOKEN}\"\n```",
       "properties": {
         "type": {
@@ -861,6 +940,7 @@
       "type": "object"
     },
     "HttpNoAuth": {
+      "additionalProperties": false,
       "description": "No authentication required for HTTP connection.\n\n**When to Use:** Public APIs or endpoints that don't require authentication.\n\nAttributes:\n    mode: Set to \"none\"",
       "properties": {
         "mode": {
@@ -874,6 +954,7 @@
       "type": "object"
     },
     "IncrementalConfig": {
+      "additionalProperties": false,
       "description": "Configuration for automatic incremental loading.\n\n**When to Use:** Load only new/changed data instead of full table scans.\n\n**See Also:** [ReadConfig](#readconfig)\n\n**Modes:**\n1. **Rolling Window** (Default): Uses a time-based lookback from NOW().\n   Good for: Stateless loading where you just want \"recent\" data.\n   Args: `lookback`, `unit`\n\n2. **Stateful**: Tracks the High-Water Mark (HWM) of the key column.\n   Good for: Exact incremental ingestion (e.g. CDC-like).\n   Args: `state_key` (optional), `watermark_lag` (optional)\n\nGenerates SQL:\n- Rolling: `WHERE column >= NOW() - lookback`\n- Stateful: `WHERE column > :last_hwm`\n\nExample (Rolling Window):\n```yaml\nincremental:\n  mode: \"rolling_window\"\n  column: \"updated_at\"\n  lookback: 3\n  unit: \"day\"\n```\n\nExample (Stateful HWM):\n```yaml\nincremental:\n  mode: \"stateful\"\n  column: \"id\"\n  # Optional: track separate column for HWM state\n  state_key: \"last_processed_id\"\n```\n\nExample (Stateful with Watermark Lag):\n```yaml\nincremental:\n  mode: \"stateful\"\n  column: \"updated_at\"\n  # Handle late-arriving data: look back 2 hours from HWM\n  watermark_lag: \"2h\"\n```\n\nExample (Oracle Date Format):\n```yaml\nincremental:\n  mode: \"rolling_window\"\n  column: \"EVENT_START\"\n  lookback: 3\n  unit: \"day\"\n  # For string columns with Oracle format (DD-MON-YY)\n  date_format: \"oracle\"\n```\n\nSupported date_format values:\n- `oracle`: DD-MON-YY for Oracle databases (uses TO_TIMESTAMP)\n- `oracle_sqlserver`: DD-MON-YY format stored in SQL Server (uses TRY_CONVERT)\n- `sql_server`: Uses CONVERT with style 120\n- `us`: MM/DD/YYYY format\n- `eu`: DD/MM/YYYY format\n- `iso`: YYYY-MM-DDTHH:MM:SS format",
       "properties": {
         "mode": {
@@ -1030,6 +1111,7 @@
       "type": "object"
     },
     "LocalConnectionConfig": {
+      "additionalProperties": false,
       "description": "Local filesystem connection.\n\n**When to Use:** Development, testing, small datasets, local processing.\n\n**See Also:** [AzureBlobConnectionConfig](#azureblobconnectionconfig) for cloud alternatives.\n\nExample:\n```yaml\nlocal_data:\n  type: \"local\"\n  base_path: \"./data\"\n```",
       "properties": {
         "type": {
@@ -1087,6 +1169,7 @@
       "type": "object"
     },
     "NodeConfig": {
+      "additionalProperties": false,
       "description": "Configuration for a single node.\n\n### \ud83e\udde0 \"The Smart Node\" Pattern\n\n**Business Problem:**\n\"We need complex dependencies, caching for heavy computations, and the ability to run only specific parts of the pipeline.\"\n\n**The Solution:**\nNodes are the building blocks. They handle dependencies (`depends_on`), execution control (`tags`, `enabled`), and performance (`cache`).\n\n### \ud83d\udd78\ufe0f DAG & Dependencies\n**The Glue of the Pipeline.**\nNodes don't run in isolation. They form a Directed Acyclic Graph (DAG).\n\n*   **`depends_on`**: Critical! If Node B reads from Node A (in memory), you MUST list `[\"Node A\"]`.\n    *   *Implicit Data Flow*: If a node has no `read` block, it automatically picks up the DataFrame from its first dependency.\n\n### \ud83e\udde0 Smart Read & Incremental Loading\n\n**Automated History Management.**\n\nOdibi intelligently determines whether to perform a **Full Load** or an **Incremental Load** based on the state of the target.\n\n**The \"Smart Read\" Logic:**\n1.  **First Run (Full Load):** If the target table (defined in `write`) does **not exist**:\n    *   Incremental filtering rules are **ignored**.\n    *   The entire source dataset is read.\n    *   Use `write.first_run_query` (optional) to override the read query for this initial bootstrap (e.g., to backfill only 1 year of history instead of all time).\n\n2.  **Subsequent Runs (Incremental Load):** If the target table **exists**:\n    *   **Rolling Window:** Filters source data where `column >= NOW() - lookback`.\n    *   **Stateful:** Filters source data where `column > last_high_water_mark`.\n\nThis ensures you don't need separate \"init\" and \"update\" pipelines. One config handles both lifecycle states.\n\n### \ud83c\udff7\ufe0f Orchestration Tags\n**Run What You Need.**\nTags allow you to execute slices of your pipeline.\n*   `odibi run --tag daily` -> Runs all nodes with \"daily\" tag.\n*   `odibi run --tag critical` -> Runs high-priority nodes.\n\n### \ud83e\udd16 Choosing Your Logic: Transformer vs. Transform\n\n**1. The \"Transformer\" (Top-Level)**\n*   **What it is:** A pre-packaged, heavy-duty operation that defines the *entire purpose* of the node.\n*   **When to use:** When applying a standard Data Engineering pattern (e.g., SCD2, Merge, Deduplicate).\n*   **Analogy:** \"Run this App.\"\n*   **Syntax:** `transformer: \"scd2\"` + `params: {...}`\n\n**2. The \"Transform Steps\" (Process Chain)**\n*   **What it is:** A sequence of smaller steps (SQL, functions, operations) executed in order.\n*   **When to use:** For custom business logic, data cleaning, or feature engineering pipelines.\n*   **Analogy:** \"Run this Script.\"\n*   **Syntax:** `transform: { steps: [...] }`\n\n*Note: You can use both! The `transformer` runs first, then `transform` steps refine the result.*\n\n### \ud83d\udd17 Chaining Operations\n**You can mix and match!**\nThe execution order is always:\n1.  **Read** (or Dependency Injection)\n2.  **Transformer** (The \"App\" logic, e.g., Deduplicate)\n3.  **Transform Steps** (The \"Script\" logic, e.g., cleanup)\n4.  **Validation**\n5.  **Write**\n\n*Constraint:* You must define **at least one** of `read`, `transformer`, `transform`, or `write`.\n\n### \u26a1 Example: App vs. Script\n\n**Scenario 1: The Full ETL Flow (Chained)**\n*Shows explicit Read, Transform Chain, and Write.*\n\n```yaml\n# 1. Ingest (The Dependency)\n- name: \"load_raw_users\"\n  read: { connection: \"s3_landing\", format: \"json\", path: \"users/*.json\" }\n  write: { connection: \"bronze\", format: \"parquet\", path: \"users_raw\" }\n\n# 2. Process (The Consumer)\n- name: \"clean_users\"\n  depends_on: [\"load_raw_users\"]\n\n  # \"clean_text\" is a registered function from the Transformer Catalog\n  transform:\n    steps:\n      - sql: \"SELECT * FROM df WHERE email IS NOT NULL\"\n      - function: \"clean_text\"\n        params: { columns: [\"email\"], case: \"lower\" }\n\n  write: { connection: \"silver\", format: \"delta\", table: \"dim_users\" }\n```\n\n**Scenario 2: The \"App\" Node (Top-Level Transformer)**\n*Shows a node that applies a pattern (Deduplicate) to incoming data.*\n\n```yaml\n- name: \"deduped_users\"\n  depends_on: [\"clean_users\"]\n\n  # The \"App\": Deduplication (From Transformer Catalog)\n  transformer: \"deduplicate\"\n  params:\n    keys: [\"user_id\"]\n    order_by: \"updated_at DESC\"\n\n  write: { connection: \"gold\", format: \"delta\", table: \"users_unique\" }\n```\n\n**Scenario 3: The Tagged Runner (Reporting)**\n*Shows how tags allow running specific slices (e.g., `odibi run --tag daily`).*\n\n```yaml\n- name: \"daily_report\"\n  tags: [\"daily\", \"reporting\"]\n  depends_on: [\"deduped_users\"]\n\n  # Ad-hoc aggregation script\n  transform:\n    steps:\n      - sql: \"SELECT date_trunc('day', updated_at) as day, count(*) as total FROM df GROUP BY 1\"\n\n  write: { connection: \"local_data\", format: \"csv\", path: \"reports/daily_stats.csv\" }\n```\n\n**Scenario 4: The \"Kitchen Sink\" (All Operations)**\n*Shows Read -> Transformer -> Transform -> Write execution order.*\n\n**Why this works:**\n1.  **Internal Chaining (`df`):** In every step (Transformer or SQL), `df` refers to the output of the *previous* step.\n2.  **External Access (`depends_on`):** If you added `depends_on: [\"other_node\"]`, you could also run `SELECT * FROM other_node` in your SQL steps!\n\n```yaml\n- name: \"complex_flow\"\n  # 1. Read -> Creates initial 'df'\n  read: { connection: \"bronze\", format: \"parquet\", path: \"users\" }\n\n  # 2. Transformer (The \"App\": Deduplicate first)\n  # Takes 'df' (from Read), dedups it, returns new 'df'\n  transformer: \"deduplicate\"\n  params: { keys: [\"user_id\"], order_by: \"updated_at DESC\" }\n\n  # 3. Transform Steps (The \"Script\": Filter AFTER deduplication)\n  # SQL sees the deduped data as 'df'\n  transform:\n    steps:\n      - sql: \"SELECT * FROM df WHERE status = 'active'\"\n\n  # 4. Write -> Saves the final filtered 'df'\n  write: { connection: \"silver\", format: \"delta\", table: \"active_unique_users\" }\n```\n\n### \ud83d\udcda Transformer Catalog\n\nThese are the built-in functions you can use in two ways:\n\n1.  **As a Top-Level Transformer:** `transformer: \"name\"` (Defines the node's main logic)\n2.  **As a Step in a Chain:** `transform: { steps: [{ function: \"name\" }] }` (Part of a sequence)\n\n*Note: `merge` and `scd2` are special \"Heavy Lifters\" and should generally be used as Top-Level Transformers.*\n\n**Data Engineering Patterns**\n*   `merge`: Upsert/Merge into target (Delta/SQL). *([Params](#mergeparams))*\n*   `scd2`: Slowly Changing Dimensions Type 2. *([Params](#scd2params))*\n*   `deduplicate`: Remove duplicates using window functions. *([Params](#deduplicateparams))*\n\n**Relational Algebra**\n*   `join`: Join two datasets. *([Params](#joinparams))*\n*   `union`: Stack datasets vertically. *([Params](#unionparams))*\n*   `pivot`: Rotate rows to columns. *([Params](#pivotparams))*\n*   `unpivot`: Rotate columns to rows (melt). *([Params](#unpivotparams))*\n*   `aggregate`: Group by and sum/count/avg. *([Params](#aggregateparams))*\n\n**Data Quality & Cleaning**\n*   `validate_and_flag`: Check rules and flag invalid rows. *([Params](#validateandflagparams))*\n*   `clean_text`: Trim and normalize case. *([Params](#cleantextparams))*\n*   `filter_rows`: SQL-based filtering. *([Params](#filterrowsparams))*\n*   `fill_nulls`: Replace NULLs with defaults. *([Params](#fillnullsparams))*\n\n**Feature Engineering**\n*   `derive_columns`: Create new cols via SQL expressions. *([Params](#derivecolumnsparams))*\n*   `case_when`: Conditional logic (if-else). *([Params](#casewhenparams))*\n*   `generate_surrogate_key`: Create MD5 keys from columns. *([Params](#surrogatekeyparams))*\n*   `date_diff`, `date_add`, `date_trunc`: Date arithmetic.\n\n**Scenario 1: The Full ETL Flow**\n*(Show two nodes: one loader, one processor)*\n\n```yaml\n# 1. Ingest (The Dependency)\n- name: \"load_raw_users\"\n  read: { connection: \"s3_landing\", format: \"json\", path: \"users/*.json\" }\n  write: { connection: \"bronze\", format: \"parquet\", path: \"users_raw\" }\n\n# 2. Process (The Consumer)\n- name: \"clean_users\"\n  depends_on: [\"load_raw_users\"]  # <--- Explicit dependency\n\n  # Explicit Transformation Steps\n  transform:\n    steps:\n      - sql: \"SELECT * FROM df WHERE email IS NOT NULL\"\n      - function: \"clean_text\"\n        params: { columns: [\"email\"], case: \"lower\" }\n\n  write: { connection: \"silver\", format: \"delta\", table: \"dim_users\" }\n```\n\n**Scenario 2: The \"App\" Node (Transformer)**\n*(Show a node that is a Transformer, no read needed if it picks up from dependency)*\n\n```yaml\n- name: \"deduped_users\"\n  depends_on: [\"clean_users\"]\n\n  # The \"App\": Deduplication\n  transformer: \"deduplicate\"\n  params:\n    keys: [\"user_id\"]\n    order_by: \"updated_at DESC\"\n\n  write: { connection: \"gold\", format: \"delta\", table: \"users_unique\" }\n```\n\n**Scenario 3: The Tagged Runner**\n*Run only this with `odibi run --tag daily`*\n```yaml\n- name: \"daily_report\"\n  tags: [\"daily\", \"reporting\"]\n  # ...\n```\n\n**Scenario 4: Pre/Post SQL Hooks**\n*Setup and cleanup with SQL statements.*\n```yaml\n- name: \"optimize_sales\"\n  depends_on: [\"load_sales\"]\n  pre_sql:\n    - \"SET spark.sql.shuffle.partitions = 200\"\n    - \"CREATE TEMP VIEW staging AS SELECT * FROM bronze.raw_sales\"\n  transform:\n    steps:\n      - sql: \"SELECT * FROM staging WHERE amount > 0\"\n  post_sql:\n    - \"OPTIMIZE gold.fact_sales ZORDER BY (customer_id)\"\n    - \"VACUUM gold.fact_sales RETAIN 168 HOURS\"\n  write:\n    connection: \"gold\"\n    format: \"delta\"\n    table: \"fact_sales\"\n```\n\n**Scenario 5: Materialization Strategies**\n*Choose how output is persisted.*\n```yaml\n# Option 1: View (no physical storage, logical model)\n- name: \"vw_active_customers\"\n  materialized: \"view\"  # Creates SQL view instead of table\n  transform:\n    steps:\n      - sql: \"SELECT * FROM customers WHERE status = 'active'\"\n  write:\n    connection: \"gold\"\n    table: \"vw_active_customers\"\n\n# Option 2: Incremental (append to existing Delta table)\n- name: \"fact_events\"\n  materialized: \"incremental\"  # Uses APPEND mode\n  read:\n    connection: \"bronze\"\n    table: \"raw_events\"\n    incremental:\n      mode: \"stateful\"\n      column: \"event_time\"\n  write:\n    connection: \"silver\"\n    format: \"delta\"\n    table: \"fact_events\"\n\n# Option 3: Table (default - full overwrite)\n- name: \"dim_products\"\n  materialized: \"table\"  # Default behavior\n  # ...\n```",
       "properties": {
         "name": {
@@ -1317,6 +1400,61 @@
               "title": "Aggregations",
               "type": "object"
             },
+            "column": {
+              "description": "Column in the main DataFrame to map",
+              "title": "Column",
+              "type": "string"
+            },
+            "mapping_source": {
+              "description": "Name of the mapping dataset registered in context",
+              "title": "Mapping Source",
+              "type": "string"
+            },
+            "source_key": {
+              "description": "Key column in the mapping table to join on",
+              "title": "Source Key",
+              "type": "string"
+            },
+            "source_value": {
+              "description": "Value column in the mapping table to pull from",
+              "title": "Source Value",
+              "type": "string"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Output column name (default: overwrite the source column)",
+              "title": "Output"
+            },
+            "default": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default value for unmatched rows (default: NULL). Accepts str/int/float/bool.",
+              "title": "Default"
+            },
             "cases": {
               "description": "List of conditional branches",
               "items": {
@@ -1324,12 +1462,6 @@
               },
               "title": "Cases",
               "type": "array"
-            },
-            "default": {
-              "type": "string",
-              "default": "NULL",
-              "description": "Default value if no condition met",
-              "title": "Default"
             },
             "output_col": {
               "description": "Name of the resulting column",
@@ -1695,11 +1827,6 @@
               "title": "Spark Native",
               "type": "boolean"
             },
-            "column": {
-              "description": "Column to map values from",
-              "title": "Column",
-              "type": "string"
-            },
             "mapping": {
               "additionalProperties": {
                 "anyOf": [
@@ -1790,6 +1917,13 @@
               "description": "SQL WHERE clause (e.g., 'age > 18 AND status = \"active\"')",
               "title": "Condition",
               "type": "string"
+            },
+            "depth": {
+              "default": 1,
+              "description": "Max nesting depth to flatten (default: 1)",
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
             },
             "fluid": {
               "default": "Water",
@@ -1971,9 +2105,13 @@
                     "type": "string"
                   },
                   "type": "array"
+                },
+                {
+                  "type": "null"
                 }
               ],
-              "description": "Column(s) to join on",
+              "default": null,
+              "description": "Column(s) to join on. Not required for cross joins.",
               "title": "On"
             },
             "how": {
@@ -2380,6 +2518,22 @@
               "title": "Replacement",
               "type": "string"
             },
+            "partition_by": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Columns to partition by (optional)",
+              "title": "Partition By"
+            },
             "fraction": {
               "description": "Fraction of rows to return (0.0 to 1.0)",
               "title": "Fraction",
@@ -2456,6 +2610,19 @@
               "description": "Use Delta Lake MERGE for Spark engine (faster for large tables). Falls back to full overwrite if target is not Delta format.",
               "title": "Use Delta Merge",
               "type": "boolean"
+            },
+            "target_format": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Declared write format of the node (delta, parquet, ...). When delta, the SCD2 history is persisted as Delta instead of parquet so the pattern and the node write agree on the target format.",
+              "title": "Target Format"
             },
             "user_col": {
               "description": "User identifier to partition sessions by",
@@ -2640,13 +2807,6 @@
               "description": "Window function e.g. 'sum(amount)', 'rank()'",
               "title": "Function",
               "type": "string"
-            },
-            "partition_by": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Partition By",
-              "type": "array"
             }
           },
           "additionalProperties": true,
@@ -3016,6 +3176,7 @@
       "type": "object"
     },
     "PipelineConfig": {
+      "additionalProperties": false,
       "description": "Configuration for a pipeline.\n\nExample:\n```yaml\npipelines:\n  - pipeline: \"user_onboarding\"\n    description: \"Ingest and process new users\"\n    layer: \"silver\"\n    owner: \"data-team@example.com\"\n    freshness_sla: \"6h\"\n    nodes:\n      - name: \"node1\"\n        ...\n```",
       "properties": {
         "pipeline": {
@@ -3092,6 +3253,14 @@
             "$ref": "#/$defs/NodeConfig"
           },
           "title": "Nodes",
+          "type": "array"
+        },
+        "tags": {
+          "description": "Free-form labels for the pipeline (documentation/grouping).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
           "type": "array"
         },
         "auto_cache_threshold": {
@@ -3364,6 +3533,7 @@
       "type": "object"
     },
     "ReadConfig": {
+      "additionalProperties": false,
       "description": "Configuration for reading data into a node.\n\n**When to Use:** First node in a pipeline, or any node that reads from storage.\n\n**Key Concepts:**\n- `connection`: References a named connection from `connections:` section\n- `format`: File format (csv, parquet, delta, json, sql)\n- `incremental`: Enable incremental loading (only new data)\n\n**See Also:**\n- [Incremental Loading](../patterns/incremental_stateful.md) - HWM-based loading\n- [IncrementalConfig](#incrementalconfig) - Incremental loading options\n\n### \ud83d\udcd6 \"Universal Reader\" Guide\n\n**Business Problem:**\n\"I need to read from files, databases, streams, and even travel back in time to see how data looked yesterday.\"\n\n**Recipe 1: The Time Traveler (Delta/Iceberg)**\n*Reproduce a bug by seeing the data exactly as it was.*\n```yaml\nread:\n  connection: \"silver_lake\"\n  format: \"delta\"\n  table: \"fact_sales\"\n  time_travel:\n    as_of_timestamp: \"2023-10-25T14:00:00Z\"\n```\n\n**Recipe 2: The Streamer**\n*Process data in real-time.*\n```yaml\nread:\n  connection: \"event_hub\"\n  format: \"json\"\n  streaming: true\n```\n\n**Recipe 3: The SQL Query**\n*Push down filtering to the source database.*\n```yaml\nread:\n  connection: \"enterprise_dw\"\n  format: \"sql\"\n  # Use the query option to filter at source!\n  query: \"SELECT * FROM huge_table WHERE date >= '2024-01-01'\"\n```\n\n**Recipe 4: Archive Bad Records (Spark)**\n*Capture malformed records for later inspection.*\n```yaml\nread:\n  connection: \"landing\"\n  format: \"json\"\n  path: \"events/*.json\"\n  archive_options:\n    badRecordsPath: \"/mnt/quarantine/bad_records\"\n```\n\n**Recipe 5: Optimize JDBC Parallelism (Spark)**\n*Control partition count for SQL sources to reduce task overhead.*\n```yaml\nread:\n  connection: \"enterprise_dw\"\n  format: \"sql\"\n  table: \"small_lookup_table\"\n  options:\n    numPartitions: 1  # Single partition for small tables\n```\n\n**Performance Tip:** For small tables (<100K rows), use `numPartitions: 1` to avoid\nexcessive Spark task scheduling overhead. For large tables, increase partitions\nto enable parallel reads (requires partitionColumn, lowerBound, upperBound).",
       "properties": {
         "connection": {
@@ -3750,6 +3920,7 @@
       "type": "object"
     },
     "SQLAadPasswordAuth": {
+      "additionalProperties": false,
       "description": "Azure Active Directory service principal authentication.\n\n**When to Use:** Azure SQL Database with service principal credentials.\n\nAttributes:\n    mode: Set to \"aad_password\"\n    tenant_id: Azure AD tenant ID\n    client_id: Service principal (application) ID\n    client_secret: Service principal password",
       "properties": {
         "mode": {
@@ -3780,6 +3951,7 @@
       "type": "object"
     },
     "SQLConnectionStringAuth": {
+      "additionalProperties": false,
       "description": "SQL Server authentication using a full connection string.\n\n**When to Use:** When you have a pre-constructed connection string with embedded credentials.\n\nAttributes:\n    mode: Set to \"connection_string\"\n    connection_string: Full ADO.NET or ODBC connection string",
       "properties": {
         "mode": {
@@ -3800,6 +3972,7 @@
       "type": "object"
     },
     "SQLLoginAuth": {
+      "additionalProperties": false,
       "description": "SQL Server authentication using username and password.\n\n**When to Use:** Traditional SQL Server authentication with database-level credentials.\n\nAttributes:\n    mode: Set to \"sql_login\"\n    username: SQL Server login username\n    password: SQL Server login password (typically from environment variable)",
       "properties": {
         "mode": {
@@ -3825,6 +3998,7 @@
       "type": "object"
     },
     "SQLMsiAuth": {
+      "additionalProperties": false,
       "description": "Azure SQL authentication using Managed Service Identity.\n\n**When to Use:** Running in Azure with managed identity enabled (recommended for production).\n\nAttributes:\n    mode: Set to \"aad_msi\"\n    client_id: Optional client ID for user-assigned managed identity",
       "properties": {
         "mode": {
@@ -3850,6 +4024,7 @@
       "type": "object"
     },
     "SQLServerConnectionConfig": {
+      "additionalProperties": false,
       "description": "SQL Server / Azure SQL Database connection.\n\n**When to Use:** Reading from SQL Server sources, Azure SQL DB, Azure Synapse.\n\n**See Also:** [ReadConfig](#readconfig) for query options\n\nScenario 1: Managed identity (AAD MSI)\n```yaml\nsql_dw_msi:\n  type: \"sql_server\"\n  host: \"server.database.windows.net\"\n  database: \"dw\"\n  auth:\n    mode: \"aad_msi\"\n```\n\nScenario 2: SQL login\n```yaml\nsql_dw_login:\n  type: \"sql_server\"\n  host: \"server.database.windows.net\"\n  database: \"dw\"\n  port: 1433\n  driver: \"ODBC Driver 17 for SQL Server\"\n  auth:\n    mode: \"sql_login\"\n    username: \"dw_writer\"\n    password: \"${DW_PASSWORD}\"\n```",
       "properties": {
         "type": {
@@ -4485,6 +4660,7 @@
       "type": "string"
     },
     "StoryConfig": {
+      "additionalProperties": false,
       "description": "Story generation configuration.\n\nStories are ODIBI's core value - execution reports with lineage.\nThey must use a connection for consistent, traceable output.\n\nExample:\n```yaml\nstory:\n  connection: \"local_data\"\n  path: \"stories/\"\n  retention_days: 30\n  failure_sample_size: 100\n  max_failure_samples: 500\n  max_sampled_validations: 5\n```\n\n**Failure Sample Settings:**\n- `failure_sample_size`: Number of failed rows to capture per validation (default: 100)\n- `max_failure_samples`: Total failed rows across all validations (default: 500)\n- `max_sampled_validations`: After this many validations, show only counts (default: 5)",
       "properties": {
         "connection": {
@@ -4809,10 +4985,11 @@
       "type": "object"
     },
     "SystemConfig": {
-      "description": "Configuration for the Odibi System Catalog (The Brain).\n\nStores metadata, state, and pattern configurations. The primary connection\nmust be a storage connection (blob/local) that supports Delta tables.\n\nExample:\n```yaml\nsystem:\n  connection: adls_bronze        # Primary - must be blob/local storage\n  path: _odibi_system\n  environment: dev\n```\n\nWith sync to SQL Server (for dashboards/queries):\n```yaml\nsystem:\n  connection: adls_prod          # Primary - Delta tables\n  environment: prod\n  sync_to:\n    connection: sql_server_prod  # Secondary - SQL for visibility\n    schema_name: odibi_system\n```\n\nWith sync to another blob (cross-region backup):\n```yaml\nsystem:\n  connection: adls_us_east\n  sync_to:\n    connection: adls_us_west\n    path: _odibi_system_replica\n```",
+      "additionalProperties": false,
+      "description": "Configuration for the Odibi System Catalog (The Brain).\n\nStores metadata, state, and pattern configurations. The primary connection\nmust be a storage connection (blob/local/unity_catalog) that supports Delta tables.\n\nExample:\n```yaml\nsystem:\n  connection: adls_bronze        # Primary - must be blob/local storage\n  path: _odibi_system\n  environment: dev\n```\n\nWith Unity Catalog (Databricks Serverless / Free Edition):\n```yaml\nsystem:\n  connection: uc_metadata        # unity_catalog connection type\n  path: meta_                    # Used as table name prefix\n  environment: dev\n```\n\nWith sync to SQL Server (for dashboards/queries):\n```yaml\nsystem:\n  connection: adls_prod          # Primary - Delta tables\n  environment: prod\n  sync_to:\n    connection: sql_server_prod  # Secondary - SQL for visibility\n    schema_name: odibi_system\n```\n\nWith sync to another blob (cross-region backup):\n```yaml\nsystem:\n  connection: adls_us_east\n  sync_to:\n    connection: adls_us_west\n    path: _odibi_system_replica\n```",
       "properties": {
         "connection": {
-          "description": "Connection for primary system tables. Must be blob storage (azure_blob) or local filesystem - NOT SQL Server. Delta tables require storage backends.",
+          "description": "Connection for primary system tables. Must be blob storage (azure_blob), local filesystem, or unity_catalog - NOT SQL Server. Delta tables require storage or UC backends.",
           "title": "Connection",
           "type": "string"
         },
@@ -4974,6 +5151,7 @@
       "type": "object"
     },
     "TransformConfig": {
+      "additionalProperties": false,
       "description": "Configuration for transformation steps within a node.\n\n**When to Use:** Custom business logic, data cleaning, SQL transformations.\n\n**Key Concepts:**\n- `steps`: Ordered list of operations (SQL, functions, or both)\n- Each step receives the DataFrame from the previous step\n- Steps execute in order: step1 \u2192 step2 \u2192 step3\n\n**See Also:** [Transformer Catalog](#nodeconfig)\n\n**Transformer vs Transform:**\n- `transformer`: Single heavy operation (scd2, merge, deduplicate)\n- `transform.steps`: Chain of lighter operations\n\n### \ud83d\udd27 \"Transformation Pipeline\" Guide\n\n**Business Problem:**\n\"I have complex logic that mixes SQL for speed and Python for complex calculations.\"\n\n**The Solution:**\nChain multiple steps together. Output of Step 1 becomes input of Step 2.\n\n**Function Registry:**\nThe `function` step type looks up functions registered with `@transform` (or `@register`).\nThis allows you to use the *same* registered functions as both top-level Transformers and steps in a chain.\n\n**Recipe: The Mix-and-Match**\n```yaml\ntransform:\n  steps:\n    # Step 1: SQL Filter (Fast)\n    - sql: \"SELECT * FROM df WHERE status = 'ACTIVE'\"\n\n    # Step 2: Custom Python Function (Complex Logic)\n    # Looks up 'calculate_lifetime_value' in the registry\n    - function: \"calculate_lifetime_value\"\n      params: { discount_rate: 0.05 }\n\n    # Step 3: Built-in Operation (Standard)\n    - operation: \"drop_duplicates\"\n      params: { subset: [\"user_id\"] }\n```",
       "properties": {
         "steps": {
@@ -4999,6 +5177,7 @@
       "type": "object"
     },
     "TransformStep": {
+      "additionalProperties": false,
       "description": "Single transformation step.\n\nSupports four step types (exactly one required):\n\n* `sql` - Inline SQL query string\n* `sql_file` - Path to external .sql file (relative to the YAML file defining the node)\n* `function` - Registered Python function name\n* `operation` - Built-in operation (e.g., drop_duplicates)\n\n**sql_file Example:**\n\nIf your project structure is:\n```\nproject.yaml              # imports pipelines/silver/silver.yaml\npipelines/\n  silver/\n    silver.yaml           # defines the node\n    sql/\n      transform.sql       # your SQL file\n```\n\nIn `silver.yaml`, use a path relative to `silver.yaml`:\n```yaml\ntransform:\n  steps:\n    - sql_file: sql/transform.sql   # relative to silver.yaml\n```\n\n**Important:** The path is resolved relative to the YAML file where the node is defined,\nNOT the project.yaml that imports it. Do NOT use absolute paths like `/pipelines/silver/sql/...`.",
       "properties": {
         "sql": {
@@ -5115,6 +5294,61 @@
               "title": "Aggregations",
               "type": "object"
             },
+            "column": {
+              "description": "Column in the main DataFrame to map",
+              "title": "Column",
+              "type": "string"
+            },
+            "mapping_source": {
+              "description": "Name of the mapping dataset registered in context",
+              "title": "Mapping Source",
+              "type": "string"
+            },
+            "source_key": {
+              "description": "Key column in the mapping table to join on",
+              "title": "Source Key",
+              "type": "string"
+            },
+            "source_value": {
+              "description": "Value column in the mapping table to pull from",
+              "title": "Source Value",
+              "type": "string"
+            },
+            "output": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Output column name (default: overwrite the source column)",
+              "title": "Output"
+            },
+            "default": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default value for unmatched rows (default: NULL). Accepts str/int/float/bool.",
+              "title": "Default"
+            },
             "cases": {
               "description": "List of conditional branches",
               "items": {
@@ -5122,12 +5356,6 @@
               },
               "title": "Cases",
               "type": "array"
-            },
-            "default": {
-              "type": "string",
-              "default": "NULL",
-              "description": "Default value if no condition met",
-              "title": "Default"
             },
             "output_col": {
               "description": "Name of the resulting column",
@@ -5493,11 +5721,6 @@
               "title": "Spark Native",
               "type": "boolean"
             },
-            "column": {
-              "description": "Column to map values from",
-              "title": "Column",
-              "type": "string"
-            },
             "mapping": {
               "additionalProperties": {
                 "anyOf": [
@@ -5588,6 +5811,13 @@
               "description": "SQL WHERE clause (e.g., 'age > 18 AND status = \"active\"')",
               "title": "Condition",
               "type": "string"
+            },
+            "depth": {
+              "default": 1,
+              "description": "Max nesting depth to flatten (default: 1)",
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
             },
             "fluid": {
               "default": "Water",
@@ -5769,9 +5999,13 @@
                     "type": "string"
                   },
                   "type": "array"
+                },
+                {
+                  "type": "null"
                 }
               ],
-              "description": "Column(s) to join on",
+              "default": null,
+              "description": "Column(s) to join on. Not required for cross joins.",
               "title": "On"
             },
             "how": {
@@ -6178,6 +6412,22 @@
               "title": "Replacement",
               "type": "string"
             },
+            "partition_by": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Columns to partition by (optional)",
+              "title": "Partition By"
+            },
             "fraction": {
               "description": "Fraction of rows to return (0.0 to 1.0)",
               "title": "Fraction",
@@ -6254,6 +6504,19 @@
               "description": "Use Delta Lake MERGE for Spark engine (faster for large tables). Falls back to full overwrite if target is not Delta format.",
               "title": "Use Delta Merge",
               "type": "boolean"
+            },
+            "target_format": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Declared write format of the node (delta, parquet, ...). When delta, the SCD2 history is persisted as Delta instead of parquet so the pattern and the node write agree on the target format.",
+              "title": "Target Format"
             },
             "user_col": {
               "description": "User identifier to partition sessions by",
@@ -6438,13 +6701,6 @@
               "description": "Window function e.g. 'sum(amount)', 'rank()'",
               "title": "Function",
               "type": "string"
-            },
-            "partition_by": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Partition By",
-              "type": "array"
             }
           },
           "additionalProperties": true,
@@ -6555,6 +6811,44 @@
       "title": "UniqueTest",
       "type": "object"
     },
+    "UnityCatalogConnectionConfig": {
+      "additionalProperties": false,
+      "description": "Unity Catalog connection for Databricks managed tables.\n\nTables are addressed as ``catalog.schema.table``; the UC metastore manages\nbackend storage (S3/ADLS/GCS), so Spark needs no direct filesystem access.\nUse this on Databricks (serverless or clusters) when system/story metadata and\noutputs should be **managed** Unity Catalog tables.\n\nExample:\n```yaml\nuc_metadata:\n  type: \"unity_catalog\"\n  catalog: \"workspace\"\n  schema: \"sim_demo\"\n```",
+      "properties": {
+        "type": {
+          "const": "unity_catalog",
+          "default": "unity_catalog",
+          "title": "Type",
+          "type": "string"
+        },
+        "validation_mode": {
+          "$ref": "#/$defs/ValidationMode",
+          "default": "lazy"
+        },
+        "catalog": {
+          "description": "Unity Catalog catalog name (e.g. 'workspace', 'main')",
+          "title": "Catalog",
+          "type": "string"
+        },
+        "schema": {
+          "default": "default",
+          "description": "Schema/database name",
+          "title": "Schema",
+          "type": "string"
+        },
+        "create_schema": {
+          "default": true,
+          "description": "Issue CREATE SCHEMA IF NOT EXISTS on first validate()",
+          "title": "Create Schema",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "catalog"
+      ],
+      "title": "UnityCatalogConnectionConfig",
+      "type": "object"
+    },
     "ValidationAction": {
       "description": "Actions to take when validation tests fail.\n\nValues:\n* `fail` - Stop pipeline execution and raise error\n* `warn` - Log warning but continue pipeline execution",
       "enum": [
@@ -6565,6 +6859,7 @@
       "type": "string"
     },
     "ValidationConfig": {
+      "additionalProperties": false,
       "description": "Configuration for data validation (post-transform checks).\n\n**When to Use:** Output data quality checks that run after transformation but before writing.\n\n**See Also:** Validation Guide, Quarantine Guide, Contracts Overview (pre-transform checks)\n\n### \ud83d\udee1\ufe0f \"The Indestructible Pipeline\" Pattern\n\n**Business Problem:**\n\"Bad data polluted our Gold reports, causing executives to make wrong decisions. We need to stop it *before* it lands.\"\n\n**The Solution:**\nA Quality Gate that runs *after* transformation but *before* writing.\n\n**Recipe: The Quality Gate**\n```yaml\nvalidation:\n  mode: \"fail\"          # fail (stop pipeline) or warn (log only)\n  on_fail: \"alert\"      # alert or ignore\n\n  tests:\n    # 1. Completeness\n    - type: \"not_null\"\n      columns: [\"transaction_id\", \"customer_id\"]\n\n    # 2. Integrity\n    - type: \"unique\"\n      columns: [\"transaction_id\"]\n\n    - type: \"accepted_values\"\n      column: \"status\"\n      values: [\"PENDING\", \"COMPLETED\", \"FAILED\"]\n\n    # 3. Ranges & Patterns\n    - type: \"range\"\n      column: \"age\"\n      min: 18\n      max: 120\n\n    - type: \"regex_match\"\n      column: \"email\"\n      pattern: \"^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$\"\n\n    # 4. Business Logic (SQL)\n    - type: \"custom_sql\"\n      name: \"dates_ordered\"\n      condition: \"created_at <= completed_at\"\n      threshold: 0.01   # Allow 1% failure\n```\n\n**Recipe: Quarantine + Gate**\n```yaml\nvalidation:\n  tests:\n    - type: not_null\n      columns: [customer_id]\n      on_fail: quarantine\n  quarantine:\n    connection: silver\n    path: customers_quarantine\n  gate:\n    require_pass_rate: 0.95\n    on_fail: abort\n```",
       "properties": {
         "mode": {
@@ -6728,6 +7023,7 @@
       "type": "object"
     },
     "WriteConfig": {
+      "additionalProperties": false,
       "description": "Configuration for writing data from a node.\n\n**When to Use:** Any node that persists data to storage.\n\n**Key Concepts:**\n- `mode`: How to handle existing data (overwrite, append, upsert)\n- `keys`: Required for upsert mode - columns that identify unique records\n- `partition_by`: Columns to partition output by (improves query performance)\n\n**See Also:**\n- [Performance Tuning](../guides/performance_tuning.md) - Partitioning strategies\n\n### \ud83d\ude80 \"Big Data Performance\" Guide\n\n**Business Problem:**\n\"My dashboards are slow because the query scans terabytes of data just to find one day's sales.\"\n\n**The Solution:**\nUse **Partitioning** for coarse filtering (skipping huge chunks) and **Z-Ordering** for fine-grained skipping (colocating related data).\n\n**Recipe: Lakehouse Optimized**\n```yaml\nwrite:\n  connection: \"gold_lake\"\n  format: \"delta\"\n  table: \"fact_sales\"\n  mode: \"append\"\n\n  # 1. Partitioning: Physical folders.\n  # Use for low-cardinality columns often used in WHERE clauses.\n  # WARNING: Do NOT partition by high-cardinality cols like ID or Timestamp!\n  partition_by: [\"country_code\", \"txn_year_month\"]\n\n  # 2. Z-Ordering: Data clustering.\n  # Use for high-cardinality columns often used in JOINs or predicates.\n  zorder_by: [\"customer_id\", \"product_id\"]\n\n  # 3. Table Properties: Engine tuning.\n  table_properties:\n    \"delta.autoOptimize.optimizeWrite\": \"true\"\n    \"delta.autoOptimize.autoCompact\": \"true\"\n```",
       "properties": {
         "connection": {
@@ -7304,13 +7600,16 @@
         "azure_blob",
         "delta",
         "sql_server",
-        "http"
+        "http",
+        "unity_catalog",
+        "databricks"
       ],
       "title": "ConnectionType",
       "type": "string"
     },
     "BaseConnectionConfig": {
-      "description": "Base configuration for all connections.",
+      "additionalProperties": false,
+      "description": "Base configuration for all connections.\n\nStrict: unknown keys in a connection block (e.g. ``base_pth`` for\n``base_path``) are a hard error with a did-you-mean hint instead of being\nsilently dropped. The open-ended plugin escape hatch is\n:class:`CustomConnectionConfig` (``extra=\"allow\"``).",
       "properties": {
         "type": {
           "$ref": "#/$defs/ConnectionType"
@@ -7376,6 +7675,7 @@
       "type": "object"
     },
     "BooleanGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Boolean generator.\n\nExample:\n```yaml\ntype: boolean\ntrue_probability: 0.95\n```",
       "properties": {
         "type": {
@@ -7399,6 +7699,7 @@
       "type": "object"
     },
     "CategoricalGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Categorical generator for discrete values.\n\nExample:\n```yaml\ntype: categorical\nvalues: [Running, Idle, Error]\nweights: [0.8, 0.15, 0.05]\n```",
       "properties": {
         "type": {
@@ -7509,6 +7810,7 @@
       "type": "object"
     },
     "ConstantGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Constant value generator.\n\nExample:\n```yaml\ntype: constant\nvalue: \"production\"\n```",
       "properties": {
         "type": {
@@ -7529,6 +7831,7 @@
       "type": "object"
     },
     "DailyProfileGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Daily profile generator for time-of-day patterns.\n\nProduces values that follow a repeating daily curve defined by anchor points.\nThe engine interpolates between anchor points, adds noise, and clamps to\n[min, max]. Ideal for simulating occupancy, energy demand, traffic, call\nvolume, or any metric with a predictable intraday shape.\n\nExample (building occupancy):\n```yaml\ntype: daily_profile\nmin: 0\nmax: 25\nprecision: 0\nnoise: 1.5\ninterpolation: linear\nprofile:\n  \"00:00\": 1\n  \"06:00\": 3\n  \"08:00\": 19\n  \"12:00\": 15\n  \"13:00\": 22\n  \"17:00\": 14\n  \"22:00\": 2\n```\n\nExample (network traffic with weekend scaling):\n```yaml\ntype: daily_profile\nmin: 0.0\nmax: 1000.0\nnoise: 50.0\ninterpolation: linear\nweekend_scale: 0.3\nprofile:\n  \"00:00\": 50.0\n  \"06:00\": 100.0\n  \"09:00\": 800.0\n  \"12:00\": 650.0\n  \"13:00\": 750.0\n  \"17:00\": 900.0\n  \"20:00\": 400.0\n  \"23:00\": 100.0\n```",
       "properties": {
         "type": {
@@ -7614,6 +7917,7 @@
       "type": "object"
     },
     "DerivedGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Derived column generator (calculated from other columns).\n\nExample:\n```yaml\ntype: derived\nexpression: \"temperature * 1.8 + 32\"  # Celsius to Fahrenheit\n```\n\nSupported operators:\n- Arithmetic: +, -, *, /, //, %, **\n- Comparison: ==, !=, <, <=, >, >=\n- Logical: and, or, not\n- Functions: abs(), round(), min(), max()\n\nExample (conditional):\n```yaml\ntype: derived\nexpression: \"100 if temperature > 80 else 0\"\n```",
       "properties": {
         "type": {
@@ -7644,6 +7948,7 @@
       "type": "string"
     },
     "EmailGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Email address generator.\n\nExample:\n```yaml\ntype: email\ndomain: example.com\n```",
       "properties": {
         "type": {
@@ -7671,6 +7976,7 @@
       "type": "object"
     },
     "GeoGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Geographic coordinate generator.\n\nExample:\n```yaml\ntype: geo\nbbox: [-90, -180, 90, 180]  # [min_lat, min_lon, max_lat, max_lon]\n```",
       "properties": {
         "type": {
@@ -7705,6 +8011,7 @@
       "type": "object"
     },
     "IPGeneratorConfig": {
+      "additionalProperties": false,
       "description": "IPv4 address generator.\n\nExample:\n```yaml\ntype: ipv4\nsubnet: \"192.168.0.0/16\"\n```",
       "properties": {
         "type": {
@@ -7742,6 +8049,7 @@
       "type": "string"
     },
     "RandomWalkGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Random walk generator for realistic time-series data.\n\nProduces values where each row depends on the previous row's value,\ncreating smooth, realistic process data instead of independent random values.\n\nUses an Ornstein-Uhlenbeck process with optional trend for realistic\nsimulation of controlled process variables (temperatures, pressures, flow rates).\n\nExample (static setpoint):\n```yaml\ntype: random_walk\nstart: 350.0\nmin: 300.0\nmax: 400.0\nvolatility: 0.5\nmean_reversion: 0.1\ntrend: 0.001\nprecision: 1\nshock_rate: 0.02\nshock_magnitude: 30.0\nshock_bias: 1.0\n```\n\nExample (dynamic setpoint - temperature tracking ambient):\n```yaml\n- name: ambient_temp_c\n  generator:\n    type: random_walk\n    start: 25.0\n    min: 15.0\n    max: 35.0\n    volatility: 0.3\n    mean_reversion: 0.05\n\n- name: battery_temp_c\n  generator:\n    type: random_walk\n    start: 28.0\n    min: 20.0\n    max: 40.0\n    volatility: 0.4\n    mean_reversion: 0.1\n    mean_reversion_to: ambient_temp_c  # Drifts toward ambient\n```",
       "properties": {
         "type": {
@@ -7847,6 +8155,7 @@
       "type": "object"
     },
     "RangeGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Range generator for numeric values.\n\nExample:\n```yaml\ntype: range\nmin: 50.0\nmax: 100.0\ndistribution: normal\n```",
       "properties": {
         "type": {
@@ -7905,6 +8214,7 @@
       "type": "object"
     },
     "SequentialGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Sequential number generator.\n\nBy default, generates globally unique IDs across all entities by offsetting\neach entity's sequence range. Entity 0 gets IDs [start, start + rows),\nentity 1 gets [start + rows, start + 2*rows), etc.\n\nSet ``unique_across_entities: false`` for per-entity sequences (all entities\nshare the same ID range).\n\nExample:\n```yaml\ntype: sequential\nstart: 1\nstep: 1\nunique_across_entities: true  # default\n```",
       "properties": {
         "type": {
@@ -7951,6 +8261,7 @@
       "type": "string"
     },
     "TimestampGeneratorConfig": {
+      "additionalProperties": false,
       "description": "Timestamp generator (uses simulation scope).\n\nExample:\n```yaml\ntype: timestamp\n```",
       "properties": {
         "type": {
@@ -7966,6 +8277,7 @@
       "type": "object"
     },
     "UUIDGeneratorConfig": {
+      "additionalProperties": false,
       "description": "UUID/GUID generator.\n\nExample:\n```yaml\ntype: uuid\nversion: 4  # UUID4 (random) or UUID5 (deterministic from namespace)\n```",
       "properties": {
         "type": {
@@ -8380,6 +8692,7 @@
       "type": "object"
     },
     "ProjectConfig": {
+      "additionalProperties": false,
       "description": "Complete project configuration from YAML.\n\n### \ud83c\udfe2 \"Enterprise Setup\" Guide\n\n**Business Problem:**\n\"We need a robust production environment with alerts, retries, and proper logging.\"\n\n**Recipe: Production Ready**\n```yaml\nproject: \"Customer360\"\nengine: \"spark\"\n\n# 1. Resilience\nretry:\n    enabled: true\n    max_attempts: 3\n    backoff: \"exponential\"\n\n# 2. Observability\nlogging:\n    level: \"INFO\"\n    structured: true  # JSON logs for Splunk/Datadog\n\n# 3. Alerting\nalerts:\n    - type: \"slack\"\n    url: \"${SLACK_WEBHOOK_URL}\"\n    on_events: [\"on_failure\"]\n\n# ... connections and pipelines ...\n```",
       "properties": {
         "project": {
@@ -8394,7 +8707,7 @@
         },
         "connections": {
           "additionalProperties": {
-            "anyOf": [
+            "oneOf": [
               {
                 "$ref": "#/$defs/LocalConnectionConfig"
               },
@@ -8403,6 +8716,12 @@
               },
               {
                 "$ref": "#/$defs/DeltaConnectionConfig"
+              },
+              {
+                "$ref": "#/$defs/UnityCatalogConnectionConfig"
+              },
+              {
+                "$ref": "#/$defs/DatabricksConnectionConfig"
               },
               {
                 "$ref": "#/$defs/SQLServerConnectionConfig"
@@ -8802,6 +9121,7 @@
       "type": "object"
     },
     "SimulationConfig": {
+      "additionalProperties": false,
       "description": "Complete simulation configuration.\n\nExample:\n```yaml\nread:\n  connection: null\n  format: simulation\n  options:\n    simulation:\n      scope:\n        start_time: \"2026-01-01T00:00:00Z\"\n        timestep: \"5m\"\n        row_count: 10000\n        seed: 42\n      entities:\n        count: 10\n        id_prefix: pump_\n      columns:\n        - name: entity_id\n          data_type: string\n          generator:\n            type: constant\n            value: \"{entity_id}\"\n        - name: timestamp\n          data_type: timestamp\n          generator:\n            type: timestamp\n        - name: temperature\n          data_type: float\n          generator:\n            type: range\n            min: 60.0\n            max: 80.0\n            distribution: normal\n          null_rate: 0.02\n      chaos:\n        outlier_rate: 0.01\n        outlier_factor: 3.0\n```",
       "properties": {
         "scope": {
@@ -8847,6 +9167,20 @@
         "columns"
       ],
       "title": "SimulationConfig",
+      "type": "object"
+    },
+    "StrictModel": {
+      "additionalProperties": false,
+      "description": "Base model that rejects unknown keys with a \"did you mean?\" hint.\n\nMost config typos used to be silently dropped (Pydantic's default\n``extra=\"ignore\"``), so an AI agent could misspell a key and get a green\nvalidation with no effect at runtime. Strict models make that a hard error\nand suggest the closest valid field \u2014 so wrong YAML fails loudly and early.\n\nGenuinely open-ended payloads (engine ``options``, transformer ``params``,\ncustom connections) are typed as ``Dict[str, Any]`` / ``extra=\"allow\"`` and\nare intentionally NOT strict.",
+      "properties": {},
+      "title": "StrictModel",
+      "type": "object"
+    },
+    "_SimGeneratorBase": {
+      "additionalProperties": false,
+      "description": "Base for all simulation generator configs.\n\nInherits StrictModel: unknown fields (e.g. ``noise`` instead of\n``volatility``) raise a validation error with a did-you-mean hint and the\nlist of allowed keys, instead of being silently dropped and falling back to\ndefaults.",
+      "properties": {},
+      "title": "_SimGeneratorBase",
       "type": "object"
     },
     "RecipeConfig": {
@@ -9317,6 +9651,7 @@
         "add_prefix",
         "add_suffix",
         "aggregate",
+        "apply_mapping",
         "case_when",
         "cast_columns",
         "clean_text",
@@ -9338,6 +9673,7 @@
         "extract_date_parts",
         "fill_nulls",
         "filter_rows",
+        "flatten_struct",
         "fluid_properties",
         "generate_numeric_key",
         "generate_surrogate_key",
@@ -9355,6 +9691,7 @@
         "regex_replace",
         "rename_columns",
         "replace_values",
+        "row_number",
         "sample",
         "saturation_properties",
         "scd2",
@@ -9371,7 +9708,7 @@
         "validate_and_flag",
         "window_calculation"
       ],
-      "description": "Available transformers: 56 registered"
+      "description": "Available transformers: 59 registered"
     },
     "AddPrefixParams": {
       "description": "Configuration for adding a prefix to column names.\n\nExample - All columns:\n```yaml\nadd_prefix:\n  prefix: \"src_\"\n```\n\nExample - Specific columns:\n```yaml\nadd_prefix:\n  prefix: \"raw_\"\n  columns: [\"id\", \"name\", \"value\"]\n```",
@@ -9504,6 +9841,74 @@
         "aggregations"
       ],
       "title": "AggregateParams",
+      "type": "object"
+    },
+    "ApplyMappingParams": {
+      "description": "Configuration for lookup-based value replacement using an external mapping table.\n\nUnlike ``dict_based_mapping`` (inline dict), this joins to a named dataset\nin context \u2014 suitable for large reference tables loaded from connections.\n\nExample:\n```yaml\napply_mapping:\n  column: status_code\n  mapping_source: ref_status_codes\n  source_key: code\n  source_value: description\n  output: status_description\n  default: \"Unknown\"\n```",
+      "properties": {
+        "column": {
+          "description": "Column in the main DataFrame to map",
+          "title": "Column",
+          "type": "string"
+        },
+        "mapping_source": {
+          "description": "Name of the mapping dataset registered in context",
+          "title": "Mapping Source",
+          "type": "string"
+        },
+        "source_key": {
+          "description": "Key column in the mapping table to join on",
+          "title": "Source Key",
+          "type": "string"
+        },
+        "source_value": {
+          "description": "Value column in the mapping table to pull from",
+          "title": "Source Value",
+          "type": "string"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Output column name (default: overwrite the source column)",
+          "title": "Output"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default value for unmatched rows (default: NULL). Accepts str/int/float/bool.",
+          "title": "Default"
+        }
+      },
+      "required": [
+        "column",
+        "mapping_source",
+        "source_key",
+        "source_value"
+      ],
+      "title": "ApplyMappingParams",
       "type": "object"
     },
     "CaseWhenCase": {
@@ -10286,6 +10691,53 @@
       "title": "FilterRowsParams",
       "type": "object"
     },
+    "FlattenStructParams": {
+      "description": "Configuration for flattening nested struct/dict columns.\n\nRecursive alternative to ``unpack_struct`` with depth control, custom\nprefix, and separator.\n\nExample \u2014 single level:\n```yaml\nflatten_struct:\n  column: metadata\n```\n\nExample \u2014 multi-level with prefix:\n```yaml\nflatten_struct:\n  column: metadata\n  prefix: meta_\n  depth: 2\n  separator: _\n```",
+      "properties": {
+        "column": {
+          "description": "Struct/dict column to flatten",
+          "title": "Column",
+          "type": "string"
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prefix for output columns (default: '{column}{separator}')",
+          "title": "Prefix"
+        },
+        "depth": {
+          "default": 1,
+          "description": "Max nesting depth to flatten (default: 1)",
+          "minimum": 1,
+          "title": "Depth",
+          "type": "integer"
+        },
+        "separator": {
+          "default": "_",
+          "description": "Separator between nested field names",
+          "title": "Separator",
+          "type": "string"
+        },
+        "drop_source": {
+          "default": true,
+          "description": "Drop the original struct column after flattening",
+          "title": "Drop Source",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "column"
+      ],
+      "title": "FlattenStructParams",
+      "type": "object"
+    },
     "PropertyOutputConfig": {
       "description": "Configuration for a single output property.",
       "properties": {
@@ -10625,9 +11077,13 @@
                 "type": "string"
               },
               "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Column(s) to join on",
+          "default": null,
+          "description": "Column(s) to join on. Not required for cross joins.",
           "title": "On"
         },
         "how": {
@@ -10660,8 +11116,7 @@
         }
       },
       "required": [
-        "right_dataset",
-        "on"
+        "right_dataset"
       ],
       "title": "JoinParams",
       "type": "object"
@@ -11416,6 +11871,51 @@
       "title": "ReplaceValuesParams",
       "type": "object"
     },
+    "RowNumberParams": {
+      "description": "Configuration for row_number \u2014 assigns sequential integers to rows.\n\nSimpler alternative to ``window_calculation`` for the common case of\nnumbering rows within optional partitions.\n\nExample \u2014 global row number:\n```yaml\nrow_number:\n  output: row_num\n```\n\nExample \u2014 per-department, ordered by hire_date:\n```yaml\nrow_number:\n  output: row_num\n  partition_by: [department]\n  order_by: [hire_date]\n```",
+      "properties": {
+        "output": {
+          "default": "row_num",
+          "description": "Name of the output column",
+          "title": "Output",
+          "type": "string"
+        },
+        "partition_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Columns to partition by (optional)",
+          "title": "Partition By"
+        },
+        "order_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Columns to order by within each partition (optional)",
+          "title": "Order By"
+        }
+      },
+      "title": "RowNumberParams",
+      "type": "object"
+    },
     "SampleParams": {
       "description": "Configuration for random sampling.\n\nExample:\n```yaml\nsample:\n  fraction: 0.1\n  seed: 42\n```",
       "properties": {
@@ -11675,6 +12175,19 @@
           "default": null,
           "description": "Hours to retain for VACUUM after SCD2 write (Spark only). Set to 168 for 7 days. None disables VACUUM.",
           "title": "Vacuum Hours"
+        },
+        "target_format": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Declared write format of the node (delta, parquet, ...). When delta, the SCD2 history is persisted as Delta instead of parquet so the pattern and the node write agree on the target format.",
+          "title": "Target Format"
         }
       },
       "required": [
@@ -12122,6 +12635,7 @@
       "type": "object"
     }
   },
+  "additionalProperties": false,
   "description": "Configuration schema for Odibi data pipelines. Generated from Pydantic models - do not edit manually.",
   "properties": {
     "project": {
@@ -12136,7 +12650,7 @@
     },
     "connections": {
       "additionalProperties": {
-        "anyOf": [
+        "oneOf": [
           {
             "$ref": "#/$defs/LocalConnectionConfig"
           },
@@ -12145,6 +12659,12 @@
           },
           {
             "$ref": "#/$defs/DeltaConnectionConfig"
+          },
+          {
+            "$ref": "#/$defs/UnityCatalogConnectionConfig"
+          },
+          {
+            "$ref": "#/$defs/DatabricksConnectionConfig"
           },
           {
             "$ref": "#/$defs/SQLServerConnectionConfig"

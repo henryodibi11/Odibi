@@ -511,6 +511,19 @@ def create_unity_catalog_connection(name: str, config: Dict[str, Any]) -> Any:
     return connection
 
 
+def create_databricks_connection(name: str, config: Dict[str, Any]) -> Any:
+    """Build a remote compute connection without opening a session."""
+    from odibi.connections.databricks import DatabricksConnection
+
+    return DatabricksConnection(
+        host=config["host"],
+        client_id=config["client_id"],
+        client_secret=config["client_secret"],
+        cluster_id=config.get("cluster_id"),
+        serverless=config.get("serverless", False),
+    )
+
+
 def register_builtins():
     """Register all built-in connection factories."""
     register_connection_factory("local", create_local_connection)
@@ -533,3 +546,4 @@ def register_builtins():
 
     # Unity Catalog
     register_connection_factory("unity_catalog", create_unity_catalog_connection)
+    register_connection_factory("databricks", create_databricks_connection)

@@ -401,6 +401,12 @@ wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && py
 
 **Read this before writing mock-based Spark tests. These pitfalls cost significant time to figure out.**
 
+### Databricks Connect Environments
+
+- Install a runtime/Python-matched `databricks-connect` separately from `odibi[spark]`, `[all]` and `[dev]`; those extras install conflicting PySpark packages. See `docs/setup_databricks_connect.md` for compatible environment examples.
+- SDK `Config` fills omitted compute targets from environment/profile defaults. Remove the unused target with `config.as_dict().pop(...)` after construction; assigning `None` stringifies it to `"None"` rather than clearing it.
+- `tests/unit/connections/test_databricks.py` covers typed YAML/env loading, lazy factories, session reuse/precedence, invalid targets and sanitized setup failures without remote credentials. Keep remote session tests offline unless workspace access is explicitly authorized.
+
 ### Safe Diagnostics Are Not Execution Inputs
 
 - Use `odibi.utils.artifacts.safe_artifact` at diagnostic serialization owners; keep original models, hashes, watermarks and resource locators for execution. Do not redact `model_dump` globally.

@@ -1963,6 +1963,11 @@ class PipelineManager:
                     spark = temp_engine.spark
                     self._ctx.debug("Spark session initialized for System Catalog")
                 except Exception as e:
+                    from odibi.connections.databricks import DatabricksConnection
+
+                    if any(isinstance(c, DatabricksConnection) for c in connections.values()):
+                        # Explicit remote compute must not silently become a local catalog.
+                        raise
                     self._ctx.warning(
                         f"Failed to initialize Spark for System Catalog: {e}",
                         suggestion="Check Spark configuration",
