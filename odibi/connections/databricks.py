@@ -63,6 +63,8 @@ class DatabricksConnection(BaseConnection):
                 client_id=self.config.client_id,
                 client_secret=self.config.client_secret.get_secret_value(),
                 auth_type="oauth-m2m",
+                # Explicit credentials must not load an unrelated shell profile.
+                profile="",
                 cluster_id=self.config.cluster_id,
                 serverless_compute_id="auto" if self.config.serverless else None,
             )

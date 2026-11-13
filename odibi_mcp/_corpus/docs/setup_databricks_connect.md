@@ -136,10 +136,11 @@ Errors deliberately omit raw SDK exception text because it can contain secrets.
 Check permissions, network access, runtime/Python compatibility and credentials
 without printing secrets or enabling unsafe SDK HTTP debug logging.
 
-The SDK also reads ambient configuration. If `DATABRICKS_CONFIG_PROFILE` names a
-missing profile, even explicit credentials can fail during SDK configuration.
-Remove that unused variable from the current test shell or select a valid profile;
-do not print the configuration file or credentials to diagnose it. Python 3.14 is
+Odibi's explicit Databricks credentials do not select an ambient SDK profile:
+even a missing `DATABRICKS_CONFIG_PROFILE` does not override this YAML connection.
+Your shell environment and configuration file are not modified. In Odibi 3.16.0,
+a missing ambient profile could still block setup; upgrade rather than changing
+your global profile settings. Do not print credentials to diagnose setup. Python 3.14 is
 not an appropriate replacement for the runtime-matched interpreter above: Odibi's
 constrained PyArrow versions may lack wheels and fall back to an unsupported build.
 

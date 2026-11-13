@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Explicit Databricks credentials take precedence** — An unrelated ambient
+  `DATABRICKS_CONFIG_PROFILE` no longer blocks YAML-configured OAuth M2M session
+  setup when that profile is missing. Shell/profile settings remain unchanged.
 - **Databricks discovery for humans and AI** — Expanded compute/UC/storage setup
   guidance, bundled the Databricks setup page and snapshot guide into the MCP corpus,
   exposed Databricks connection fields through MCP schemas/explanations, and linked
