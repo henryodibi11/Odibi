@@ -194,15 +194,15 @@ class PolarsEngine(Engine):
                 storage_options = options.get("storage_options", None)
                 version = options.get("versionAsOf", None)
 
-                # scan_delta is available in recent polars
-                # It might accept storage_options in recent versions
+                # Use the public Arrow dataset scanner: the native Polars scanner
+                # expects a schema API absent from supported delta-rs <0.30.
                 delta_opts = {}
                 if storage_options:
                     delta_opts["storage_options"] = storage_options
                 if version is not None:
                     delta_opts["version"] = version
 
-                return pl.scan_delta(full_path, **delta_opts)
+                return pl.scan_delta(full_path, use_pyarrow=True, **delta_opts)
 
             elif format == "excel":
                 # Excel format: delegate to Pandas (best Excel support), convert to Polars

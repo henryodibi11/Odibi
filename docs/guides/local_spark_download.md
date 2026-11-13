@@ -100,6 +100,9 @@ outside the public Odibi checkout.
 
 ## Continue locally
 
+Polars Delta reads use the lazy Arrow dataset scanner for compatibility with
+Odibi's supported delta-rs versions; they do not require a newer delta-rs schema API.
+
 In a separate project configured with `engine: polars` (or `pandas`), use the
 same local connection and read the snapshot:
 

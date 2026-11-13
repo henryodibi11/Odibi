@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Polars Delta rereads** — Use the lazy Arrow dataset scanner for compatibility
+  with Odibi's supported delta-rs versions, preserving local snapshot rereads,
+  partitioned tables and version selection.
 - **Explicit Databricks credentials take precedence** — An unrelated ambient
   `DATABRICKS_CONFIG_PROFILE` no longer blocks YAML-configured OAuth M2M session
   setup when that profile is missing. Shell/profile settings remain unchanged.

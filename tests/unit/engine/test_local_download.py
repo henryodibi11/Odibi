@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from odibi.config import NodeConfig, PerformanceConfig, WriteConfig
 from odibi.connections.local import LocalConnection
+from odibi.engine.polars_engine import PolarsEngine
 from odibi.engine.spark_engine import SparkEngine
 from odibi.node import NodeExecutor
 
@@ -86,6 +87,14 @@ def test_delta_snapshot_values_schema_modes_and_limit(engine, data, tmp_path):
     assert DeltaTable(path).to_pyarrow_table().num_rows == 6
     engine.write(RemoteResult(data.slice(1, 1)), **kwargs)
     assert DeltaTable(path).to_pyarrow_table().to_pylist() == data.slice(1, 1).to_pylist()
+    local = PolarsEngine()
+    reread = local.materialize(local.read(connection, "delta", path="snapshot"))
+    assert reread.to_dicts() == data.slice(1, 1).to_pylist()
+    assert reread.to_arrow().schema.field("amount").type == pa.decimal128(12, 2)
+    original = local.materialize(
+        local.read(connection, "delta", path="snapshot", options={"versionAsOf": 0})
+    )
+    assert sorted(original.to_dicts(), key=str) == sorted(data.to_pylist(), key=str)
 
 
 def test_empty_typed_snapshot_and_partitioned_output(engine, data, tmp_path):
@@ -106,6 +115,10 @@ def test_empty_typed_snapshot_and_partitioned_output(engine, data, tmp_path):
         options={"local_download": {"max_rows": 3}, "partition_by": ["id"]},
     )
     assert DeltaTable(connection.get_path("partitioned")).metadata().partition_columns == ["id"]
+    local = PolarsEngine()
+    assert local.materialize(local.read(connection, "delta", path="empty")).height == 0
+    partitioned = local.materialize(local.read(connection, "delta", path="partitioned"))
+    assert sorted(partitioned.to_dicts(), key=str) == sorted(data.to_pylist(), key=str)
 
 
 def test_download_schema_evolution(engine, data, tmp_path):
