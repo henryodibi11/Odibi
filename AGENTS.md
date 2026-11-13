@@ -404,6 +404,7 @@ wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && py
 ### Databricks Connect Environments
 
 - Install a runtime/Python-matched `databricks-connect` separately from `odibi[spark]`, `[all]` and `[dev]`; those extras install conflicting PySpark packages. See `docs/setup_databricks_connect.md` for compatible environment examples.
+- Starter install defaults live in the generated Dockerfile and CI in `odibi/cli/init_pipeline.py`, not only in installation docs. Keep those defaults local-Pandas-only; `tests/unit/cli/test_cli_init_pipeline.py` checks their actual package requirements.
 - SDK `Config` fills omitted compute targets from environment/profile defaults. Remove the unused target with `config.as_dict().pop(...)` after construction; assigning `None` stringifies it to `"None"` rather than clearing it.
 - Explicit OAuth configuration must pass `profile=""` to SDK `Config`; omitting it (or passing `None`) lets a missing ambient `DATABRICKS_CONFIG_PROFILE` block setup before session creation. Test real SDK file/env loading with only network/auth boundaries stubbed; leave the caller's environment unchanged.
 - `tests/unit/connections/test_databricks.py` covers typed YAML/env loading, lazy factories, session reuse/precedence, invalid targets and sanitized setup failures without remote credentials. Keep remote session tests offline unless workspace access is explicitly authorized.

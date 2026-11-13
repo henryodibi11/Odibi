@@ -252,12 +252,11 @@ pip install odibi
 # With Polars engine
 pip install "odibi[polars]"
 
-# With Spark + Azure support
+# Standalone Spark + Azure (not Databricks Connect or managed Databricks)
 pip install "odibi[spark,azure]"
-
-# All engines and features
-pip install "odibi[all]"
 ```
+
+For Databricks Connect, use a runtime-matched environment without Odibi's `[spark]`, `[all]` or `[dev]` extras. Inside Databricks, reuse its Spark runtime and install base Odibi plus only the non-Spark extras you need. See the [installation guide](docs/guides/installation.md) to choose an environment; `[all]` is an opt-in standalone bundle, not a universal setup.
 
 ---
 

@@ -1,6 +1,6 @@
 # AI Assistant Setup Guide
 
-This guide explains how to set up AI coding assistants (Continue, Cline, Amp) to work with odibi using MCP (Model Context Protocol) servers.
+This guide explains how to set up AI coding assistants (OpenCode, Continue, Cline, Amp) to work with odibi using MCP (Model Context Protocol) servers.
 
 ## Overview
 
@@ -13,6 +13,10 @@ Odibi includes an MCP server (`odibi-knowledge`) that gives AI assistants perfec
 ## Installation
 
 ### 1. Install odibi with MCP support
+
+For a consumer project, install the published package with the non-Spark extras you need, such as `python -m pip install "odibi[mcp]"` or `"odibi[mcp,polars]"`; cloning Odibi is only needed when working on the framework itself. First select the execution environment using the [installation guide](installation.md). A Databricks Connect client needs a runtime-matched interpreter and Connect package; do not add `[spark]`, `[all]` or `[dev]`. Inside Databricks, reuse its provided Spark runtime rather than installing Connect or standalone Spark.
+
+The source-checkout example below is for a separate local framework/MCP environment. For Connect, follow [its setup guide](../setup_databricks_connect.md) instead of creating an environment with an arbitrary Python version.
 
 ```bash
 # Clone the repository

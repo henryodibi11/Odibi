@@ -1,6 +1,7 @@
 """Tests for odibi.cli.init_pipeline — init-pipeline command and template maps."""
 
 import os
+import shlex
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -216,6 +217,19 @@ class TestInitPipelineHappyPath:
         ci = tmp_path / "proj" / ".github" / "workflows" / "ci.yaml"
         assert ci.is_file()
         assert "Odibi CI" in ci.read_text()
+
+    @pytest.mark.parametrize("artifact", ["Dockerfile", ".github/workflows/ci.yaml"])
+    def test_starter_installs_odibi_without_spark_extras(self, workspace, artifact):
+        tmp_path, _ = workspace
+        assert init_pipeline_command(_make_args(name="proj")) == 0
+        requirements = []
+        for line in (tmp_path / "proj" / artifact).read_text().splitlines():
+            words = shlex.split(line)
+            if "pip" in words and "install" in words:
+                requirements.extend(
+                    word for word in words[words.index("install") + 1 :] if word.startswith("odibi")
+                )
+        assert requirements == ["odibi"]
 
     def test_creates_mcp_config(self, workspace):
         tmp_path, _ = workspace

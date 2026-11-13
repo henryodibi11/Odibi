@@ -107,7 +107,8 @@ def _copy_assistant() -> None:
 
 def _build_index(doc_files: list[Path]) -> None:
     entries = []
-    for md in sorted(doc_files):
+    # Path ordering is case-insensitive on Windows; keep the index portable.
+    for md in sorted(doc_files, key=lambda path: path.parts):
         rel = md.relative_to(CORPUS)
         title, summary = _title_and_summary(md)
         entries.append(
