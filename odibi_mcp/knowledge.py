@@ -372,38 +372,50 @@ pm.run("pipeline_name")""",
         return result
 
     def search_docs(self, query: str) -> list[dict[str, Any]]:
-        """Search documentation files for a keyword/phrase.
+        """Search documents containing all query terms, ranking exact phrases first.
 
         Args:
-            query: Search term
+            query: Case-insensitive, whitespace-separated search terms.
         """
+        terms = query.casefold().split()
+        if not terms:
+            return []
+        phrase = " ".join(terms)
         results = []
-        query_lower = query.lower()
 
         docs_dir = self.odibi_root / "docs"
         for md in docs_dir.rglob("*.md"):
             try:
                 content = md.read_text(encoding="utf-8")
-                if query_lower in content.lower():
-                    # Find matching lines
-                    lines = content.split("\n")
-                    matches = []
-                    for i, line in enumerate(lines):
-                        if query_lower in line.lower():
-                            matches.append({"line": i + 1, "text": line.strip()[:100]})
-                            if len(matches) >= 3:
-                                break
+                content_lower = content.casefold()
+                if not all(term in content_lower for term in terms):
+                    continue
 
-                    results.append(
+                matches = []
+                for number, line in enumerate(content.splitlines(), 1):
+                    line_lower = line.casefold()
+                    count = sum(term in line_lower for term in terms)
+                    if count:
+                        matches.append((phrase not in line_lower, -count, number, line))
+                matches.sort()
+
+                results.append(
+                    (
+                        phrase not in content_lower,
                         {
                             "path": md.relative_to(self.odibi_root).as_posix(),
-                            "matches": matches,
-                        }
+                            "matches": [
+                                {"line": number, "text": line.strip()[:100]}
+                                for _, _, number, line in matches[:3]
+                            ],
+                        },
                     )
+                )
             except Exception:
                 continue
 
-        return results[:20]  # Limit results
+        results.sort(key=lambda result: (result[0], result[1]["path"]))
+        return [result for _, result in results[:20]]
 
     # =========================================================================
     # Skills (progressive disclosure) + onboarding

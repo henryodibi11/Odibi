@@ -674,7 +674,7 @@ class OdibiDispatcher:
                 {
                     "name": "search_docs",
                     "signature": "query",
-                    "description": "Full-text search across 80+ documentation files",
+                    "description": "Case-insensitive search for all query terms; exact phrases rank first",
                 },
                 {
                     "name": "get_doc",

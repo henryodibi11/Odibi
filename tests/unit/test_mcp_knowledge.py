@@ -1,5 +1,7 @@
 """Tests for odibi_mcp knowledge tools."""
 
+from pathlib import Path
+
 import pytest
 
 
@@ -262,6 +264,53 @@ project: test
         result = knowledge.search_docs("SCD2")
         assert isinstance(result, list)
         assert len(result) > 0
+
+    @pytest.mark.parametrize("packaged", [False, True], ids=["source", "packaged"])
+    def test_search_docs_finds_databricks_profile(self, packaged):
+        from odibi_mcp.knowledge import OdibiKnowledge
+
+        root = Path(__file__).resolve().parents[2]
+        if packaged:
+            root = root / "odibi_mcp" / "_corpus"
+        knowledge = OdibiKnowledge(root)
+
+        for query in ("databricks profile", "  DaTaBrIcKs\t PROFILE  "):
+            results = knowledge.search_docs(query)
+            assert any(hit["path"] == "docs/setup_databricks_connect.md" for hit in results)
+
+    def test_search_docs_ranks_phrases_before_term_matches_and_limits_results(self, tmp_path):
+        from odibi_mcp.knowledge import OdibiKnowledge
+
+        docs = tmp_path / "docs"
+        docs.mkdir()
+        content = (
+            "Databricks\nDatabricks\nDatabricks\n\nProfile authentication using Databricks CLI\n"
+        )
+        for index in range(22):
+            (docs / f"a-terms-{index:02}.md").write_text(content, encoding="utf-8")
+        (docs / "z-phrase.md").write_text("Databricks profile setup\n", encoding="utf-8")
+        (docs / "missing-term.md").write_text("Databricks compute only\n", encoding="utf-8")
+        (docs / "split-lines.md").write_text(
+            "Databricks compute\nNamed profile\n", encoding="utf-8"
+        )
+        knowledge = OdibiKnowledge(tmp_path)
+
+        results = knowledge.search_docs("databricks profile")
+
+        assert [hit["path"] for hit in results] == ["docs/z-phrase.md"] + [
+            f"docs/a-terms-{index:02}.md" for index in range(19)
+        ]
+        matches = results[1]["matches"]
+        assert len(matches) == 3
+        assert matches[0] == {"line": 5, "text": "Profile authentication using Databricks CLI"}
+        for match in matches:
+            assert match["text"] == content.splitlines()[match["line"] - 1].strip()
+        assert knowledge.search_docs("compute profile")[0]["path"] == "docs/split-lines.md"
+        assert knowledge.search_docs("databricks nonexistent") == []
+
+    @pytest.mark.parametrize("query", ["", " \t\n"])
+    def test_search_docs_empty_query_returns_no_results(self, knowledge, query):
+        assert knowledge.search_docs(query) == []
 
     def test_get_example(self, knowledge):
         """Test get_example returns working example."""
