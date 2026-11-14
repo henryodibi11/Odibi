@@ -3738,7 +3738,7 @@ class Node:
             storage_opts = self.catalog_manager._get_storage_options()
             environment = getattr(self.catalog_manager.config, "environment", None)
             backend = CatalogStateBackend(
-                spark_session=spark_session,
+                spark_session=self.catalog_manager.spark,
                 meta_state_path=self.catalog_manager.tables.get("meta_state"),
                 meta_runs_path=self.catalog_manager.tables.get("meta_runs"),
                 storage_options=storage_opts if storage_opts else None,

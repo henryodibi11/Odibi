@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.2] — 2026-11-14
+
+### Fixed
+
+- **Local metadata with remote Databricks compute** — An explicitly local system
+  connection now uses the client-side Delta backend even when pipeline nodes run
+  on Databricks Connect. Catalog initialization, run history, derived summaries
+  and node/pipeline state remain local, including watermark rereads after restart.
+  Local stories remain independent of remote compute. Existing local Spark,
+  URI-backed and Unity Catalog metadata selection is unchanged; failed remote
+  session setup still fails rather than silently falling back.
+
 ## [3.17.1] — 2026-11-13
 
 ### Fixed
