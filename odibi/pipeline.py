@@ -530,7 +530,11 @@ class Pipeline:
                     backend = create_state_backend(
                         config=self.project_config,
                         project_root=".",
-                        spark_session=getattr(self.engine, "spark", None),
+                        spark_session=(
+                            self.catalog_manager.spark
+                            if self.catalog_manager is not None
+                            else getattr(self.engine, "spark", None)
+                        ),
                     )
                     state_manager = StateManager(backend=backend)
                     self._ctx.debug("StateManager initialized for resume capability")
@@ -1320,7 +1324,11 @@ class Pipeline:
                     backend = create_state_backend(
                         config=self.project_config,
                         project_root=".",
-                        spark_session=getattr(self.engine, "spark", None),
+                        spark_session=(
+                            self.catalog_manager.spark
+                            if self.catalog_manager is not None
+                            else getattr(self.engine, "spark", None)
+                        ),
                     )
                     state_manager = StateManager(backend=backend)
                 except Exception as e:
@@ -1976,6 +1984,18 @@ class PipelineManager:
             sys_conn = connections.get(project_config.system.connection)
             if sys_conn:
                 base_path = sys_conn.get_path(project_config.system.path)
+
+                from odibi.connections.databricks import DatabricksConnection
+                from odibi.connections.local import LocalConnection
+
+                if (
+                    isinstance(sys_conn, LocalConnection)
+                    and not sys_conn.is_uri
+                    and any(isinstance(c, DatabricksConnection) for c in connections.values())
+                ):
+                    # Explicit client-local metadata is independent of remote compute.
+                    # The remote session above must still initialize successfully.
+                    spark = None
 
                 if not spark:
                     try:

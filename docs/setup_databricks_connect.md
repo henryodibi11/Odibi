@@ -99,6 +99,41 @@ cannot read arbitrary paths on your laptop; use data locations visible to comput
 are distinct from data paths read remotely by Spark. ADLS configuration can be
 restricted on shared/serverless compute; prefer UC storage credentials there.
 
+### Keep metadata and stories on the laptop
+
+With an explicit `databricks` compute connection, a non-URI `type: local`
+system connection stores the system catalog and state on the Python client's
+filesystem using Pandas/delta-rs, not remote Spark. Pipeline nodes still run
+on Databricks. No remote metadata schema or download node is required:
+
+```yaml
+connections:
+  data:
+    type: local
+    base_path: data
+  # Keep the compute and warehouse connections from the example above.
+
+system:
+  connection: data
+  path: _system_catalog
+
+story:
+  connection: data
+  path: stories
+```
+
+This includes catalog bootstrap, run/node history, derived catalog summaries and
+state/watermark rereads after restarting Odibi. Relative paths resolve on the
+client; Windows drive paths are not sent to Databricks as Spark storage URIs.
+The local catalog uses the `deltalake` dependency (included in base Odibi).
+Keep its directory between runs when you want to retain history and watermarks.
+Local metadata and stories do not copy the warehouse table to your laptop.
+
+URI-backed storage (such as `dbfs:/...` or `abfss://...`) and Unity Catalog system
+connections retain their remote Spark backend. Ordinary local Spark and notebook
+session selection are unchanged. A failed Databricks session still fails setup;
+explicit local metadata is not a silent compute fallback.
+
 ## 4. Verify your actual workspace
 
 First use Databricks' environment diagnostic (configure the same standard

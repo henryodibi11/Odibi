@@ -412,6 +412,7 @@ wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && py
 - Polars 1.36's native `scan_delta` expects an iterable schema unavailable in delta-rs 0.25.5. Use public `scan_delta(..., use_pyarrow=True)` for the supported delta-rs range; verify lazy rereads, partitions, empty tables and `versionAsOf`, not only successful writes.
 - Check the actual Connect client for `toArrow()`: Databricks Connect 15.4.10 exposes it even though upstream Spark introduced it in 4.0. Use public collection APIs, not private transport internals. Decimal values can survive pandas conversion while declared precision changes; compare schemas as well as rows.
 - New top-level docs must be included in `scripts/build_corpus.py` to ship through installed MCP. Regenerate the corpus and test discovery with both repository and packaged roots; human MkDocs navigation alone does not establish MCP availability.
+- With explicit Databricks compute and non-URI local system storage, catalog and state must use client-local delta-rs, not the node execution session. Node and pipeline state inherit the catalog's session choice. `tests/unit/test_local_metadata_remote_compute.py` exercises persisted history/watermarks, stories, summaries and remote-storage/local-Spark controls. Run lifecycle tests with `system.async_derived_updates: false` so daemon Delta writes finish before interpreter teardown.
 
 ### Safe Diagnostics Are Not Execution Inputs
 
