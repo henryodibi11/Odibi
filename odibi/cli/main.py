@@ -194,6 +194,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print(f"Status: {result['status'].upper()}")
         print(f"Python: {result['python_version']}")
 
+        print("\n--- Actual process runtime ---")
+        print_table(result.get("runtime", {}))
+
         print("\n--- Packages ---")
         print_table(result.get("packages", {}))
 
@@ -207,7 +210,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 print("\n--- Connections ---")
                 print_table(result["connections"], "Connection Status")
         else:
-            print("\n✗ No project loaded")
+            print("\nProject/connection execution not checked (environment-only diagnostics)")
 
         if result.get("issues"):
             print("\n--- Issues ---")

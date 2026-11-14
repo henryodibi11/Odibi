@@ -699,6 +699,13 @@ class SparkEngine(Engine):
         # Read based on format
         if table:
             # Managed/External Table (Catalog)
+            # Match catalog connection detection in CatalogManager; filesystem
+            # connections must not turn session table names into local paths.
+            if connection.__class__.__name__ in (
+                "UnityCatalogConnection",
+                "DeltaCatalogConnection",
+            ):
+                table = connection.get_path(table)
             ctx.debug(f"Reading from catalog table: {table}")
 
             if streaming:

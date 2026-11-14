@@ -308,7 +308,7 @@ class TestCmdDoctor:
             result = cmd_doctor(args)
         assert result == 0
         captured = capsys.readouterr()
-        assert "No project loaded" in captured.out or "✗" in captured.out
+        assert "environment-only diagnostics" in captured.out
 
 
 # ---------------------------------------------------------------------------

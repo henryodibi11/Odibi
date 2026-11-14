@@ -635,19 +635,22 @@ adls_msi:
 ### `DatabricksConnectionConfig`
 > *Used in: [ProjectConfig](#projectconfig)*
 
-Remote Spark session using Databricks Connect and OAuth M2M.
+Remote Spark session using explicit OAuth M2M or a named CLI OAuth profile.
 
 Use environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.
-Choose exactly one compute target: ``cluster_id`` or ``serverless: true``.
+M2M requires host/client credentials and exactly one compute target.
+Alternatively set ``profile`` to use a saved databricks-cli OAuth login;
+host and compute come from that exact profile unless compute is overridden.
 Install a runtime-matched databricks-connect separately, not odibi[spark].
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **type** | Literal['databricks'] | No | `ConnectionType.DATABRICKS` | - |
 | **validation_mode** | ValidationMode | No | `ValidationMode.LAZY` | - |
-| **host** | str | Yes | - | Workspace HTTPS URL, not an account URL |
-| **client_id** | str | Yes | - | Databricks service principal application ID |
-| **client_secret** | SecretStr | Yes | - | Databricks OAuth secret (not an Azure secret) |
+| **host** | Optional[str] | No | - | M2M workspace HTTPS URL |
+| **client_id** | Optional[str] | No | - | - |
+| **client_secret** | Optional[SecretStr] | No | - | M2M OAuth secret |
+| **profile** | Optional[str] | No | - | Exact CLI OAuth profile |
 | **cluster_id** | Optional[str] | No | - | - |
 | **serverless** | bool | No | `False` | - |
 

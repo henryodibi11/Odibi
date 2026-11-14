@@ -704,26 +704,34 @@ class DeltaConnectionConfig(BaseConnectionConfig):
 
 
 class DatabricksConnectionConfig(BaseConnectionConfig):
-    """Remote Spark session using Databricks Connect and OAuth M2M.
+    """Remote Spark session using explicit OAuth M2M or a named CLI OAuth profile.
 
     Use environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.
-    Choose exactly one compute target: ``cluster_id`` or ``serverless: true``.
+    M2M requires host/client credentials and exactly one compute target.
+    Alternatively set ``profile`` to use a saved databricks-cli OAuth login;
+    host and compute come from that exact profile unless compute is overridden.
     Install a runtime-matched databricks-connect separately, not odibi[spark].
     """
 
     type: Literal[ConnectionType.DATABRICKS] = ConnectionType.DATABRICKS
-    host: str = Field(min_length=1, description="Workspace HTTPS URL, not an account URL")
-    client_id: str = Field(min_length=1, description="Databricks service principal application ID")
-    client_secret: SecretStr = Field(description="Databricks OAuth secret (not an Azure secret)")
+    host: Optional[str] = Field(default=None, min_length=1, description="M2M workspace HTTPS URL")
+    client_id: Optional[str] = Field(default=None, min_length=1)
+    client_secret: Optional[SecretStr] = Field(default=None, description="M2M OAuth secret")
+    profile: Optional[str] = Field(
+        default=None, min_length=1, description="Exact CLI OAuth profile"
+    )
     cluster_id: Optional[str] = Field(default=None, min_length=1)
     serverless: bool = False
 
-    @model_validator(mode="after")
-    def validate_remote_settings(self):
+    @field_validator("host")
+    @classmethod
+    def validate_workspace_host(cls, host):
         from urllib.parse import urlsplit
 
+        if host is None:
+            return host
         try:
-            url = urlsplit(self.host)
+            url = urlsplit(host)
             valid = (
                 url.scheme == "https"
                 and url.hostname
@@ -732,12 +740,26 @@ class DatabricksConnectionConfig(BaseConnectionConfig):
                 and url.path in ("", "/")
                 and not url.query
                 and not url.fragment
-                and not any(c.isspace() for c in self.host)
+                and not any(c.isspace() for c in host)
             )
         except ValueError:
             valid = False
         if not valid:
             raise ValueError("Databricks host must be a workspace HTTPS URL without credentials")
+        return host
+
+    @model_validator(mode="after")
+    def validate_remote_settings(self):
+        if self.cluster_id and self.serverless:
+            raise ValueError("Set only one of cluster_id or serverless: true")
+        if self.profile is not None:
+            if not self.profile.strip():
+                raise ValueError("Databricks profile must not be blank")
+            if any(value is not None for value in (self.host, self.client_id, self.client_secret)):
+                raise ValueError("profile cannot be combined with host or M2M credentials")
+            return self
+        if not self.host or not self.client_id or self.client_secret is None:
+            raise ValueError("Set profile, or provide host, client_id and client_secret for M2M")
         if bool(self.cluster_id) == self.serverless:
             raise ValueError("Set exactly one of cluster_id or serverless: true")
         if not self.client_secret.get_secret_value().strip():

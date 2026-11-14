@@ -420,7 +420,7 @@
     },
     "DatabricksConnectionConfig": {
       "additionalProperties": false,
-      "description": "Remote Spark session using Databricks Connect and OAuth M2M.\n\nUse environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.\nChoose exactly one compute target: ``cluster_id`` or ``serverless: true``.\nInstall a runtime-matched databricks-connect separately, not odibi[spark].",
+      "description": "Remote Spark session using explicit OAuth M2M or a named CLI OAuth profile.\n\nUse environment references for credentials, e.g. ``${DATABRICKS_CLIENT_SECRET}``.\nM2M requires host/client credentials and exactly one compute target.\nAlternatively set ``profile`` to use a saved databricks-cli OAuth login;\nhost and compute come from that exact profile unless compute is overridden.\nInstall a runtime-matched databricks-connect separately, not odibi[spark].",
       "properties": {
         "type": {
           "const": "databricks",
@@ -433,23 +433,60 @@
           "default": "lazy"
         },
         "host": {
-          "description": "Workspace HTTPS URL, not an account URL",
-          "minLength": 1,
-          "title": "Host",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M2M workspace HTTPS URL",
+          "title": "Host"
         },
         "client_id": {
-          "description": "Databricks service principal application ID",
-          "minLength": 1,
-          "title": "Client Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Id"
         },
         "client_secret": {
-          "description": "Databricks OAuth secret (not an Azure secret)",
-          "format": "password",
-          "title": "Client Secret",
-          "type": "string",
-          "writeOnly": true
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M2M OAuth secret",
+          "title": "Client Secret"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exact CLI OAuth profile",
+          "title": "Profile"
         },
         "cluster_id": {
           "anyOf": [
@@ -470,11 +507,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "host",
-        "client_id",
-        "client_secret"
-      ],
       "title": "DatabricksConnectionConfig",
       "type": "object"
     },
