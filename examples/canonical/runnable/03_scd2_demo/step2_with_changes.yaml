@@ -1,0 +1,51 @@
+# SCD2 Demo - Step 2: Process Changes
+# Detects Alice's tier change and creates history
+project: scd2_demo
+
+connections:
+  source:
+    type: local
+    base_path: .
+  target:
+    type: local
+    base_path: ./data
+
+story:
+  connection: target
+  path: stories
+
+system:
+  connection: target
+  path: _system
+
+pipelines:
+  - pipeline: dimensions
+    layer: silver
+    nodes:
+      - name: dim_customer
+        read:
+          connection: source
+          format: csv
+          path: customers_v2.csv
+        
+        pattern:
+          type: dimension
+          params:
+            natural_key: customer_id
+            surrogate_key: customer_sk
+            scd_type: 2
+            track_cols:
+              - name
+              - email
+              - tier
+              - city
+            target: target.dim_customer
+            unknown_member: true
+        
+        write:
+          connection: target
+          format: delta
+          path: dim_customer
+          mode: merge
+          merge_keys:
+            - customer_sk
