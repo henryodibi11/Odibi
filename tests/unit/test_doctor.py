@@ -1,9 +1,78 @@
 """Tests for odibi.doctor module."""
 
 import os
+import sys
+
+import pytest
 
 
 from odibi.doctor import diagnose_path, doctor
+
+
+def test_doctor_reports_actual_runtime_without_loading_project(tmp_path, monkeypatch):
+    import odibi
+    import odibi.context
+
+    config = tmp_path / "project.yaml"
+    config.write_text("secret: do-not-load-this")
+    monkeypatch.setenv("ODIBI_CONFIG", str(config))
+    monkeypatch.setenv("DATABRICKS_CLIENT_SECRET", "do-not-report-this")
+    monkeypatch.setattr(
+        odibi.context, "create_context", lambda *args: pytest.fail("No project load")
+    )
+    result = doctor()
+    assert result["runtime"]["executable"] == sys.executable
+    assert result["runtime"]["odibi_import"] == odibi.__file__
+    assert result["runtime"]["odibi_version"] == odibi.__version__
+    assert result["runtime"]["odibi_distribution_version"] == result["packages"]["odibi"]
+    assert result["connections"] == {} and result["project_loaded"] is False
+    assert "do-not-" not in str(result)
+
+
+@pytest.mark.parametrize("conflict", [None, "pyspark", "delta-spark"])
+def test_doctor_connect_distribution_conflicts(monkeypatch, conflict):
+    from importlib import metadata
+
+    def version(name):
+        if name in ("pyspark", "delta-spark") and name != conflict:
+            raise metadata.PackageNotFoundError(name)
+        return {"databricks-connect": "15.4.26"}.get(name, "1.0.0")
+
+    monkeypatch.setattr(metadata, "version", version)
+    result = doctor()
+    messages = [issue["message"] for issue in result["issues"]]
+    assert any("conflicts with standalone" in m for m in messages) == bool(conflict)
+    assert result["packages"]["databricks-connect"] == "15.4.26"
+
+
+def test_doctor_missing_connect_is_actionable_not_a_local_error(monkeypatch):
+    from importlib import metadata
+
+    real_version = metadata.version
+
+    def version(name):
+        if name == "databricks-connect":
+            raise metadata.PackageNotFoundError(name)
+        return real_version(name)
+
+    monkeypatch.setattr(metadata, "version", version)
+    result = doctor()
+    assert result["packages"]["databricks-connect"] == "not installed"
+    assert any("For remote Spark" in s for s in result["suggestions"])
+
+
+def test_doctor_flags_known_connect_python_mismatch(monkeypatch):
+    from importlib import metadata
+
+    line = "16.4" if sys.version_info[:2] == (3, 11) else "15.4"
+    original = metadata.version
+    monkeypatch.setattr(
+        metadata,
+        "version",
+        lambda name: line + ".26" if name == "databricks-connect" else original(name),
+    )
+    result = doctor()
+    assert any(f"Connect {line} requires Python" in i["message"] for i in result["issues"])
 
 
 def test_doctor_returns_expected_structure():

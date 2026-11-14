@@ -516,9 +516,10 @@ def create_databricks_connection(name: str, config: Dict[str, Any]) -> Any:
     from odibi.connections.databricks import DatabricksConnection
 
     return DatabricksConnection(
-        host=config["host"],
-        client_id=config["client_id"],
-        client_secret=config["client_secret"],
+        host=config.get("host"),
+        client_id=config.get("client_id"),
+        client_secret=config.get("client_secret"),
+        profile=config.get("profile"),
         cluster_id=config.get("cluster_id"),
         serverless=config.get("serverless", False),
     )

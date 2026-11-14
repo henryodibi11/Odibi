@@ -83,7 +83,36 @@ connections:
 For serverless, **remove `cluster_id`** and set `serverless: true`. Exactly one
 target is required. Explicit YAML targets override ambient SDK compute defaults.
 Use a workspace `https://...` URL, not an account-console URL or SQL HTTP path.
-Only OAuth M2M is supported by this connection; SDK token refresh is automatic.
+This explicit-credentials mode uses OAuth M2M; SDK token refresh is automatic.
+
+### Named CLI OAuth profile (interactive local development)
+
+Alternatively, reuse an existing named `databricks auth login` profile:
+
+```yaml
+engine: spark
+connections:
+  compute:
+    type: databricks
+    profile: local-user-connect
+```
+
+The exact saved profile must contain its own `host`, `auth_type = databricks-cli`,
+and either `cluster_id` or `serverless_compute_id = auto`. Odibi reads the file
+selected by `DATABRICKS_CONFIG_FILE`, otherwise `~/.databrickscfg`. It does not
+inherit fields from `DEFAULT` or silently switch to an ambient identity/target.
+The SDK delegates OAuth acquisition/refresh to the Databricks CLI token cache.
+This mode requires **databricks-sdk>=0.166.0** and **Databricks CLI>=0.207.1** on
+PATH so token acquisition is bound to the selected profile, not only its host.
+It supports saved CLI OAuth profiles, not arbitrary PAT/M2M profiles.
+
+Do not combine `profile` with YAML `host`, `client_id` or `client_secret`.
+Optionally set `cluster_id` or `serverless: true` in YAML to override the profile's
+compute target; setting both is an error. Ambient `DATABRICKS_CONFIG_PROFILE`,
+credentials and compute targets do not override explicit Odibi selection.
+Odibi does not edit the environment or profile file. Authenticate that named
+profile separately before starting a pipeline; session setup does not prompt
+for login or fall back to service-principal credentials.
 
 The Spark engine selects the single `databricks` connection automatically. Multiple
 compute connections are rejected rather than guessing. An explicitly injected
@@ -136,6 +165,19 @@ explicit local metadata is not a silent compute fallback.
 
 ## 4. Verify your actual workspace
 
+First run `python -m odibi doctor --format json` using the same Python
+that will run the pipeline (or that interpreter's `odibi doctor --format json`).
+Doctor reports **its own process**, including `sys.executable`, Python version,
+Odibi import path/version and installed distribution versions. It reports Connect,
+SDK, Arrow, Polars and delta-rs, detects standalone PySpark/delta-spark conflicts,
+and checks known 15.4/16.4 Python pairings. It cannot certify arbitrary runtime
+compatibility: consult the current matrix and run `python -m pip check` as well.
+Doctor does not load YAML contents, credentials or profiles, initialize connections,
+or open Spark/network sessions; `project_loaded: false` and empty `connections`
+are intentional. A separate MCP worker's version is not pipeline execution
+provenance. Existing long-lived Python workers must be restarted explicitly by
+their operator to import an upgraded package; installing a wheel is not hot reload.
+
 First use Databricks' environment diagnostic (configure the same standard
 `DATABRICKS_*` variables, including `DATABRICKS_AUTH_TYPE=oauth-m2m`; for serverless,
 unset `DATABRICKS_CLUSTER_ID` and set `DATABRICKS_SERVERLESS_COMPUTE_ID=auto`):
@@ -181,9 +223,15 @@ constrained PyArrow versions may lack wheels and fall back to an unsupported bui
 
 ## Unity Catalog tables, volumes and writes
 
-Use `type: unity_catalog` for addressing data, alongside the `databricks` compute
-connection. For reads, use a fully qualified table name, for example
+Use `type: unity_catalog`, or `type: delta` with `catalog` and `schema`, for
+addressing tables alongside the `databricks` compute connection. Batch and streaming
+`read.table` resolve bare names through that connection: with catalog `main` and
+schema `development`, `table: orders` reads `main.development.orders`.
+Already-qualified two/three-part names are preserved, for example
 `read: {connection: warehouse, format: delta, table: main.development.orders}`.
+Local session tables, file paths and JDBC table reads keep their existing behavior.
+Qualification does not grant permissions; an insufficient-permissions error alone
+does not establish which Unity Catalog grant is missing.
 For a volume, use `path: /Volumes/main/development/incoming/orders.parquet` with
 `format: parquet`. These paths are read by remote Spark, not local Python `open()`.
 Data access still requires the service principal's UC table/volume permissions.

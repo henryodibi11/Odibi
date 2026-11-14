@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.0] — 2026-11-14
+
+### Added
+
+- **Explicit named CLI OAuth profiles** for Databricks Connect local development,
+  alongside existing service-principal M2M credentials. Profile identity and compute
+  selection are isolated from ambient credentials/targets, with optional explicit
+  compute override and no fallback to another identity. Requires SDK 0.166.0+ and
+  Databricks CLI 0.207.1+ for this mode; existing M2M requirements are unchanged.
+
+### Fixed
+
+- **Catalog table reads** now qualify bare table names through the configured
+  Delta catalog/Unity Catalog connection in batch and streaming reads. Already
+  qualified names, session tables, file paths and JDBC reads retain their behavior.
+- **Doctor runtime provenance** now reports the actual interpreter, Odibi import
+  and installed distribution versions, Connect dependencies/conflicts and known
+  Python compatibility diagnostics without loading project contents or initializing
+  connections/sessions. A separate worker's version is not execution provenance.
+
 ## [3.17.2] — 2026-11-14
 
 ### Fixed

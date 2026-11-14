@@ -2,6 +2,7 @@
 
 import os
 import sys
+from importlib import metadata
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -14,7 +15,9 @@ def doctor() -> Dict[str, Any]:
     - Installed packages (pyspark, pandas, etc.)
     - Environment variables
     - ODIBI_CONFIG if set
-    - Connections if project loaded
+    - Actual interpreter/import provenance and Connect distribution conflicts
+
+    This check never loads project contents, credentials, profiles or sessions.
 
     Returns:
         Dictionary with:
@@ -45,19 +48,25 @@ def doctor() -> Dict[str, Any]:
             }
         )
 
-    required_packages = ["pandas", "pydantic", "yaml"]
-    optional_packages = ["pyspark", "polars", "duckdb", "azure.storage.blob", "pyodbc"]
+    required_packages = ["pandas", "pydantic", "pyyaml"]
+    optional_packages = [
+        "pyspark",
+        "delta-spark",
+        "polars",
+        "duckdb",
+        "azure-storage-blob",
+        "pyodbc",
+        "databricks-connect",
+        "databricks-sdk",
+        "pyarrow",
+        "deltalake",
+        "odibi",
+    ]
 
     for pkg in required_packages:
         try:
-            if pkg == "yaml":
-                import yaml
-
-                packages["pyyaml"] = getattr(yaml, "__version__", "unknown")
-            else:
-                mod = __import__(pkg)
-                packages[pkg] = getattr(mod, "__version__", "unknown")
-        except ImportError:
+            packages[pkg] = metadata.version(pkg)
+        except metadata.PackageNotFoundError:
             issues.append(
                 {
                     "severity": "error",
@@ -69,10 +78,52 @@ def doctor() -> Dict[str, Any]:
 
     for pkg in optional_packages:
         try:
-            mod = __import__(pkg.split(".")[0])
-            packages[pkg.split(".")[0]] = getattr(mod, "__version__", "unknown")
-        except ImportError:
-            packages[pkg.split(".")[0]] = "not installed"
+            packages[pkg] = metadata.version(pkg)
+        except metadata.PackageNotFoundError:
+            packages[pkg] = "not installed"
+
+    import odibi
+
+    runtime = {
+        "executable": sys.executable,
+        "python_version": python_version,
+        "odibi_import": odibi.__file__,
+        "odibi_version": odibi.__version__,
+        "odibi_distribution_version": packages["odibi"],
+    }
+    if packages["databricks-connect"] != "not installed":
+        conflicts = [p for p in ("pyspark", "delta-spark") if packages[p] != "not installed"]
+        if conflicts:
+            issues.append(
+                {
+                    "severity": "error",
+                    "message": "Databricks Connect conflicts with standalone "
+                    + ", ".join(conflicts),
+                    "fix": "Use a fresh runtime-matched environment with odibi and databricks-connect, without odibi[spark]/[all]/[dev]",
+                }
+            )
+        line = ".".join(packages["databricks-connect"].split(".")[:2])
+        expected_python = {"15.4": (3, 11), "16.4": (3, 12)}.get(line)
+        if expected_python and sys.version_info[:2] != expected_python:
+            issues.append(
+                {
+                    "severity": "error",
+                    "message": f"Connect {line} requires Python {expected_python[0]}.{expected_python[1]}",
+                    "fix": "Select the matching interpreter; see docs/setup_databricks_connect.md and the Databricks compatibility matrix",
+                }
+            )
+        if packages["databricks-sdk"] == "not installed":
+            issues.append(
+                {
+                    "severity": "error",
+                    "message": "Databricks SDK is missing",
+                    "fix": "Install the dependencies required by your matched databricks-connect release",
+                }
+            )
+    else:
+        suggestions.append(
+            "For remote Spark, install databricks-connect matched to your compute/Python in a dedicated environment; see docs/setup_databricks_connect.md"
+        )
 
     odibi_config = os.environ.get("ODIBI_CONFIG", "")
     odibi_projects_dir = os.environ.get("ODIBI_PROJECTS_DIR", "")
@@ -100,34 +151,9 @@ def doctor() -> Dict[str, Any]:
             }
         )
     else:
-        project_loaded = True
-        try:
-            from odibi.context import create_context
-
-            ctx = create_context(Path(odibi_config))
-            ctx.initialize_connections()
-            for name, conn in ctx.connections.items():
-                try:
-                    conn_type = type(conn).__name__
-                    connections[name] = f"ok ({conn_type})"
-                except Exception as e:
-                    connections[name] = f"error: {e}"
-                    issues.append(
-                        {
-                            "severity": "error",
-                            "message": f"Connection '{name}' failed to initialize: {e}",
-                            "fix": "Check connection configuration in YAML file",
-                        }
-                    )
-        except Exception as e:
-            project_loaded = False
-            issues.append(
-                {
-                    "severity": "error",
-                    "message": f"Failed to load project context: {e}",
-                    "fix": "Check YAML file syntax and configuration",
-                }
-            )
+        suggestions.append(
+            "Project path exists; contents, credentials and connections were not loaded or tested"
+        )
 
     if not odibi_projects_dir:
         suggestions.append("Set ODIBI_PROJECTS_DIR for auto-discovery of project files")
@@ -149,6 +175,7 @@ def doctor() -> Dict[str, Any]:
     return {
         "status": status,
         "python_version": python_version,
+        "runtime": runtime,
         "packages": packages,
         "environment": environment,
         "project_loaded": project_loaded,
