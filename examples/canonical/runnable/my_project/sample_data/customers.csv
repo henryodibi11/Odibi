@@ -1,0 +1,6 @@
+customer_id,name,email,tier,city,updated_at
+1,Alice,alice@example.com,Gold,NYC,2025-01-01
+2,Bob,bob@example.com,Silver,LA,2025-01-01
+3,Charlie,charlie@example.com,Bronze,Chicago,2025-01-01
+4,Diana,diana@example.com,Gold,Seattle,2025-01-01
+5,Eve,eve@example.com,Silver,Austin,2025-01-01
