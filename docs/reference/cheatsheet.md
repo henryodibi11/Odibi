@@ -5,6 +5,7 @@
 | Command | Description |
 | :--- | :--- |
 | `odibi run odibi.yaml` | Run the pipeline. |
+| `odibi run odibi.yaml --quiet` | Save full Python/JVM output to a per-run log; show diagnostics and completion only. |
 | `odibi run odibi.yaml --dry-run` | Legacy late runtime simulation; surrounding effects remain possible. |
 | `cat odibi.yaml \| odibi plan --stdin --format json` | Immutable logical plan; only `status == "planned"` succeeds. See [planning](../features/planning.md). |
 | `odibi validate odibi.yaml` | Validate YAML schema, pipeline logic, and transformer params. |
@@ -17,6 +18,19 @@
 | `odibi templates show azure_blob` | Show YAML template with all options. |
 | `odibi templates transformer scd2` | Show transformer params and example. |
 | `odibi templates schema` | Generate JSON schema for VS Code autocomplete. |
+
+`--quiet` runs the same command with the same Python interpreter in a child process.
+It prints the full log's path (a unique `odibi-run-*.log` in the user's temporary
+directory). Routine output, including JVM startup, Ivy resolution and progress,
+stays in that log. Emitted Python logging warnings/errors, structured JSON
+warnings/errors and standard native `ERROR`/`FATAL` log records remain visible.
+Failed commands also show recent log context and retain their exit code. Warnings
+or errors do not become a clean-success message just because the process exits 0.
+Quiet mode changes presentation, not pipeline execution, permissions or failure
+policy. It applies to CLI runs, not notebook/MCP calls made directly in Python.
+The logs are retained for diagnostics; remove them when no longer needed. Native
+and extension output is captured verbatim, so treat these logs as private and
+review them before sharing. Omit `--quiet` for the existing live output.
 
 ---
 

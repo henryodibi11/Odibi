@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from odibi.cli.quiet import quiet_diagnostics
 from odibi.pipeline import PipelineManager
 from odibi.utils.extensions import load_extensions
 from odibi.utils.logging import logger
@@ -26,6 +27,11 @@ def run_command(args):
     telemetry, stories, lineage, alerts, and surrounding lifecycle effects.
     It is not an immutable planning or security boundary.
     """
+    with quiet_diagnostics():
+        return _execute(args)
+
+
+def _execute(args):
     if args.dry_run:
         print(LEGACY_DRY_RUN_WARNING, file=sys.stderr)
     try:
