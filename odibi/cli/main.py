@@ -296,6 +296,11 @@ def main() -> int:
     run_parser = subparsers.add_parser("run", help="Execute pipeline")
     run_parser.add_argument("config", help="Path to YAML config file")
     run_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Save full output to a per-run log; show warnings, errors and completion only",
+    )
+    run_parser.add_argument(
         "--env", default=None, help="Environment to apply overrides (e.g., dev, qat, prod)"
     )
     run_parser.add_argument(
@@ -459,6 +464,11 @@ def main() -> int:
     if args.command == "plan":
         return immutable_plan_command(args)
     elif args.command == "run":
+        if args.quiet:
+            from odibi.cli.quiet import quiet_run_command
+
+            return quiet_run_command(sys.argv[1:])
+
         from odibi.cli.run import run_command
 
         return run_command(args)

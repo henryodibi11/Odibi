@@ -201,6 +201,7 @@ This ensures all conditional branches are exercised in CI.
   - `tests/unit/patterns/test_date_dimension_coverage.py`
 - CLI small commands — covering cli/templates.py (list/show/transformer/schema/dispatch), cli/validate.py (valid/invalid/exception), cli/ui.py (import error, parser), cli/export.py (airflow/dagster/errors), cli/run.py (success/failure/exception), cli/deploy.py (success/no catalog/exception).
   - `tests/unit/cli/test_cli_small_commands_coverage.py`
+  - `tests/unit/cli/test_cli_quiet_run.py` — public quiet/normal CLI runs, native output retention, visible warning/error diagnostics and failure exit codes with synthetic local data.
 - `pipeline.py` — PipelineResults (debug_summary, to_dict, get_node_result, defaults), Pipeline utility methods (_cleanup_connections, flush_stories, flush_sync, _send_alerts, buffer_lineage/asset/hwm, _get_databricks_*_id, _flush_batch_writes, _sync_catalog_if_configured, context manager), PipelineManager (_build_connections, register_outputs). Remaining: Pipeline.run() execution paths, PipelineManager.from_yaml, __init__, validate, run_node.
   - `tests/unit/test_pipeline_coverage.py` — _build_connections, register_outputs, PipelineResults basics
   - `tests/unit/test_pipeline_extended_coverage.py` — debug_summary, to_dict, cleanup, flush, alerts, buffers, databricks IDs, batch writes, sync
@@ -400,6 +401,10 @@ wsl -d Ubuntu-22.04 -- bash -c "cd /mnt/d/odibi && pip install -e '.[dev]' && py
 ## Testing Gotchas & Lessons Learned
 
 **Read this before writing mock-based Spark tests. These pitfalls cost significant time to figure out.**
+
+### CLI Quiet Output
+
+- JVM startup and Ivy output bypass Python logging and `redirect_stderr`; validate quiet CLI runs with real child-process stdout/stderr, not just mocked loggers. Preserve full logs and warning/error diagnostics because metadata failures can coexist with exit code 0. `odibi/cli/quiet.py` owns this CLI-only presentation; notebook and in-process MCP execution remain unchanged.
 
 ### Databricks Connect Environments
 
